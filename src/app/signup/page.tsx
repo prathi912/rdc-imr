@@ -26,8 +26,10 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import type { User } from '@/types';
+import { useState } from 'react';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -51,6 +53,8 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
@@ -60,25 +64,50 @@ export default function SignupPage() {
       confirmPassword: '',
     },
   });
+  
+  const processSignIn = async (firebaseUser: FirebaseUser) => {
+    const userDocRef = doc(db, 'users', firebaseUser.uid);
+    const userDocSnap = await getDoc(userDocRef);
+    let user: User;
 
-  const onSubmit = async (data: SignupFormValues) => {
+    if (userDocSnap.exists()) {
+      user = userDocSnap.data() as User;
+    } else {
+      user = {
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
+        email: firebaseUser.email!,
+        role: 'faculty', // All sign-ups are faculty
+      };
+      await setDoc(userDocRef, user);
+    }
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('user', JSON.stringify(user));
+    }
+    
+    toast({
+      title: 'Sign Up Successful',
+      description: "You've been successfully signed in.",
+    });
+    router.push('/dashboard');
+  };
+
+  const onEmailSubmit = async (data: SignupFormValues) => {
+    setIsSubmitting(true);
     try {
-      // Create user with Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
       const firebaseUser = userCredential.user;
 
-      // Create user object for Firestore and localStorage
-      const user = {
+      const user: User = {
         uid: firebaseUser.uid,
         name: data.name,
         email: data.email,
         role: 'faculty', // All new signups are faculty
       };
 
-      // Save user data to Firestore
       await setDoc(doc(db, 'users', firebaseUser.uid), user);
 
-      // Save user to localStorage to maintain session
       if (typeof window !== 'undefined') {
         localStorage.setItem('user', JSON.stringify(user));
       }
@@ -97,6 +126,40 @@ export default function SignupPage() {
           ? 'This email is already registered.'
           : error.message || 'An unknown error occurred.',
       });
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleSignUp = async () => {
+    setIsSubmitting(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      const isAllowed = firebaseUser.email && firebaseUser.email.endsWith('@paruluniversity.ac.in');
+      
+      if (!isAllowed) {
+        await signOut(auth);
+        toast({
+            variant: 'destructive',
+            title: 'Access Denied',
+            description: 'Sign up is restricted to Parul University members.',
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      await processSignIn(firebaseUser);
+
+    } catch (error: any) {
+        console.error('Google Sign-up error:', error);
+        toast({
+            variant: 'destructive',
+            title: 'Sign Up Failed',
+            description: error.message || 'Could not sign up with Google. Please try again.',
+        });
+        setIsSubmitting(false);
     }
   };
 
@@ -115,7 +178,7 @@ export default function SignupPage() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="name"
@@ -123,7 +186,7 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" {...field} />
+                        <Input placeholder="John Doe" {...field} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -136,7 +199,7 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>University Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="your.name@paruluniversity.ac.in" {...field} />
+                        <Input placeholder="your.name@paruluniversity.ac.in" {...field} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -149,7 +212,7 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -162,17 +225,34 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Confirm Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                  {form.formState.isSubmitting ? "Creating Account..." : "Sign Up"}
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? "Creating Account..." : "Sign Up with Email"}
                 </Button>
               </form>
             </Form>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignUp} disabled={isSubmitting}>
+               <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="mr-2 h-4 w-4">
+                 <title>Google</title>
+                 <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.9-4.63 1.9-3.87 0-7-3.13-7-7s3.13-7 7-7c2.18 0 3.66.87 4.53 1.73l2.43-2.38C18.04 2.33 15.47 1 12.48 1 7.01 1 3 5.02 3 9.98s4.01 8.98 9.48 8.98c2.96 0 5.42-1 7.15-2.68 1.78-1.74 2.37-4.24 2.37-6.52 0-.6-.05-1.18-.15-1.72H12.48z" />
+               </svg>
+              Sign up with Google
+            </Button>
           </CardContent>
           <CardFooter className="justify-center text-sm">
             <p className="text-muted-foreground">Already have an account?&nbsp;</p>
