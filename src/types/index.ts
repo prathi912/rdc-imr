@@ -5,6 +5,25 @@ export type User = {
   role: 'admin' | 'faculty';
 };
 
+export type BankDetails = {
+  accountHolderName: string;
+  accountNumber: string;
+  bankName: string;
+  ifscCode: string;
+};
+
+export type GrantDetails = {
+    amount: number;
+    status: 'Pending Bank Details' | 'Disbursed' | 'Utilization Submitted' | 'Completed';
+    disbursementDate?: string; // ISO String
+    bankDetails?: BankDetails;
+    utilizationReport?: {
+        amountSpent: number;
+        description: string;
+        submissionDate: string; // ISO String
+    };
+};
+
 export type Project = {
   id: string;
   title: string;
@@ -17,6 +36,7 @@ export type Project = {
   teamInfo: string;
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string
+  grant?: GrantDetails;
 };
 
 export type Notification = {

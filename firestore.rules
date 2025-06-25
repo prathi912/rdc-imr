@@ -2,66 +2,62 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if the requesting user has the 'admin' role.
+    
+    // Function to check if the user is an admin
     function isAdmin() {
-      // Reads the user's own document from the 'users' collection to check their role.
-      // This read is secure because it's based on the user's authenticated UID.
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Rules for the 'users' collection.
+    // Function to check if user is the owner of the resource
+    function isOwner(uid) {
+        return request.auth.uid == uid;
+    }
+    
+    // Users
     match /users/{userId} {
-      // A user can create their own document upon signup.
-      allow create: if request.auth.uid == userId;
-
-      // A user can read their own document. Admins can read any user's document.
-      allow read: if request.auth.uid == userId || isAdmin();
-
-      // Only admins can update user documents (e.g., to change a role).
-      // A user cannot change their own role.
-      allow update: if isAdmin();
-
-      // Only admins can delete users.
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if request.auth != null;
+      allow update: if isOwner(userId);
       allow delete: if isAdmin();
-
-      // Admins can list all users for the management page.
-      allow list: if isAdmin();
     }
 
-    // Rules for the 'projects' collection.
+    // Projects
     match /projects/{projectId} {
-      // A user can read a project if they are the PI or an Admin.
-      // This rule also secures list queries for faculty (e.g., "my-projects").
-      allow read: if isAdmin() || resource.data.pi_uid == request.auth.uid;
-
-      // Any authenticated user can create a project, but they must be the PI.
-      // The incoming document's pi_uid must match the creator's UID.
-      allow create: if request.auth.uid != null
-                    && request.resource.data.pi_uid == request.auth.uid;
-
-      // Only admins can update projects (e.g., to change status).
-      allow update: if isAdmin();
-
-      // Deleting projects is disabled to preserve record history.
-      allow delete: if false;
+      allow read: if isOwner(resource.data.pi_uid) || isAdmin();
+      allow create: if request.auth != null;
+      allow update: if isAdmin() || (isOwner(resource.data.pi_uid) && isGrantUpdateAllowed(request, resource));
+      allow delete: if isAdmin();
     }
 
-    // Rules for the 'notifications' collection.
+    // Notifications
     match /notifications/{notificationId} {
-       // Only admins can create notifications. This happens server-side when project status changes.
-      allow create: if isAdmin();
-
-      // A user can read their own notifications. This secures their notification list query.
-      allow read: if resource.data.uid == request.auth.uid;
-
-      // A user can update ONLY the 'isRead' field of their own notification.
-      // No other fields can be changed.
-      allow update: if request.auth.uid == resource.data.uid
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
-
-      // Deleting notifications is disabled.
-      allow delete: if false;
+      allow read, update: if isOwner(resource.data.uid);
+      allow create: if request.auth != null;
     }
   }
+}
+
+// Helper function to validate PI updates to a project
+function isGrantUpdateAllowed(request, resource) {
+    // A PI can only update the 'grant' field of their own project.
+    // They cannot change any other top-level fields.
+    let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+    
+    // Check that only the 'grant' field is being modified
+    if (changedKeys.hasOnly(['grant'])) {
+        let requestGrant = request.resource.data.grant;
+        let existingGrant = resource.data.grant;
+        
+        // PI cannot change grant amount, status, or disbursement date.
+        // They can add/update bankDetails and utilizationReport.
+        if (existingGrant == null) {
+          // This should not happen as only admin can create it.
+          return false;
+        }
+
+        return requestGrant.amount == existingGrant.amount &&
+               requestGrant.status == existingGrant.status &&
+               requestGrant.disbursementDate == existingGrant.disbursementDate;
+    }
+    return false;
 }
