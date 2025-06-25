@@ -1,6 +1,6 @@
 'use server';
 
-import { summarizeProject, type SummarizeProjectInput } from './ai/flows/project-summarization';
+import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
