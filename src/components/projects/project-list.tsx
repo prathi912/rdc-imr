@@ -1,0 +1,73 @@
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Eye, FilePenLine, Bot } from 'lucide-react';
+import { type Project } from '@/types';
+import { type Role } from '../dashboard/dashboard-client';
+import { ProjectSummary } from './project-summary';
+
+interface ProjectListProps {
+  title: string;
+  projects: Project[];
+  userRole: Role;
+}
+
+const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
+  'Approved': 'default',
+  'In Progress': 'default',
+  'Under Review': 'secondary',
+  'Rejected': 'destructive',
+  'Completed': 'outline'
+};
+
+
+export function ProjectList({ title, projects, userRole }: ProjectListProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Title</TableHead>
+              <TableHead className="hidden md:table-cell">Department</TableHead>
+              <TableHead className="hidden sm:table-cell">PI</TableHead>
+              <TableHead className="hidden md:table-cell">Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {projects.map((project) => (
+              <TableRow key={project.id}>
+                <TableCell className="font-medium">{project.title}</TableCell>
+                <TableCell className="hidden md:table-cell">{project.department}</TableCell>
+                <TableCell className="hidden sm:table-cell">{project.pi}</TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {userRole === 'faculty' && <Button variant="outline" size="icon"><Eye className="h-4 w-4" /></Button>}
+                    {userRole === 'evaluator' && <Button variant="outline" size="icon"><FilePenLine className="h-4 w-4" /></Button>}
+                    {userRole === 'admin' && <Button variant="outline" size="icon"><Eye className="h-4 w-4" /></Button>}
+                    {(userRole === 'admin' || userRole === 'evaluator') && <ProjectSummary project={project} />}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
