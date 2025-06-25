@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,6 +15,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { db } from '@/lib/firebase';
 import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { User } from '@/types';
@@ -23,9 +34,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function ManageUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const { toast } = useToast();
 
-  const fetchUsers = async () => {
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setCurrentUser(JSON.parse(storedUser));
+    }
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       const usersCollection = collection(db, 'users');
@@ -38,14 +58,13 @@ export default function ManageUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
-  const handleDeleteUser = async (uid: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) return;
+  const handleDeleteUser = useCallback(async (uid: string) => {
     try {
       await deleteDoc(doc(db, 'users', uid));
       toast({ title: 'User Deleted', description: 'The user has been successfully deleted.' });
@@ -53,11 +72,13 @@ export default function ManageUsersPage() {
     } catch (error) {
        console.error("Error deleting user:", error);
        toast({ variant: 'destructive', title: "Error", description: "Could not delete user." });
+    } finally {
+      setUserToDelete(null);
     }
-  }
+  }, [fetchUsers, toast]);
 
-  // In a real app, you might have more roles.
-  const handleRoleChange = async (uid: string, newRole: 'admin' | 'faculty') => {
+
+  const handleRoleChange = useCallback(async (uid: string, newRole: 'admin' | 'faculty') => {
     try {
       const userDoc = doc(db, 'users', uid);
       await updateDoc(userDoc, { role: newRole });
@@ -67,7 +88,7 @@ export default function ManageUsersPage() {
        console.error("Error updating role:", error);
        toast({ variant: 'destructive', title: "Error", description: "Could not update role." });
     }
-  }
+  }, [fetchUsers, toast]);
   
   if (loading) {
     return (
@@ -112,7 +133,7 @@ export default function ManageUsersPage() {
                     <TableCell className="text-right">
                        <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost" disabled={user.email === 'rathipranav07@gmail.com'}>
+                          <Button aria-haspopup="true" size="icon" variant="ghost" disabled={user.uid === currentUser?.uid}>
                             <MoreHorizontal className="h-4 w-4" />
                             <span className="sr-only">Toggle menu</span>
                           </Button>
@@ -121,7 +142,9 @@ export default function ManageUsersPage() {
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           {user.role === 'faculty' && <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin')}>Make Admin</DropdownMenuItem>}
                           {user.role === 'admin' && <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty')}>Make Faculty</DropdownMenuItem>}
-                          <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.uid)}>Delete User</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onSelect={() => setUserToDelete(user)}>
+                            Delete User
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -132,6 +155,27 @@ export default function ManageUsersPage() {
           </CardContent>
         </Card>
       </div>
+       {userToDelete && (
+          <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
+              <AlertDialogContent>
+                  <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the user account for <span className="font-bold">{userToDelete.name}</span>.
+                      </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                          onClick={() => handleDeleteUser(userToDelete.uid)}
+                          className="bg-destructive hover:bg-destructive/90"
+                      >
+                          Continue
+                      </AlertDialogAction>
+                  </AlertDialogFooter>
+              </AlertDialogContent>
+          </AlertDialog>
+      )}
     </div>
   );
 }
