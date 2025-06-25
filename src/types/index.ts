@@ -12,8 +12,9 @@ export type Project = {
   type: string;
   department: string;
   pi: string;
+  pi_uid: string;
   status: 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed';
   teamInfo: string;
   timelineAndOutcomes: string;
-  submissionDate: string;
+  submissionDate: string; // Should be ISO string
 };

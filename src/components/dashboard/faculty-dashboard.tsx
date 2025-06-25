@@ -1,17 +1,43 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProjectList } from '@/components/projects/project-list';
 import { FilePlus2, CheckCircle, Clock, ArrowRight, BookOpenCheck } from 'lucide-react';
-import { type User } from '@/types';
-import { projects } from '@/lib/data';
+import type { User, Project } from '@/types';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { Skeleton } from '../ui/skeleton';
 
 export function FacultyDashboard({ user }: { user: User }) {
-  const myProjects = projects.filter(p => p.pi === user.name);
-  
-  const activeProjects = myProjects.filter(p => p.status === 'Approved' || p.status === 'In Progress').length;
-  const pendingApproval = myProjects.filter(p => p.status === 'Under Review').length;
-  const completedProjects = myProjects.filter(p => p.status === 'Completed').length;
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!user) return;
+      setLoading(true);
+      try {
+        const projectsRef = collection(db, 'projects');
+        const q = query(projectsRef, where('pi_uid', '==', user.uid));
+        const querySnapshot = await getDocs(q);
+        const userProjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        setProjects(userProjects);
+      } catch (error) {
+        console.error("Failed to fetch faculty projects", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProjects();
+  }, [user]);
+
+  const activeProjects = projects.filter(p => p.status === 'Approved' || p.status === 'In Progress').length;
+  const pendingApproval = projects.filter(p => p.status === 'Under Review').length;
+  const completedProjects = projects.filter(p => p.status === 'Completed').length;
 
   const statCards = [
     { title: 'Active Projects', value: activeProjects.toString(), icon: BookOpenCheck },
@@ -19,7 +45,7 @@ export function FacultyDashboard({ user }: { user: User }) {
     { title: 'Completed Projects', value: completedProjects.toString(), icon: CheckCircle },
   ];
 
-  const recentProjects = myProjects
+  const recentProjects = projects
     .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
     .slice(0, 3);
 
@@ -35,19 +61,28 @@ export function FacultyDashboard({ user }: { user: User }) {
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {statCards.map((card) => (
-          <Card key={card.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-              <card.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{card.value}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-3">
+          {statCards.map((card) => (
+            <Card key={card.title}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                <card.icon className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{card.value}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       <div>
          <div className="mb-4 flex items-center justify-between">
             <h3 className="text-2xl font-bold tracking-tight">My Recent Projects</h3>
@@ -58,7 +93,11 @@ export function FacultyDashboard({ user }: { user: User }) {
               </Button>
             </Link>
         </div>
-        <ProjectList projects={recentProjects} userRole="faculty" />
+        {loading ? (
+          <Skeleton className="h-48 w-full" />
+        ) : (
+          <ProjectList projects={recentProjects} userRole="faculty" />
+        )}
       </div>
     </div>
   );

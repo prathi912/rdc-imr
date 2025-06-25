@@ -25,6 +25,9 @@ import {
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { auth, db } from '@/lib/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -58,26 +61,43 @@ export default function SignupPage() {
     },
   });
 
-  const onSubmit = (data: SignupFormValues) => {
-    // Mock user creation
-    console.log('Signup attempt with:', data.email);
+  const onSubmit = async (data: SignupFormValues) => {
+    try {
+      // Create user with Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const firebaseUser = userCredential.user;
 
-    const user = {
-      name: data.name,
-      email: data.email,
-      role: 'faculty', // All new signups are faculty
-      uid: `faculty-${Math.random().toString(36).substring(7)}`,
-    };
+      // Create user object for Firestore and localStorage
+      const user = {
+        uid: firebaseUser.uid,
+        name: data.name,
+        email: data.email,
+        role: 'faculty', // All new signups are faculty
+      };
 
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('user', JSON.stringify(user));
+      // Save user data to Firestore
+      await setDoc(doc(db, 'users', firebaseUser.uid), user);
+
+      // Save user to localStorage to maintain session
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+      
+      toast({
+        title: 'Account Created',
+        description: "You've been successfully signed in.",
+      });
+      router.push('/dashboard');
+    } catch (error: any) {
+      console.error('Signup Error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Sign Up Failed',
+        description: error.code === 'auth/email-already-in-use' 
+          ? 'This email is already registered.'
+          : error.message || 'An unknown error occurred.',
+      });
     }
-    
-    toast({
-      title: 'Account Created',
-      description: "You've been successfully signed in.",
-    });
-    router.push('/dashboard');
   };
 
   return (
@@ -149,7 +169,7 @@ export default function SignupPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                  Sign Up
+                  {form.formState.isSubmitting ? "Creating Account..." : "Sign Up"}
                 </Button>
               </form>
             </Form>

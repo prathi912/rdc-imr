@@ -4,25 +4,53 @@ import { ProjectList } from '@/components/projects/project-list';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { ArrowRight } from 'lucide-react';
-import { projects, users } from '@/lib/data';
+import { db } from '@/lib/firebase';
+import { collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import type { Project } from '@/types';
 
-const totalProjects = projects.length;
-const pendingReviews = projects.filter(p => p.status === 'Under Review').length;
-const approvedProjects = projects.filter(p => p.status === 'Approved').length;
-const totalUsers = users.length;
+async function getDashboardData() {
+    try {
+        const projectsRef = collection(db, "projects");
+        const usersRef = collection(db, "users");
 
-const statCards = [
-  { title: 'Total Projects', value: totalProjects.toString(), icon: Book },
-  { title: 'Pending Reviews', value: pendingReviews.toString(), icon: Clock },
-  { title: 'Approved Projects', value: approvedProjects.toString(), icon: CheckCircle },
-  { title: 'Total Users', value: totalUsers.toString(), icon: Users },
-];
+        const projectsSnapshot = await getDocs(projectsRef);
+        const usersSnapshot = await getDocs(usersRef);
 
-const recentProjects = [...projects]
-  .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
-  .slice(0, 4);
+        const allProjects = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+        
+        const totalProjects = allProjects.length;
+        const pendingReviews = allProjects.filter(p => p.status === 'Under Review').length;
+        const approvedProjects = allProjects.filter(p => p.status === 'Approved').length;
+        const totalUsers = usersSnapshot.size;
 
-export function AdminDashboard() {
+        const recentProjects = allProjects
+            .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
+            .slice(0, 4);
+
+        return {
+            totalProjects,
+            pendingReviews,
+            approvedProjects,
+            totalUsers,
+            recentProjects
+        };
+
+    } catch (error) {
+        console.error("Error fetching admin dashboard data: ", error);
+        return { totalProjects: 0, pendingReviews: 0, approvedProjects: 0, totalUsers: 0, recentProjects: [] };
+    }
+}
+
+export async function AdminDashboard() {
+  const { totalProjects, pendingReviews, approvedProjects, totalUsers, recentProjects } = await getDashboardData();
+  
+  const statCards = [
+    { title: 'Total Projects', value: totalProjects.toString(), icon: Book },
+    { title: 'Pending Reviews', value: pendingReviews.toString(), icon: Clock },
+    { title: 'Approved Projects', value: approvedProjects.toString(), icon: CheckCircle },
+    { title: 'Total Users', value: totalUsers.toString(), icon: Users },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>

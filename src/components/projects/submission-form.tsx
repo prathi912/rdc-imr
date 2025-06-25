@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,8 +11,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Upload, GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
+import { GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { db } from '@/lib/firebase';
+import { addDoc, collection } from 'firebase/firestore';
+import type { User } from '@/types';
 
 const formSchema = z.object({
   // Step 1
@@ -21,7 +24,6 @@ const formSchema = z.object({
   projectType: z.string().min(1, 'Please select a project type.'),
   department: z.string().min(1, 'Please select a department.'),
   // Step 2
-  piName: z.string().min(2, "Principal Investigator's name is required."),
   coPiNames: z.string().optional(),
   studentInfo: z.string().optional(),
   cvUpload: z.any().optional(),
@@ -45,7 +47,9 @@ const steps = [
 
 export function SubmissionForm() {
   const [currentStep, setCurrentStep] = useState(1);
+  const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
+  
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -53,17 +57,23 @@ export function SubmissionForm() {
       abstract: '',
       projectType: '',
       department: '',
-      piName: '',
       coPiNames: '',
       studentInfo: '',
       expectedOutcomes: '',
     },
   });
 
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
+
   const handleNext = async () => {
     const fieldsToValidate = {
       1: ['title', 'abstract', 'projectType', 'department'],
-      2: ['piName'],
+      2: [],
       3: [],
       4: ['expectedOutcomes'],
     }[currentStep] as (keyof FormData)[];
@@ -82,13 +92,45 @@ export function SubmissionForm() {
     }
   };
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form submitted:', data);
-    toast({
-      title: "Project Submitted!",
-      description: "Your research project has been successfully submitted for review.",
-    });
-    // Here you would handle the actual submission to Firebase
+  const onSubmit = async (data: FormData) => {
+    if (!user) {
+      toast({
+        variant: 'destructive',
+        title: 'Authentication Error',
+        description: 'You must be logged in to submit a project.',
+      });
+      return;
+    }
+
+    try {
+      const docRef = await addDoc(collection(db, 'projects'), {
+        title: data.title,
+        abstract: data.abstract,
+        type: data.projectType,
+        department: data.department,
+        pi: user.name,
+        pi_uid: user.uid,
+        teamInfo: `PI: ${user.name}; Co-PIs: ${data.coPiNames || 'N/A'}; Students: ${data.studentInfo || 'N/A'}`,
+        timelineAndOutcomes: data.expectedOutcomes,
+        status: 'Under Review',
+        submissionDate: new Date().toISOString(),
+      });
+      
+      console.log('Document written with ID: ', docRef.id);
+      toast({
+        title: 'Project Submitted!',
+        description: 'Your research project has been successfully submitted for review.',
+      });
+      form.reset();
+      setCurrentStep(1);
+    } catch (error) {
+      console.error('Error adding document: ', error);
+      toast({
+        variant: 'destructive',
+        title: 'Submission Failed',
+        description: 'There was an error submitting your project. Please try again.',
+      });
+    }
   };
 
   return (
@@ -121,21 +163,22 @@ export function SubmissionForm() {
                     <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="research">Research</SelectItem><SelectItem value="development">Development</SelectItem><SelectItem value="clinical_trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   <FormField name="department" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Department</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl><SelectContent><SelectItem value="cs">Computer Science</SelectItem><SelectItem value="physics">Physics</SelectItem><SelectItem value="medical">Medical Research</SelectItem><SelectItem value="engineering">Engineering</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Department</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl><SelectContent><SelectItem value="cs">Computer Science</SelectItem><SelectItem value="physics">Physics</SelectItem><SelectItem value="medical">Medical Research</SelectItem><SelectItem value="engineering">Engineering</SelectItem><SelectItem value="arts_humanities">Arts & Humanities</SelectItem><SelectItem value="civil_engineering">Civil Engineering</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                   )} />
                 </div>
               </div>
             )}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <FormField name="piName" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Principal Investigator (PI)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormItem>
+                  <FormLabel>Principal Investigator (PI)</FormLabel>
+                  <Input disabled value={user?.name || 'Loading...'} />
+                </FormItem>
                 <FormField name="coPiNames" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Co-PIs (comma-separated)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Co-PIs (comma-separated)</FormLabel><FormControl><Input {...field} placeholder="Dr. Jane Smith, Dr. John Doe" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField name="studentInfo" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Student Members</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Student Members</FormLabel><FormControl><Textarea {...field} placeholder="List student names and roles..." /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField name="cvUpload" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Upload CVs (ZIP file)</FormLabel><FormControl><Input type="file" accept=".zip" /></FormControl><FormMessage /></FormItem>
@@ -168,7 +211,7 @@ export function SubmissionForm() {
             <div className="flex justify-between pt-4">
               <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>Previous</Button>
               {currentStep < 4 && <Button type="button" onClick={handleNext}>Next</Button>}
-              {currentStep === 4 && <Button type="submit">Submit Project</Button>}
+              {currentStep === 4 && <Button type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? "Submitting..." : "Submit Project"}</Button>}
             </div>
           </form>
         </FormProvider>

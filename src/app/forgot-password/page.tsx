@@ -25,6 +25,8 @@ import {
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { auth } from '@/lib/firebase';
+import { sendPasswordResetEmail } from 'firebase/auth';
 
 const forgotPasswordSchema = z.object({
   email: z
@@ -48,15 +50,22 @@ export default function ForgotPasswordPage() {
     },
   });
 
-  const onSubmit = (data: ForgotPasswordFormValues) => {
-    // Mock password reset
-    console.log('Password reset request for:', data.email);
-    
-    toast({
-      title: 'Check your email',
-      description: "If an account exists, we've sent a password reset link.",
-    });
-    router.push('/');
+  const onSubmit = async (data: ForgotPasswordFormValues) => {
+    try {
+      await sendPasswordResetEmail(auth, data.email);
+      toast({
+        title: 'Check your email',
+        description: "If an account exists, we've sent a password reset link.",
+      });
+      router.push('/');
+    } catch (error: any) {
+       console.error('Password reset error:', error);
+       toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to send reset email. Please try again.',
+      });
+    }
   };
 
   return (
@@ -89,7 +98,7 @@ export default function ForgotPasswordPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                  Send Reset Link
+                  {form.formState.isSubmitting ? "Sending..." : "Send Reset Link"}
                 </Button>
               </form>
             </Form>

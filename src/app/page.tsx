@@ -25,6 +25,10 @@ import {
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { auth, db } from '@/lib/firebase';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import type { User } from '@/types';
 
 const loginSchema = z.object({
   email: z
@@ -50,29 +54,54 @@ export default function LoginPage() {
     },
   });
 
-  const onSubmit = (data: LoginFormValues) => {
-    // Mock authentication
-    console.log('Login attempt with:', data.email);
+  const onSubmit = async (data: LoginFormValues) => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      const firebaseUser = userCredential.user;
 
-    const isAdmin = data.email === 'rathipranav07@gmail.com';
-    const user = {
-      name: isAdmin ? 'Pranav Rathi' : 'Faculty Member',
-      email: data.email,
-      role: isAdmin ? 'admin' : 'faculty',
-      uid: isAdmin ? 'admin-id' : `faculty-${Math.random().toString(36).substring(7)}`,
-    };
+      let user: User;
 
-    // In a real app, you'd get a token from your auth provider
-    // For this demo, we'll use localStorage to simulate a session
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('user', JSON.stringify(user));
+      if (firebaseUser.email === 'rathipranav07@gmail.com') {
+        // Hardcoded admin user
+        user = {
+          uid: firebaseUser.uid,
+          name: 'Pranav Rathi',
+          email: firebaseUser.email,
+          role: 'admin',
+        };
+      } else {
+        // Fetch user data from Firestore for faculty
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+          user = userDocSnap.data() as User;
+        } else {
+          throw new Error("User data not found in database.");
+        }
+      }
+
+      // Store user session in localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+      
+      toast({
+        title: 'Login Successful',
+        description: 'Redirecting to your dashboard...',
+      });
+      router.push('/dashboard');
+
+    } catch (error: any) {
+      console.error('Login error:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Login Failed',
+        description: error.code === 'auth/invalid-credential'
+          ? 'Invalid email or password.'
+          : error.message || 'An unknown error occurred.',
+      });
     }
-    
-    toast({
-      title: 'Login Successful',
-      description: 'Redirecting to your dashboard...',
-    });
-    router.push('/dashboard');
   };
 
   return (
@@ -123,7 +152,7 @@ export default function LoginPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                  Sign In
+                  {form.formState.isSubmitting ? "Signing In..." : "Sign In"}
                 </Button>
               </form>
             </Form>
