@@ -3,64 +3,65 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper: is user an admin?
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Helper: is user the owner?
     function isOwner(uid) {
       return request.auth.uid == uid;
     }
 
+    // Helper: validate PI grant update (expressions only)
     function isUpdatingGrantByPI(incoming, existing) {
-      // The PI should only be able to modify the 'grant' field.
-      if (!incoming.diff(existing).affectedKeys().hasOnly(['grant'])) {
-        return false;
-      }
-      
+      let changesAllowed = incoming.diff(existing).affectedKeys().hasOnly(['grant']);
+
       let incomingGrant = incoming.grant;
       let existingGrant = existing.grant;
 
-      // Check that required fields are not being tampered with by the PI
-      let coreGrantFieldsUnchanged = incomingGrant.amount == existingGrant.amount &&
-                                     incomingGrant.disbursementDate == existingGrant.disbursementDate;
-      if (!coreGrantFieldsUnchanged) {
-        return false;
-      }
-      
-      // Allow PI to submit bank details.
-      let isSubmittingBankDetails = existingGrant.status == 'Pending Bank Details' &&
-                                    incomingGrant.status == 'Bank Details Submitted' &&
-                                    existingGrant.bankDetails == null &&
-                                    incomingGrant.bankDetails != null &&
-                                    incomingGrant.utilizationReport == existingGrant.utilizationReport;
-                                    
-      // Allow PI to submit utilization report.
-      let isSubmittingUtilization = existingGrant.status == 'Disbursed' &&
-                                    incomingGrant.status == 'Utilization Submitted' &&
-                                    existingGrant.utilizationReport == null &&
-                                    incomingGrant.utilizationReport != null &&
-                                    incomingGrant.bankDetails == existingGrant.bankDetails;
+      let coreFieldsUntouched =
+        incomingGrant.amount == existingGrant.amount &&
+        incomingGrant.disbursementDate == existingGrant.disbursementDate;
 
-      return isSubmittingBankDetails || isSubmittingUtilization;
+      let isSubmittingBankDetails =
+        existingGrant.status == 'Pending Bank Details' &&
+        incomingGrant.status == 'Bank Details Submitted' &&
+        existingGrant.bankDetails == null &&
+        incomingGrant.bankDetails != null &&
+        incomingGrant.utilizationReport == existingGrant.utilizationReport;
+
+      let isSubmittingUtilization =
+        existingGrant.status == 'Disbursed' &&
+        incomingGrant.status == 'Utilization Submitted' &&
+        existingGrant.utilizationReport == null &&
+        incomingGrant.utilizationReport != null &&
+        incomingGrant.bankDetails == existingGrant.bankDetails;
+
+      return changesAllowed && coreFieldsUntouched &&
+             (isSubmittingBankDetails || isSubmittingUtilization);
     }
 
+    // USERS
     match /users/{userId} {
       allow read, write: if isOwner(userId) || isAdmin();
     }
 
+    // PROJECTS
     match /projects/{projectId} {
       allow read: if request.auth != null;
-      
+
       allow create: if request.auth != null && request.resource.data.pi_uid == request.auth.uid;
-      
-      // Admins can update any field.
-      // PIs can only update their grant details under specific conditions.
-      allow update: if isAdmin() || (isOwner(resource.data.pi_uid) && 
-                      isUpdatingGrantByPI(request.resource.data, resource.data));
+
+      allow update: if isAdmin() ||
+        (isOwner(resource.data.pi_uid) &&
+         isUpdatingGrantByPI(request.resource.data, resource.data));
     }
 
+    // NOTIFICATIONS
     match /notifications/{notificationId} {
-      allow read, create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read, create, update: if request.auth != null &&
+                                   request.resource.data.uid == request.auth.uid;
     }
   }
 }

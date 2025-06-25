@@ -30,9 +30,9 @@ import { Logo } from '@/components/logo';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { auth, db } from '@/lib/firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -43,15 +43,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { toast } = useToast();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-    } else {
-      router.replace('/');
-    }
-    setLoading(false);
-  }, [router]);
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
+          setUser(appUser);
+          localStorage.setItem('user', JSON.stringify(appUser));
+        } else {
+          toast({ variant: 'destructive', title: 'Authentication Error', description: 'User profile not found.' });
+          await signOut(auth);
+          router.replace('/');
+        }
+      } else {
+        localStorage.removeItem('user');
+        router.replace('/');
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribeAuth();
+  }, [router, toast]);
 
   useEffect(() => {
     if (user) {
@@ -63,11 +77,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         setUnreadCount(querySnapshot.size);
+      }, (error) => {
+        console.error("Firestore notification listener error:", error);
+        toast({
+          variant: "destructive",
+          title: "Network Error",
+          description: "Could not fetch real-time notifications.",
+        });
       });
 
       return () => unsubscribe();
     }
-  }, [user]);
+  }, [user, toast]);
 
   const handleLogout = async () => {
     try {
