@@ -48,6 +48,7 @@ const steps = [
 export function SubmissionForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [user, setUser] = useState<User | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   
   const form = useForm<FormData>({
@@ -102,8 +103,9 @@ export function SubmissionForm() {
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      const docRef = await addDoc(collection(db, 'projects'), {
+      await addDoc(collection(db, 'projects'), {
         title: data.title,
         abstract: data.abstract,
         type: data.projectType,
@@ -116,7 +118,6 @@ export function SubmissionForm() {
         submissionDate: new Date().toISOString(),
       });
       
-      console.log('Document written with ID: ', docRef.id);
       toast({
         title: 'Project Submitted!',
         description: 'Your research project has been successfully submitted for review.',
@@ -130,6 +131,8 @@ export function SubmissionForm() {
         title: 'Submission Failed',
         description: 'There was an error submitting your project. Please try again.',
       });
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
@@ -209,9 +212,9 @@ export function SubmissionForm() {
               </div>
             )}
             <div className="flex justify-between pt-4">
-              <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>Previous</Button>
-              {currentStep < 4 && <Button type="button" onClick={handleNext}>Next</Button>}
-              {currentStep === 4 && <Button type="submit" disabled={form.formState.isSubmitting}>{form.formState.isSubmitting ? "Submitting..." : "Submit Project"}</Button>}
+              <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1 || isSubmitting}>Previous</Button>
+              {currentStep < 4 && <Button type="button" onClick={handleNext} disabled={isSubmitting}>Next</Button>}
+              {currentStep === 4 && <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Submit Project"}</Button>}
             </div>
           </form>
         </FormProvider>
