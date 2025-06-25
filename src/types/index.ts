@@ -18,3 +18,12 @@ export type Project = {
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string
 };
+
+export type Notification = {
+  id: string;
+  uid: string; // The user this notification is for
+  projectId: string;
+  title: string;
+  createdAt: string; // ISO String
+  isRead: boolean;
+};

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Eye } from 'lucide-react';
 import { type Project, type User } from '@/types';
 import { ProjectSummary } from './project-summary';
+import Link from 'next/link';
 
 interface ProjectListProps {
   projects: Project[];
@@ -52,7 +53,11 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" size="icon"><Eye className="h-4 w-4" /></Button>
+                    <Link href={`/dashboard/project/${project.id}`}>
+                      <Button variant="outline" size="icon" aria-label="View Project Details">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </Link>
                     {userRole === 'admin' && <ProjectSummary project={project} />}
                   </div>
                 </TableCell>

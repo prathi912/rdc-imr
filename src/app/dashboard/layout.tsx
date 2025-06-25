@@ -29,13 +29,15 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Logo } from '@/components/logo';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -43,12 +45,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
     } else {
       router.replace('/');
     }
     setLoading(false);
   }, [router]);
+
+  useEffect(() => {
+    if (user) {
+      const q = query(
+        collection(db, 'notifications'),
+        where('uid', '==', user.uid),
+        where('isRead', '==', false)
+      );
+
+      const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        setUnreadCount(querySnapshot.size);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -67,13 +86,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
   
   const getPageTitle = () => {
-      const segment = pathname.split('/').pop() || 'dashboard';
-      if (segment === 'dashboard') return 'Dashboard';
-      return segment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const segments = pathname.split('/');
+      const lastSegment = segments.pop() || 'dashboard';
+
+      if(lastSegment === 'project' && segments.includes('dashboard')) return "Project Details";
+
+      if (lastSegment === 'dashboard') return 'Dashboard';
+      return lastSegment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
 
   if (loading || !user) {
-    // Loading skeleton to prevent flash of content/redirect
     return (
        <div className="flex min-h-screen">
           <div className="hidden md:block md:w-64 bg-card border-r p-4">
@@ -168,7 +190,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <SidebarMenuItem>
               <SidebarMenuButton href="/dashboard/notifications" tooltip="Notifications" isActive={pathname === '/dashboard/notifications'}>
                 <Bell />
-                Notifications
+                <span>Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-medium text-destructive-foreground">
+                    {unreadCount}
+                  </span>
+                )}
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
