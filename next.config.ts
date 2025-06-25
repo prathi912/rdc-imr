@@ -16,6 +16,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'rdc-full.vercel.app',
+        port: '',
+        pathname: '/assets/**',
+      },
     ],
   },
 };
