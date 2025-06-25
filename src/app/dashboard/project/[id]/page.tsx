@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Project } from '@/types';
@@ -10,16 +11,20 @@ import { ProjectSummary } from '@/components/projects/project-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 
-export default function ProjectDetailsPage({ params }: { params: { id: string } }) {
+export default function ProjectDetailsPage() {
+  const params = useParams();
+  const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
-    async function getProject(projectId: string) {
+    if (!projectId) return;
+    
+    async function getProject(id: string) {
       setLoading(true);
       try {
-          const projectRef = doc(db, 'projects', projectId);
+          const projectRef = doc(db, 'projects', id);
           const projectSnap = await getDoc(projectRef);
 
           if (!projectSnap.exists()) {
@@ -40,8 +45,8 @@ export default function ProjectDetailsPage({ params }: { params: { id: string } 
         setLoading(false);
       }
     }
-    getProject(params.id);
-  }, [params.id]);
+    getProject(projectId);
+  }, [projectId]);
 
 
   if (loading) {
