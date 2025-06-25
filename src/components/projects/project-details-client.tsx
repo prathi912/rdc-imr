@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { updateProjectStatus } from '@/app/actions';
+import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +38,10 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const router = useRouter();
 
   useEffect(() => {
+    setProject(initialProject);
+  }, [initialProject]);
+
+  useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -45,15 +50,30 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     setIsUpdating(true);
-    const result = await updateProjectStatus(project.id, newStatus);
-    if (result.success) {
+    try {
+      const projectRef = doc(db, 'projects', project.id);
+      await updateDoc(projectRef, { status: newStatus });
+
+      // Create a notification for the project's PI
+      if (project.pi_uid) {
+        await addDoc(collection(db, 'notifications'), {
+          uid: project.pi_uid,
+          title: `Your project "${project.title}" status was updated to: ${newStatus}`,
+          projectId: project.id,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+        });
+      }
+
       setProject({ ...project, status: newStatus });
-      toast({ title: 'Success', description: result.message });
+      toast({ title: 'Success', description: `Project status updated to ${newStatus}` });
       router.refresh(); 
-    } else {
-      toast({ variant: 'destructive', title: 'Error', description: result.error });
+    } catch (error) {
+      console.error('Error updating project status:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update project status.' });
+    } finally {
+      setIsUpdating(false);
     }
-    setIsUpdating(false);
   };
   
   const formatDate = (isoString: string) => {
