@@ -31,7 +31,7 @@ const forgotPasswordSchema = z.object({
     .string()
     .email('Invalid email address.')
     .refine(
-      (email) => email.endsWith('@paruluniversity.ac.in'),
+      (email) => email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
       'Only emails from paruluniversity.ac.in are allowed.'
     ),
 });
