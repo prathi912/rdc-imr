@@ -9,15 +9,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, FilePenLine, Bot } from 'lucide-react';
-import { type Project } from '@/types';
-import { type Role } from '../dashboard/dashboard-client';
+import { Eye, Bot } from 'lucide-react';
+import { type Project, type User } from '@/types';
 import { ProjectSummary } from './project-summary';
 
 interface ProjectListProps {
   title: string;
   projects: Project[];
-  userRole: Role;
+  userRole: User['role'];
 }
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -57,10 +56,8 @@ export function ProjectList({ title, projects, userRole }: ProjectListProps) {
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
-                    {userRole === 'faculty' && <Button variant="outline" size="icon"><Eye className="h-4 w-4" /></Button>}
-                    {userRole === 'evaluator' && <Button variant="outline" size="icon"><FilePenLine className="h-4 w-4" /></Button>}
-                    {userRole === 'admin' && <Button variant="outline" size="icon"><Eye className="h-4 w-4" /></Button>}
-                    {(userRole === 'admin' || userRole === 'evaluator') && <ProjectSummary project={project} />}
+                    <Button variant="outline" size="icon"><Eye className="h-4 w-4" /></Button>
+                    {userRole === 'admin' && <ProjectSummary project={project} />}
                   </div>
                 </TableCell>
               </TableRow>
