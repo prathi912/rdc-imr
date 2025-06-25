@@ -6,15 +6,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, Bot } from 'lucide-react';
+import { Eye } from 'lucide-react';
 import { type Project, type User } from '@/types';
 import { ProjectSummary } from './project-summary';
 
 interface ProjectListProps {
-  title: string;
   projects: Project[];
   userRole: User['role'];
 }
@@ -28,13 +27,10 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
 };
 
 
-export function ProjectList({ title, projects, userRole }: ProjectListProps) {
+export function ProjectList({ projects, userRole }: ProjectListProps) {
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <Table>
           <TableHeader>
             <TableRow>

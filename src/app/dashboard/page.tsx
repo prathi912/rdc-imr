@@ -37,7 +37,7 @@ export default function DashboardPage() {
   return (
     <div className="transition-all duration-300">
       {user.role === 'admin' && <AdminDashboard />}
-      {user.role === 'faculty' && <FacultyDashboard />}
+      {user.role === 'faculty' && <FacultyDashboard user={user} />}
     </div>
   );
 }

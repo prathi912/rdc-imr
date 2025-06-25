@@ -2,41 +2,27 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProjectList } from '@/components/projects/project-list';
-import { FilePlus2, CheckCircle, Clock, ArrowRight } from 'lucide-react';
-import { type Project } from '@/types';
+import { FilePlus2, CheckCircle, Clock, ArrowRight, BookOpenCheck } from 'lucide-react';
+import { type User } from '@/types';
+import { projects } from '@/lib/data';
 
-const statCards = [
-  { title: 'Active Projects', value: '3', icon: FilePlus2 },
-  { title: 'Pending Approval', value: '1', icon: Clock },
-  { title: 'Completed Projects', value: '8', icon: CheckCircle },
-];
+export function FacultyDashboard({ user }: { user: User }) {
+  const myProjects = projects.filter(p => p.pi === user.name);
+  
+  const activeProjects = myProjects.filter(p => p.status === 'Approved' || p.status === 'In Progress').length;
+  const pendingApproval = myProjects.filter(p => p.status === 'Under Review').length;
+  const completedProjects = myProjects.filter(p => p.status === 'Completed').length;
 
-const sampleProjects: Project[] = [
-    {
-      id: 'proj-001',
-      title: 'My Research on Quantum Entanglement',
-      department: 'Physics',
-      pi: 'Self',
-      status: 'Under Review',
-      abstract: 'An investigation into the nature of quantum entanglement.',
-      type: 'Research',
-      teamInfo: 'PI: Me',
-      timelineAndOutcomes: 'Ongoing'
-    },
-    {
-      id: 'proj-002',
-      title: 'A Novel Approach to Machine Learning',
-      department: 'Computer Science',
-      pi: 'Self',
-      status: 'Approved',
-      abstract: 'Developing a new algorithm for neural networks.',
-      type: 'Development',
-      teamInfo: 'PI: Me',
-      timelineAndOutcomes: 'Ongoing'
-    },
-];
+  const statCards = [
+    { title: 'Active Projects', value: activeProjects.toString(), icon: BookOpenCheck },
+    { title: 'Pending Approval', value: pendingApproval.toString(), icon: Clock },
+    { title: 'Completed Projects', value: completedProjects.toString(), icon: CheckCircle },
+  ];
 
-export function FacultyDashboard() {
+  const recentProjects = myProjects
+    .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
+    .slice(0, 3);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -72,7 +58,7 @@ export function FacultyDashboard() {
               </Button>
             </Link>
         </div>
-        <ProjectList projects={sampleProjects} userRole="faculty" />
+        <ProjectList projects={recentProjects} userRole="faculty" />
       </div>
     </div>
   );

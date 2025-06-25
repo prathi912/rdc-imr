@@ -1,13 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Bell } from "lucide-react";
+import { Bell, FileCheck2, GanttChartSquare } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 
 export default function NotificationsPage() {
   const notifications = [
-    { id: 1, title: "Project 'AI in Agriculture' Approved", time: "2 hours ago", read: false },
-    { id: 2, title: "New Review Assigned: 'Quantum Materials'", time: "1 day ago", read: false },
-    { id: 3, title: "Submission deadline approaching for Q3 grants", time: "3 days ago", read: true },
-    { id: 4, title: "Your project 'Urban Mobility' has been completed", time: "1 week ago", read: true },
+    { id: 1, title: "Project 'Advanced Materials for Solar Cells' was Approved", time: "2 days ago", read: false, icon: FileCheck2 },
+    { id: 2, title: "New Review Assigned: 'AI in Sustainable Agriculture'", time: "3 days ago", read: false, icon: GanttChartSquare },
+    { id: 3, title: "Submission deadline approaching for Q3 grants", time: "1 week ago", read: true, icon: Bell },
+    { id: 4, title: "Your project 'Urban Mobility Study' has been completed", time: "2 months ago", read: true, icon: FileCheck2 },
   ];
 
   return (
@@ -25,7 +25,7 @@ export default function NotificationsPage() {
                   }`}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Bell className="h-5 w-5" />
+                    <notification.icon className="h-5 w-5" />
                   </div>
                   <div className="flex-1">
                     <p className="font-semibold">{notification.title}</p>

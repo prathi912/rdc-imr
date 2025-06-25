@@ -2,33 +2,44 @@
 
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, Legend, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { projects } from '@/lib/data';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 
-const submissionsData = [
-  { month: 'January', submissions: 18 },
-  { month: 'February', submissions: 30 },
-  { month: 'March', submissions: 23 },
-  { month: 'April', submissions: 27 },
-  { month: 'May', submissions: 20 },
-  { month: 'June', submissions: 25 },
-];
+// --- Data Processing ---
+// Submissions over the last 6 months
+const last6Months = Array.from({ length: 6 }, (_, i) => {
+  const d = subMonths(new Date(), i);
+  return { name: format(d, 'MMMM'), start: startOfMonth(d), end: endOfMonth(d) };
+}).reverse();
+
+const submissionsData = last6Months.map(month => {
+  const count = projects.filter(p => {
+    const submissionDate = new Date(p.submissionDate);
+    return submissionDate >= month.start && submissionDate <= month.end;
+  }).length;
+  return { month: month.name, submissions: count };
+});
 
 const submissionsConfig = {
   submissions: { label: 'Submissions', color: 'hsl(var(--primary))' },
 } satisfies ChartConfig;
 
-const departmentData = [
-  { department: 'Computer Science', projects: 120, },
-  { department: 'Physics', projects: 90, },
-  { department: 'Medical Research', projects: 50, },
-  { department: 'Engineering', projects: 80, },
-  { department: 'Arts & Humanities', projects: 30, },
-];
+// Projects by department
+const departmentData = Object.entries(
+  projects.reduce((acc, project) => {
+    acc[project.department] = (acc[project.department] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>)
+).map(([department, count]) => ({ department, projects: count }))
+ .sort((a, b) => b.projects - a.projects);
+
 
 const departmentConfig = {
   projects: { label: 'Projects', color: 'hsl(var(--accent))' },
 } satisfies ChartConfig;
+
 
 export default function AnalyticsPage() {
   return (
@@ -54,6 +65,7 @@ export default function AnalyticsPage() {
                   axisLine={false}
                   tickMargin={8}
                 />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} />
                 <ChartTooltip
                   cursor={false}
                   content={<ChartTooltipContent />}

@@ -11,16 +11,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User } from '@/types';
-
-const users: User[] = [
-    { uid: 'admin-id', name: 'Pranav Rathi', email: 'rathipranav07@gmail.com', role: 'admin' },
-    { uid: 'faculty-id', name: 'Faculty Member', email: 'faculty.member@paruluniversity.ac.in', role: 'faculty' },
-    { uid: 'faculty-2', name: 'Jane Doe', email: 'jane.doe@paruluniversity.ac.in', role: 'faculty' },
-    { uid: 'faculty-3', name: 'John Smith', email: 'john.smith@paruluniversity.ac.in', role: 'faculty' },
-    { uid: 'faculty-4', name: 'Emily White', email: 'emily.white@paruluniversity.ac.in', role: 'faculty' },
-    { uid: 'faculty-5', name: 'Michael Brown', email: 'michael.brown@paruluniversity.ac.in', role: 'faculty' },
-];
+import { users } from '@/lib/data';
 
 export default function ManageUsersPage() {
   return (

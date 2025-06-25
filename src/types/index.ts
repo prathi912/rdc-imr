@@ -15,4 +15,5 @@ export type Project = {
   status: 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed';
   teamInfo: string;
   timelineAndOutcomes: string;
+  submissionDate: string;
 };
