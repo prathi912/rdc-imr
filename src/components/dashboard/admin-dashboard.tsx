@@ -1,3 +1,6 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Book, CheckCircle, Clock, Users } from 'lucide-react';
 import { ProjectList } from '@/components/projects/project-list';
@@ -5,11 +8,30 @@ import Link from 'next/link';
 import { Button } from '../ui/button';
 import { ArrowRight } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, limit, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import type { Project } from '@/types';
+import { Skeleton } from '../ui/skeleton';
 
-async function getDashboardData() {
-    try {
+interface DashboardStats {
+  totalProjects: number;
+  pendingReviews: number;
+  approvedProjects: number;
+  totalUsers: number;
+}
+
+export function AdminDashboard() {
+  const [stats, setStats] = useState<DashboardStats>({
+    totalProjects: 0,
+    pendingReviews: 0,
+    approvedProjects: 0,
+    totalUsers: 0,
+  });
+  const [recentProjects, setRecentProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function getDashboardData() {
+      try {
         const projectsRef = collection(db, "projects");
         const usersRef = collection(db, "users");
 
@@ -23,32 +45,26 @@ async function getDashboardData() {
         const approvedProjects = allProjects.filter(p => p.status === 'Approved').length;
         const totalUsers = usersSnapshot.size;
 
-        const recentProjects = allProjects
+        const sortedProjects = allProjects
             .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
             .slice(0, 4);
-
-        return {
-            totalProjects,
-            pendingReviews,
-            approvedProjects,
-            totalUsers,
-            recentProjects
-        };
-
-    } catch (error) {
+        
+        setStats({ totalProjects, pendingReviews, approvedProjects, totalUsers });
+        setRecentProjects(sortedProjects);
+      } catch (error) {
         console.error("Error fetching admin dashboard data: ", error);
-        return { totalProjects: 0, pendingReviews: 0, approvedProjects: 0, totalUsers: 0, recentProjects: [] };
+      } finally {
+        setLoading(false);
+      }
     }
-}
-
-export async function AdminDashboard() {
-  const { totalProjects, pendingReviews, approvedProjects, totalUsers, recentProjects } = await getDashboardData();
+    getDashboardData();
+  }, []);
   
   const statCards = [
-    { title: 'Total Projects', value: totalProjects.toString(), icon: Book },
-    { title: 'Pending Reviews', value: pendingReviews.toString(), icon: Clock },
-    { title: 'Approved Projects', value: approvedProjects.toString(), icon: CheckCircle },
-    { title: 'Total Users', value: totalUsers.toString(), icon: Users },
+    { title: 'Total Projects', value: stats.totalProjects.toString(), icon: Book, loading: loading },
+    { title: 'Pending Reviews', value: stats.pendingReviews.toString(), icon: Clock, loading: loading },
+    { title: 'Approved Projects', value: stats.approvedProjects.toString(), icon: CheckCircle, loading: loading },
+    { title: 'Total Users', value: stats.totalUsers.toString(), icon: Users, loading: loading },
   ];
 
   return (
@@ -62,7 +78,7 @@ export async function AdminDashboard() {
               <card.icon className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{card.value}</div>
+              {card.loading ? <Skeleton className="h-8 w-1/4" /> : <div className="text-2xl font-bold">{card.value}</div>}
             </CardContent>
           </Card>
         ))}
@@ -77,7 +93,7 @@ export async function AdminDashboard() {
               </Button>
             </Link>
         </div>
-        <ProjectList projects={recentProjects} userRole="admin" />
+        {loading ? <Skeleton className="h-64 w-full" /> : <ProjectList projects={recentProjects} userRole="admin" />}
       </div>
     </div>
   );
