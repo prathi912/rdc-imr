@@ -7,8 +7,8 @@ export function Logo() {
       <Image
         src="https://rdc-full.vercel.app/assets/RDC-PU-LOGO.svg"
         alt="Parul Research Portal Logo"
-        width={150}
-        height={33}
+        width={350}
+        height={100}
         className="block dark:hidden group-data-[collapsible=icon]:hidden"
         priority
       />
@@ -16,8 +16,8 @@ export function Logo() {
       <Image
         src="https://rdc-full.vercel.app/assets/RDC-PU-LOGO-WHITE.svg"
         alt="Parul Research Portal Logo"
-        width={150}
-        height={33}
+        width={350}
+        height={100}
         className="hidden dark:block group-data-[collapsible=icon]:hidden"
         priority
       />

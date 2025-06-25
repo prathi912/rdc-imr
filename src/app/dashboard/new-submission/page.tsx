@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 export default function NewSubmissionPage() {
   return (
     <div className="container mx-auto max-w-4xl py-10">
-      <Link href="/">
+      <Link href="/dashboard">
         <Button variant="ghost" className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Dashboard

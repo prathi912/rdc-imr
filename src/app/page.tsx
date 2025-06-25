@@ -1,141 +1,114 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
 import {
-  Bell,
-  Book,
-  FileCheck2,
-  FilePlus2,
-  GanttChartSquare,
-  Home,
-  LineChart,
-  Settings,
-  Users,
-} from 'lucide-react';
-
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarProvider,
-  SidebarInset,
-} from '@/components/ui/sidebar';
-import { UserNav } from '@/components/user-nav';
-import { ThemeToggle } from '@/components/theme-toggle';
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from '@/components/ui/form';
 import { Logo } from '@/components/logo';
-import { DashboardClient } from '@/components/dashboard/dashboard-client';
-import type { User } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
-const adminUser: User = {
-  uid: 'admin-id',
-  name: 'Pranav Rathi',
-  email: 'rathipranav07@gmail.com',
-  role: 'admin',
-};
+const loginSchema = z.object({
+  email: z
+    .string()
+    .email('Invalid email address.')
+    .refine(
+      (email) => email.endsWith('@paruluniversity.ac.in'),
+      'Only emails from paruluniversity.ac.in are allowed.'
+    ),
+  password: z.string().min(1, 'Password is required.'),
+});
 
-const facultyUser: User = {
-  uid: 'faculty-id',
-  name: 'Faculty Member',
-  email: 'faculty.member@paruluniversity.ac.in',
-  role: 'faculty',
-};
+type LoginFormValues = z.infer<typeof loginSchema>;
 
-export default function DashboardPage() {
-  const [user, setUser] = useState<User>(facultyUser);
+export default function LoginPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
+  });
 
-  const isAdmin = user.role === 'admin';
+  const onSubmit = (data: LoginFormValues) => {
+    // Mock authentication
+    console.log('Login attempt with:', data.email);
+    toast({
+      title: 'Login Successful',
+      description: 'Redirecting to your dashboard...',
+    });
+    // In a real app, you'd set a session here.
+    router.push('/dashboard');
+  };
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <Logo />
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/" tooltip="Dashboard" isActive>
-                <Home />
-                Dashboard
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/new-submission" tooltip="New Submission">
-                <FilePlus2 />
-                New Submission
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton href="#" tooltip="My Projects">
-                <Book />
-                My Projects
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            {isAdmin && (
-              <>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="#" tooltip="Pending Reviews">
-                    <GanttChartSquare />
-                    Pending Reviews
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="#" tooltip="Completed Reviews">
-                    <FileCheck2 />
-                    Completed Reviews
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="#" tooltip="All Projects">
-                    <Book />
-                    All Projects
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="#" tooltip="Analytics">
-                    <LineChart />
-                    Analytics
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="#" tooltip="Manage Users">
-                    <Users />
-                    Manage Users
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </>
-            )}
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/notifications" tooltip="Notifications">
-                <Bell />
-                Notifications
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="#" tooltip="Settings">
-                <Settings />
-                Settings
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarContent>
-      </Sidebar>
-      <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
-          <h1 className="text-xl font-semibold">Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <UserNav user={user} />
-          </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <DashboardClient user={user} setUser={setUser} adminUser={adminUser} facultyUser={facultyUser} />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+      <div className="w-full max-w-md">
+        <Card className="shadow-xl">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-6 flex justify-center">
+              <Logo />
+            </div>
+            <CardTitle className="text-2xl font-bold">Research Portal</CardTitle>
+            <CardDescription>
+              Please sign in to continue
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>University Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="your.name@paruluniversity.ac.in" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
+                  Sign In
+                </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
   );
 }
