@@ -114,7 +114,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       });
 
       setProject({ ...project, grant: newGrant });
-      toast({ title: 'Grant Awarded!', description: `A grant of $${grantAmount.toLocaleString()} has been awarded.` });
+      toast({ title: 'Grant Awarded!', description: `A grant of ₹${grantAmount.toLocaleString('en-IN')} has been awarded.` });
       setIsDialogOpen(false);
       setGrantAmount('');
     } catch (error) {
@@ -187,14 +187,14 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                           <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="grant-amount" className="text-right">Amount ($)</Label>
+                            <Label htmlFor="grant-amount" className="text-right">Amount (₹)</Label>
                             <Input
                               id="grant-amount"
                               type="number"
                               value={grantAmount}
                               onChange={(e) => setGrantAmount(Number(e.target.value))}
                               className="col-span-3"
-                              placeholder="e.g., 5000"
+                              placeholder="e.g., 400000"
                             />
                           </div>
                         </div>

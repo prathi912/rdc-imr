@@ -2,18 +2,30 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Function to check if the user is an admin
+
+    // ✅ Top-level helper functions
     function isAdmin() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Function to check if user is the owner of the resource
     function isOwner(uid) {
-        return request.auth.uid == uid;
+      return request.auth.uid == uid;
     }
-    
-    // Users
+
+    function isGrantUpdateAllowed(request, resource) {
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      let requestGrant = request.resource.data.grant;
+      let existingGrant = resource.data.grant;
+
+      // ✅ Single return expression combining all checks
+      return changedKeys.hasOnly(['grant']) &&
+             existingGrant != null &&
+             requestGrant.amount == existingGrant.amount &&
+             requestGrant.status == existingGrant.status &&
+             requestGrant.disbursementDate == existingGrant.disbursementDate;
+    }
+
+    // USERS
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if request.auth != null;
@@ -21,7 +33,7 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Projects
+    // PROJECTS
     match /projects/{projectId} {
       allow read: if isOwner(resource.data.pi_uid) || isAdmin();
       allow create: if request.auth != null;
@@ -29,35 +41,10 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Notifications
+    // NOTIFICATIONS
     match /notifications/{notificationId} {
       allow read, update: if isOwner(resource.data.uid);
       allow create: if request.auth != null;
     }
   }
-}
-
-// Helper function to validate PI updates to a project
-function isGrantUpdateAllowed(request, resource) {
-    // A PI can only update the 'grant' field of their own project.
-    // They cannot change any other top-level fields.
-    let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
-    
-    // Check that only the 'grant' field is being modified
-    if (changedKeys.hasOnly(['grant'])) {
-        let requestGrant = request.resource.data.grant;
-        let existingGrant = resource.data.grant;
-        
-        // PI cannot change grant amount, status, or disbursement date.
-        // They can add/update bankDetails and utilizationReport.
-        if (existingGrant == null) {
-          // This should not happen as only admin can create it.
-          return false;
-        }
-
-        return requestGrant.amount == existingGrant.amount &&
-               requestGrant.status == existingGrant.status &&
-               requestGrant.disbursementDate == existingGrant.disbursementDate;
-    }
-    return false;
 }

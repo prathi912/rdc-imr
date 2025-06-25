@@ -138,7 +138,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             <CardTitle>Grant Management</CardTitle>
         </div>
         <CardDescription>
-          Grant of ${grant.amount.toLocaleString()} awarded for this project. Current status: <span className="font-semibold">{grant.status}</span>
+          Grant of ₹{grant.amount.toLocaleString('en-IN')} awarded for this project. Current status: <span className="font-semibold">{grant.status}</span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -211,7 +211,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     <FileText className="h-5 w-5 text-muted-foreground"/>
                     <h4 className="font-semibold">Submit Fund Utilization Report</h4>
                 </div>
-              <FormField name="amountSpent" control={utilizationForm.control} render={({ field }) => ( <FormItem><FormLabel>Amount Spent ($)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+              <FormField name="amountSpent" control={utilizationForm.control} render={({ field }) => ( <FormItem><FormLabel>Amount Spent (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
               <FormField name="description" control={utilizationForm.control} render={({ field }) => ( <FormItem><FormLabel>Utilization Description</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem> )} />
               <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Report'}</Button>
             </form>
@@ -226,7 +226,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                 </div>
                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                     <dt className="font-medium text-muted-foreground">Amount Spent</dt>
-                    <dd>${grant.utilizationReport.amountSpent.toLocaleString()}</dd>
+                    <dd>₹{grant.utilizationReport.amountSpent.toLocaleString('en-IN')}</dd>
                     <dt className="font-medium text-muted-foreground">Submission Date</dt>
                     <dd>{new Date(grant.utilizationReport.submissionDate).toLocaleDateString()}</dd>
                  </dl>
