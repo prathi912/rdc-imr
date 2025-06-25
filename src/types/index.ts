@@ -14,7 +14,7 @@ export type BankDetails = {
 
 export type GrantDetails = {
     amount: number;
-    status: 'Pending Bank Details' | 'Disbursed' | 'Utilization Submitted' | 'Completed';
+    status: 'Pending Bank Details' | 'Bank Details Submitted' | 'Disbursed' | 'Utilization Submitted' | 'Completed';
     disbursementDate?: string; // ISO String
     bankDetails?: BankDetails;
     utilizationReport?: {

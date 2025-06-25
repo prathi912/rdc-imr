@@ -66,6 +66,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       const updatedGrant: GrantDetails = {
         ...project.grant,
         bankDetails: values,
+        status: 'Bank Details Submitted',
       };
       await updateDoc(projectRef, { grant: updatedGrant });
       onUpdate({ ...project, grant: updatedGrant });
@@ -152,6 +153,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Pending Bank Details">Pending Bank Details</SelectItem>
+                            <SelectItem value="Bank Details Submitted">Bank Details Submitted</SelectItem>
                             <SelectItem value="Disbursed">Disbursed</SelectItem>
                             <SelectItem value="Utilization Submitted">Utilization Submitted</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>
@@ -204,7 +206,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             </div>
         )}
 
-        {isPI && (grant.status === 'Disbursed' || (grant.status === 'Utilization Submitted' && !grant.utilizationReport)) && (
+        {isPI && (grant.status === 'Disbursed' || (grant.status === 'Utilization Submitted' && grant.utilizationReport === undefined)) && (
           <Form {...utilizationForm}>
             <form onSubmit={utilizationForm.handleSubmit(handleUtilizationSubmit)} className="space-y-4 p-4 border rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
