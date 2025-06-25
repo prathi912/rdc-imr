@@ -26,7 +26,7 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
-const loginSchema = z.object({
+const forgotPasswordSchema = z.object({
   email: z
     .string()
     .email('Invalid email address.')
@@ -34,45 +34,29 @@ const loginSchema = z.object({
       (email) => email.endsWith('@paruluniversity.ac.in'),
       'Only emails from paruluniversity.ac.in are allowed.'
     ),
-  password: z.string().min(1, 'Password is required.'),
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
-export default function LoginPage() {
+export default function ForgotPasswordPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<ForgotPasswordFormValues>({
+    resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
       email: '',
-      password: '',
     },
   });
 
-  const onSubmit = (data: LoginFormValues) => {
-    // Mock authentication
-    console.log('Login attempt with:', data.email);
-
-    const isAdmin = data.email === 'rathipranav07@gmail.com';
-    const user = {
-      name: isAdmin ? 'Pranav Rathi' : 'Faculty Member',
-      email: data.email,
-      role: isAdmin ? 'admin' : 'faculty',
-      uid: isAdmin ? 'admin-id' : `faculty-${Math.random().toString(36).substring(7)}`,
-    };
-
-    // In a real app, you'd get a token from your auth provider
-    // For this demo, we'll use localStorage to simulate a session
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('user', JSON.stringify(user));
-    }
+  const onSubmit = (data: ForgotPasswordFormValues) => {
+    // Mock password reset
+    console.log('Password reset request for:', data.email);
     
     toast({
-      title: 'Login Successful',
-      description: 'Redirecting to your dashboard...',
+      title: 'Check your email',
+      description: "If an account exists, we've sent a password reset link.",
     });
-    router.push('/dashboard');
+    router.push('/');
   };
 
   return (
@@ -83,9 +67,9 @@ export default function LoginPage() {
             <div className="mx-auto mb-6 flex justify-center">
               <Logo />
             </div>
-            <CardTitle className="text-2xl font-bold">Welcome Back!</CardTitle>
+            <CardTitle className="text-2xl font-bold">Forgot Password?</CardTitle>
             <CardDescription>
-              Sign in to access the Research Portal.
+              Enter your email to receive a reset link.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -104,34 +88,15 @@ export default function LoginPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                       <div className="flex items-center justify-between">
-                        <FormLabel>Password</FormLabel>
-                        <Link href="/forgot-password" passHref>
-                           <Button variant="link" className="p-0 h-auto text-xs">Forgot password?</Button>
-                        </Link>
-                      </div>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                  Sign In
+                  Send Reset Link
                 </Button>
               </form>
             </Form>
           </CardContent>
           <CardFooter className="justify-center text-sm">
-            <p className="text-muted-foreground">Don't have an account?&nbsp;</p>
-            <Link href="/signup" passHref>
-                <Button variant="link" className="p-0 h-auto">Sign Up</Button>
+             <Link href="/" passHref>
+                <Button variant="link" className="p-0 h-auto">Back to Sign In</Button>
             </Link>
           </CardFooter>
         </Card>

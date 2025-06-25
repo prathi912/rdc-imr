@@ -10,12 +10,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { User } from '@/types';
+import Link from 'next/link';
 
 interface UserNavProps {
   user: User | null;
+  onLogout: () => void;
 }
 
-export function UserNav({ user }: UserNavProps) {
+export function UserNav({ user, onLogout }: UserNavProps) {
   if (!user) {
     return null;
   }
@@ -39,11 +41,15 @@ export function UserNav({ user }: UserNavProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>Profile</DropdownMenuItem>
-          <DropdownMenuItem>Settings</DropdownMenuItem>
+          <Link href="/dashboard/settings" passHref>
+             <DropdownMenuItem>Profile</DropdownMenuItem>
+          </Link>
+          <Link href="/dashboard/settings" passHref>
+            <DropdownMenuItem>Settings</DropdownMenuItem>
+          </Link>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>Log out</DropdownMenuItem>
+        <DropdownMenuItem onClick={onLogout}>Log out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

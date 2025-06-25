@@ -1,143 +1,43 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import {
-  Bell,
-  Book,
-  FileCheck2,
-  FilePlus2,
-  GanttChartSquare,
-  Home,
-  LineChart,
-  Settings,
-  Users,
-} from 'lucide-react';
-
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarProvider,
-  SidebarInset,
-} from '@/components/ui/sidebar';
-import { UserNav } from '@/components/user-nav';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { Logo } from '@/components/logo';
-import { DashboardClient } from '@/components/dashboard/dashboard-client';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
+import { FacultyDashboard } from '@/components/dashboard/faculty-dashboard';
 import type { User } from '@/types';
-
-const adminUser: User = {
-  uid: 'admin-id',
-  name: 'Pranav Rathi',
-  email: 'rathipranav07@gmail.com',
-  role: 'admin',
-};
-
-const facultyUser: User = {
-  uid: 'faculty-id',
-  name: 'Faculty Member',
-  email: 'faculty.member@paruluniversity.ac.in',
-  role: 'faculty',
-};
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User>(facultyUser);
-  const pathname = usePathname();
+  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
 
-  const isAdmin = user.role === 'admin';
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    } else {
+      router.replace('/');
+    }
+  }, [router]);
+  
+  if (!user) {
+      return (
+          <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+                <Skeleton className="h-28" />
+              </div>
+              <Skeleton className="h-96" />
+          </div>
+      )
+  }
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <Logo />
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard" tooltip="Dashboard" isActive={pathname === '/dashboard'}>
-                <Home />
-                Dashboard
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/new-submission" tooltip="New Submission" isActive={pathname === '/dashboard/new-submission'}>
-                <FilePlus2 />
-                New Submission
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/my-projects" tooltip="My Projects" isActive={pathname === '/dashboard/my-projects'}>
-                <Book />
-                My Projects
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            {isAdmin && (
-              <>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/pending-reviews" tooltip="Pending Reviews" isActive={pathname === '/dashboard/pending-reviews'}>
-                    <GanttChartSquare />
-                    Pending Reviews
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/completed-reviews" tooltip="Completed Reviews" isActive={pathname === '/dashboard/completed-reviews'}>
-                    <FileCheck2 />
-                    Completed Reviews
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/all-projects" tooltip="All Projects" isActive={pathname === '/dashboard/all-projects'}>
-                    <Book />
-                    All Projects
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/analytics" tooltip="Analytics" isActive={pathname === '/dashboard/analytics'}>
-                    <LineChart />
-                    Analytics
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/manage-users" tooltip="Manage Users" isActive={pathname === '/dashboard/manage-users'}>
-                    <Users />
-                    Manage Users
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </>
-            )}
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/notifications" tooltip="Notifications" isActive={pathname === '/dashboard/notifications'}>
-                <Bell />
-                Notifications
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/settings" tooltip="Settings" isActive={pathname === '/dashboard/settings'}>
-                <Settings />
-                Settings
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarContent>
-      </Sidebar>
-      <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
-          <h1 className="text-xl font-semibold">Dashboard</h1>
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <UserNav user={user} />
-          </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <DashboardClient user={user} setUser={setUser} adminUser={adminUser} facultyUser={facultyUser} />
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+    <div className="transition-all duration-300">
+      {user.role === 'admin' && <AdminDashboard />}
+      {user.role === 'faculty' && <FacultyDashboard />}
+    </div>
   );
 }

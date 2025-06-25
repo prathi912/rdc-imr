@@ -26,7 +26,8 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 
-const loginSchema = z.object({
+const signupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z
     .string()
     .email('Invalid email address.')
@@ -34,43 +35,47 @@ const loginSchema = z.object({
       (email) => email.endsWith('@paruluniversity.ac.in'),
       'Only emails from paruluniversity.ac.in are allowed.'
     ),
-  password: z.string().min(1, 'Password is required.'),
+  password: z.string().min(8, 'Password must be at least 8 characters.'),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
 });
 
-type LoginFormValues = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+type SignupFormValues = z.infer<typeof signupSchema>;
+
+export default function SignupPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<SignupFormValues>({
+    resolver: zodResolver(signupSchema),
     defaultValues: {
+      name: '',
       email: '',
       password: '',
+      confirmPassword: '',
     },
   });
 
-  const onSubmit = (data: LoginFormValues) => {
-    // Mock authentication
-    console.log('Login attempt with:', data.email);
+  const onSubmit = (data: SignupFormValues) => {
+    // Mock user creation
+    console.log('Signup attempt with:', data.email);
 
-    const isAdmin = data.email === 'rathipranav07@gmail.com';
     const user = {
-      name: isAdmin ? 'Pranav Rathi' : 'Faculty Member',
+      name: data.name,
       email: data.email,
-      role: isAdmin ? 'admin' : 'faculty',
-      uid: isAdmin ? 'admin-id' : `faculty-${Math.random().toString(36).substring(7)}`,
+      role: 'faculty', // All new signups are faculty
+      uid: `faculty-${Math.random().toString(36).substring(7)}`,
     };
 
-    // In a real app, you'd get a token from your auth provider
-    // For this demo, we'll use localStorage to simulate a session
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(user));
     }
     
     toast({
-      title: 'Login Successful',
-      description: 'Redirecting to your dashboard...',
+      title: 'Account Created',
+      description: "You've been successfully signed in.",
     });
     router.push('/dashboard');
   };
@@ -83,14 +88,27 @@ export default function LoginPage() {
             <div className="mx-auto mb-6 flex justify-center">
               <Logo />
             </div>
-            <CardTitle className="text-2xl font-bold">Welcome Back!</CardTitle>
+            <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
             <CardDescription>
-              Sign in to access the Research Portal.
+              Join the Parul University Research Portal.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="email"
@@ -109,12 +127,20 @@ export default function LoginPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                       <div className="flex items-center justify-between">
-                        <FormLabel>Password</FormLabel>
-                        <Link href="/forgot-password" passHref>
-                           <Button variant="link" className="p-0 h-auto text-xs">Forgot password?</Button>
-                        </Link>
-                      </div>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
                       <FormControl>
                         <Input type="password" placeholder="••••••••" {...field} />
                       </FormControl>
@@ -123,15 +149,15 @@ export default function LoginPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                  Sign In
+                  Sign Up
                 </Button>
               </form>
             </Form>
           </CardContent>
           <CardFooter className="justify-center text-sm">
-            <p className="text-muted-foreground">Don't have an account?&nbsp;</p>
-            <Link href="/signup" passHref>
-                <Button variant="link" className="p-0 h-auto">Sign Up</Button>
+            <p className="text-muted-foreground">Already have an account?&nbsp;</p>
+             <Link href="/" passHref>
+                <Button variant="link" className="p-0 h-auto">Sign In</Button>
             </Link>
           </CardFooter>
         </Card>
