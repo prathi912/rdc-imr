@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProjectList } from '@/components/projects/project-list';
-import { FilePlus2, CheckCircle, Clock } from 'lucide-react';
+import { FilePlus2, CheckCircle, Clock, ArrowRight } from 'lucide-react';
 import { type Project } from '@/types';
 
 const statCards = [
@@ -62,7 +62,18 @@ export function FacultyDashboard() {
           </Card>
         ))}
       </div>
-      <ProjectList title="My Projects" projects={sampleProjects} userRole="faculty" />
+      <div>
+         <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-2xl font-bold tracking-tight">My Recent Projects</h3>
+            <Link href="/dashboard/my-projects">
+              <Button variant="ghost">
+                View All
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+        </div>
+        <ProjectList projects={sampleProjects} userRole="faculty" />
+      </div>
     </div>
   );
 }

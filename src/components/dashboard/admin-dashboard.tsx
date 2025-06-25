@@ -2,6 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, FileText, CheckCircle, Users } from 'lucide-react';
 import { ProjectList } from '@/components/projects/project-list';
 import { type Project } from '@/types';
+import Link from 'next/link';
+import { Button } from '../ui/button';
+import { ArrowRight } from 'lucide-react';
 
 const statCards = [
   { title: 'Total Projects', value: '150', icon: FileText, change: '+12' },
@@ -64,7 +67,18 @@ export function AdminDashboard() {
           </Card>
         ))}
       </div>
-      <ProjectList title="All Projects" projects={sampleProjects} userRole="admin" />
+      <div>
+        <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-2xl font-bold tracking-tight">Recent Submissions</h3>
+            <Link href="/dashboard/all-projects">
+              <Button variant="ghost">
+                View All
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+        </div>
+        <ProjectList projects={sampleProjects} userRole="admin" />
+      </div>
     </div>
   );
 }
