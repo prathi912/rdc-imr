@@ -186,7 +186,31 @@ export function SubmissionForm() {
                     <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Research">Research</SelectItem><SelectItem value="Development">Development</SelectItem><SelectItem value="Clinical Trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   <FormField name="department" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Department</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl><SelectContent><SelectItem value="cs">Computer Science</SelectItem><SelectItem value="physics">Physics</SelectItem><SelectItem value="medical">Medical Research</SelectItem><SelectItem value="engineering">Engineering</SelectItem><SelectItem value="arts_humanities">Arts & Humanities</SelectItem><SelectItem value="civil_engineering">Civil Engineering</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Department</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                        <SelectItem value="Faculty of Engineering & Technology">Faculty of Engineering & Technology</SelectItem>
+                        <SelectItem value="Faculty of Diploma Studies">Faculty of Diploma Studies</SelectItem>
+                        <SelectItem value="Faculty of Applied Sciences">Faculty of Applied Sciences</SelectItem>
+                        <SelectItem value="Faculty of Computer Applications">Faculty of Computer Applications</SelectItem>
+                        <SelectItem value="Faculty of Agriculture">Faculty of Agriculture</SelectItem>
+                        <SelectItem value="Faculty of Architecture & Planning">Faculty of Architecture & Planning</SelectItem>
+                        <SelectItem value="Faculty of Design">Faculty of Design</SelectItem>
+                        <SelectItem value="Faculty of Fine Arts">Faculty of Fine Arts</SelectItem>
+                        <SelectItem value="Faculty of Arts">Faculty of Arts</SelectItem>
+                        <SelectItem value="Faculty of Commerce">Faculty of Commerce</SelectItem>
+                        <SelectItem value="Faculty of Social Work">Faculty of Social Work</SelectItem>
+                        <SelectItem value="Faculty of Management Studies">Faculty of Management Studies</SelectItem>
+                        <SelectItem value="Faculty of Hotel Management & Catering Technology">Faculty of Hotel Management & Catering Technology</SelectItem>
+                        <SelectItem value="Faculty of Law">Faculty of Law</SelectItem>
+                        <SelectItem value="Faculty of Medicine">Faculty of Medicine</SelectItem>
+                        <SelectItem value="Faculty of Homoeopathy">Faculty of Homoeopathy</SelectItem>
+                        <SelectItem value="Faculty of Ayurveda">Faculty of Ayurveda</SelectItem>
+                        <SelectItem value="Faculty of Nursing">Faculty of Nursing</SelectItem>
+                        <SelectItem value="Faculty of Pharmacy">Faculty of Pharmacy</SelectItem>
+                        <SelectItem value="Faculty of Physiotherapy">Faculty of Physiotherapy</SelectItem>
+                        <SelectItem value="Faculty of Public Health">Faculty of Public Health</SelectItem>
+                    </SelectContent>
+                    </Select><FormMessage /></FormItem>
                   )} />
                 </div>
               </div>

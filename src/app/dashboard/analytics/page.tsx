@@ -146,7 +146,10 @@ export default function AnalyticsPage() {
                   tickLine={false}
                   tickMargin={10}
                   axisLine={false}
-                  width={120}
+                  width={250}
+                  tick={{
+                    fontSize: 12
+                  }}
                 />
                  <XAxis dataKey="projects" type="number" hide allowDecimals={false} />
                 <ChartTooltip
