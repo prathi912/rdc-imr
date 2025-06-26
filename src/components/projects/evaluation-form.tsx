@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, runTransaction } from 'firebase/firestore';
 import type { Project, User, Evaluation } from '@/types';
 import { getEvaluationPrompts } from '@/app/actions';
 import { Loader2, Wand2 } from 'lucide-react';
@@ -83,23 +83,39 @@ export function EvaluationForm({ project, user, onUpdate }: EvaluationFormProps)
         },
         comments: values.comments,
       };
-
-      let updatedEvaluations = [...(project.evaluations || [])];
       
-      const existingIndex = updatedEvaluations.findIndex(e => e.evaluatorUid === user.uid);
-      if (existingIndex > -1) {
-        updatedEvaluations[existingIndex] = newEvaluation;
-      } else {
+      await runTransaction(db, async (transaction) => {
+        const projectDoc = await transaction.get(projectRef);
+        if (!projectDoc.exists()) {
+          throw "Project document does not exist!";
+        }
+        
+        const currentData = projectDoc.data();
+        const currentEvaluations = currentData.evaluations || [];
+        
+        // Remove any previous evaluation from this user
+        const updatedEvaluations = currentEvaluations.filter(
+            (e: Evaluation) => e.evaluatorUid !== user.uid
+        );
+        
+        // Add the new evaluation
         updatedEvaluations.push(newEvaluation);
-      }
+        
+        transaction.update(projectRef, { evaluations: updatedEvaluations });
+      });
 
-      await updateDoc(projectRef, { evaluations: updatedEvaluations });
+      // Manually update local state to reflect the change for the UI
+      const updatedLocalEvaluations = [
+          ...(project.evaluations?.filter(e => e.evaluatorUid !== user.uid) || []),
+          newEvaluation
+      ];
 
-      onUpdate({ ...project, evaluations: updatedEvaluations });
+      onUpdate({ ...project, evaluations: updatedLocalEvaluations });
       toast({ title: 'Success', description: 'Your evaluation has been submitted.' });
+
     } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit evaluation.' });
+      console.error("Error submitting evaluation in transaction: ", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit evaluation. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
