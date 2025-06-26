@@ -3,6 +3,12 @@ export type User = {
   name: string;
   email: string;
   role: 'admin' | 'faculty';
+  faculty?: string;
+  institute?: string;
+  department?: string;
+  misId?: string;
+  phoneNumber?: string;
+  profileComplete?: boolean;
 };
 
 export type BankDetails = {

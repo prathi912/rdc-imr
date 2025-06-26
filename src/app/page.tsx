@@ -63,7 +63,7 @@ export default function LoginPage() {
     let user: User;
 
     if (userDocSnap.exists()) {
-      user = userDocSnap.data() as User;
+      user = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
     } else {
       // Create new user if they don't exist in Firestore (e.g., first Google sign-in)
       user = {
@@ -71,13 +71,15 @@ export default function LoginPage() {
         name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
         email: firebaseUser.email!,
         role: firebaseUser.email === 'rathipranav07@gmail.com' ? 'admin' : 'faculty',
+        profileComplete: false,
       };
       await setDoc(userDocRef, user);
     }
     
-    // Ensure admin user always has admin role
-    if (user.email === 'rathipranav07@gmail.com' && user.role !== 'admin') {
+    // Ensure admin user always has admin role and bypasses profile setup
+    if (user.email === 'rathipranav07@gmail.com' && !user.profileComplete) {
       user.role = 'admin';
+      user.profileComplete = true;
       await setDoc(userDocRef, user, { merge: true });
     }
 
@@ -85,11 +87,19 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(user));
     }
     
-    toast({
-      title: 'Login Successful',
-      description: 'Redirecting to your dashboard...',
-    });
-    router.push('/dashboard');
+    if (user.profileComplete) {
+      toast({
+        title: 'Login Successful',
+        description: 'Redirecting to your dashboard...',
+      });
+      router.push('/dashboard');
+    } else {
+       toast({
+        title: 'Profile Setup Required',
+        description: 'Please complete your profile to continue.',
+      });
+      router.push('/profile-setup');
+    }
   };
 
   const onEmailSubmit = async (data: LoginFormValues) => {
@@ -106,6 +116,7 @@ export default function LoginPage() {
           ? 'Invalid email or password.'
           : error.message || 'An unknown error occurred.',
       });
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -138,7 +149,8 @@ export default function LoginPage() {
             title: 'Sign In Failed',
             description: error.message || 'Could not sign in with Google. Please try again.',
         });
-        setIsSubmitting(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

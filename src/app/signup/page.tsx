@@ -65,58 +65,45 @@ export default function SignupPage() {
     },
   });
   
-  const processSignIn = async (firebaseUser: FirebaseUser) => {
+  const processNewUser = async (firebaseUser: FirebaseUser, name?: string) => {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDocSnap = await getDoc(userDocRef);
-    let user: User;
 
     if (userDocSnap.exists()) {
-      user = userDocSnap.data() as User;
-    } else {
-      user = {
-        uid: firebaseUser.uid,
-        name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
-        email: firebaseUser.email!,
-        role: 'faculty', // All sign-ups are faculty
-      };
-      await setDoc(userDocRef, user);
+      toast({
+        title: 'Account Exists',
+        description: 'This email is already registered. Please sign in.',
+      });
+      await signOut(auth);
+      router.push('/');
+      return;
     }
+
+    const user: User = {
+      uid: firebaseUser.uid,
+      name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
+      email: firebaseUser.email!,
+      role: 'faculty',
+      profileComplete: false,
+    };
+    await setDoc(userDocRef, user);
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(user));
     }
     
     toast({
-      title: 'Sign Up Successful',
-      description: "You've been successfully signed in.",
+      title: 'Account Created',
+      description: "Let's complete your profile to continue.",
     });
-    router.push('/dashboard');
+    router.push('/profile-setup');
   };
 
   const onEmailSubmit = async (data: SignupFormValues) => {
     setIsSubmitting(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      const firebaseUser = userCredential.user;
-
-      const user: User = {
-        uid: firebaseUser.uid,
-        name: data.name,
-        email: data.email,
-        role: 'faculty', // All new signups are faculty
-      };
-
-      await setDoc(doc(db, 'users', firebaseUser.uid), user);
-
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('user', JSON.stringify(user));
-      }
-      
-      toast({
-        title: 'Account Created',
-        description: "You've been successfully signed in.",
-      });
-      router.push('/dashboard');
+      await processNewUser(userCredential.user, data.name);
     } catch (error: any) {
       console.error('Signup Error:', error);
       toast({
@@ -150,7 +137,7 @@ export default function SignupPage() {
         return;
       }
 
-      await processSignIn(firebaseUser);
+      await processNewUser(firebaseUser);
 
     } catch (error: any) {
         console.error('Google Sign-up error:', error);

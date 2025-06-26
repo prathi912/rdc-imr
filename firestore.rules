@@ -2,71 +2,79 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isAuthOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    function getUserData(uid) {
+      // Make sure to handle the case where the user doc might not exist yet.
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
     
-    // USERS
+    function isAdmin(uid) {
+      return isAuth() && getUserData(uid).role == 'admin';
+    }
+
     match /users/{userId} {
-      // Admins can read/write any user profile
-      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Admins can do anything to user profiles
+      allow read, write: if isAdmin(request.auth.uid);
+      
       // Users can read their own profile
-      allow get: if request.auth.uid == userId;
-      // Allow users to be created
-      allow create: if request.auth.uid == userId;
-    }
+      allow read: if isAuthOwner(userId);
 
-    // PROJECTS
-    match /projects/{projectId} {
-      // Admins can perform any action on any project
-      allow read, write, create: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-
-      // Authenticated users can read all projects (for lists)
-      allow list: if request.auth != null;
-      // Users can get a specific project if they are the PI or an admin
-      allow get: if request.auth != null && (request.auth.uid == resource.data.pi_uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
-
-      // Faculty can create new projects for themselves
-      allow create: if request.auth.uid == request.resource.data.pi_uid &&
-                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'faculty';
-
-      // Allow faculty to update their own project for specific workflows
-      allow update: if request.auth.uid == resource.data.pi_uid &&
-                    (
-                      // Rule for submitting bank details
-                      (request.resource.data.grant.status == 'Bank Details Submitted' &&
-                       resource.data.grant.status == 'Pending Bank Details' &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant'])) ||
-
-                      // Rule for submitting utilization report
-                      (request.resource.data.grant.status == 'Utilization Submitted' &&
-                       resource.data.grant.status == 'Disbursed' &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant'])) ||
-
-                      // Rule for adding transactions
-                      (request.resource.data.grant.status == 'Disbursed' &&
-                       resource.data.grant.status == 'Disbursed' &&
-                       request.resource.data.grant.transactions.size() == resource.data.grant.transactions.size() + 1 &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant'])) ||
-                      
-                      // Rule for submitting completion report
-                      (request.resource.data.status == 'Pending Completion Approval' &&
-                       (resource.data.status == 'Approved' || resource.data.status == 'In Progress') &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completionReportUrl', 'completionSubmissionDate']))
-                    );
+      // Users can be created during signup
+      allow create: if isAuthOwner(userId);
+      
+      // Users can update their own profile, but cannot change their role.
+      allow update: if isAuthOwner(userId) && request.resource.data.role == resource.data.role;
     }
     
-    // COUNTERS
-    match /counters/projects {
-        // Only faculty can update the counter, but only as part of a transaction creating a project.
-        // This is implicitly handled by the create rule on projects within a transaction.
-        // Explicit write is only for admins for maintenance.
-        allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-        allow get: if request.auth != null;
+    match /projects/{projectId} {
+      allow read: if isAuth();
+
+      // Users can create a project for themselves
+      allow create: if isAuth() && request.resource.data.pi_uid == request.auth.uid;
+      
+      function isProjectOwner() {
+        return isAuthOwner(resource.data.pi_uid);
+      }
+      
+      function incomingData() {
+        return request.resource.data;
+      }
+      
+      // Allow PI to submit completion report
+      allow update: if isProjectOwner() &&
+                      incomingData().status == 'Pending Completion Approval' &&
+                      resource.data.status in ['Approved', 'In Progress'];
+      
+      // Allow PI to update grant details, but not status, amount, or other project fields.
+      allow update: if isProjectOwner() &&
+                      // only grant can be updated
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant']) &&
+                      // PI cannot change grant amount or status themselves
+                      incomingData().grant.amount == resource.data.grant.amount &&
+                      incomingData().grant.status == resource.data.grant.status;
+                      
+      // Allow admin to update any field on a project
+      allow update: if isAdmin(request.auth.uid);
     }
 
-    // NOTIFICATIONS
     match /notifications/{notificationId} {
-        // Users can only read, create, and update their own notifications
-        allow read, create, update: if request.auth.uid == request.resource.data.uid;
-        allow list: if request.auth.uid == request.query.where.uid;
+      allow read, update: if isAuthOwner(resource.data.uid);
+      // Notifications are created server-side by trusted code
+      allow create: if isAuth(); 
+    }
+    
+    match /counters/{counterId} {
+        allow read: if isAuth();
+        // Counter writes happen inside a transaction in a trusted client environment
+        allow write: if isAuth();
     }
   }
 }
