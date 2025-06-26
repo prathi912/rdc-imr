@@ -36,7 +36,9 @@ export function ProjectSummary({ project }: ProjectSummaryProps) {
       title: project.title,
       abstract: project.abstract,
       type: project.type,
-      department: project.department,
+      faculty: project.faculty,
+      institute: project.institute,
+      departmentName: project.departmentName,
       teamInfo: project.teamInfo,
       timelineAndOutcomes: project.timelineAndOutcomes,
     };

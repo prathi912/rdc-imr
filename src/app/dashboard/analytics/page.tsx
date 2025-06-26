@@ -51,16 +51,16 @@ export default function AnalyticsPage() {
     submissions: { label: 'Submissions', color: 'hsl(var(--primary))' },
   } satisfies ChartConfig;
 
-  // Projects by department
-  const departmentData = Object.entries(
+  // Projects by faculty
+  const facultyData = Object.entries(
     projects.reduce((acc, project) => {
-      acc[project.department] = (acc[project.department] || 0) + 1;
+      acc[project.faculty] = (acc[project.faculty] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
-  ).map(([department, count]) => ({ department, projects: count }))
+  ).map(([faculty, count]) => ({ faculty, projects: count }))
   .sort((a, b) => b.projects - a.projects);
 
-  const departmentConfig = {
+  const facultyConfig = {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },
   } satisfies ChartConfig;
 
@@ -133,15 +133,15 @@ export default function AnalyticsPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Projects by Department</CardTitle>
-            <CardDescription>Total projects submitted by each department.</CardDescription>
+            <CardTitle>Projects by Faculty</CardTitle>
+            <CardDescription>Total projects submitted by each faculty.</CardDescription>
           </CardHeader>
           <CardContent>
-             <ChartContainer config={departmentConfig} className="h-[300px] w-full">
-              <BarChart accessibilityLayer data={departmentData} layout="vertical" margin={{left: 30}}>
+             <ChartContainer config={facultyConfig} className="h-[300px] w-full">
+              <BarChart accessibilityLayer data={facultyData} layout="vertical" margin={{left: 30}}>
                 <CartesianGrid horizontal={false} />
                 <YAxis
-                  dataKey="department"
+                  dataKey="faculty"
                   type="category"
                   tickLine={false}
                   tickMargin={10}

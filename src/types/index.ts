@@ -37,7 +37,9 @@ export type Project = {
   title: string;
   abstract: string;
   type: string;
-  department: string;
+  faculty: string;
+  institute: string;
+  departmentName: string;
   pi: string;
   pi_uid: string;
   status: 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed' | 'Pending Completion Approval';

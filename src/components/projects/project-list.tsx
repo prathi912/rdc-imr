@@ -36,7 +36,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Title</TableHead>
-              <TableHead className="hidden md:table-cell">Department</TableHead>
+              <TableHead className="hidden md:table-cell">Faculty</TableHead>
               <TableHead className="hidden sm:table-cell">PI</TableHead>
               <TableHead className="hidden md:table-cell">Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -46,7 +46,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
             {projects.map((project) => (
               <TableRow key={project.id}>
                 <TableCell className="font-medium">{project.title}</TableCell>
-                <TableCell className="hidden md:table-cell">{project.department}</TableCell>
+                <TableCell className="hidden md:table-cell">{project.faculty}</TableCell>
                 <TableCell className="hidden sm:table-cell">{project.pi}</TableCell>
                 <TableCell className="hidden md:table-cell">
                   <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>

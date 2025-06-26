@@ -15,7 +15,9 @@ const SummarizeProjectInputSchema = z.object({
   title: z.string().describe('The title of the project.'),
   abstract: z.string().describe('The abstract of the project.'),
   type: z.string().describe('The type of the project.'),
-  department: z.string().describe('The department associated with the project.'),
+  faculty: z.string().describe('The faculty associated with the project.'),
+  institute: z.string().describe('The institute associated with the project.'),
+  departmentName: z.string().describe('The specific department name.'),
   teamInfo: z.string().describe('Information about the project team (PI, Co-PIs, students).'),
   timelineAndOutcomes: z.string().describe('Timeline and expected outcomes of the project.'),
 });
@@ -41,7 +43,9 @@ const summarizeProjectPrompt = ai.definePrompt({
   Project Title: {{{title}}}
   Abstract: {{{abstract}}}
   Project Type: {{{type}}}
-  Department: {{{department}}}
+  Faculty: {{{faculty}}}
+  Institute: {{{institute}}}
+  Department: {{{departmentName}}}
   Team Information: {{{teamInfo}}}
   Timeline and Expected Outcomes: {{{timelineAndOutcomes}}}
   `,

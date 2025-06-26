@@ -22,7 +22,9 @@ const formSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters.'),
   abstract: z.string().min(20, 'Abstract must be at least 20 characters.'),
   projectType: z.string().min(1, 'Please select a project type.'),
-  department: z.string().min(1, 'Please select a department.'),
+  faculty: z.string().min(1, 'Please select a faculty.'),
+  institute: z.string().min(1, 'Please select an institute.'),
+  departmentName: z.string().min(2, 'Department name is required.'),
   // Step 2
   coPiNames: z.string().optional(),
   studentInfo: z.string().optional(),
@@ -45,6 +47,61 @@ const steps = [
   { id: 4, title: 'Timeline & Outcomes', icon: GanttChartSquare },
 ];
 
+const faculties = [
+    "Faculty of Engineering & Technology",
+    "Faculty of Diploma Studies",
+    "Faculty of Applied Sciences",
+    "Faculty of Computer Applications",
+    "Faculty of Agriculture",
+    "Faculty of Architecture & Planning",
+    "Faculty of Design",
+    "Faculty of Fine Arts",
+    "Faculty of Arts",
+    "Faculty of Commerce",
+    "Faculty of Social Work",
+    "Faculty of Management Studies",
+    "Faculty of Hotel Management & Catering Technology",
+    "Faculty of Law",
+    "Faculty of Medicine",
+    "Faculty of Homoeopathy",
+    "Faculty of Ayurveda",
+    "Faculty of Nursing",
+    "Faculty of Pharmacy",
+    "Faculty of Physiotherapy",
+    "Faculty of Public Health",
+];
+
+const institutes = [
+    "Parul Institute of Engineering & Technology",
+    "Parul Institute of Technology",
+    "Parul Diploma Studies",
+    "Parul Institute of Computer Application",
+    "Parul Institute of Applied Sciences",
+    "Parul Institute of Agriculture",
+    "Parul Institute of Architecture and Research",
+    "Faculty of Design",
+    "Parul Institute of Fine Arts",
+    "Parul Institute of Arts",
+    "Parul Institute of Commerce",
+    "Parul Institute of Social Work",
+    "Faculty of Management Studies",
+    "Parul Institute of Hotel Management & Catering Technology",
+    "Parul Institute of Law",
+    "Parul Medical College & Hospital",
+    "Jawaharlal Nehru Homoeopathic Medical College",
+    "Ahmedabad Homoeopathic Medical College",
+    "Parul Institute of Homoeopathy & Research",
+    "Rajkot Homoeopathic Medical College",
+    "Parul Institute of Ayurved",
+    "Parul Institute of Ayurved & Research",
+    "Parul Institute of Nursing",
+    "Parul Institute of Pharmacy",
+    "Parul Institute of Pharmacy & Research",
+    "Parul Institute of Physiotherapy",
+    "Faculty of Public Health",
+];
+
+
 export function SubmissionForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [user, setUser] = useState<User | null>(null);
@@ -57,7 +114,9 @@ export function SubmissionForm() {
       title: '',
       abstract: '',
       projectType: '',
-      department: '',
+      faculty: '',
+      institute: '',
+      departmentName: '',
       coPiNames: '',
       studentInfo: '',
       expectedOutcomes: '',
@@ -73,7 +132,7 @@ export function SubmissionForm() {
 
   const handleNext = async () => {
     const fieldsToValidate = {
-      1: ['title', 'abstract', 'projectType', 'department'],
+      1: ['title', 'abstract', 'projectType', 'faculty', 'institute', 'departmentName'],
       2: [],
       3: [],
       4: ['expectedOutcomes'],
@@ -125,7 +184,9 @@ export function SubmissionForm() {
           title: data.title,
           abstract: data.abstract,
           type: data.projectType,
-          department: data.department,
+          faculty: data.faculty,
+          institute: data.institute,
+          departmentName: data.departmentName,
           pi: user.name,
           pi_uid: user.uid,
           teamInfo: `PI: ${user.name}; Co-PIs: ${data.coPiNames || 'N/A'}; Students: ${data.studentInfo || 'N/A'}`,
@@ -185,34 +246,24 @@ export function SubmissionForm() {
                   <FormField name="projectType" control={form.control} render={({ field }) => (
                     <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Research">Research</SelectItem><SelectItem value="Development">Development</SelectItem><SelectItem value="Clinical Trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                   )} />
-                  <FormField name="department" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Department</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl>
+                   <FormField name="faculty" control={form.control} render={({ field }) => (
+                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl>
                     <SelectContent>
-                        <SelectItem value="Faculty of Engineering & Technology">Faculty of Engineering & Technology</SelectItem>
-                        <SelectItem value="Faculty of Diploma Studies">Faculty of Diploma Studies</SelectItem>
-                        <SelectItem value="Faculty of Applied Sciences">Faculty of Applied Sciences</SelectItem>
-                        <SelectItem value="Faculty of Computer Applications">Faculty of Computer Applications</SelectItem>
-                        <SelectItem value="Faculty of Agriculture">Faculty of Agriculture</SelectItem>
-                        <SelectItem value="Faculty of Architecture & Planning">Faculty of Architecture & Planning</SelectItem>
-                        <SelectItem value="Faculty of Design">Faculty of Design</SelectItem>
-                        <SelectItem value="Faculty of Fine Arts">Faculty of Fine Arts</SelectItem>
-                        <SelectItem value="Faculty of Arts">Faculty of Arts</SelectItem>
-                        <SelectItem value="Faculty of Commerce">Faculty of Commerce</SelectItem>
-                        <SelectItem value="Faculty of Social Work">Faculty of Social Work</SelectItem>
-                        <SelectItem value="Faculty of Management Studies">Faculty of Management Studies</SelectItem>
-                        <SelectItem value="Faculty of Hotel Management & Catering Technology">Faculty of Hotel Management & Catering Technology</SelectItem>
-                        <SelectItem value="Faculty of Law">Faculty of Law</SelectItem>
-                        <SelectItem value="Faculty of Medicine">Faculty of Medicine</SelectItem>
-                        <SelectItem value="Faculty of Homoeopathy">Faculty of Homoeopathy</SelectItem>
-                        <SelectItem value="Faculty of Ayurveda">Faculty of Ayurveda</SelectItem>
-                        <SelectItem value="Faculty of Nursing">Faculty of Nursing</SelectItem>
-                        <SelectItem value="Faculty of Pharmacy">Faculty of Pharmacy</SelectItem>
-                        <SelectItem value="Faculty of Physiotherapy">Faculty of Physiotherapy</SelectItem>
-                        <SelectItem value="Faculty of Public Health">Faculty of Public Health</SelectItem>
+                        {faculties.map(faculty => <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>)}
                     </SelectContent>
                     </Select><FormMessage /></FormItem>
                   )} />
                 </div>
+                <FormField name="institute" control={form.control} render={({ field }) => (
+                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select institute" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                        {institutes.map(institute => <SelectItem key={institute} value={institute}>{institute}</SelectItem>)}
+                    </SelectContent>
+                    </Select><FormMessage /></FormItem>
+                )} />
+                <FormField name="departmentName" control={form.control} render={({ field }) => (
+                    <FormItem><FormLabel>Department Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Computer Science & Engineering" /></FormControl><FormMessage /></FormItem>
+                )} />
               </div>
             )}
             {currentStep === 2 && (
