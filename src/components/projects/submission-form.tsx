@@ -119,6 +119,15 @@ export function SubmissionForm() {
         
         const projectDocRef = doc(db, 'projects', newProjectId);
 
+        const teamInfoParts = [`PI: ${user.name}`];
+        if (data.coPiNames) {
+          teamInfoParts.push(`Co-PIs: ${data.coPiNames}`);
+        }
+        if (data.studentInfo) {
+          teamInfoParts.push(`Students: ${data.studentInfo}`);
+        }
+        const teamInfo = teamInfoParts.join('; ');
+
         const projectData = {
           title: data.title,
           abstract: data.abstract,
@@ -128,7 +137,7 @@ export function SubmissionForm() {
           departmentName: user.department,
           pi: user.name,
           pi_uid: user.uid,
-          teamInfo: `PI: ${user.name}; Co-PIs: ${data.coPiNames || 'N/A'}; Students: ${data.studentInfo || 'N/A'}`,
+          teamInfo: teamInfo,
           timelineAndOutcomes: data.expectedOutcomes,
           status: 'Under Review' as const,
           submissionDate: new Date().toISOString(),
