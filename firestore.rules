@@ -3,49 +3,63 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Users can only read their own profile, admins can read any.
-    // Users can create their own profile.
-    match /users/{userId} {
-      allow read: if request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      // Only admins can delete users.
-      allow delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    match /projects/{projectId} {
-      // Any authenticated user can read projects (needed for lists). Details might need stricter rules if sensitive.
-      allow read: if request.auth != null;
-      
-      // Any authenticated user can create a project, but must be their own.
-      allow create: if request.auth.uid == request.resource.data.pi_uid;
-      
-      // Update rules are complex and depend on role.
-      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-                      (request.auth.uid == resource.data.pi_uid && isOwnerUpdatingGrant(request, resource));
+    function isSignedIn() {
+      return request.auth != null;
     }
     
-    // Notifications can only be read/updated by the recipient.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isFaculty() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'faculty';
+    }
+    
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isOwner(userId);
+    }
+
+    match /counters/projects {
+      allow read: if isSignedIn();
+      allow write: if isFaculty() && (
+        (resource == null && request.resource.data.count >= 1) ||
+        (resource != null && request.resource.data.count == resource.data.count + 1)
+      );
+    }
+    
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create: if isFaculty();
+
+      // Admin can update anything.
+      // Faculty (PI) can only update the 'grant' field under specific conditions.
+      allow update: if isAdmin() || (
+        isOwner(resource.data.pi_uid) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant']) &&
+        (
+          // Case 1: Submitting bank details
+          (
+            resource.data.grant.status == 'Pending Bank Details' &&
+            request.resource.data.grant.status == 'Bank Details Submitted'
+          ) ||
+          // Case 2: Adding transactions or submitting utilization report when status is Disbursed
+          (
+            resource.data.grant.status == 'Disbursed'
+          )
+        )
+      );
+    }
+    
     match /notifications/{notificationId} {
-      allow read, update: if request.auth.uid == resource.data.uid;
-      allow create: if request.auth.uid != null; // Server/functions will create these.
+      allow read, update: if isOwner(resource.data.uid);
+      allow create: if isAdmin();
     }
   }
-}
-
-// Helper function for project grant updates by the project owner (PI).
-function isOwnerUpdatingGrant(request, resource) {
-  let grantBefore = resource.data.grant;
-  let grantAfter = request.resource.data.grant;
-  let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
-
-  // Allow update only on the 'grant' field.
-  return changedKeys.hasOnly(['grant']) && (
-    // 1. PI Submitting bank details
-    (grantBefore.status == 'Pending Bank Details' && grantAfter.status == 'Bank Details Submitted' && grantBefore.bankDetails == null && grantAfter.bankDetails != null) ||
-    // 2. PI adding/updating transactions
-    (grantBefore.status == 'Disbursed' && grantAfter.status == 'Disbursed' && grantAfter.transactions.size() >= (grantBefore.transactions != null ? grantBefore.transactions.size() : 0) ) ||
-    // 3. PI finalizing the report
-    (grantBefore.status == 'Disbursed' && grantAfter.status == 'Utilization Submitted' && grantBefore.utilizationSubmissionDate == null && grantAfter.utilizationSubmissionDate != null)
-  );
 }

@@ -14,7 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { addDoc, collection } from 'firebase/firestore';
+import { runTransaction, doc } from 'firebase/firestore';
 import type { User } from '@/types';
 
 const formSchema = z.object({
@@ -105,17 +105,37 @@ export function SubmissionForm() {
 
     setIsSubmitting(true);
     try {
-      await addDoc(collection(db, 'projects'), {
-        title: data.title,
-        abstract: data.abstract,
-        type: data.projectType,
-        department: data.department,
-        pi: user.name,
-        pi_uid: user.uid,
-        teamInfo: `PI: ${user.name}; Co-PIs: ${data.coPiNames || 'N/A'}; Students: ${data.studentInfo || 'N/A'}`,
-        timelineAndOutcomes: data.expectedOutcomes,
-        status: 'Under Review',
-        submissionDate: new Date().toISOString(),
+      const counterRef = doc(db, 'counters', 'projects');
+
+      await runTransaction(db, async (transaction) => {
+        const counterDoc = await transaction.get(counterRef);
+        let newCount = 1;
+        if (counterDoc.exists()) {
+          newCount = counterDoc.data().count + 1;
+        }
+
+        const year = new Date().getFullYear();
+        const projectType = data.projectType.replace(/\s+/g, '_');
+        const paddedCount = String(newCount).padStart(4, '0');
+        const newProjectId = `${year}_${projectType}_${paddedCount}`;
+        
+        const projectDocRef = doc(db, 'projects', newProjectId);
+
+        const projectData = {
+          title: data.title,
+          abstract: data.abstract,
+          type: data.projectType,
+          department: data.department,
+          pi: user.name,
+          pi_uid: user.uid,
+          teamInfo: `PI: ${user.name}; Co-PIs: ${data.coPiNames || 'N/A'}; Students: ${data.studentInfo || 'N/A'}`,
+          timelineAndOutcomes: data.expectedOutcomes,
+          status: 'Under Review' as const,
+          submissionDate: new Date().toISOString(),
+        };
+
+        transaction.set(projectDocRef, projectData);
+        transaction.set(counterRef, { count: newCount }, { merge: true });
       });
       
       toast({
@@ -163,7 +183,7 @@ export function SubmissionForm() {
                 )} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField name="projectType" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="research">Research</SelectItem><SelectItem value="development">Development</SelectItem><SelectItem value="clinical_trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Research">Research</SelectItem><SelectItem value="Development">Development</SelectItem><SelectItem value="Clinical Trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   <FormField name="department" control={form.control} render={({ field }) => (
                     <FormItem><FormLabel>Department</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger></FormControl><SelectContent><SelectItem value="cs">Computer Science</SelectItem><SelectItem value="physics">Physics</SelectItem><SelectItem value="medical">Medical Research</SelectItem><SelectItem value="engineering">Engineering</SelectItem><SelectItem value="arts_humanities">Arts & Humanities</SelectItem><SelectItem value="civil_engineering">Civil Engineering</SelectItem></SelectContent></Select><FormMessage /></FormItem>
