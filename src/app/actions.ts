@@ -28,22 +28,19 @@ export async function getEvaluationPrompts(input: EvaluationPromptsInput) {
 }
 
 export async function scheduleMeetingForProjects(
-  projectIds: string[],
-  meetingDetails: { date: string; time: string; venue: string; },
-  projectsData: { id: string; pi_uid: string; title: string; }[]
+  projectsToSchedule: { id: string; pi_uid: string; title: string; }[],
+  meetingDetails: { date: string; time: string; venue: string; }
 ) {
   try {
     const batch = writeBatch(db);
 
-    projectIds.forEach(id => {
-      const projectRef = doc(db, 'projects', id);
+    projectsToSchedule.forEach(project => {
+      const projectRef = doc(db, 'projects', project.id);
       batch.update(projectRef, { 
         meetingDetails: meetingDetails,
         status: 'Under Review'
       });
-    });
 
-    projectsData.forEach(project => {
        const notificationRef = doc(collection(db, 'notifications'));
        batch.set(notificationRef, {
          uid: project.pi_uid,
@@ -58,6 +55,7 @@ export async function scheduleMeetingForProjects(
     return { success: true };
   } catch (error) {
     console.error('Error scheduling meeting:', error);
-    return { success: false, error: 'Failed to schedule meeting.' };
+    const errorMessage = error instanceof Error ? error.message : 'Failed to schedule meeting.';
+    return { success: false, error: errorMessage };
   }
 }

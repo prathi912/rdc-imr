@@ -94,10 +94,10 @@ export function ScheduleMeetingForm() {
       date: data.date.toISOString(),
     };
     
-    const projectsToUpdate = projects.filter(p => selectedProjects.includes(p.id))
+    const projectsToSchedule = projects.filter(p => selectedProjects.includes(p.id))
       .map(p => ({ id: p.id, pi_uid: p.pi_uid, title: p.title }));
 
-    const result = await scheduleMeetingForProjects(selectedProjects, meetingDetails, projectsToUpdate);
+    const result = await scheduleMeetingForProjects(projectsToSchedule, meetingDetails);
 
     if (result.success) {
       toast({ title: 'Meeting Scheduled!', description: 'The meeting has been scheduled and PIs have been notified.' });
