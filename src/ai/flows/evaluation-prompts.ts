@@ -10,13 +10,13 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const EvaluationPromptsInputSchema = z.object({
+const EvaluationPromptsInputSchema = z.object({
   title: z.string().describe('The title of the project.'),
   abstract: z.string().describe('The abstract of the project.'),
 });
 export type EvaluationPromptsInput = z.infer<typeof EvaluationPromptsInputSchema>;
 
-export const EvaluationPromptsOutputSchema = z.object({
+const EvaluationPromptsOutputSchema = z.object({
   relevance: z.string().describe("A question to prompt evaluation of the project's relevance and significance."),
   methodology: z.string().describe("A question to prompt evaluation of the project's methodology and research design."),
   feasibility: z.string().describe("A question to prompt evaluation of the project's feasibility, considering timeline and budget."),
