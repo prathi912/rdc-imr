@@ -48,6 +48,7 @@ interface ProjectDetailsClientProps {
 }
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
+  'Submitted': 'secondary',
   'Approved': 'default',
   'In Progress': 'default',
   'Under Review': 'secondary',
@@ -235,7 +236,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       handleStatusUpdate(status);
   }
 
-  const availableStatuses: Project['status'][] = ['Approved', 'Rejected', 'In Progress', 'Completed', 'Under Review', 'Pending Completion Approval'];
+  const availableStatuses: Project['status'][] = ['Submitted', 'Under Review', 'Approved', 'Rejected', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
   return (
     <>
@@ -335,6 +336,19 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {project.meetingDetails && (
+            <>
+              <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
+                <h3 className="font-semibold text-lg">IMR Evaluation Meeting Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                  <p><strong>Date:</strong> {formatDate(project.meetingDetails.date)}</p>
+                  <p><strong>Time:</strong> {project.meetingDetails.time}</p>
+                  <p><strong>Venue:</strong> {project.meetingDetails.venue}</p>
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
           <div className="space-y-2">
             <h3 className="font-semibold text-lg">Abstract</h3>
             <p className="text-muted-foreground">{project.abstract}</p>
@@ -363,11 +377,15 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
             </div>
           </div>
           <Separator />
-          <div className="space-y-2">
-            <h3 className="font-semibold text-lg">Team Information</h3>
-            <p className="text-muted-foreground whitespace-pre-wrap">{project.teamInfo}</p>
-          </div>
-          <Separator />
+           {project.teamInfo && (
+                <>
+                <div className="space-y-2">
+                  <h3 className="font-semibold text-lg">Team Information</h3>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{project.teamInfo}</p>
+                </div>
+                <Separator />
+                </>
+            )}
           <div className="space-y-2">
             <h3 className="font-semibold text-lg">Timeline and Outcomes</h3>
             <p className="text-muted-foreground whitespace-pre-wrap">{project.timelineAndOutcomes}</p>

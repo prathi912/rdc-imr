@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProjectList } from '@/components/projects/project-list';
 import { FilePlus2, CheckCircle, Clock, ArrowRight, BookOpenCheck } from 'lucide-react';
@@ -38,6 +38,8 @@ export function FacultyDashboard({ user }: { user: User }) {
   const activeProjects = projects.filter(p => p.status === 'Approved' || p.status === 'In Progress').length;
   const pendingApproval = projects.filter(p => p.status === 'Under Review').length;
   const completedProjects = projects.filter(p => p.status === 'Completed').length;
+  const upcomingMeetings = projects.filter(p => p.meetingDetails && p.status !== 'Completed' && p.status !== 'Rejected');
+
 
   const statCards = [
     { title: 'Active Projects', value: activeProjects.toString(), icon: BookOpenCheck },
@@ -81,6 +83,30 @@ export function FacultyDashboard({ user }: { user: User }) {
             </Card>
           ))}
         </div>
+      )}
+      
+      {loading ? (
+        <Skeleton className="h-40 w-full" />
+      ) : upcomingMeetings.length > 0 && (
+        <Card className="border-primary/40">
+            <CardHeader>
+                <CardTitle>Upcoming IMR Evaluation Meeting</CardTitle>
+                <CardDescription>Details for your scheduled project presentation.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {upcomingMeetings.map(p => (
+                    p.meetingDetails &&
+                    <div key={p.id} className="p-3 border rounded-lg">
+                        <p className="font-semibold">{p.title}</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm mt-2 text-muted-foreground">
+                            <span><strong>Date:</strong> {new Date(p.meetingDetails.date).toLocaleDateString()}</span>
+                            <span><strong>Time:</strong> {p.meetingDetails.time}</span>
+                            <span><strong>Venue:</strong> {p.meetingDetails.venue}</span>
+                        </div>
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
       )}
 
       <div>

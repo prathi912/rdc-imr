@@ -61,7 +61,7 @@ export type Project = {
   departmentName: string;
   pi: string;
   pi_uid: string;
-  status: 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed' | 'Pending Completion Approval';
+  status: 'Submitted' | 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed' | 'Pending Completion Approval';
   teamInfo: string;
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string
@@ -69,6 +69,11 @@ export type Project = {
   completionReportUrl?: string;
   completionSubmissionDate?: string; // ISO String
   evaluatedBy?: string[];
+  meetingDetails?: {
+    date: string;
+    time: string;
+    venue: string;
+  };
 };
 
 export type Notification = {

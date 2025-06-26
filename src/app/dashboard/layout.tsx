@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import {
   Bell,
   Book,
+  CalendarClock,
   ClipboardCheck,
   FileCheck2,
   FilePlus2,
@@ -192,6 +193,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
             {isAdmin && (
               <>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/schedule-meeting" tooltip="Schedule Meeting" isActive={pathname === '/dashboard/schedule-meeting'}>
+                    <CalendarClock />
+                    Schedule Meeting
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton href="/dashboard/pending-reviews" tooltip="Pending Reviews" isActive={pathname === '/dashboard/pending-reviews'}>
                     <GanttChartSquare />

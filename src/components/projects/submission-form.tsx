@@ -119,11 +119,11 @@ export function SubmissionForm() {
         
         const projectDocRef = doc(db, 'projects', newProjectId);
 
-        const teamInfoParts = [`PI: ${user.name}`];
-        if (data.coPiNames) {
+        const teamInfoParts = [];
+        if (data.coPiNames && data.coPiNames.trim() !== '') {
           teamInfoParts.push(`Co-PIs: ${data.coPiNames}`);
         }
-        if (data.studentInfo) {
+        if (data.studentInfo && data.studentInfo.trim() !== '') {
           teamInfoParts.push(`Students: ${data.studentInfo}`);
         }
         const teamInfo = teamInfoParts.join('; ');
@@ -139,7 +139,7 @@ export function SubmissionForm() {
           pi_uid: user.uid,
           teamInfo: teamInfo,
           timelineAndOutcomes: data.expectedOutcomes,
-          status: 'Under Review' as const,
+          status: 'Submitted' as const,
           submissionDate: new Date().toISOString(),
         };
 
