@@ -192,7 +192,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                   <CardTitle className="text-2xl">{project.title}</CardTitle>
-                  <CardDescription>Submitted by {project.pi} on {formatDate(project.submissionDate)}</CardDescription>
+                  <CardDescription>Submitted on {formatDate(project.submissionDate)}</CardDescription>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                   <Badge variant={statusVariant[project.status] || 'secondary'} className="text-sm px-3 py-1">
@@ -283,25 +283,31 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
           </div>
           <Separator />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                  <h3 className="font-semibold text-lg">Details</h3>
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                      <dt className="font-medium text-muted-foreground">Project Type</dt>
-                      <dd>{project.type}</dd>
-                      <dt className="font-medium text-muted-foreground">Faculty</dt>
-                      <dd>{project.faculty}</dd>
-                      <dt className="font-medium text-muted-foreground">Institute</dt>
-                      <dd>{project.institute}</dd>
-                      <dt className="font-medium text-muted-foreground">Department</dt>
-                      <dd>{project.departmentName}</dd>
-                      <dt className="font-medium text-muted-foreground">Principal Investigator</dt>
-                      <dd>{project.pi}</dd>
-                  </dl>
-              </div>
-              <div className="space-y-2">
-                  <h3 className="font-semibold text-lg">Team Information</h3>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{project.teamInfo}</p>
-              </div>
+            <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Project Details</h3>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <dt className="font-medium text-muted-foreground">Project Type</dt>
+                    <dd>{project.type}</dd>
+                </dl>
+            </div>
+             <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Submitter Information</h3>
+                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    <dt className="font-medium text-muted-foreground">Principal Investigator</dt>
+                    <dd>{project.pi}</dd>
+                    <dt className="font-medium text-muted-foreground">Faculty</dt>
+                    <dd>{project.faculty}</dd>
+                    <dt className="font-medium text-muted-foreground">Institute</dt>
+                    <dd>{project.institute}</dd>
+                    <dt className="font-medium text-muted-foreground">Department</dt>
+                    <dd>{project.departmentName}</dd>
+                </dl>
+            </div>
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <h3 className="font-semibold text-lg">Team Information</h3>
+            <p className="text-muted-foreground whitespace-pre-wrap">{project.teamInfo}</p>
           </div>
           <Separator />
           <div className="space-y-2">
