@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import type { Project, User, Evaluation } from '@/types';
 import { getEvaluationPrompts } from '@/app/actions';
 import { Loader2, Wand2 } from 'lucide-react';
@@ -20,7 +20,7 @@ import { Skeleton } from '../ui/skeleton';
 interface EvaluationFormProps {
   project: Project;
   user: User;
-  onUpdate: (updatedProject: Project) => void;
+  onEvaluationSubmitted: () => void;
 }
 
 const evaluationSchema = z.object({
@@ -33,35 +33,69 @@ const evaluationSchema = z.object({
 
 type EvaluationFormData = z.infer<typeof evaluationSchema>;
 
-export function EvaluationForm({ project, user, onUpdate }: EvaluationFormProps) {
+export function EvaluationForm({ project, user, onEvaluationSubmitted }: EvaluationFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [prompts, setPrompts] = useState<any>(null);
   const [loadingPrompts, setLoadingPrompts] = useState(true);
+  const [existingEvaluation, setExistingEvaluation] = useState<Evaluation | null>(null);
+  const [loadingExisting, setLoadingExisting] = useState(true);
 
-  const existingEvaluation = project.evaluations?.find(e => e.evaluatorUid === user.uid);
 
   const form = useForm<EvaluationFormData>({
     resolver: zodResolver(evaluationSchema),
     defaultValues: {
-      relevance: existingEvaluation?.scores.relevance || 5,
-      methodology: existingEvaluation?.scores.methodology || 5,
-      feasibility: existingEvaluation?.scores.feasibility || 5,
-      innovation: existingEvaluation?.scores.innovation || 5,
-      comments: existingEvaluation?.comments || '',
+      relevance: 5,
+      methodology: 5,
+      feasibility: 5,
+      innovation: 5,
+      comments: '',
     },
   });
 
   useEffect(() => {
+    async function fetchExistingEvaluation() {
+        setLoadingExisting(true);
+        try {
+            const evalRef = doc(db, 'projects', project.id, 'evaluations', user.uid);
+            const evalSnap = await getDoc(evalRef);
+            if (evalSnap.exists()) {
+                const data = evalSnap.data() as Evaluation;
+                setExistingEvaluation(data);
+                form.reset({
+                    relevance: data.scores.relevance,
+                    methodology: data.scores.methodology,
+                    feasibility: data.scores.feasibility,
+                    innovation: data.scores.innovation,
+                    comments: data.comments,
+                });
+            }
+        } catch (error) {
+            console.error("Error fetching existing evaluation:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not load your previous evaluation.' });
+        } finally {
+            setLoadingExisting(false);
+        }
+    }
+    fetchExistingEvaluation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id, user.uid]);
+
+  useEffect(() => {
     async function fetchPrompts() {
       setLoadingPrompts(true);
-      const result = await getEvaluationPrompts({ title: project.title, abstract: project.abstract });
-      if (result.success) {
-        setPrompts(result.prompts);
-      } else {
-        toast({ variant: 'destructive', title: 'AI Error', description: 'Could not load AI evaluation prompts.' });
+      try {
+        const result = await getEvaluationPrompts({ title: project.title, abstract: project.abstract });
+        if (result.success) {
+          setPrompts(result.prompts);
+        } else {
+          toast({ variant: 'destructive', title: 'AI Error', description: 'Could not load AI evaluation prompts.' });
+        }
+      } catch (error) {
+          console.error("Error fetching prompts:", error);
+      } finally {
+        setLoadingPrompts(false);
       }
-      setLoadingPrompts(false);
     }
     fetchPrompts();
   }, [project.title, project.abstract, toast]);
@@ -69,6 +103,7 @@ export function EvaluationForm({ project, user, onUpdate }: EvaluationFormProps)
   const handleSubmit = async (values: EvaluationFormData) => {
     setIsSubmitting(true);
     try {
+      const evaluationRef = doc(db, 'projects', project.id, 'evaluations', user.uid);
       const projectRef = doc(db, 'projects', project.id);
       
       const newEvaluation: Evaluation = {
@@ -84,37 +119,19 @@ export function EvaluationForm({ project, user, onUpdate }: EvaluationFormProps)
         comments: values.comments,
       };
       
-      await runTransaction(db, async (transaction) => {
-        const projectDoc = await transaction.get(projectRef);
-        if (!projectDoc.exists()) {
-          throw "Project document does not exist!";
-        }
-        
-        const currentData = projectDoc.data();
-        const currentEvaluations = currentData.evaluations || [];
-        
-        // Remove any previous evaluation from this user
-        const updatedEvaluations = currentEvaluations.filter(
-            (e: Evaluation) => e.evaluatorUid !== user.uid
-        );
-        
-        // Add the new evaluation
-        updatedEvaluations.push(newEvaluation);
-        
-        transaction.update(projectRef, { evaluations: updatedEvaluations });
+      // Upsert the evaluation document in the subcollection
+      await setDoc(evaluationRef, newEvaluation, { merge: true });
+
+      // Add the evaluator's UID to the `evaluatedBy` array on the project document
+      await updateDoc(projectRef, {
+        evaluatedBy: arrayUnion(user.uid)
       });
-
-      // Manually update local state to reflect the change for the UI
-      const updatedLocalEvaluations = [
-          ...(project.evaluations?.filter(e => e.evaluatorUid !== user.uid) || []),
-          newEvaluation
-      ];
-
-      onUpdate({ ...project, evaluations: updatedLocalEvaluations });
+      
+      onEvaluationSubmitted(); // Trigger refetch in parent component
       toast({ title: 'Success', description: 'Your evaluation has been submitted.' });
 
     } catch (error) {
-      console.error("Error submitting evaluation in transaction: ", error);
+      console.error("Error submitting evaluation: ", error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit evaluation. Please try again.' });
     } finally {
       setIsSubmitting(false);
@@ -139,7 +156,7 @@ export function EvaluationForm({ project, user, onUpdate }: EvaluationFormProps)
               step={1}
               value={[field.value as number]}
               onValueChange={(vals) => field.onChange(vals[0])}
-              disabled={isSubmitting}
+              disabled={isSubmitting || loadingExisting}
             />
           </FormControl>
           <FormMessage />
@@ -158,6 +175,11 @@ export function EvaluationForm({ project, user, onUpdate }: EvaluationFormProps)
         <CardDescription>{existingEvaluation ? 'You can update your previous evaluation below.' : 'Please provide your scores and comments for this project.'}</CardDescription>
       </CardHeader>
       <CardContent>
+        {loadingExisting ? (
+             <div className="flex items-center justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
             <ScoreField name="relevance" label="Relevance & Significance" prompt={prompts?.relevance} />
@@ -172,18 +194,19 @@ export function EvaluationForm({ project, user, onUpdate }: EvaluationFormProps)
                 <FormItem>
                   <FormLabel>Overall Comments</FormLabel>
                   <FormControl>
-                    <Textarea rows={5} {...field} disabled={isSubmitting} />
+                    <Textarea rows={5} {...field} disabled={isSubmitting || loadingExisting} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" disabled={isSubmitting || loadingExisting}>
+              {(isSubmitting || loadingExisting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : (existingEvaluation ? 'Update Evaluation' : 'Submit Evaluation')}
             </Button>
           </form>
         </Form>
+        )}
       </CardContent>
     </Card>
   );

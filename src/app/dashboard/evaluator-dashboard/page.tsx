@@ -41,7 +41,7 @@ export default function EvaluatorDashboardPage() {
 
         // Filter out projects the evaluator has already reviewed
         const pendingForCurrentUser = projectList.filter(p => 
-            !p.evaluations?.some(e => e.evaluatorUid === user.uid)
+            !p.evaluatedBy?.includes(user.uid)
         );
 
         setProjectsToReview(pendingForCurrentUser);

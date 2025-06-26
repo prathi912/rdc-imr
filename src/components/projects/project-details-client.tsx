@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import type { Project, User, GrantDetails } from '@/types';
+import { useState, useEffect, useCallback } from 'react';
+import type { Project, User, GrantDetails, Evaluation } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import {
   DropdownMenu,
@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, UserCheck } from 'lucide-react';
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -58,6 +58,7 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
 
 export function ProjectDetailsClient({ project: initialProject }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject);
+  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
@@ -70,9 +71,36 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
   const [showApprovalAlert, setShowApprovalAlert] = useState(false);
 
+  const refetchData = useCallback(async () => {
+    try {
+        const projectRef = doc(db, 'projects', initialProject.id);
+        const projectSnap = await getDoc(projectRef);
+
+        if (projectSnap.exists()) {
+          const data = projectSnap.data();
+          setProject({ 
+              id: projectSnap.id,
+              ...data,
+              submissionDate: data.submissionDate || new Date().toISOString()
+          } as Project);
+        }
+
+        const evaluationsCol = collection(db, 'projects', initialProject.id, 'evaluations');
+        const evaluationsSnapshot = await getDocs(evaluationsCol);
+        const evaluationsList = evaluationsSnapshot.docs.map(doc => doc.data() as Evaluation);
+        setEvaluations(evaluationsList);
+
+    } catch (error) {
+        console.error("Error refetching data:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not refresh project data.' });
+    }
+  }, [initialProject.id, toast]);
+
+
   useEffect(() => {
     setProject(initialProject);
-  }, [initialProject]);
+    refetchData();
+  }, [initialProject, refetchData]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -84,7 +112,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const isPI = user?.uid === project.pi_uid;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
   const isEvaluator = user && REQUIRED_EVALUATOR_EMAILS.includes(user.email);
-  const allEvaluationsIn = project.evaluations && project.evaluations.length >= REQUIRED_EVALUATOR_EMAILS.length;
+  const allEvaluationsIn = evaluations.length >= REQUIRED_EVALUATOR_EMAILS.length;
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     setIsUpdating(true);
@@ -361,10 +389,10 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
         </CardContent>
       </Card>
       
-      {isAdmin && project.status === 'Under Review' && <EvaluationsSummary project={project} />}
+      {isAdmin && project.status === 'Under Review' && <EvaluationsSummary project={project} evaluations={evaluations} />}
 
       {isEvaluator && project.status === 'Under Review' && user && (
-        <EvaluationForm project={project} user={user} onUpdate={handleProjectUpdate} />
+        <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchData} />
       )}
       
       {project.grant && user && (
@@ -376,7 +404,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                     <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
                     <AlertDialogDescription>
                         This project cannot be approved or rejected until all required evaluations have been submitted. 
-                        There are currently {project.evaluations?.length || 0} of {REQUIRED_EVALUATOR_EMAILS.length} evaluations complete.
+                        There are currently {evaluations.length || 0} of {REQUIRED_EVALUATOR_EMAILS.length} evaluations complete.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

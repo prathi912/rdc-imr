@@ -68,7 +68,7 @@ export type Project = {
   grant?: GrantDetails;
   completionReportUrl?: string;
   completionSubmissionDate?: string; // ISO String
-  evaluations?: Evaluation[];
+  evaluatedBy?: string[];
 };
 
 export type Notification = {

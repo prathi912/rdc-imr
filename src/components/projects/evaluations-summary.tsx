@@ -2,13 +2,14 @@
 
 import type { Project, Evaluation } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCheck, UserX, Star } from 'lucide-react';
+import { UserCheck, UserX } from 'lucide-react';
 import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
 import { Badge } from '../ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 interface EvaluationsSummaryProps {
   project: Project;
+  evaluations: Evaluation[];
 }
 
 const getOverallScore = (scores: Evaluation['scores']) => {
@@ -16,9 +17,7 @@ const getOverallScore = (scores: Evaluation['scores']) => {
     return (total / (Object.keys(scores).length * 10)) * 100; // As percentage
 }
 
-export function EvaluationsSummary({ project }: EvaluationsSummaryProps) {
-  const evaluations = project.evaluations || [];
-
+export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryProps) {
   return (
     <Card className="mt-8">
       <CardHeader>
