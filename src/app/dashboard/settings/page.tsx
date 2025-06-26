@@ -163,14 +163,24 @@ export default function SettingsPage() {
 
     } catch (error: any) {
       console.error("Password update error:", error);
-      let description = 'Could not update your password. Please try again.';
-      if (error.code === 'auth/wrong-password') {
-        description = 'The current password you entered is incorrect.';
-        passwordForm.setError("currentPassword", { type: "manual", message: description });
+      if (error.code === 'auth/invalid-credential') {
+        passwordForm.setError("currentPassword", {
+            type: "manual",
+            message: "The current password you entered is incorrect."
+        });
       } else if (error.code === 'auth/requires-recent-login') {
-        description = 'For security, please log out and sign in again before changing your password.';
+        toast({
+            variant: 'destructive',
+            title: 'Update Failed',
+            description: 'For security, please log out and sign in again before changing your password.'
+        });
+      } else {
+        toast({
+            variant: 'destructive',
+            title: 'Update Failed',
+            description: 'Could not update your password. Please try again.'
+        });
       }
-      toast({ variant: 'destructive', title: 'Update Failed', description });
     } finally {
       setIsSubmittingPassword(false);
     }
