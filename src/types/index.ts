@@ -12,16 +12,24 @@ export type BankDetails = {
   ifscCode: string;
 };
 
+export type Transaction = {
+  id: string;
+  dateOfTransaction: string; // ISO String
+  amount: number;
+  vendorName: string;
+  isGstRegistered: boolean;
+  gstNumber?: string;
+  invoiceUrl?: string; // URL to the uploaded invoice in Firebase Storage
+  description: string;
+};
+
 export type GrantDetails = {
     amount: number;
     status: 'Pending Bank Details' | 'Bank Details Submitted' | 'Disbursed' | 'Utilization Submitted' | 'Completed';
     disbursementDate?: string; // ISO String
     bankDetails?: BankDetails;
-    utilizationReport?: {
-        amountSpent: number;
-        description: string;
-        submissionDate: string; // ISO String
-    };
+    transactions?: Transaction[];
+    utilizationSubmissionDate?: string; // ISO String
 };
 
 export type Project = {

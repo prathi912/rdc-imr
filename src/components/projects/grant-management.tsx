@@ -3,18 +3,31 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Project, User, GrantDetails } from '@/types';
+import type { Project, User, GrantDetails, Transaction } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, updateDoc, addDoc, collection } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { useState } from 'react';
-import { DollarSign, Banknote, FileText, CheckCircle } from 'lucide-react';
+import { DollarSign, Banknote, FileText, CheckCircle, PlusCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
+import { Textarea } from '../ui/textarea';
+import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 interface GrantManagementProps {
   project: Project;
@@ -29,14 +42,29 @@ const bankDetailsSchema = z.object({
   ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC code format."),
 });
 
-const utilizationSchema = z.object({
-  amountSpent: z.coerce.number().positive("Amount spent must be a positive number."),
-  description: z.string().min(20, "Please provide a detailed description of fund utilization."),
+const transactionSchema = z.object({
+    dateOfTransaction: z.string().min(1, 'Transaction date is required.'),
+    amount: z.coerce.number().positive("Amount must be a positive number."),
+    vendorName: z.string().min(2, "Vendor name is required."),
+    isGstRegistered: z.boolean().default(false),
+    gstNumber: z.string().optional(),
+    description: z.string().min(10, "Description is required."),
+    invoice: z.any().optional(), // For file input
+}).refine(data => {
+    if (data.isGstRegistered) {
+        return !!data.gstNumber && data.gstNumber.length > 0;
+    }
+    return true;
+}, {
+    message: "GST number is required for registered vendors.",
+    path: ["gstNumber"],
 });
+
 
 export function GrantManagement({ project, user, onUpdate }: GrantManagementProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
   const isAdmin = user.role === 'admin';
   const isPI = user.uid === project.pi_uid;
 
@@ -50,10 +78,14 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     },
   });
 
-  const utilizationForm = useForm<z.infer<typeof utilizationSchema>>({
-    resolver: zodResolver(utilizationSchema),
-    defaultValues: project.grant?.utilizationReport || {
-      amountSpent: 0,
+  const transactionForm = useForm<z.infer<typeof transactionSchema>>({
+    resolver: zodResolver(transactionSchema),
+    defaultValues: {
+      dateOfTransaction: '',
+      amount: 0,
+      vendorName: '',
+      isGstRegistered: false,
+      gstNumber: '',
       description: '',
     },
   });
@@ -78,31 +110,56 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       setIsSubmitting(false);
     }
   };
-
-  const handleUtilizationSubmit = async (values: z.infer<typeof utilizationSchema>) => {
+  
+  const handleAddTransaction = async (values: z.infer<typeof transactionSchema>) => {
     if (!project.grant) return;
     setIsSubmitting(true);
     try {
-      const projectRef = doc(db, 'projects', project.id);
-      const updatedGrant: GrantDetails = {
-        ...project.grant,
-        utilizationReport: {
-          ...values,
-          submissionDate: new Date().toISOString(),
-        },
-        status: 'Utilization Submitted',
-      };
-      await updateDoc(projectRef, { grant: updatedGrant });
-      onUpdate({ ...project, grant: updatedGrant });
-      toast({ title: 'Success', description: 'Utilization report submitted successfully.' });
+        const projectRef = doc(db, 'projects', project.id);
+        const newTransaction: Transaction = {
+            id: new Date().toISOString() + Math.random(), // simple unique id
+            ...values,
+            // Note: File upload to Firebase Storage is not implemented. 
+            // Storing placeholder for invoiceUrl.
+            invoiceUrl: values.invoice?.[0]?.name ? 'placeholder_url' : undefined,
+        };
+        const updatedTransactions = [...(project.grant.transactions || []), newTransaction];
+        const updatedGrant = { ...project.grant, transactions: updatedTransactions };
+
+        await updateDoc(projectRef, { grant: updatedGrant });
+        onUpdate({ ...project, grant: updatedGrant });
+        toast({ title: 'Success', description: 'Transaction added successfully.' });
+        transactionForm.reset();
+        setIsTransactionDialogOpen(false);
     } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit utilization report.' });
+        console.error(error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to add transaction.' });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   };
   
+  const handleFinalizeReport = async () => {
+    if (!project.grant) return;
+    setIsSubmitting(true);
+    try {
+        const projectRef = doc(db, 'projects', project.id);
+        const updatedGrant: GrantDetails = {
+            ...project.grant,
+            status: 'Utilization Submitted',
+            utilizationSubmissionDate: new Date().toISOString(),
+        };
+        await updateDoc(projectRef, { grant: updatedGrant });
+        onUpdate({ ...project, grant: updatedGrant });
+        toast({ title: 'Success', description: 'Utilization report finalized and submitted.'});
+    } catch (error) {
+        console.error(error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to finalize report.' });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
   const handleAdminStatusUpdate = async (newStatus: GrantDetails['status']) => {
     if (!project.grant) return;
     setIsSubmitting(true);
@@ -130,6 +187,8 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
 
   const grant = project.grant;
   if (!grant) return null;
+  
+  const totalUtilized = grant.transactions?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
 
   return (
     <Card className="mt-8">
@@ -139,7 +198,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             <CardTitle>Grant Management</CardTitle>
         </div>
         <CardDescription>
-          Grant of ₹{grant.amount.toLocaleString('en-IN')} awarded for this project. Current status: <span className="font-semibold">{grant.status}</span>
+          Grant of ₹{grant.amount.toLocaleString('en-IN')} awarded. Current status: <span className="font-semibold">{grant.status}</span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -206,36 +265,77 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             </div>
         )}
 
-        {isPI && (grant.status === 'Disbursed' || (grant.status === 'Utilization Submitted' && grant.utilizationReport === undefined)) && (
-          <Form {...utilizationForm}>
-            <form onSubmit={utilizationForm.handleSubmit(handleUtilizationSubmit)} className="space-y-4 p-4 border rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                    <FileText className="h-5 w-5 text-muted-foreground"/>
-                    <h4 className="font-semibold">Submit Fund Utilization Report</h4>
+        {(grant.status === 'Disbursed' || grant.status === 'Utilization Submitted') && (
+            <div className="p-4 border rounded-lg space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        <h4 className="font-semibold">Fund Utilization Report</h4>
+                    </div>
+                    {isPI && grant.status === 'Disbursed' && (
+                        <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm"><PlusCircle className="mr-2 h-4 w-4" /> Add Transaction</Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-2xl">
+                                <DialogHeader>
+                                    <DialogTitle>Add New Transaction</DialogTitle>
+                                    <DialogDescription>Fill in the details for the expense.</DialogDescription>
+                                </DialogHeader>
+                                <Form {...transactionForm}>
+                                    <form id="transaction-form" onSubmit={transactionForm.handleSubmit(handleAddTransaction)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
+                                        <FormField name="dateOfTransaction" control={transactionForm.control} render={({ field }) => ( <FormItem><FormLabel>Date of Transaction</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField name="amount" control={transactionForm.control} render={({ field }) => ( <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField name="vendorName" control={transactionForm.control} render={({ field }) => ( <FormItem><FormLabel>Vendor Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField name="description" control={transactionForm.control} render={({ field }) => ( <FormItem><FormLabel>Description of Service</FormLabel><FormControl><Textarea rows={3} {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField name="isGstRegistered" control={transactionForm.control} render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>Is vendor GST registered?</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem> )} />
+                                        {transactionForm.watch('isGstRegistered') && (
+                                            <FormField name="gstNumber" control={transactionForm.control} render={({ field }) => ( <FormItem><FormLabel>GST Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                        )}
+                                        <FormField name="invoice" control={transactionForm.control} render={({ field }) => ( <FormItem><FormLabel>Upload Invoice</FormLabel><FormControl><Input type="file" /></FormControl><FormMessage /></FormItem> )} />
+                                    </form>
+                                </Form>
+                                <DialogFooter>
+                                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                                    <Button type="submit" form="transaction-form" disabled={isSubmitting}>{isSubmitting ? 'Adding...' : 'Add Transaction'}</Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
                 </div>
-              <FormField name="amountSpent" control={utilizationForm.control} render={({ field }) => ( <FormItem><FormLabel>Amount Spent (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
-              <FormField name="description" control={utilizationForm.control} render={({ field }) => ( <FormItem><FormLabel>Utilization Description</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem> )} />
-              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Report'}</Button>
-            </form>
-          </Form>
-        )}
-        
-        {grant.utilizationReport && (
-            <div className="p-4 border rounded-lg space-y-2">
-                <div className="flex items-center gap-2 mb-2">
-                    <FileText className="h-5 w-5 text-muted-foreground"/>
-                    <h4 className="font-semibold">Fund Utilization Report</h4>
+                 <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="font-medium text-muted-foreground">Total Sanctioned: <span className="font-bold text-foreground">₹{grant.amount.toLocaleString('en-IN')}</span></div>
+                    <div className="font-medium text-muted-foreground">Total Utilized: <span className="font-bold text-foreground">₹{totalUtilized.toLocaleString('en-IN')}</span></div>
                 </div>
-                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <dt className="font-medium text-muted-foreground">Amount Spent</dt>
-                    <dd>₹{grant.utilizationReport.amountSpent.toLocaleString('en-IN')}</dd>
-                    <dt className="font-medium text-muted-foreground">Submission Date</dt>
-                    <dd>{new Date(grant.utilizationReport.submissionDate).toLocaleDateString()}</dd>
-                 </dl>
-                 <div className="space-y-1 pt-2">
-                     <p className="font-medium text-sm text-muted-foreground">Description</p>
-                     <p className="text-sm whitespace-pre-wrap">{grant.utilizationReport.description}</p>
-                 </div>
+                 {grant.transactions && grant.transactions.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Vendor</TableHead>
+                                <TableHead className="text-right">Amount (₹)</TableHead>
+                                <TableHead>Invoice</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {grant.transactions.map(t => (
+                                <TableRow key={t.id}>
+                                    <TableCell>{new Date(t.dateOfTransaction).toLocaleDateString()}</TableCell>
+                                    <TableCell>{t.vendorName}</TableCell>
+                                    <TableCell className="text-right">{t.amount.toLocaleString('en-IN')}</TableCell>
+                                    <TableCell>{t.invoiceUrl ? <a href={t.invoiceUrl} target="_blank" rel="noopener noreferrer" className="underline">View</a> : 'N/A'}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                 ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No transactions have been added yet.</p>
+                 )}
+                 {isPI && grant.status === 'Disbursed' && grant.transactions && grant.transactions.length > 0 && (
+                     <div className="flex justify-end pt-4">
+                         <Button onClick={handleFinalizeReport} disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Finalize and Submit Report"}</Button>
+                     </div>
+                 )}
             </div>
         )}
 
