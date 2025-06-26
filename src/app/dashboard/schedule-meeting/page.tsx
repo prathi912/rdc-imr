@@ -1,7 +1,5 @@
 import { PageHeader } from '@/components/page-header';
 import { ScheduleMeetingForm } from '@/components/projects/schedule-meeting-form';
-import { Suspense } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ScheduleMeetingPage() {
   return (
@@ -12,9 +10,7 @@ export default function ScheduleMeetingPage() {
         showBackButton={false}
       />
       <div className="mt-8">
-        <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-          <ScheduleMeetingForm />
-        </Suspense>
+        <ScheduleMeetingForm />
       </div>
     </div>
   );
