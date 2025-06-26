@@ -30,6 +30,7 @@ import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOu
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
+import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
 
 const loginSchema = z.object({
   email: z
@@ -57,6 +58,16 @@ export default function LoginPage() {
     },
   });
 
+  const determineUserRole = (email: string): User['role'] => {
+    if (email === 'rathipranav07@gmail.com') {
+      return 'Super-admin';
+    }
+    if (REQUIRED_EVALUATOR_EMAILS.includes(email)) {
+      return 'Evaluator';
+    }
+    return 'faculty';
+  }
+
   const processSignIn = async (firebaseUser: FirebaseUser) => {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDocSnap = await getDoc(userDocRef);
@@ -70,17 +81,20 @@ export default function LoginPage() {
         uid: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
         email: firebaseUser.email!,
-        role: firebaseUser.email === 'rathipranav07@gmail.com' ? 'Super-admin' : 'faculty',
+        role: determineUserRole(firebaseUser.email!),
         profileComplete: false,
       };
       await setDoc(userDocRef, user);
     }
     
-    // Ensure admin user always has Super-admin role and bypasses profile setup
-    if (user.email === 'rathipranav07@gmail.com' && (!user.profileComplete || user.role !== 'Super-admin')) {
-      user.role = 'Super-admin';
-      user.profileComplete = true;
-      await setDoc(userDocRef, user, { merge: true });
+    // Ensure admin and evaluator roles are correctly set and bypass profile setup for them
+    const specialRole = determineUserRole(user.email);
+    if (user.role !== specialRole || (specialRole !== 'faculty' && !user.profileComplete)) {
+        user.role = specialRole;
+        if(specialRole !== 'faculty') {
+            user.profileComplete = true;
+        }
+        await setDoc(userDocRef, user, { merge: true });
     }
 
     if (typeof window !== 'undefined') {

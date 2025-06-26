@@ -38,6 +38,19 @@ export type GrantDetails = {
     utilizationSubmissionDate?: string; // ISO String
 };
 
+export type Evaluation = {
+  evaluatorUid: string;
+  evaluatorName: string;
+  evaluationDate: string; // ISO String
+  scores: {
+    relevance: number;
+    methodology: number;
+    feasibility: number;
+    innovation: number;
+  };
+  comments: string;
+};
+
 export type Project = {
   id: string;
   title: string;
@@ -55,6 +68,7 @@ export type Project = {
   grant?: GrantDetails;
   completionReportUrl?: string;
   completionSubmissionDate?: string; // ISO String
+  evaluations?: Evaluation[];
 };
 
 export type Notification = {

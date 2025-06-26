@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2 } from 'lucide-react';
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, UserCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -29,6 +29,19 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GrantManagement } from './grant-management';
+import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
+import { EvaluationForm } from './evaluation-form';
+import { EvaluationsSummary } from './evaluations-summary';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ProjectDetailsClientProps {
   project: Project;
@@ -55,6 +68,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
   const [completionReportFile, setCompletionReportFile] = useState<File | null>(null);
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
+  const [showApprovalAlert, setShowApprovalAlert] = useState(false);
 
   useEffect(() => {
     setProject(initialProject);
@@ -68,7 +82,9 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   }, []);
   
   const isPI = user?.uid === project.pi_uid;
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
+  const isEvaluator = user && REQUIRED_EVALUATOR_EMAILS.includes(user.email);
+  const allEvaluationsIn = project.evaluations && project.evaluations.length >= REQUIRED_EVALUATOR_EMAILS.length;
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     setIsUpdating(true);
@@ -182,6 +198,14 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const handleProjectUpdate = (updatedProject: Project) => {
     setProject(updatedProject);
   };
+  
+  const handleApprovalClick = (status: 'Approved' | 'Rejected') => {
+      if (!allEvaluationsIn) {
+          setShowApprovalAlert(true);
+          return;
+      }
+      handleStatusUpdate(status);
+  }
 
   const availableStatuses: Project['status'][] = ['Approved', 'Rejected', 'In Progress', 'Completed', 'Under Review', 'Pending Completion Approval'];
 
@@ -202,6 +226,12 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                       {project.status === 'Rejected' && <X className="mr-2 h-4 w-4" />}
                       {project.status}
                   </Badge>
+                  {isAdmin && project.status === 'Under Review' && (
+                     <div className="flex items-center gap-2">
+                        <Button size="sm" onClick={() => handleApprovalClick('Approved')}><Check className="mr-2 h-4 w-4"/>Approve</Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleApprovalClick('Rejected')}><X className="mr-2 h-4 w-4"/>Reject</Button>
+                     </div>
+                  )}
                   {isAdmin && (
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -331,9 +361,29 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
         </CardContent>
       </Card>
       
+      {isAdmin && project.status === 'Under Review' && <EvaluationsSummary project={project} />}
+
+      {isEvaluator && project.status === 'Under Review' && user && (
+        <EvaluationForm project={project} user={user} onUpdate={handleProjectUpdate} />
+      )}
+      
       {project.grant && user && (
         <GrantManagement project={project} user={user} onUpdate={handleProjectUpdate} />
       )}
+       <AlertDialog open={showApprovalAlert} onOpenChange={setShowApprovalAlert}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This project cannot be approved or rejected until all required evaluations have been submitted. 
+                        There are currently {project.evaluations?.length || 0} of {REQUIRED_EVALUATOR_EMAILS.length} evaluations complete.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>OK</AlertDialogCancel>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </>
   );
 }

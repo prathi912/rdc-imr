@@ -30,6 +30,7 @@ import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, si
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
+import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -65,6 +66,13 @@ export default function SignupPage() {
     },
   });
   
+  const determineUserRole = (email: string): User['role'] => {
+    if (REQUIRED_EVALUATOR_EMAILS.includes(email)) {
+      return 'Evaluator';
+    }
+    return 'faculty';
+  }
+
   const processNewUser = async (firebaseUser: FirebaseUser, name?: string) => {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDocSnap = await getDoc(userDocRef);
@@ -78,13 +86,14 @@ export default function SignupPage() {
       router.push('/');
       return;
     }
-
+    
+    const role = determineUserRole(firebaseUser.email!);
     const user: User = {
       uid: firebaseUser.uid,
       name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
-      role: 'faculty',
-      profileComplete: false,
+      role: role,
+      profileComplete: role !== 'faculty', // Evaluators don't need to complete the long profile form
     };
     await setDoc(userDocRef, user);
 
@@ -92,11 +101,19 @@ export default function SignupPage() {
       localStorage.setItem('user', JSON.stringify(user));
     }
     
-    toast({
-      title: 'Account Created',
-      description: "Let's complete your profile to continue.",
-    });
-    router.push('/profile-setup');
+    if (user.profileComplete) {
+       toast({
+        title: 'Account Created',
+        description: "Welcome! Redirecting to your dashboard.",
+      });
+      router.push('/dashboard');
+    } else {
+       toast({
+        title: 'Account Created',
+        description: "Let's complete your profile to continue.",
+      });
+      router.push('/profile-setup');
+    }
   };
 
   const onEmailSubmit = async (data: SignupFormValues) => {

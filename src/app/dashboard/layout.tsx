@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import {
   Bell,
   Book,
+  ClipboardCheck,
   FileCheck2,
   FilePlus2,
   GanttChartSquare,
@@ -147,6 +148,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(user.role);
+  const isEvaluator = user.role === 'Evaluator';
+  const isFaculty = user.role === 'faculty';
+
 
   return (
     <SidebarProvider>
@@ -162,18 +166,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 Dashboard
               </SidebarMenuButton>
             </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/new-submission" tooltip="New Submission" isActive={pathname === '/dashboard/new-submission'}>
-                <FilePlus2 />
-                New Submission
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/my-projects" tooltip="My Projects" isActive={pathname === '/dashboard/my-projects'}>
-                <Book />
-                My Projects
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+             {isFaculty && (
+              <>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/new-submission" tooltip="New Submission" isActive={pathname === '/dashboard/new-submission'}>
+                    <FilePlus2 />
+                    New Submission
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/my-projects" tooltip="My Projects" isActive={pathname === '/dashboard/my-projects'}>
+                    <Book />
+                    My Projects
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </>
+             )}
+            {isEvaluator && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
+                    <ClipboardCheck />
+                    Evaluation Queue
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+            )}
             {isAdmin && (
               <>
                 <SidebarMenuItem>
