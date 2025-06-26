@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -37,6 +38,10 @@ export function ScheduleMeetingForm() {
 
   const form = useForm<z.infer<typeof scheduleSchema>>({
     resolver: zodResolver(scheduleSchema),
+    defaultValues: {
+      time: '',
+      venue: '',
+    },
   });
 
   const fetchProjects = useCallback(async () => {
