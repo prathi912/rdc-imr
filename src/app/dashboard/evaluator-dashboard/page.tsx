@@ -56,7 +56,7 @@ export default function EvaluatorDashboardPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title="Evaluation Queue" description="Projects awaiting your review and evaluation." />
+      <PageHeader title="Evaluation Queue" description="Projects awaiting your review and evaluation." showBackButton={false} />
       <div className="mt-8">
         {loading ? (
           <Card>

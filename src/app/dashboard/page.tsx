@@ -14,13 +14,20 @@ export default function DashboardPage() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser) as User;
+      setUser(parsedUser);
+
+      // Redirect Evaluators to their specific dashboard
+      if (parsedUser.role === 'Evaluator') {
+        router.replace('/dashboard/evaluator-dashboard');
+      }
+
     } else {
       router.replace('/');
     }
   }, [router]);
   
-  if (!user) {
+  if (!user || user.role === 'Evaluator') {
       return (
           <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -35,11 +42,12 @@ export default function DashboardPage() {
   }
 
   const adminRoles: User['role'][] = ['admin', 'CRO', 'Super-admin'];
+  const isFaculty = user.role === 'faculty';
 
   return (
     <div className="transition-all duration-300">
       {adminRoles.includes(user.role) && <AdminDashboard />}
-      {!adminRoles.includes(user.role) && <FacultyDashboard user={user} />}
+      {isFaculty && <FacultyDashboard user={user} />}
     </div>
   );
 }
