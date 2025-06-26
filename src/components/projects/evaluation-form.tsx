@@ -11,9 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import type { Project, User, Evaluation } from '@/types';
-import { getEvaluationPrompts } from '@/app/actions';
+import { getEvaluationPrompts, submitEvaluation } from '@/app/actions';
 import { Loader2, Wand2 } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 
@@ -103,13 +103,7 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
   const handleSubmit = async (values: EvaluationFormData) => {
     setIsSubmitting(true);
     try {
-      const evaluationRef = doc(db, 'projects', project.id, 'evaluations', user.uid);
-      const projectRef = doc(db, 'projects', project.id);
-      
-      const newEvaluation: Evaluation = {
-        evaluatorUid: user.uid,
-        evaluatorName: user.name,
-        evaluationDate: new Date().toISOString(),
+      const evaluationData = {
         scores: {
           relevance: values.relevance,
           methodology: values.methodology,
@@ -118,21 +112,18 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
         },
         comments: values.comments,
       };
-      
-      // Upsert the evaluation document in the subcollection
-      await setDoc(evaluationRef, newEvaluation, { merge: true });
 
-      // Add the evaluator's UID to the `evaluatedBy` array on the project document
-      await updateDoc(projectRef, {
-        evaluatedBy: arrayUnion(user.uid)
-      });
-      
-      onEvaluationSubmitted(); // Trigger refetch in parent component
-      toast({ title: 'Success', description: 'Your evaluation has been submitted.' });
+      const result = await submitEvaluation(project.id, user, evaluationData);
 
-    } catch (error) {
+      if (result.success) {
+        onEvaluationSubmitted();
+        toast({ title: 'Success', description: 'Your evaluation has been submitted.' });
+      } else {
+        throw new Error(result.error || 'An unknown server error occurred.');
+      }
+    } catch (error: any) {
       console.error("Error submitting evaluation: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit evaluation. Please try again.' });
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit evaluation. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
