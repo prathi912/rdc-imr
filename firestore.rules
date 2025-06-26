@@ -1,80 +1,54 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isAuth() {
-      return request.auth != null;
+    // Helper function to check for admin roles
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'CRO', 'Super-admin'];
     }
 
-    function isAuthOwner(uid) {
-      return isAuth() && request.auth.uid == uid;
-    }
-
-    function getUserData(uid) {
-      // Make sure to handle the case where the user doc might not exist yet.
-      return get(/databases/$(database)/documents/users/$(uid)).data;
+    // Helper function to check for evaluator role
+    function isEvaluator() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Evaluator';
     }
     
-    function isAdmin(uid) {
-      return isAuth() && getUserData(uid).role == 'admin';
+    // Helper function to check if the user is the owner of the document
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
+    // Users can read/update their own profile. Admins can manage all users.
     match /users/{userId} {
-      // Admins can do anything to user profiles
-      allow read, write: if isAdmin(request.auth.uid);
-      
-      // Users can read their own profile
-      allow read: if isAuthOwner(userId);
-
-      // Users can be created during signup
-      allow create: if isAuthOwner(userId);
-      
-      // Users can update their own profile, but cannot change their role.
-      allow update: if isAuthOwner(userId) && request.resource.data.role == resource.data.role;
+      allow read, update: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow delete: if isAdmin();
     }
-    
+
+    // Projects can be read by any authenticated user.
+    // Creation is limited to faculty members for their own projects.
+    // Updates are limited to the PI or admins.
     match /projects/{projectId} {
-      allow read: if isAuth();
-
-      // Users can create a project for themselves
-      allow create: if isAuth() && request.resource.data.pi_uid == request.auth.uid;
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.pi_uid == request.auth.uid;
+      allow update: if (resource.data.pi_uid == request.auth.uid) || isAdmin();
       
-      function isProjectOwner() {
-        return isAuthOwner(resource.data.pi_uid);
+      // Evaluations subcollection
+      match /evaluations/{evaluatorId} {
+        allow read: if isAdmin() || (isEvaluator() && isOwner(evaluatorId));
+        allow write: if isEvaluator() && isOwner(evaluatorId);
       }
-      
-      function incomingData() {
-        return request.resource.data;
-      }
-      
-      // Allow PI to submit completion report
-      allow update: if isProjectOwner() &&
-                      incomingData().status == 'Pending Completion Approval' &&
-                      resource.data.status in ['Approved', 'In Progress'];
-      
-      // Allow PI to update grant details, but not status, amount, or other project fields.
-      allow update: if isProjectOwner() &&
-                      // only grant can be updated
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant']) &&
-                      // PI cannot change grant amount or status themselves
-                      incomingData().grant.amount == resource.data.grant.amount &&
-                      incomingData().grant.status == resource.data.grant.status;
-                      
-      // Allow admin to update any field on a project
-      allow update: if isAdmin(request.auth.uid);
-    }
-
-    match /notifications/{notificationId} {
-      allow read, update: if isAuthOwner(resource.data.uid);
-      // Notifications are created server-side by trusted code
-      allow create: if isAuth(); 
     }
     
+    // Users can only read and update their own notifications.
+    match /notifications/{notificationId} {
+        allow read, update: if resource.data.uid == request.auth.uid;
+        allow create: if false; // Creation is handled by server actions.
+    }
+    
+    // Counters are managed by server-side logic only.
     match /counters/{counterId} {
-        allow read: if isAuth();
-        // Counter writes happen inside a transaction in a trusted client environment
-        allow write: if isAuth();
+      allow read, write: if false;
     }
   }
 }
