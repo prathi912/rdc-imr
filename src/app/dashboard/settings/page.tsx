@@ -16,7 +16,7 @@ import { db, auth } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -139,12 +139,41 @@ export default function SettingsPage() {
     }
   }
 
-  function onPasswordSubmit(data: PasswordFormValues) {
+  async function onPasswordSubmit(data: PasswordFormValues) {
     setIsSubmittingPassword(true);
-    console.log(data);
-    toast({ title: 'Password updated successfully!' });
-    passwordForm.reset();
-    setIsSubmittingPassword(false);
+    const currentUser = auth.currentUser;
+
+    if (!currentUser || !currentUser.email) {
+      toast({
+        variant: 'destructive',
+        title: 'Authentication Error',
+        description: 'Could not find the current user. Please log in again.',
+      });
+      setIsSubmittingPassword(false);
+      return;
+    }
+
+    try {
+      const credential = EmailAuthProvider.credential(currentUser.email, data.currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, data.newPassword);
+
+      toast({ title: 'Password updated successfully!' });
+      passwordForm.reset();
+
+    } catch (error: any) {
+      console.error("Password update error:", error);
+      let description = 'Could not update your password. Please try again.';
+      if (error.code === 'auth/wrong-password') {
+        description = 'The current password you entered is incorrect.';
+        passwordForm.setError("currentPassword", { type: "manual", message: description });
+      } else if (error.code === 'auth/requires-recent-login') {
+        description = 'For security, please log out and sign in again before changing your password.';
+      }
+      toast({ variant: 'destructive', title: 'Update Failed', description });
+    } finally {
+      setIsSubmittingPassword(false);
+    }
   }
 
   if (loading) {
