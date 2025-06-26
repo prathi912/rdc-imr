@@ -40,11 +40,13 @@ export type Project = {
   department: string;
   pi: string;
   pi_uid: string;
-  status: 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed';
+  status: 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed' | 'Pending Completion Approval';
   teamInfo: string;
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string
   grant?: GrantDetails;
+  completionReportUrl?: string;
+  completionSubmissionDate?: string; // ISO String
 };
 
 export type Notification = {

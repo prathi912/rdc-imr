@@ -19,7 +19,7 @@ export default function PendingReviewsPage() {
         const projectsCol = collection(db, 'projects');
         const q = query(
           projectsCol, 
-          where('status', '==', 'Under Review'),
+          where('status', 'in', ['Under Review', 'Pending Completion Approval']),
           orderBy('submissionDate', 'desc')
         );
         const projectSnapshot = await getDocs(q);
@@ -39,7 +39,7 @@ export default function PendingReviewsPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title="Pending Reviews" description="Projects awaiting review and approval." />
+      <PageHeader title="Pending Reviews" description="Projects awaiting initial review or completion approval." />
       <div className="mt-8">
          {loading ? (
           <Card>

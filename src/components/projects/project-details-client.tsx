@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Check, ChevronDown, Clock, X, DollarSign } from 'lucide-react';
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -38,6 +38,7 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
   'Approved': 'default',
   'In Progress': 'default',
   'Under Review': 'secondary',
+  'Pending Completion Approval': 'secondary',
   'Rejected': 'destructive',
   'Completed': 'outline'
 };
@@ -51,6 +52,9 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const [grantAmount, setGrantAmount] = useState<number | ''>('');
   const [isAwarding, setIsAwarding] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
+  const [completionReportFile, setCompletionReportFile] = useState<File | null>(null);
+  const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
 
   useEffect(() => {
     setProject(initialProject);
@@ -62,6 +66,9 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       setUser(JSON.parse(storedUser));
     }
   }, []);
+  
+  const isPI = user?.uid === project.pi_uid;
+  const isAdmin = user?.role === 'admin';
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     setIsUpdating(true);
@@ -124,6 +131,42 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       setIsAwarding(false);
     }
   };
+
+  const handleCompletionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        setCompletionReportFile(e.target.files[0]);
+    }
+  };
+
+  const handleCompletionSubmit = async () => {
+    if (!completionReportFile) {
+        toast({ variant: 'destructive', title: 'No File Selected', description: 'Please upload the completion report.' });
+        return;
+    }
+    setIsSubmittingCompletion(true);
+    try {
+        const projectRef = doc(db, 'projects', project.id);
+        const reportUrl = `reports/${project.id}/${completionReportFile.name}`;
+
+        const updateData = {
+          status: 'Pending Completion Approval',
+          completionReportUrl: reportUrl,
+          completionSubmissionDate: new Date().toISOString(),
+        };
+
+        await updateDoc(projectRef, updateData);
+        setProject({ ...project, ...updateData });
+
+        toast({ title: 'Report Submitted', description: 'Your completion report has been submitted for review.' });
+        setIsCompletionDialogOpen(false);
+        setCompletionReportFile(null);
+    } catch (error) {
+        console.error('Error submitting completion report:', error);
+        toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not submit the completion report.' });
+    } finally {
+        setIsSubmittingCompletion(false);
+    }
+  };
   
   const formatDate = (isoString: string) => {
       if (!isoString) return 'N/A';
@@ -140,21 +183,21 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
     setProject(updatedProject);
   };
 
-  const isAdmin = user?.role === 'admin';
-  const availableStatuses: Project['status'][] = ['Approved', 'Rejected', 'In Progress', 'Completed', 'Under Review'];
+  const availableStatuses: Project['status'][] = ['Approved', 'Rejected', 'In Progress', 'Completed', 'Under Review', 'Pending Completion Approval'];
 
   return (
     <>
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                   <CardTitle className="text-2xl">{project.title}</CardTitle>
                   <CardDescription>Submitted by {project.pi} on {formatDate(project.submissionDate)}</CardDescription>
               </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                   <Badge variant={statusVariant[project.status] || 'secondary'} className="text-sm px-3 py-1">
                       {project.status === 'Under Review' && <Clock className="mr-2 h-4 w-4" />}
+                      {project.status === 'Pending Completion Approval' && <Clock className="mr-2 h-4 w-4" />}
                       {(project.status === 'Approved' || project.status === 'Completed') && <Check className="mr-2 h-4 w-4" />}
                       {project.status === 'Rejected' && <X className="mr-2 h-4 w-4" />}
                       {project.status}
@@ -206,6 +249,30 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                       </DialogContent>
                     </Dialog>
                   )}
+                  {isPI && (project.status === 'Approved' || project.status === 'In Progress') && (
+                    <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Request Project Closure</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Submit Completion Report</DialogTitle>
+                          <DialogDescription>To request project closure, upload your final 'Project outcome-cum-completion report'.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="completion-report" className="text-right">Report (PDF)</Label>
+                            <Input id="completion-report" type="file" accept=".pdf" onChange={handleCompletionFileChange} className="col-span-3" />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button type="button" onClick={handleCompletionSubmit} disabled={isSubmittingCompletion || !completionReportFile}>
+                            {isSubmittingCompletion ? 'Submitting...' : 'Submit for Review'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
               </div>
           </div>
         </CardHeader>
@@ -237,6 +304,20 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
             <h3 className="font-semibold text-lg">Timeline and Outcomes</h3>
             <p className="text-muted-foreground whitespace-pre-wrap">{project.timelineAndOutcomes}</p>
           </div>
+          {project.completionReportUrl && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">Completion Report</h3>
+                    <p className="text-sm text-muted-foreground">
+                        The project outcome-cum-completion report was submitted on {formatDate(project.completionSubmissionDate!)}.
+                    </p>
+                    <Button variant="link" asChild className="p-0 h-auto">
+                        <a href={project.completionReportUrl} target="_blank" rel="noopener noreferrer">View Submitted Report</a>
+                    </Button>
+                </div>
+              </>
+          )}
         </CardContent>
       </Card>
       

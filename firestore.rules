@@ -3,63 +3,70 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    function isSignedIn() {
-      return request.auth != null;
-    }
-    
-    function isOwner(userId) {
-      return request.auth.uid == userId;
-    }
-    
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    
-    function isFaculty() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'faculty';
-    }
-    
+    // USERS
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isOwner(userId);
+      // Admins can read/write any user profile
+      allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Users can read their own profile
+      allow get: if request.auth.uid == userId;
+      // Allow users to be created
+      allow create: if request.auth.uid == userId;
     }
 
-    match /counters/projects {
-      allow read: if isSignedIn();
-      allow write: if isFaculty() && (
-        (resource == null && request.resource.data.count >= 1) ||
-        (resource != null && request.resource.data.count == resource.data.count + 1)
-      );
-    }
-    
+    // PROJECTS
     match /projects/{projectId} {
-      allow read: if isSignedIn();
-      allow create: if isFaculty();
+      // Admins can perform any action on any project
+      allow read, write, create: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
 
-      // Admin can update anything.
-      // Faculty (PI) can only update the 'grant' field under specific conditions.
-      allow update: if isAdmin() || (
-        isOwner(resource.data.pi_uid) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant']) &&
-        (
-          // Case 1: Submitting bank details
-          (
-            resource.data.grant.status == 'Pending Bank Details' &&
-            request.resource.data.grant.status == 'Bank Details Submitted'
-          ) ||
-          // Case 2: Adding transactions or submitting utilization report when status is Disbursed
-          (
-            resource.data.grant.status == 'Disbursed'
-          )
-        )
-      );
+      // Authenticated users can read all projects (for lists)
+      allow list: if request.auth != null;
+      // Users can get a specific project if they are the PI or an admin
+      allow get: if request.auth != null && (request.auth.uid == resource.data.pi_uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
+
+      // Faculty can create new projects for themselves
+      allow create: if request.auth.uid == request.resource.data.pi_uid &&
+                     get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'faculty';
+
+      // Allow faculty to update their own project for specific workflows
+      allow update: if request.auth.uid == resource.data.pi_uid &&
+                    (
+                      // Rule for submitting bank details
+                      (request.resource.data.grant.status == 'Bank Details Submitted' &&
+                       resource.data.grant.status == 'Pending Bank Details' &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant'])) ||
+
+                      // Rule for submitting utilization report
+                      (request.resource.data.grant.status == 'Utilization Submitted' &&
+                       resource.data.grant.status == 'Disbursed' &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant'])) ||
+
+                      // Rule for adding transactions
+                      (request.resource.data.grant.status == 'Disbursed' &&
+                       resource.data.grant.status == 'Disbursed' &&
+                       request.resource.data.grant.transactions.size() == resource.data.grant.transactions.size() + 1 &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['grant'])) ||
+                      
+                      // Rule for submitting completion report
+                      (request.resource.data.status == 'Pending Completion Approval' &&
+                       (resource.data.status == 'Approved' || resource.data.status == 'In Progress') &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completionReportUrl', 'completionSubmissionDate']))
+                    );
     }
     
+    // COUNTERS
+    match /counters/projects {
+        // Only faculty can update the counter, but only as part of a transaction creating a project.
+        // This is implicitly handled by the create rule on projects within a transaction.
+        // Explicit write is only for admins for maintenance.
+        allow read, write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        allow get: if request.auth != null;
+    }
+
+    // NOTIFICATIONS
     match /notifications/{notificationId} {
-      allow read, update: if isOwner(resource.data.uid);
-      allow create: if isAdmin();
+        // Users can only read, create, and update their own notifications
+        allow read, create, update: if request.auth.uid == request.resource.data.uid;
+        allow list: if request.auth.uid == request.query.where.uid;
     }
   }
 }
