@@ -146,7 +146,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ); 
   }
 
-  const isAdmin = user.role === 'admin';
+  const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(user.role);
 
   return (
     <SidebarProvider>

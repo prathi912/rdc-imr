@@ -14,6 +14,10 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -30,6 +34,9 @@ import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firesto
 import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+
+const ROLES: User['role'][] = ['faculty', 'Evaluator', 'CRO', 'Admin', 'Super-admin'];
+const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
 
 export default function ManageUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -78,7 +85,7 @@ export default function ManageUsersPage() {
   }, [fetchUsers, toast]);
 
 
-  const handleRoleChange = useCallback(async (uid: string, newRole: 'admin' | 'faculty') => {
+  const handleRoleChange = useCallback(async (uid: string, newRole: User['role']) => {
     try {
       const userDoc = doc(db, 'users', uid);
       await updateDoc(userDoc, { role: newRole });
@@ -123,33 +130,52 @@ export default function ManageUsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.uid}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>{user.role}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost" disabled={user.uid === currentUser?.uid}>
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          {user.role === 'faculty' && <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin')}>Make Admin</DropdownMenuItem>}
-                          {user.role === 'admin' && <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty')}>Make Faculty</DropdownMenuItem>}
-                          <DropdownMenuItem className="text-destructive" onSelect={() => setUserToDelete(user)}>
-                            Delete User
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {users.map((user) => {
+                   const isSuperAdminUser = user.email === SUPER_ADMIN_EMAIL;
+                   const isCurrentUser = user.uid === currentUser?.uid;
+
+                   return (
+                    <TableRow key={user.uid}>
+                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.role === 'admin' || user.role === 'Super-admin' ? 'default' : 'secondary'}>{user.role}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                         <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button aria-haspopup="true" size="icon" variant="ghost" disabled={isCurrentUser || isSuperAdminUser}>
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Toggle menu</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
+                                <DropdownMenuPortal>
+                                    <DropdownMenuSubContent>
+                                        {ROLES.map(role => (
+                                            <DropdownMenuItem 
+                                                key={role} 
+                                                onClick={() => handleRoleChange(user.uid, role)}
+                                                disabled={user.role === role}
+                                            >
+                                               {role.charAt(0).toUpperCase() + role.slice(1)}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuSubContent>
+                                </DropdownMenuPortal>
+                            </DropdownMenuSub>
+                            <DropdownMenuItem className="text-destructive" onSelect={() => setUserToDelete(user)}>
+                              Delete User
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>

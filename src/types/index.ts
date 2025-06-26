@@ -2,7 +2,7 @@ export type User = {
   uid: string;
   name: string;
   email: string;
-  role: 'admin' | 'faculty';
+  role: 'admin' | 'faculty' | 'Evaluator' | 'CRO' | 'Super-admin';
   faculty?: string;
   institute?: string;
   department?: string;

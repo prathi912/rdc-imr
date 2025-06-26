@@ -70,15 +70,15 @@ export default function LoginPage() {
         uid: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
         email: firebaseUser.email!,
-        role: firebaseUser.email === 'rathipranav07@gmail.com' ? 'admin' : 'faculty',
+        role: firebaseUser.email === 'rathipranav07@gmail.com' ? 'Super-admin' : 'faculty',
         profileComplete: false,
       };
       await setDoc(userDocRef, user);
     }
     
-    // Ensure admin user always has admin role and bypasses profile setup
-    if (user.email === 'rathipranav07@gmail.com' && !user.profileComplete) {
-      user.role = 'admin';
+    // Ensure admin user always has Super-admin role and bypasses profile setup
+    if (user.email === 'rathipranav07@gmail.com' && (!user.profileComplete || user.role !== 'Super-admin')) {
+      user.role = 'Super-admin';
       user.profileComplete = true;
       await setDoc(userDocRef, user, { merge: true });
     }

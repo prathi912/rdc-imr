@@ -34,10 +34,12 @@ export default function DashboardPage() {
       )
   }
 
+  const adminRoles: User['role'][] = ['admin', 'CRO', 'Super-admin'];
+
   return (
     <div className="transition-all duration-300">
-      {user.role === 'admin' && <AdminDashboard />}
-      {user.role === 'faculty' && <FacultyDashboard user={user} />}
+      {adminRoles.includes(user.role) && <AdminDashboard />}
+      {!adminRoles.includes(user.role) && <FacultyDashboard user={user} />}
     </div>
   );
 }
