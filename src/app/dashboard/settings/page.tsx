@@ -12,10 +12,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { db } from '@/lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
+import { db, auth } from '@/lib/firebase';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -91,22 +92,30 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        profileForm.reset({
-            name: parsedUser.name || '',
-            email: parsedUser.email || '',
-            faculty: parsedUser.faculty || '',
-            institute: parsedUser.institute || '',
-            department: parsedUser.department || '',
-            misId: parsedUser.misId || '',
-            phoneNumber: parsedUser.phoneNumber || '',
-        });
-    }
-    setLoading(false);
-  }, [profileForm]);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (firebaseUser) {
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
+          setUser(appUser);
+          profileForm.reset({
+            name: appUser.name || '',
+            email: appUser.email || '',
+            faculty: appUser.faculty || '',
+            institute: appUser.institute || '',
+            department: appUser.department || '',
+            misId: appUser.misId || '',
+            phoneNumber: appUser.phoneNumber || '',
+          });
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   async function onProfileSubmit(data: ProfileFormValues) {
@@ -114,7 +123,6 @@ export default function SettingsPage() {
     setIsSubmittingProfile(true);
     try {
         const userDocRef = doc(db, 'users', user.uid);
-        // Exclude email from the update data as it shouldn't be changed here.
         const { email, ...updateData } = data;
         await updateDoc(userDocRef, updateData);
         
