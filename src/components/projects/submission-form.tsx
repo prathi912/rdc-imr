@@ -22,9 +22,6 @@ const formSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters.'),
   abstract: z.string().min(20, 'Abstract must be at least 20 characters.'),
   projectType: z.string().min(1, 'Please select a project type.'),
-  faculty: z.string().min(1, 'Please select a faculty.'),
-  institute: z.string().min(1, 'Please select an institute.'),
-  departmentName: z.string().min(2, 'Department name is required.'),
   // Step 2
   coPiNames: z.string().optional(),
   studentInfo: z.string().optional(),
@@ -47,61 +44,6 @@ const steps = [
   { id: 4, title: 'Timeline & Outcomes', icon: GanttChartSquare },
 ];
 
-const faculties = [
-    "Faculty of Engineering & Technology",
-    "Faculty of Diploma Studies",
-    "Faculty of Applied Sciences",
-    "Faculty of Computer Applications",
-    "Faculty of Agriculture",
-    "Faculty of Architecture & Planning",
-    "Faculty of Design",
-    "Faculty of Fine Arts",
-    "Faculty of Arts",
-    "Faculty of Commerce",
-    "Faculty of Social Work",
-    "Faculty of Management Studies",
-    "Faculty of Hotel Management & Catering Technology",
-    "Faculty of Law",
-    "Faculty of Medicine",
-    "Faculty of Homoeopathy",
-    "Faculty of Ayurveda",
-    "Faculty of Nursing",
-    "Faculty of Pharmacy",
-    "Faculty of Physiotherapy",
-    "Faculty of Public Health",
-];
-
-const institutes = [
-    "Parul Institute of Engineering & Technology",
-    "Parul Institute of Technology",
-    "Parul Diploma Studies",
-    "Parul Institute of Computer Application",
-    "Parul Institute of Applied Sciences",
-    "Parul Institute of Agriculture",
-    "Parul Institute of Architecture and Research",
-    "Faculty of Design",
-    "Parul Institute of Fine Arts",
-    "Parul Institute of Arts",
-    "Parul Institute of Commerce",
-    "Parul Institute of Social Work",
-    "Faculty of Management Studies",
-    "Parul Institute of Hotel Management & Catering Technology",
-    "Parul Institute of Law",
-    "Parul Medical College & Hospital",
-    "Jawaharlal Nehru Homoeopathic Medical College",
-    "Ahmedabad Homoeopathic Medical College",
-    "Parul Institute of Homoeopathy & Research",
-    "Rajkot Homoeopathic Medical College",
-    "Parul Institute of Ayurved",
-    "Parul Institute of Ayurved & Research",
-    "Parul Institute of Nursing",
-    "Parul Institute of Pharmacy",
-    "Parul Institute of Pharmacy & Research",
-    "Parul Institute of Physiotherapy",
-    "Faculty of Public Health",
-];
-
-
 export function SubmissionForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [user, setUser] = useState<User | null>(null);
@@ -114,9 +56,6 @@ export function SubmissionForm() {
       title: '',
       abstract: '',
       projectType: '',
-      faculty: '',
-      institute: '',
-      departmentName: '',
       coPiNames: '',
       studentInfo: '',
       expectedOutcomes: '',
@@ -126,18 +65,13 @@ export function SubmissionForm() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      const parsedUser = JSON.parse(storedUser) as User;
-      setUser(parsedUser);
-      // Pre-fill form with user profile data
-      if (parsedUser.faculty) form.setValue('faculty', parsedUser.faculty);
-      if (parsedUser.institute) form.setValue('institute', parsedUser.institute);
-      if (parsedUser.department) form.setValue('departmentName', parsedUser.department);
+      setUser(JSON.parse(storedUser));
     }
-  }, [form]);
+  }, []);
 
   const handleNext = async () => {
     const fieldsToValidate = {
-      1: ['title', 'abstract', 'projectType', 'faculty', 'institute', 'departmentName'],
+      1: ['title', 'abstract', 'projectType'],
       2: [],
       3: [],
       4: ['expectedOutcomes'],
@@ -158,11 +92,11 @@ export function SubmissionForm() {
   };
 
   const onSubmit = async (data: FormData) => {
-    if (!user) {
+    if (!user || !user.faculty || !user.institute || !user.department) {
       toast({
         variant: 'destructive',
-        title: 'Authentication Error',
-        description: 'You must be logged in to submit a project.',
+        title: 'Profile Incomplete',
+        description: 'Please complete your profile in Settings before submitting a project.',
       });
       return;
     }
@@ -189,9 +123,9 @@ export function SubmissionForm() {
           title: data.title,
           abstract: data.abstract,
           type: data.projectType,
-          faculty: data.faculty,
-          institute: data.institute,
-          departmentName: data.departmentName,
+          faculty: user.faculty,
+          institute: user.institute,
+          departmentName: user.department,
           pi: user.name,
           pi_uid: user.uid,
           teamInfo: `PI: ${user.name}; Co-PIs: ${data.coPiNames || 'N/A'}; Students: ${data.studentInfo || 'N/A'}`,
@@ -247,28 +181,15 @@ export function SubmissionForm() {
                 <FormField name="abstract" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Abstract</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField name="projectType" control={form.control} render={({ field }) => (
+                <FormField name="projectType" control={form.control} render={({ field }) => (
                     <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Research">Research</SelectItem><SelectItem value="Development">Development</SelectItem><SelectItem value="Clinical Trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                  )} />
-                   <FormField name="faculty" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                        {faculties.map(faculty => <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>)}
-                    </SelectContent>
-                    </Select><FormMessage /></FormItem>
-                  )} />
+                )} />
+                 <div className="p-4 border rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                    <p><span className="font-semibold text-foreground">Faculty:</span> {user?.faculty || 'Not set'}</p>
+                    <p><span className="font-semibold text-foreground">Institute:</span> {user?.institute || 'Not set'}</p>
+                    <p><span className="font-semibold text-foreground">Department:</span> {user?.department || 'Not set'}</p>
+                    <p className="mt-2 text-xs">This information is from your profile. You can change it in <a href="/dashboard/settings" className="underline">Settings</a>.</p>
                 </div>
-                <FormField name="institute" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled><FormControl><SelectTrigger><SelectValue placeholder="Select institute" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                        {institutes.map(institute => <SelectItem key={institute} value={institute}>{institute}</SelectItem>)}
-                    </SelectContent>
-                    </Select><FormMessage /></FormItem>
-                )} />
-                <FormField name="departmentName" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Department Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Computer Science & Engineering" disabled /></FormControl><FormMessage /></FormItem>
-                )} />
               </div>
             )}
             {currentStep === 2 && (
