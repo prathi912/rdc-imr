@@ -126,9 +126,14 @@ export function SubmissionForm() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser) as User;
+      setUser(parsedUser);
+      // Pre-fill form with user profile data
+      if (parsedUser.faculty) form.setValue('faculty', parsedUser.faculty);
+      if (parsedUser.institute) form.setValue('institute', parsedUser.institute);
+      if (parsedUser.department) form.setValue('departmentName', parsedUser.department);
     }
-  }, []);
+  }, [form]);
 
   const handleNext = async () => {
     const fieldsToValidate = {
@@ -247,7 +252,7 @@ export function SubmissionForm() {
                     <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Research">Research</SelectItem><SelectItem value="Development">Development</SelectItem><SelectItem value="Clinical Trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                   )} />
                    <FormField name="faculty" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl>
+                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl>
                     <SelectContent>
                         {faculties.map(faculty => <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>)}
                     </SelectContent>
@@ -255,14 +260,14 @@ export function SubmissionForm() {
                   )} />
                 </div>
                 <FormField name="institute" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select institute" /></SelectTrigger></FormControl>
+                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled><FormControl><SelectTrigger><SelectValue placeholder="Select institute" /></SelectTrigger></FormControl>
                     <SelectContent>
                         {institutes.map(institute => <SelectItem key={institute} value={institute}>{institute}</SelectItem>)}
                     </SelectContent>
                     </Select><FormMessage /></FormItem>
                 )} />
                 <FormField name="departmentName" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Department Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Computer Science & Engineering" /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Department Name</FormLabel><FormControl><Input {...field} placeholder="e.g., Computer Science & Engineering" disabled /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
             )}
