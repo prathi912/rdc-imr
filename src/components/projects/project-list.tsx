@@ -30,6 +30,7 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
 
 
 export function ProjectList({ projects, userRole }: ProjectListProps) {
+  const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(userRole);
   return (
     <Card>
       <CardContent className="pt-6">
@@ -59,7 +60,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
                         <Eye className="h-4 w-4" />
                       </Button>
                     </Link>
-                    {userRole === 'admin' && <ProjectSummary project={project} />}
+                    {isAdmin && <ProjectSummary project={project} />}
                   </div>
                 </TableCell>
               </TableRow>
