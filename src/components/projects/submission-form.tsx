@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -32,7 +31,6 @@ const formSchema = z.object({
   budgetUpload: z.any().optional(),
   ethicsUpload: z.any().optional(),
   // Step 4
-  ganttChart: z.any().optional(),
   expectedOutcomes: z.string().min(10, 'Please describe the expected outcomes.'),
   guidelinesAgreement: z.boolean().refine(val => val === true, {
     message: "You must agree to the guidelines to submit.",
@@ -222,9 +220,6 @@ export function SubmissionForm() {
             )}
             {currentStep === 4 && (
               <div className="space-y-6">
-                 <FormField name="ganttChart" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Timeline / Gantt Chart (PDF, PNG)</FormLabel><FormControl><Input type="file" accept=".pdf, .png" /></FormControl><FormMessage /></FormItem>
-                )} />
                 <FormField name="expectedOutcomes" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Expected Outcomes & Impact</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
