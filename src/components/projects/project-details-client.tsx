@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format, startOfToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
-import type { Project, User, GrantDetails, Evaluation } from '@/types';
+import type { Project, User, GrantDetails, Evaluation, BankDetails } from '@/types';
 import { db, storage } from '@/lib/firebase';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -214,10 +214,48 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
     setIsAwarding(true);
     try {
       const projectRef = doc(db, 'projects', project.id);
-      const newGrant: GrantDetails = {
-        amount: grantAmount,
-        status: 'Pending Bank Details',
-      };
+
+      // Fetch PI's user data to get bank details
+      const userRef = doc(db, 'users', project.pi_uid);
+      const userSnap = await getDoc(userRef);
+      
+      let newGrant: GrantDetails;
+      
+      if (userSnap.exists()) {
+        const piUser = userSnap.data() as User;
+        
+        if (piUser.bankDetails) {
+          // Bank details exist, copy them over
+          const grantBankDetails: BankDetails = {
+              accountHolderName: piUser.bankDetails.beneficiaryName,
+              accountNumber: piUser.bankDetails.accountNumber,
+              bankName: piUser.bankDetails.bankName,
+              ifscCode: piUser.bankDetails.ifscCode,
+              branchName: piUser.bankDetails.branchName,
+              city: piUser.bankDetails.city,
+          };
+          
+          newGrant = {
+            amount: grantAmount,
+            status: 'Bank Details Submitted',
+            bankDetails: grantBankDetails
+          };
+        } else {
+          // Bank details don't exist
+          newGrant = {
+            amount: grantAmount,
+            status: 'Pending Bank Details',
+          };
+        }
+      } else {
+        // PI user document not found, proceed without bank details
+        newGrant = {
+          amount: grantAmount,
+          status: 'Pending Bank Details',
+        };
+        toast({ variant: 'destructive', title: 'Warning', description: "Could not find PI's user profile to fetch bank details." });
+      }
+
 
       await updateDoc(projectRef, { grant: newGrant });
 

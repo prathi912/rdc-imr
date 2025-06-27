@@ -14,7 +14,7 @@ import { db, storage } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useState } from 'react';
-import { DollarSign, Banknote, FileText, CheckCircle, PlusCircle } from 'lucide-react';
+import { DollarSign, Banknote, FileText, CheckCircle, PlusCircle, AlertCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -30,19 +30,14 @@ import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import Link from 'next/link';
 
 interface GrantManagementProps {
   project: Project;
   user: User;
   onUpdate: (updatedProject: Project) => void;
 }
-
-const bankDetailsSchema = z.object({
-  accountHolderName: z.string().min(2, "Account holder's name is required."),
-  accountNumber: z.string().min(5, "A valid account number is required."),
-  bankName: z.string().min(2, "Bank name is required."),
-  ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC code format."),
-});
 
 const transactionSchema = z.object({
     dateOfTransaction: z.string().min(1, 'Transaction date is required.'),
@@ -70,16 +65,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const isAdmin = user.role === 'admin';
   const isPI = user.uid === project.pi_uid;
 
-  const bankForm = useForm<z.infer<typeof bankDetailsSchema>>({
-    resolver: zodResolver(bankDetailsSchema),
-    defaultValues: project.grant?.bankDetails || {
-      accountHolderName: '',
-      accountNumber: '',
-      bankName: '',
-      ifscCode: '',
-    },
-  });
-
   const transactionForm = useForm<z.infer<typeof transactionSchema>>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
@@ -91,27 +76,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       description: '',
     },
   });
-
-  const handleBankDetailsSubmit = async (values: z.infer<typeof bankDetailsSchema>) => {
-    if (!project.grant) return;
-    setIsSubmitting(true);
-    try {
-      const projectRef = doc(db, 'projects', project.id);
-      const updatedGrant: GrantDetails = {
-        ...project.grant,
-        bankDetails: values,
-        status: 'Bank Details Submitted',
-      };
-      await updateDoc(projectRef, { grant: updatedGrant });
-      onUpdate({ ...project, grant: updatedGrant });
-      toast({ title: 'Success', description: 'Bank details submitted successfully. Awaiting disbursement.' });
-    } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit bank details.' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
   
   const handleAddTransaction = async (values: z.infer<typeof transactionSchema>) => {
     if (!project.grant) return;
@@ -237,22 +201,15 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             </div>
         )}
 
-        {isPI && grant.status === 'Pending Bank Details' && !grant.bankDetails && (
-          <Form {...bankForm}>
-            <form onSubmit={bankForm.handleSubmit(handleBankDetailsSubmit)} className="space-y-4 p-4 border rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                    <Banknote className="h-5 w-5 text-muted-foreground"/>
-                    <h4 className="font-semibold">Submit Bank Account Details</h4>
-                </div>
-              <FormField name="accountHolderName" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>Account Holder Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              <FormField name="accountNumber" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField name="bankName" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="ifscCode" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>IFSC Code</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              </div>
-              <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit Bank Details'}</Button>
-            </form>
-          </Form>
+        {isPI && grant.status === 'Pending Bank Details' && (
+           <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Action Required</AlertTitle>
+            <AlertDescription>
+                Grant has been awarded, but your bank details are missing. Please add your salary bank account details in your profile to receive the funds.
+                <Button asChild variant="link" className="p-1 h-auto ml-1"><Link href="/dashboard/settings">Go to Settings</Link></Button>
+            </AlertDescription>
+          </Alert>
         )}
         
         {grant.bankDetails && (
@@ -268,6 +225,10 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     <dd>{grant.bankDetails.accountNumber}</dd>
                     <dt className="font-medium text-muted-foreground">Bank Name</dt>
                     <dd>{grant.bankDetails.bankName}</dd>
+                    <dt className="font-medium text-muted-foreground">Branch</dt>
+                    <dd>{grant.bankDetails.branchName}</dd>
+                    <dt className="font-medium text-muted-foreground">City</dt>
+                    <dd>{grant.bankDetails.city}</dd>
                     <dt className="font-medium text-muted-foreground">IFSC Code</dt>
                     <dd>{grant.bankDetails.ifscCode}</dd>
                     {grant.disbursementDate && (
@@ -280,7 +241,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             </div>
         )}
 
-        {(grant.status === 'Disbursed' || grant.status === 'Utilization Submitted') && (
+        {(grant.status === 'Disbursed' || grant.status === 'Utilization Submitted' || grant.status === 'Completed') && (
             <div className="p-4 border rounded-lg space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-center gap-2">

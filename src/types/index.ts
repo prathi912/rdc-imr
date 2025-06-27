@@ -1,5 +1,6 @@
 
 
+
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -30,6 +31,8 @@ export type BankDetails = {
   accountNumber: string;
   bankName: string;
   ifscCode: string;
+  branchName: string;
+  city: string;
 };
 
 export type Transaction = {
