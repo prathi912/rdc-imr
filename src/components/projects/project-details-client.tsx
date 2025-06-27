@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -8,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -213,8 +215,14 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
     setIsSubmittingCompletion(true);
     try {
         const projectRef = doc(db, 'projects', project.id);
-        const reportUrl = `reports/${project.id}/${completionReportFile.name}`;
-        const certificateUrl = `reports/${project.id}/${utilizationCertificateFile.name}`;
+        
+        const reportStorageRef = ref(storage, `reports/${project.id}/${completionReportFile.name}`);
+        await uploadBytes(reportStorageRef, completionReportFile);
+        const reportUrl = await getDownloadURL(reportStorageRef);
+        
+        const certificateStorageRef = ref(storage, `reports/${project.id}/${utilizationCertificateFile.name}`);
+        await uploadBytes(certificateStorageRef, utilizationCertificateFile);
+        const certificateUrl = await getDownloadURL(certificateStorageRef);
 
         const updateData = {
           status: 'Pending Completion Approval',
@@ -246,8 +254,10 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
     setIsSubmittingRevision(true);
     try {
         const projectRef = doc(db, 'projects', project.id);
-        // In a real app, you'd upload to Firebase Storage here and get a URL
-        const revisedProposalUrl = `revisions/${project.id}/${revisedProposalFile.name}`;
+
+        const storageRef = ref(storage, `revisions/${project.id}/${revisedProposalFile.name}`);
+        await uploadBytes(storageRef, revisedProposalFile);
+        const revisedProposalUrl = await getDownloadURL(storageRef);
 
         const updateData = {
           revisedProposalUrl: revisedProposalUrl,
@@ -473,6 +483,37 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
             <h3 className="font-semibold text-lg">Timeline and Outcomes</h3>
             <p className="text-muted-foreground whitespace-pre-wrap">{project.timelineAndOutcomes}</p>
           </div>
+          {(project.proposalUrl || project.cvUrl || project.ethicsUrl) && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <h3 className="font-semibold text-lg">Submitted Documents</h3>
+                <ul className="list-disc list-inside text-sm space-y-1">
+                  {project.proposalUrl && (
+                    <li>
+                      <Button variant="link" asChild className="p-0 h-auto">
+                        <a href={project.proposalUrl} target="_blank" rel="noopener noreferrer">View Project Proposal</a>
+                      </Button>
+                    </li>
+                  )}
+                  {project.cvUrl && (
+                    <li>
+                      <Button variant="link" asChild className="p-0 h-auto">
+                        <a href={project.cvUrl} target="_blank" rel="noopener noreferrer">View Team CVs</a>
+                      </Button>
+                    </li>
+                  )}
+                  {project.ethicsUrl && (
+                    <li>
+                      <Button variant="link" asChild className="p-0 h-auto">
+                        <a href={project.ethicsUrl} target="_blank" rel="noopener noreferrer">View Ethics Approval</a>
+                      </Button>
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </>
+          )}
           {project.revisedProposalUrl && (
               <>
                 <Separator />

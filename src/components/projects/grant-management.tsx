@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -9,8 +10,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useState } from 'react';
 import { DollarSign, Banknote, FileText, CheckCircle, PlusCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -116,13 +118,26 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     setIsSubmitting(true);
     try {
         const projectRef = doc(db, 'projects', project.id);
+        
+        let invoiceUrl: string | undefined;
+        const invoiceFile = values.invoice?.[0];
+        if (invoiceFile) {
+            const storageRef = ref(storage, `invoices/${project.id}/${new Date().toISOString()}-${invoiceFile.name}`);
+            await uploadBytes(storageRef, invoiceFile);
+            invoiceUrl = await getDownloadURL(storageRef);
+        }
+
         const newTransaction: Transaction = {
-            id: new Date().toISOString() + Math.random(), // simple unique id
-            ...values,
-            // Note: File upload to Firebase Storage is not implemented. 
-            // Storing placeholder for invoiceUrl.
-            invoiceUrl: values.invoice?.[0]?.name ? 'placeholder_url' : undefined,
+            id: new Date().toISOString() + Math.random(),
+            dateOfTransaction: values.dateOfTransaction,
+            amount: values.amount,
+            vendorName: values.vendorName,
+            isGstRegistered: values.isGstRegistered,
+            gstNumber: values.gstNumber,
+            description: values.description,
+            invoiceUrl: invoiceUrl,
         };
+
         const updatedTransactions = [...(project.grant.transactions || []), newTransaction];
         const updatedGrant = { ...project.grant, transactions: updatedTransactions };
 
@@ -292,7 +307,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                                         {transactionForm.watch('isGstRegistered') && (
                                             <FormField name="gstNumber" control={transactionForm.control} render={({ field }) => ( <FormItem><FormLabel>GST Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                         )}
-                                        <FormField name="invoice" control={transactionForm.control} render={({ field }) => ( <FormItem><FormLabel>Upload Invoice</FormLabel><FormControl><Input type="file" /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField name="invoice" control={transactionForm.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Upload Invoice</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
                                     </form>
                                 </Form>
                                 <DialogFooter>

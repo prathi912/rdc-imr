@@ -17,8 +17,9 @@ import { GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const formSchema = z.object({
   // Step 1
@@ -109,6 +110,33 @@ export function SubmissionForm() {
 
     setIsSubmitting(true);
     try {
+      const projectDocRef = doc(collection(db, 'projects'));
+      const projectId = projectDocRef.id;
+
+      const uploadFile = async (file: File, folder: string): Promise<string> => {
+        const storageRef = ref(storage, `projects/${projectId}/${folder}/${file.name}`);
+        await uploadBytes(storageRef, file);
+        return await getDownloadURL(storageRef);
+      };
+
+      let cvUrl: string | undefined;
+      if (data.cvUpload && data.cvUpload.length > 0) {
+        cvUrl = await uploadFile(data.cvUpload[0], 'cv');
+      }
+      
+      const proposalFile = data.proposalUpload?.[0];
+      if (!proposalFile) {
+        toast({ variant: 'destructive', title: 'Missing File', description: 'Project proposal is required.' });
+        setIsSubmitting(false);
+        return;
+      }
+      const proposalUrl = await uploadFile(proposalFile, 'proposal');
+      
+      let ethicsUrl: string | undefined;
+      if (data.ethicsUpload && data.ethicsUpload.length > 0) {
+        ethicsUrl = await uploadFile(data.ethicsUpload[0], 'ethics');
+      }
+
       const teamInfoParts = [];
       if (data.coPiNames && data.coPiNames.trim() !== '') {
         teamInfoParts.push(`Co-PIs: ${data.coPiNames}`);
@@ -117,8 +145,6 @@ export function SubmissionForm() {
         teamInfoParts.push(`Students: ${data.studentInfo}`);
       }
       const teamInfo = teamInfoParts.join('; ');
-
-      const projectDocRef = doc(collection(db, 'projects'));
 
       const projectData: Omit<Project, 'id'> = {
         title: data.title,
@@ -133,6 +159,9 @@ export function SubmissionForm() {
         timelineAndOutcomes: data.expectedOutcomes,
         status: 'Submitted' as const,
         submissionDate: new Date().toISOString(),
+        proposalUrl,
+        cvUrl,
+        ethicsUrl,
       };
 
       await setDoc(projectDocRef, projectData);

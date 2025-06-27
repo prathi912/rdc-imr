@@ -80,6 +80,9 @@ export type Project = {
   teamInfo: string;
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string
+  proposalUrl?: string;
+  cvUrl?: string;
+  ethicsUrl?: string;
   grant?: GrantDetails;
   completionReportUrl?: string;
   utilizationCertificateUrl?: string;
