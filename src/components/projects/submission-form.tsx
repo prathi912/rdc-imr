@@ -27,8 +27,7 @@ const formSchema = z.object({
   studentInfo: z.string().optional(),
   cvUpload: z.any().optional(),
   // Step 3
-  proposalUpload: z.any().optional(),
-  budgetUpload: z.any().optional(),
+  proposalUpload: z.any().refine((files) => files?.length > 0, 'Project proposal is required.'),
   ethicsUpload: z.any().optional(),
   // Step 4
   expectedOutcomes: z.string().min(10, 'Please describe the expected outcomes.'),
@@ -76,7 +75,7 @@ export function SubmissionForm() {
     const fieldsToValidate = {
       1: ['title', 'abstract', 'projectType'],
       2: [],
-      3: [],
+      3: ['proposalUpload'],
       4: ['expectedOutcomes', 'guidelinesAgreement'],
     }[currentStep] as (keyof FormData)[];
 
@@ -200,22 +199,64 @@ export function SubmissionForm() {
                 <FormField name="studentInfo" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Student Members</FormLabel><FormControl><Textarea {...field} placeholder="List student names and roles..." /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField name="cvUpload" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Upload CVs (ZIP file)</FormLabel><FormControl><Input type="file" accept=".zip" /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  name="cvUpload"
+                  control={form.control}
+                  render={({ field: { value, onChange, ...fieldProps } }) => (
+                    <FormItem>
+                      <FormLabel>Upload CVs (ZIP file)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...fieldProps}
+                          type="file"
+                          accept=".zip"
+                          onChange={(e) => onChange(e.target.files)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
             {currentStep === 3 && (
               <div className="space-y-6">
-                <FormField name="proposalUpload" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Project Proposal (PDF)</FormLabel><FormControl><Input type="file" accept=".pdf" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField name="budgetUpload" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Budget Plan (XLSX, PDF)</FormLabel><FormControl><Input type="file" accept=".xlsx, .pdf" /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField name="ethicsUpload" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Ethics Approval (if applicable)</FormLabel><FormControl><Input type="file" accept=".pdf" /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  name="proposalUpload"
+                  control={form.control}
+                  render={({ field: { value, onChange, ...fieldProps } }) => (
+                    <FormItem>
+                      <FormLabel>Project Proposal (PDF)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...fieldProps}
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => onChange(e.target.files)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  name="ethicsUpload"
+                  control={form.control}
+                  render={({ field: { value, onChange, ...fieldProps } }) => (
+                    <FormItem>
+                      <FormLabel>Ethics Approval (if applicable)</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...fieldProps}
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) => onChange(e.target.files)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
             {currentStep === 4 && (
