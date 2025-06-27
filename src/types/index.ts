@@ -95,6 +95,7 @@ export type IncentiveClaim = {
     userEmail: string;
     status: 'Pending' | 'Accepted' | 'Rejected';
     submissionDate: string; // ISO String
+    faculty: string;
     
     // Form fields
     claimType: string;

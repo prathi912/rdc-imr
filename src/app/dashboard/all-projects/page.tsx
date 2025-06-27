@@ -33,14 +33,14 @@ export default function AllProjectsPage() {
         let q;
 
         const isAdmin = ['admin', 'Super-admin'].includes(user.role);
-        const isCro = user.role === 'CRO' && user.email === 'unnati.joshi22950@paruluniversity.ac.in';
+        const isCro = user.role === 'CRO';
 
         if (isAdmin) {
           q = query(projectsCol, orderBy('submissionDate', 'desc'));
         } else if (isCro) {
           q = query(
             projectsCol, 
-            where('faculty', '==', 'Faculty of Engineering & Technology'),
+            where('faculty', '==', user.faculty),
             orderBy('submissionDate', 'desc')
           );
         } else {
@@ -64,8 +64,8 @@ export default function AllProjectsPage() {
     getProjects();
   }, [user]);
   
-  const isCro = user?.role === 'CRO' && user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
-  const pageTitle = isCro ? "Faculty of Engineering & Technology Projects" : "All Projects";
+  const isCro = user?.role === 'CRO';
+  const pageTitle = isCro ? `Projects - ${user?.faculty}` : "All Projects";
   const pageDescription = isCro ? "Browse all projects submitted from your faculty." : "Browse and manage all projects in the system.";
 
   return (

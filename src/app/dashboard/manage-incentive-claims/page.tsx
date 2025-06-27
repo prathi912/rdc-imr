@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,8 +26,8 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
-import type { IncentiveClaim } from '@/types';
+import { collection, getDocs, doc, updateDoc, orderBy, query, where } from 'firebase/firestore';
+import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -84,12 +85,41 @@ export default function ManageIncentiveClaimsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
   const { toast } = useToast();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser) as User;
+      if (parsedUser.role !== 'Super-admin' && parsedUser.role !== 'CRO') {
+        toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
+        router.replace('/dashboard');
+        return;
+      }
+      setCurrentUser(parsedUser);
+    } else {
+        router.replace('/login');
+    }
+  }, [router, toast]);
+
 
   const fetchClaims = useCallback(async () => {
+    if (!currentUser) return;
     setLoading(true);
     try {
       const claimsCollection = collection(db, 'incentiveClaims');
-      const q = query(claimsCollection, orderBy('submissionDate', 'desc'));
+      let q;
+      if (currentUser.role === 'Super-admin') {
+          q = query(claimsCollection, orderBy('submissionDate', 'desc'));
+      } else if (currentUser.role === 'CRO') {
+          q = query(claimsCollection, where('faculty', '==', currentUser.faculty), orderBy('submissionDate', 'desc'));
+      } else {
+          setAllClaims([]);
+          setLoading(false);
+          return;
+      }
+
       const claimSnapshot = await getDocs(q);
       const claimList = claimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
       setAllClaims(claimList);
@@ -99,7 +129,7 @@ export default function ManageIncentiveClaimsPage() {
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, currentUser]);
 
   useEffect(() => {
     fetchClaims();
@@ -187,9 +217,13 @@ export default function ManageIncentiveClaimsPage() {
     </Table>
   );
 
+  const pageDescription = currentUser?.role === 'CRO' 
+    ? `Review claims submitted from ${currentUser.faculty}.` 
+    : "Review and manage all submitted incentive claims.";
+
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title="Manage Incentive Claims" description="Review and manage all submitted incentive claims.">
+      <PageHeader title="Manage Incentive Claims" description={pageDescription}>
          <Button onClick={handleExport} disabled={loading}>
             <Download className="mr-2 h-4 w-4" />
             Export XLSX

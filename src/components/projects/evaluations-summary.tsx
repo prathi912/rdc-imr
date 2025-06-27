@@ -3,7 +3,6 @@
 import type { Project, Evaluation } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCheck, UserX } from 'lucide-react';
-import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
 import { Badge } from '../ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
@@ -26,7 +25,7 @@ export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryP
             <CardTitle>Evaluations Summary</CardTitle>
         </div>
         <CardDescription>
-          {evaluations.length} of {REQUIRED_EVALUATOR_EMAILS.length} required evaluations submitted.
+          {evaluations.length} evaluations submitted.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

@@ -30,7 +30,6 @@ import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, si
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
-import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -67,9 +66,7 @@ export default function SignupPage() {
   });
   
   const determineUserRole = (email: string): User['role'] => {
-    if (REQUIRED_EVALUATOR_EMAILS.includes(email)) {
-      return 'Evaluator';
-    }
+    // New users are faculty by default. Admins can assign other roles.
     return 'faculty';
   }
 
@@ -94,7 +91,7 @@ export default function SignupPage() {
       email: firebaseUser.email!,
       photoURL: firebaseUser.photoURL || undefined,
       role: role,
-      profileComplete: role !== 'faculty', // Evaluators don't need to complete the long profile form
+      profileComplete: role !== 'faculty', // Evaluators, CROs etc. don't need to complete the long profile form
     };
     await setDoc(userDocRef, user);
 

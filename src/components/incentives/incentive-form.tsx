@@ -121,8 +121,8 @@ export function IncentiveForm() {
   const indexType = form.watch('indexType');
 
   async function onSubmit(data: IncentiveFormValues) {
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to submit a claim.' });
+    if (!user || !user.faculty) {
+        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in and have a faculty set in your profile to submit a claim.' });
         return;
     }
     setIsSubmitting(true);
@@ -132,6 +132,7 @@ export function IncentiveForm() {
             uid: user.uid,
             userName: user.name,
             userEmail: user.email,
+            faculty: user.faculty,
             status: 'Pending',
             submissionDate: new Date().toISOString(),
         };

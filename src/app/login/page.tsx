@@ -30,7 +30,6 @@ import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOu
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
-import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
 
 const loginSchema = z.object({
   email: z
@@ -62,9 +61,7 @@ export default function LoginPage() {
     if (email === 'rathipranav07@gmail.com') {
       return 'Super-admin';
     }
-    if (REQUIRED_EVALUATOR_EMAILS.includes(email)) {
-      return 'Evaluator';
-    }
+    // New users are faculty by default, admins can change roles.
     return 'faculty';
   }
 
@@ -98,6 +95,11 @@ export default function LoginPage() {
         if(specialRole !== 'faculty') {
             user.profileComplete = true;
         }
+    }
+    
+    // For existing users, ensure roles that don't need profile setup are marked as complete
+    if (['admin', 'Super-admin', 'Evaluator', 'CRO'].includes(user.role) && !user.profileComplete) {
+        user.profileComplete = true;
     }
     
     await setDoc(userDocRef, user, { merge: true });

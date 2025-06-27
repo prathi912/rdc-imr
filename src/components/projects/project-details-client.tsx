@@ -29,7 +29,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GrantManagement } from './grant-management';
-import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
 import { EvaluationForm } from './evaluation-form';
 import { EvaluationsSummary } from './evaluations-summary';
 import {
@@ -113,8 +112,8 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   
   const isPI = user?.uid === project.pi_uid;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
-  const isEvaluator = user && REQUIRED_EVALUATOR_EMAILS.includes(user.email);
-  const allEvaluationsIn = evaluations.length >= REQUIRED_EVALUATOR_EMAILS.length;
+  const canEvaluate = user && ['Evaluator', 'CRO'].includes(user.role);
+  const allEvaluationsIn = evaluations.length >= 3; // Require at least 3 evaluations
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     setIsUpdating(true);
@@ -434,7 +433,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       
       {isAdmin && project.status === 'Under Review' && <EvaluationsSummary project={project} evaluations={evaluations} />}
 
-      {isEvaluator && project.status === 'Under Review' && user && (
+      {canEvaluate && project.status === 'Under Review' && user && (
         <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchData} />
       )}
       
@@ -447,7 +446,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                     <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
                     <AlertDialogDescription>
                         This project cannot be approved or rejected until all required evaluations have been submitted. 
-                        There are currently {evaluations.length || 0} of {REQUIRED_EVALUATOR_EMAILS.length} evaluations complete.
+                        There are currently {evaluations.length || 0} of 3 required evaluations complete.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

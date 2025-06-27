@@ -35,7 +35,7 @@ import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const ROLES: User['role'][] = ['faculty', 'Evaluator', 'CRO', 'Admin', 'Super-admin'];
+const ROLES: User['role'][] = ['faculty', 'Evaluator', 'CRO', 'admin', 'Super-admin'];
 const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
 
 export default function ManageUsersPage() {

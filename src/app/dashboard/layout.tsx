@@ -155,7 +155,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(user.role);
   const isSuperAdmin = user.role === 'Super-admin';
-  const isEvaluator = user.role === 'Evaluator';
+  const canEvaluate = user.role === 'Evaluator' || user.role === 'CRO';
   const isFaculty = user.role === 'faculty';
 
 
@@ -195,7 +195,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </SidebarMenuItem>
               </>
              )}
-            {isEvaluator && (
+            {canEvaluate && (
                 <SidebarMenuItem>
                   <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
                     <ClipboardCheck />
@@ -241,6 +241,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     Manage Users
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                 {user.role === 'CRO' && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname === '/dashboard/manage-incentive-claims'}>
+                      <Award />
+                      Manage Claims
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                 )}
               </>
             )}
             {isSuperAdmin && (
