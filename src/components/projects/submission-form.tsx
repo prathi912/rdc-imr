@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
@@ -114,7 +114,7 @@ export function SubmissionForm() {
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
         let newCount = 1;
-        if (counterDoc.exists()) {
+        if (counterDoc.exists() && typeof counterDoc.data().count === 'number') {
           newCount = counterDoc.data().count + 1;
         }
 
@@ -260,7 +260,8 @@ export function SubmissionForm() {
                         <FormLabel>
                           Declaration
                         </FormLabel>
-                        <FormDescription>
+                        <FormMessage />
+                          <p className="text-sm text-muted-foreground">
                           I declare that I have gone through all the guidelines of the{" "}
                           <a
                             href="https://firebasestorage.googleapis.com/v0/b/pierc-portal.firebasestorage.app/o/Notification%201446_Revision%20in%20the%20Research%20%26%20Development%20Policy%20of%20the%20University.pdf?alt=media&token=3578f9f4-4e38-419b-aa29-3ecc5a8c32bf"
@@ -271,8 +272,7 @@ export function SubmissionForm() {
                             Research Policy of Parul University
                           </a>
                           .
-                        </FormDescription>
-                        <FormMessage />
+                        </p>
                       </div>
                     </FormItem>
                   )}
