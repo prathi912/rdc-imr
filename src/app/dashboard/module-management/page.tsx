@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ALL_MODULES } from '@/lib/modules';
 import { Loader2 } from 'lucide-react';
+import { updateUserModules } from '@/app/actions';
 
 
 export default function ModuleManagementPage() {
@@ -65,16 +66,9 @@ export default function ModuleManagementPage() {
     const modulesToSave = userModules[uid] || [];
     
     try {
-      const response = await fetch('/api/update-modules', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ uid, allowedModules: modulesToSave }),
-      });
+      const result = await updateUserModules(uid, modulesToSave);
 
-      const result = await response.json();
-      if (!response.ok) {
+      if (!result.success) {
         throw new Error(result.error || 'An unknown error occurred.');
       }
       

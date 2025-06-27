@@ -4,7 +4,7 @@
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
 import { db } from '@/lib/firebase';
-import { doc, collection, setDoc } from 'firebase/firestore';
+import { doc, collection, setDoc, writeBatch, updateDoc } from 'firebase/firestore';
 import type { Project } from '@/types';
 
 
@@ -53,10 +53,54 @@ export async function submitProject(
 
     await setDoc(projectDocRef, projectData);
     
-    return { success: true };
+    return { success: true, id: projectDocRef.id };
 
   } catch (error: any) {
     console.error('Error submitting project in server action: ', error);
     return { success: false, error: error.message || 'There was an error submitting your project.' };
   }
+}
+
+
+export async function scheduleMeeting(
+  projectsToSchedule: { id: string; pi_uid: string; title: string; }[],
+  meetingDetails: { date: string; time: string; venue: string; }
+) {
+  try {
+    const batch = writeBatch(db);
+
+    projectsToSchedule.forEach((project) => {
+      const projectRef = doc(db, 'projects', project.id);
+      batch.update(projectRef, { 
+        meetingDetails: meetingDetails,
+        status: 'Under Review'
+      });
+
+      const notificationRef = doc(collection(db, 'notifications'));
+      batch.set(notificationRef, {
+         uid: project.pi_uid,
+         projectId: project.id,
+         title: `IMR meeting scheduled for your project: "${project.title}"`,
+         createdAt: new Date().toISOString(),
+         isRead: false,
+      });
+    });
+
+    await batch.commit();
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error scheduling meeting:', error);
+    return { success: false, error: error.message || 'Failed to schedule meeting.' };
+  }
+}
+
+export async function updateUserModules(uid: string, allowedModules: string[]) {
+    try {
+        const userDocRef = doc(db, 'users', uid);
+        await updateDoc(userDocRef, { allowedModules });
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error updating user modules:', error);
+        return { success: false, error: error.message || 'Failed to update modules.' };
+    }
 }

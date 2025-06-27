@@ -22,6 +22,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
+import { scheduleMeeting } from '@/app/actions';
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
@@ -97,14 +98,8 @@ export function ScheduleMeetingForm() {
       .map(p => ({ id: p.id, pi_uid: p.pi_uid, title: p.title }));
 
     try {
-      const response = await fetch('/api/schedule-meeting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectsToSchedule, meetingDetails }),
-      });
-      
-      const result = await response.json();
-      if (!response.ok) {
+      const result = await scheduleMeeting(projectsToSchedule, meetingDetails);
+      if (!result.success) {
         throw new Error(result.error || 'Failed to schedule meeting.');
       }
 
