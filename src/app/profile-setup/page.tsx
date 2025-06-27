@@ -11,12 +11,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, storage } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { User } from '@/types';
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const profileSetupSchema = z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
@@ -56,6 +58,8 @@ export default function ProfileSetupPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
@@ -80,6 +84,7 @@ export default function ProfileSetupPage() {
             return;
           }
           setUser(appUser);
+          setPreviewUrl(appUser.photoURL || null);
           form.reset({
             faculty: appUser.faculty || '',
             institute: appUser.institute || '',
@@ -100,17 +105,36 @@ export default function ProfileSetupPage() {
     return () => unsubscribe();
   }, [router, form, toast]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        setProfilePicFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
   const onSubmit = async (data: ProfileSetupFormValues) => {
     if (!user) return;
     setIsSubmitting(true);
     try {
       const userDocRef = doc(db, 'users', user.uid);
-      await updateDoc(userDocRef, {
+      let photoURL = user.photoURL || '';
+
+      if (profilePicFile) {
+        const storageRef = ref(storage, `profile-pictures/${user.uid}`);
+        await uploadBytes(storageRef, profilePicFile);
+        photoURL = await getDownloadURL(storageRef);
+      }
+
+      const updateData = {
         ...data,
+        photoURL: photoURL,
         profileComplete: true,
-      });
+      };
+
+      await updateDoc(userDocRef, updateData);
       
-      const updatedUser = { ...user, ...data, profileComplete: true };
+      const updatedUser = { ...user, ...updateData };
       localStorage.setItem('user', JSON.stringify(updatedUser));
 
       toast({ title: 'Profile Updated!', description: 'Redirecting to your dashboard.' });
@@ -158,6 +182,15 @@ export default function ProfileSetupPage() {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="flex flex-col items-center space-y-4 pt-4 pb-6">
+                    <Avatar className="h-24 w-24">
+                        <AvatarImage src={previewUrl || undefined} alt={user.name} />
+                        <AvatarFallback>{user.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                    </Avatar>
+                    <FormControl>
+                        <Input id="picture" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" className="max-w-xs" />
+                    </FormControl>
+                </div>
                 <FormField name="faculty" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />

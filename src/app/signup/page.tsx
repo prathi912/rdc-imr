@@ -92,6 +92,7 @@ export default function SignupPage() {
       uid: firebaseUser.uid,
       name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
+      photoURL: firebaseUser.photoURL || undefined,
       role: role,
       profileComplete: role !== 'faculty', // Evaluators don't need to complete the long profile form
     };

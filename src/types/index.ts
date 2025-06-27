@@ -9,6 +9,7 @@ export type User = {
   misId?: string;
   phoneNumber?: string;
   profileComplete?: boolean;
+  photoURL?: string;
 };
 
 export type BankDetails = {
@@ -45,6 +46,7 @@ export type Evaluation = {
   scores: {
     relevance: number;
     methodology: number;
+
     feasibility: number;
     innovation: number;
   };

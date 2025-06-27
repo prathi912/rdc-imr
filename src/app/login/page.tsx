@@ -84,9 +84,13 @@ export default function LoginPage() {
         role: determineUserRole(firebaseUser.email!),
         profileComplete: false,
       };
-      await setDoc(userDocRef, user);
     }
     
+    // Always update/set the photoURL from provider on sign-in
+    if (firebaseUser.photoURL) {
+        user.photoURL = firebaseUser.photoURL;
+    }
+
     // Ensure admin and evaluator roles are correctly set and bypass profile setup for them
     const specialRole = determineUserRole(user.email);
     if (user.role !== specialRole || (specialRole !== 'faculty' && !user.profileComplete)) {
@@ -94,8 +98,9 @@ export default function LoginPage() {
         if(specialRole !== 'faculty') {
             user.profileComplete = true;
         }
-        await setDoc(userDocRef, user, { merge: true });
     }
+    
+    await setDoc(userDocRef, user, { merge: true });
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(user));

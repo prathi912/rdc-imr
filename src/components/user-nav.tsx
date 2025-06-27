@@ -27,7 +27,7 @@ export function UserNav({ user, onLogout }: UserNavProps) {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src="https://placehold.co/40x40" alt="@user" data-ai-hint="user avatar" />
+            <AvatarImage src={user.photoURL || undefined} alt={user.name || 'User'} />
             <AvatarFallback>{user.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
           </Avatar>
         </Button>
@@ -41,8 +41,8 @@ export function UserNav({ user, onLogout }: UserNavProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <Link href="/dashboard/settings" passHref>
-             <DropdownMenuItem>Profile</DropdownMenuItem>
+          <Link href="/dashboard" passHref>
+             <DropdownMenuItem>Dashboard</DropdownMenuItem>
           </Link>
           <Link href="/dashboard/settings" passHref>
             <DropdownMenuItem>Settings</DropdownMenuItem>

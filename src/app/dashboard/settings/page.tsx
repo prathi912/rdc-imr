@@ -12,11 +12,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { db, auth } from '@/lib/firebase';
+import { db, auth, storage } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -68,6 +70,9 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -99,6 +104,7 @@ export default function SettingsPage() {
         if (userDocSnap.exists()) {
           const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
           setUser(appUser);
+          setPreviewUrl(appUser.photoURL || null);
           profileForm.reset({
             name: appUser.name || '',
             email: appUser.email || '',
@@ -186,6 +192,40 @@ export default function SettingsPage() {
     }
   }
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        setProfilePicFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handlePictureUpdate = async () => {
+    if (!profilePicFile || !user) return;
+    setIsUploading(true);
+    try {
+        const storageRef = ref(storage, `profile-pictures/${user.uid}`);
+        await uploadBytes(storageRef, profilePicFile);
+        const photoURL = await getDownloadURL(storageRef);
+
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, { photoURL });
+
+        const updatedUser = { ...user, photoURL };
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+
+        toast({ title: 'Profile picture updated!' });
+        setProfilePicFile(null);
+    } catch (error) {
+        console.error("Error updating profile picture: ", error);
+        toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update your profile picture.' });
+    } finally {
+        setIsUploading(false);
+    }
+  };
+
+
   if (loading) {
     return (
         <div className="container mx-auto py-10">
@@ -223,6 +263,28 @@ export default function SettingsPage() {
     <div className="container mx-auto py-10">
       <PageHeader title="Settings" description="Manage your account settings and preferences." />
       <div className="mt-8 space-y-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Profile Picture</CardTitle>
+            <CardDescription>Update your profile picture.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center gap-6">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={previewUrl || user?.photoURL || undefined} alt={user?.name || ''} />
+              <AvatarFallback>{user?.name?.[0].toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div className="space-y-2">
+                <Input id="picture" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" className="max-w-xs" />
+                <p className="text-xs text-muted-foreground">PNG or JPG. 2MB max.</p>
+            </div>
+          </CardContent>
+          <CardFooter className="border-t px-6 py-4">
+            <Button onClick={handlePictureUpdate} disabled={isUploading || !profilePicFile}>
+              {isUploading ? 'Uploading...' : 'Save Picture'}
+            </Button>
+          </CardFooter>
+        </Card>
+
         <Form {...profileForm}>
           <form onSubmit={profileForm.handleSubmit(onProfileSubmit)}>
             <Card>
