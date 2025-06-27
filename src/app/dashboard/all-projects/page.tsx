@@ -99,6 +99,7 @@ export default function AllProjectsPage() {
     }
     
     const dataToExport = allProjects.map(p => ({
+      'Project ID': p.id,
       'Project Title': p.title,
       'Project Type': p.type,
       'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
