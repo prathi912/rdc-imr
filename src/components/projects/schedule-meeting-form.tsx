@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, writeBatch, doc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 
@@ -22,7 +22,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
-import { scheduleMeeting } from '@/app/actions';
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
@@ -98,17 +97,34 @@ export function ScheduleMeetingForm() {
       .map(p => ({ id: p.id, pi_uid: p.pi_uid, title: p.title }));
 
     try {
-      const result = await scheduleMeeting(projectsToSchedule, meetingDetails);
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to schedule meeting.');
-      }
+      const batch = writeBatch(db);
+
+      projectsToSchedule.forEach((project) => {
+        const projectRef = doc(db, 'projects', project.id);
+        batch.update(projectRef, { 
+          meetingDetails: meetingDetails,
+          status: 'Under Review'
+        });
+
+        const notificationRef = doc(collection(db, 'notifications'));
+        batch.set(notificationRef, {
+           uid: project.pi_uid,
+           projectId: project.id,
+           title: `IMR meeting scheduled for your project: "${project.title}"`,
+           createdAt: new Date().toISOString(),
+           isRead: false,
+        });
+      });
+      
+      await batch.commit();
 
       toast({ title: 'Meeting Scheduled!', description: 'The meeting has been scheduled and PIs have been notified.' });
       setSelectedProjects([]);
       form.reset();
       await fetchProjects();
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Scheduling Failed', description: error.message });
+      console.error("Error scheduling meeting:", error);
+      toast({ variant: 'destructive', title: 'Scheduling Failed', description: error.message || 'An unknown error occurred.' });
     }
   };
 
