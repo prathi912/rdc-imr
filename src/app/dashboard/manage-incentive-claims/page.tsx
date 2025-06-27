@@ -175,7 +175,24 @@ export default function ManageIncentiveClaimsPage() {
       toast({ variant: 'destructive', title: "No Data", description: "There are no claims to export in the current view." });
       return;
     }
-    const worksheet = XLSX.utils.json_to_sheet(filteredClaims);
+    
+    const dataToExport = filteredClaims.map(claim => {
+      // Destructure to separate bankDetails and the rest of the claim
+      const { bankDetails, id, uid, ...rest } = claim;
+      
+      // Create a new flat object for export
+      return {
+        ...rest,
+        beneficiaryName: bankDetails?.beneficiaryName || '',
+        accountNumber: bankDetails?.accountNumber || '',
+        bankName: bankDetails?.bankName || '',
+        branchName: bankDetails?.branchName || '',
+        city: bankDetails?.city || '',
+        ifscCode: bankDetails?.ifscCode || '',
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Claims");
     XLSX.writeFile(workbook, `incentive_claims_${activeTab}.xlsx`);
