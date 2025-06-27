@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -36,18 +37,18 @@ export default function AllProjectsPage() {
         const isCro = user.role === 'CRO';
         const isSpecialUser = user.email === 'unnati.joshi22950@paruluniversity.ac.in';
 
-        if (isAdmin) {
+        if (isSpecialUser) {
+          q = query(
+            projectsCol, 
+            where('faculty', '==', 'Faculty of Engineering & Technology'),
+            orderBy('submissionDate', 'desc')
+          );
+        } else if (isAdmin) {
           q = query(projectsCol, orderBy('submissionDate', 'desc'));
         } else if (isCro) {
           q = query(
             projectsCol, 
             where('faculty', '==', user.faculty),
-            orderBy('submissionDate', 'desc')
-          );
-        } else if (isSpecialUser) {
-          q = query(
-            projectsCol, 
-            where('faculty', '==', 'Faculty of Engineering & Technology'),
             orderBy('submissionDate', 'desc')
           );
         } else {
@@ -71,19 +72,18 @@ export default function AllProjectsPage() {
     getProjects();
   }, [user]);
   
-  const isAdmin = user && ['admin', 'Super-admin'].includes(user.role);
   const isCro = user?.role === 'CRO';
   const isSpecialUser = user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
   
   let pageTitle = "All Projects";
   let pageDescription = "Browse and manage all projects in the system.";
 
-  if (isCro) {
-    pageTitle = `Projects from ${user.faculty}`;
-    pageDescription = "Browse all projects submitted from your faculty.";
-  } else if (isSpecialUser && !isAdmin) {
+  if (isSpecialUser) {
     pageTitle = "Projects from Faculty of Engineering & Technology";
     pageDescription = "Browse all projects submitted from the Faculty of Engineering & Technology.";
+  } else if (isCro) {
+    pageTitle = `Projects from ${user.faculty}`;
+    pageDescription = "Browse all projects submitted from your faculty.";
   }
 
   return (
