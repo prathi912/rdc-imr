@@ -26,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarProvider,
   SidebarInset,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -310,7 +311,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </Sidebar>
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/90 px-4 backdrop-blur-md sm:px-6">
-          <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
+          <div className="flex items-center gap-2">
+            <SidebarTrigger className="md:hidden" />
+            <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
+          </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <UserNav user={user} onLogout={handleLogout} />
