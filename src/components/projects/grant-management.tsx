@@ -4,7 +4,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Project, User, GrantDetails, Transaction } from '@/types';
+import type { Project, User, GrantDetails, Transaction, BankDetails } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db, storage } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DollarSign, Banknote, FileText, CheckCircle, PlusCircle, AlertCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -64,6 +64,46 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
   const isAdmin = user.role === 'admin';
   const isPI = user.uid === project.pi_uid;
+
+  const grant = project.grant;
+
+  useEffect(() => {
+    const syncBankDetails = async () => {
+      // Condition: This user is the PI, the grant status is pending, but the user *does* have bank details.
+      if (isPI && grant?.status === 'Pending Bank Details' && user.bankDetails) {
+        try {
+          const projectRef = doc(db, 'projects', project.id);
+          const grantBankDetails: BankDetails = {
+            accountHolderName: user.bankDetails.beneficiaryName,
+            accountNumber: user.bankDetails.accountNumber,
+            bankName: user.bankDetails.bankName,
+            ifscCode: user.bankDetails.ifscCode,
+            branchName: user.bankDetails.branchName,
+            city: user.bankDetails.city,
+          };
+          
+          const updatedGrant: GrantDetails = {
+            ...grant,
+            status: 'Bank Details Submitted',
+            bankDetails: grantBankDetails,
+          };
+
+          await updateDoc(projectRef, { grant: updatedGrant });
+          onUpdate({ ...project, grant: updatedGrant }); // Propagate change up to parent component
+          toast({ title: 'Success', description: 'Your bank details have been synced with this grant.' });
+        } catch (error) {
+          console.error("Error syncing bank details:", error);
+          toast({ variant: 'destructive', title: 'Error', description: 'Could not sync your bank details with this grant.' });
+        }
+      }
+    };
+    
+    // Only run if we have the necessary data
+    if (grant && user) {
+        syncBankDetails();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project, user, onUpdate]);
 
   const transactionForm = useForm<z.infer<typeof transactionSchema>>({
     resolver: zodResolver(transactionSchema),
@@ -164,7 +204,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     }
   };
 
-  const grant = project.grant;
   if (!grant) return null;
   
   const totalUtilized = grant.transactions?.reduce((acc, curr) => acc + curr.amount, 0) || 0;
