@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -36,6 +37,8 @@ import { Separator } from '@/components/ui/separator';
 const incentiveSchema = z
   .object({
     claimType: z.string().min(1, 'Please select a claim type.'),
+    prefilledMonthlyStatusId: z.string().optional(),
+    partialEnteredId: z.string().optional(),
     publicationType: z.string().min(1, 'Please select a publication type.'),
     indexType: z.enum(['wos', 'scopus', 'both', 'esci', 'ft50'], {
       required_error: 'You need to select an index type.',
@@ -101,52 +104,88 @@ export function IncentiveForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6">
-            <FormField
-              control={form.control}
-              name="claimType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Please Select</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a claim type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Research Papers">Research Papers</SelectItem>
-                      <SelectItem value="Books">Books</SelectItem>
-                      <SelectItem value="Patents">Patents</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="flex items-center gap-4">
+              <FormField
+                control={form.control}
+                name="claimType"
+                render={({ field }) => (
+                  <FormItem className="flex-grow">
+                    <FormLabel>Please Select</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a claim type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Research Papers">Research Papers</SelectItem>
+                        <SelectItem value="Books">Books</SelectItem>
+                        <SelectItem value="Patents">Patents</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button variant="link" type="button" className="self-end pb-2 h-auto">Important Information</Button>
+            </div>
 
-            <div className="rounded-lg border p-4 space-y-6">
-                <CardTitle className="text-lg">Research Paper Details</CardTitle>
-                 <FormField
+            <div className="rounded-lg border p-4 space-y-4">
+                <h3 className="font-semibold text-sm -mb-2">RESEARCH PAPER</h3>
+                <Separator />
+                
+                <FormField
+                    control={form.control}
+                    name="prefilledMonthlyStatusId"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Please Select the Prefilled Monthly Status id</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl>
+                                <SelectContent></SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                
+                <div className="text-center font-bold text-sm">Or</div>
+                
+                <FormField
+                    control={form.control}
+                    name="partialEnteredId"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Please Select the Partial Entered id</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl>
+                                <SelectContent></SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                
+                <div className="text-center font-bold text-sm">Or</div>
+
+                <FormField
                   control={form.control}
                   name="publicationType"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Please Select</FormLabel>
-                       <div className="flex items-center gap-4">
-                         <Select onValueChange={field.onChange} defaultValue={field.value} className="flex-grow">
-                          <FormControl>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select publication type" />
+                            <SelectValue placeholder="Select publication type" />
                             </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
+                        </FormControl>
+                        <SelectContent>
                             <SelectItem value="Referred paper in journal listed by WOS/Scopus">
-                              Referred paper in journal listed by WOS/Scopus
+                            Referred paper in journal listed by WOS/Scopus
                             </SelectItem>
-                          </SelectContent>
+                        </SelectContent>
                         </Select>
-                        <Button variant="outline" type="button">Important Information</Button>
-                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
