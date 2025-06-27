@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/firebase';
@@ -9,11 +10,15 @@ import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AllProjectsPage() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -72,6 +77,7 @@ export default function AllProjectsPage() {
     getProjects();
   }, [user]);
   
+  const isAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
   const isCro = user?.role === 'CRO';
   const isSpecialUser = user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
   
@@ -86,9 +92,50 @@ export default function AllProjectsPage() {
     pageDescription = "Browse all projects submitted from your faculty.";
   }
 
+  const handleExport = () => {
+    if (allProjects.length === 0) {
+      toast({ variant: 'destructive', title: "No Data", description: "There are no projects to export." });
+      return;
+    }
+    
+    const dataToExport = allProjects.map(p => ({
+      'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
+      'Project Title': p.title,
+      'Principal Investigator': p.pi,
+      'Faculty': p.faculty,
+      'Institute': p.institute,
+      'Department': p.departmentName,
+      'Status': p.status,
+      'Grant Amount': p.grant?.amount ?? 'N/A',
+      'Grant Status': p.grant?.status ?? 'N/A',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Projects");
+
+    let fileName = `all_projects_${new Date().toISOString().split('T')[0]}.xlsx`;
+    if (isCro && user?.faculty) {
+        fileName = `projects_${user.faculty.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    } else if (isSpecialUser) {
+        fileName = `projects_Eng_Tech_${new Date().toISOString().split('T')[0]}.xlsx`;
+    }
+    
+    XLSX.writeFile(workbook, fileName);
+    toast({ title: "Export Started", description: `Downloading ${allProjects.length} projects.` });
+  };
+
+
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title={pageTitle} description={pageDescription} />
+      <PageHeader title={pageTitle} description={pageDescription}>
+        {(isAdmin || isCro || isSpecialUser) && (
+            <Button onClick={handleExport} disabled={loading || allProjects.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                Export XLSX
+            </Button>
+        )}
+      </PageHeader>
       <div className="mt-8">
         {loading ? (
            <Card>
