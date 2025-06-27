@@ -264,8 +264,7 @@ export function SubmissionForm() {
                           I declare that I have gone through all the guidelines of the{" "}
                           <a
                             href="https://firebasestorage.googleapis.com/v0/b/pierc-portal.firebasestorage.app/o/Notification%201446_Revision%20in%20the%20Research%20%26%20Development%20Policy%20of%20the%20University.pdf?alt=media&token=3578f9f4-4e38-419b-aa29-3ecc5a8c32bf"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            download
                             className="font-medium text-primary underline-offset-4 hover:underline"
                           >
                             Research Policy of Parul University
