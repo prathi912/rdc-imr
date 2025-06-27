@@ -14,7 +14,7 @@ import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ALL_MODULES } from '@/lib/modules';
-import { updateUserModules } from '@/app/actions';
+import { updateUserModules } from '@/app/admin-actions';
 import { Loader2 } from 'lucide-react';
 
 

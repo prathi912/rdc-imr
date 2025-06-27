@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { scheduleMeetingForProjects } from '@/app/actions';
+import { scheduleMeetingForProjects } from '@/app/admin-actions';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 
