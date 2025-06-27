@@ -217,13 +217,17 @@ export default function ManageIncentiveClaimsPage() {
     </Table>
   );
 
+  const pageTitle = currentUser?.role === 'CRO' 
+    ? `Incentive Claims from ${currentUser.faculty}`
+    : "Manage Incentive Claims";
+
   const pageDescription = currentUser?.role === 'CRO' 
-    ? `Review claims submitted from ${currentUser.faculty}.` 
+    ? `Review claims submitted from your faculty.` 
     : "Review and manage all submitted incentive claims.";
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title="Manage Incentive Claims" description={pageDescription}>
+      <PageHeader title={pageTitle} description={pageDescription}>
          <Button onClick={handleExport} disabled={loading}>
             <Download className="mr-2 h-4 w-4" />
             Export XLSX

@@ -65,7 +65,7 @@ export default function AllProjectsPage() {
   }, [user]);
   
   const isCro = user?.role === 'CRO';
-  const pageTitle = isCro ? `Projects - ${user?.faculty}` : "All Projects";
+  const pageTitle = isCro ? `Projects from ${user?.faculty}` : "All Projects";
   const pageDescription = isCro ? "Browse all projects submitted from your faculty." : "Browse and manage all projects in the system.";
 
   return (
