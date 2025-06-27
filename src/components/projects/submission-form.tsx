@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { runTransaction, doc } from 'firebase/firestore';
 import type { User } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const formSchema = z.object({
   // Step 1
@@ -33,6 +34,9 @@ const formSchema = z.object({
   // Step 4
   ganttChart: z.any().optional(),
   expectedOutcomes: z.string().min(10, 'Please describe the expected outcomes.'),
+  guidelinesAgreement: z.boolean().refine(val => val === true, {
+    message: "You must agree to the guidelines to submit.",
+  }),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -59,6 +63,7 @@ export function SubmissionForm() {
       coPiNames: '',
       studentInfo: '',
       expectedOutcomes: '',
+      guidelinesAgreement: false,
     },
   });
 
@@ -232,13 +237,45 @@ export function SubmissionForm() {
               </div>
             )}
             {currentStep === 4 && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                  <FormField name="ganttChart" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Timeline / Gantt Chart (PDF, PNG)</FormLabel><FormControl><Input type="file" accept=".pdf, .png" /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField name="expectedOutcomes" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Expected Outcomes & Impact</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+                <FormField
+                  control={form.control}
+                  name="guidelinesAgreement"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>
+                          Declaration
+                        </FormLabel>
+                        <FormDescription>
+                          I declare that I have gone through all the guidelines of the{" "}
+                          <a
+                            href="https://firebasestorage.googleapis.com/v0/b/pierc-portal.firebasestorage.app/o/Notification%201446_Revision%20in%20the%20Research%20%26%20Development%20Policy%20of%20the%20University.pdf?alt=media&token=3578f9f4-4e38-419b-aa29-3ecc5a8c32bf"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-medium text-primary underline-offset-4 hover:underline"
+                          >
+                            Research Policy of Parul University
+                          </a>
+                          .
+                        </FormDescription>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
               </div>
             )}
             <div className="flex justify-between pt-4">
