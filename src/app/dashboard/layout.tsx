@@ -115,6 +115,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       if(lastSegment === 'project' && segments.includes('dashboard')) return "Project Details";
       if(lastSegment === 'incentive-claim' && segments.includes('dashboard')) return "Incentive Claims";
+      if(lastSegment === 'manage-incentive-claims' && segments.includes('dashboard')) return "Manage Incentive Claims";
+
 
       if (lastSegment === 'dashboard') return 'Dashboard';
       return lastSegment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -184,16 +186,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     My Projects
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>
+                    <Award />
+                    Incentive Claims
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </>
              )}
-            {(isFaculty || isSuperAdmin) && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>
-                  <Award />
-                  Incentive Claims
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
             {isEvaluator && (
                 <SidebarMenuItem>
                   <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
@@ -281,9 +281,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                   <SidebarMenuItem>
-                    <SidebarMenuButton href="/dashboard/incentive-claims-admin" tooltip="Incentive Claims" isActive={pathname === '/dashboard/incentive-claims-admin'}>
+                    <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname === '/dashboard/manage-incentive-claims'}>
                       <Award />
-                      Incentive Claims
+                      Manage Claims
                     </SidebarMenuButton>
                   </SidebarMenuItem>
               </>
