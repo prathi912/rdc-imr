@@ -113,19 +113,13 @@ export function SubmissionForm() {
 
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
-        let newCount;
         
+        let newCount = 1; // Default to 1 for the first project or if data is invalid
         if (counterDoc.exists()) {
-          const currentCount = counterDoc.data()?.count;
-          if (typeof currentCount === 'number') {
-            newCount = currentCount + 1;
-          } else {
-            // Document exists but has malformed data, reset count.
-            newCount = 1;
-          }
-        } else {
-          // Document does not exist, start from 1.
-          newCount = 1;
+            const counterData = counterDoc.data();
+            if (counterData && typeof counterData.count === 'number' && !isNaN(counterData.count)) {
+                newCount = counterData.count + 1;
+            }
         }
 
         const year = new Date().getFullYear();
@@ -169,12 +163,12 @@ export function SubmissionForm() {
       });
       form.reset();
       setCurrentStep(1);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding document: ', error);
       toast({
         variant: 'destructive',
         title: 'Submission Failed',
-        description: 'There was an error submitting your project. Please try again.',
+        description: error.message || 'There was an error submitting your project. Please try again.',
       });
     } finally {
         setIsSubmitting(false);
