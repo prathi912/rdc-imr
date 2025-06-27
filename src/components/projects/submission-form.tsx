@@ -14,10 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
-import { runTransaction, doc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
+import { submitProject } from '@/app/actions';
 
 const formSchema = z.object({
   // Step 1
@@ -109,53 +108,33 @@ export function SubmissionForm() {
 
     setIsSubmitting(true);
     try {
-      const counterRef = doc(db, 'counters', 'projects');
+      const teamInfoParts = [];
+      if (data.coPiNames && data.coPiNames.trim() !== '') {
+        teamInfoParts.push(`Co-PIs: ${data.coPiNames}`);
+      }
+      if (data.studentInfo && data.studentInfo.trim() !== '') {
+        teamInfoParts.push(`Students: ${data.studentInfo}`);
+      }
+      const teamInfo = teamInfoParts.join('; ');
 
-      await runTransaction(db, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        
-        let newCount = 1; // Default to 1 for the first project or if data is invalid
-        if (counterDoc.exists()) {
-            const counterData = counterDoc.data();
-            if (counterData && typeof counterData.count === 'number' && !isNaN(counterData.count)) {
-                newCount = counterData.count + 1;
-            }
-        }
+      const projectPayload = {
+        title: data.title,
+        abstract: data.abstract,
+        type: data.projectType,
+        faculty: user.faculty,
+        institute: user.institute,
+        departmentName: user.department,
+        pi: user.name,
+        pi_uid: user.uid,
+        teamInfo: teamInfo,
+        timelineAndOutcomes: data.expectedOutcomes,
+      };
 
-        const year = new Date().getFullYear();
-        const projectType = data.projectType.replace(/\s+/g, '_');
-        const paddedCount = String(newCount).padStart(4, '0');
-        const newProjectId = `${year}_${projectType}_${paddedCount}`;
-        
-        const projectDocRef = doc(db, 'projects', newProjectId);
+      const result = await submitProject(projectPayload);
 
-        const teamInfoParts = [];
-        if (data.coPiNames && data.coPiNames.trim() !== '') {
-          teamInfoParts.push(`Co-PIs: ${data.coPiNames}`);
-        }
-        if (data.studentInfo && data.studentInfo.trim() !== '') {
-          teamInfoParts.push(`Students: ${data.studentInfo}`);
-        }
-        const teamInfo = teamInfoParts.join('; ');
-
-        const projectData = {
-          title: data.title,
-          abstract: data.abstract,
-          type: data.projectType,
-          faculty: user.faculty,
-          institute: user.institute,
-          departmentName: user.department,
-          pi: user.name,
-          pi_uid: user.uid,
-          teamInfo: teamInfo,
-          timelineAndOutcomes: data.expectedOutcomes,
-          status: 'Submitted' as const,
-          submissionDate: new Date().toISOString(),
-        };
-
-        transaction.set(projectDocRef, projectData);
-        transaction.set(counterRef, { count: newCount }, { merge: true });
-      });
+      if (!result.success) {
+        throw new Error(result.error);
+      }
       
       toast({
         title: 'Project Submitted!',

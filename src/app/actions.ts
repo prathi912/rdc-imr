@@ -4,7 +4,8 @@
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
 import { db } from '@/lib/firebase';
-import { doc, writeBatch, collection } from 'firebase/firestore';
+import { doc, writeBatch, collection, runTransaction } from 'firebase/firestore';
+import type { Project } from '@/types';
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -57,5 +58,55 @@ export async function scheduleMeetingForProjects(
     console.error('Error scheduling meeting:', error);
     const errorMessage = error instanceof Error ? error.message : 'Failed to schedule meeting.';
     return { success: false, error: errorMessage };
+  }
+}
+
+export async function submitProject(
+  projectPayload: {
+    title: string;
+    abstract: string;
+    type: string;
+    faculty: string;
+    institute: string;
+    departmentName: string;
+    pi: string;
+    pi_uid: string;
+    teamInfo: string;
+    timelineAndOutcomes: string;
+  }
+) {
+  try {
+    const counterRef = doc(db, 'counters', 'projects');
+
+    await runTransaction(db, async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
+      
+      let newCount = 1;
+      if (counterDoc.exists() && typeof counterDoc.data()?.count === 'number') {
+          newCount = counterDoc.data().count + 1;
+      }
+
+      const year = new Date().getFullYear();
+      const projectType = projectPayload.type.replace(/\s+/g, '_');
+      const paddedCount = String(newCount).padStart(4, '0');
+      const newProjectId = `${year}_${projectType}_${paddedCount}`;
+      
+      const projectDocRef = doc(db, 'projects', newProjectId);
+
+      const projectData: Omit<Project, 'id'> = {
+        ...projectPayload,
+        status: 'Submitted' as const,
+        submissionDate: new Date().toISOString(),
+      };
+
+      transaction.set(projectDocRef, projectData);
+      transaction.set(counterRef, { count: newCount }, { merge: true });
+    });
+    
+    return { success: true };
+
+  } catch (error: any) {
+    console.error('Error submitting project in server action: ', error);
+    return { success: false, error: error.message || 'There was an error submitting your project.' };
   }
 }
