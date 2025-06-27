@@ -83,12 +83,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (user) {
       const q = query(
         collection(db, 'notifications'),
-        where('uid', '==', user.uid),
-        where('isRead', '==', false)
+        where('uid', '==', user.uid)
+        // Removed: where('isRead', '==', false) to prevent needing a composite index.
       );
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        setUnreadCount(querySnapshot.size);
+        // Filter for unread notifications on the client side.
+        const unreadNotifications = querySnapshot.docs.filter(doc => !doc.data().isRead);
+        setUnreadCount(unreadNotifications.length);
       }, (error) => {
         console.error("Firestore notification listener error:", error);
         toast({

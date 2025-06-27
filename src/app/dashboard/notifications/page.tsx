@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Bell, FileCheck2, GanttChartSquare, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { type Notification as NotificationType, type User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -34,14 +34,17 @@ export default function NotificationsPage() {
       try {
         const q = query(
           collection(db, 'notifications'),
-          where('uid', '==', user.uid),
-          orderBy('createdAt', 'desc')
+          where('uid', '==', user.uid)
         );
         const querySnapshot = await getDocs(q);
         const fetchedNotifications = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         } as NotificationType));
+        
+        // Sort on the client to avoid needing a composite index
+        fetchedNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
         setNotifications(fetchedNotifications);
       } catch (error) {
         console.error("Error fetching notifications:", error);

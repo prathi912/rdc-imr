@@ -30,7 +30,7 @@ const scheduleSchema = z.object({
   venue: z.string().min(1, 'Meeting venue is required.'),
 });
 
-const venues = ["RDC Committee Room", "PIMSR Micro-Nano R&D Center Colab Space, D-Block"];
+const venues = ["RDC Committee Room, PIMSR", "Micro-Nano R&D Center Colab Space, D-Block"];
 
 export function ScheduleMeetingForm() {
   const [projects, setProjects] = useState<Project[]>([]);

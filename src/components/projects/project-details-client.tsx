@@ -56,7 +56,7 @@ const scheduleSchema = z.object({
 });
 type ScheduleFormData = z.infer<typeof scheduleSchema>;
 
-const venues = ["RDC Committee Room", "PIMSR Micro-Nano R&D Center Colab Space, D-Block"];
+const venues = ["RDC Committee Room, PIMSR", "Micro-Nano R&D Center Colab Space, D-Block"];
 
 export function ProjectDetailsClient({ project: initialProject }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject);
