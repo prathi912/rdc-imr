@@ -33,6 +33,7 @@ import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as Calen
 import { GrantManagement } from './grant-management';
 import { EvaluationForm } from './evaluation-form';
 import { EvaluationsSummary } from './evaluations-summary';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface ProjectDetailsClientProps {
   project: Project;
@@ -55,6 +56,7 @@ const scheduleSchema = z.object({
 });
 type ScheduleFormData = z.infer<typeof scheduleSchema>;
 
+const venues = ["RDC Committee Room", "PIMSR Micro-Nano R&D Center Colab Space, D-Block"];
 
 export function ProjectDetailsClient({ project: initialProject }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject);
@@ -575,9 +577,18 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                                             render={({ field }) => (
                                                 <FormItem>
                                                 <FormLabel>New Venue</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="e.g., RDC Conference Hall" {...field} />
-                                                </FormControl>
+                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                                  <FormControl>
+                                                    <SelectTrigger>
+                                                      <SelectValue placeholder="Select a venue" />
+                                                    </SelectTrigger>
+                                                  </FormControl>
+                                                  <SelectContent>
+                                                    {venues.map(venue => (
+                                                      <SelectItem key={venue} value={venue}>{venue}</SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
                                                 <FormMessage />
                                                 </FormItem>
                                             )}

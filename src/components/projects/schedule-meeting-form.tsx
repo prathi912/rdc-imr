@@ -15,19 +15,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '../ui/input';
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
   time: z.string().min(1, 'Meeting time is required.'),
   venue: z.string().min(1, 'Meeting venue is required.'),
 });
+
+const venues = ["RDC Committee Room", "PIMSR Micro-Nano R&D Center Colab Space, D-Block"];
 
 export function ScheduleMeetingForm() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -245,9 +248,18 @@ export function ScheduleMeetingForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Venue</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., RDC Conference Hall" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a venue" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {venues.map(venue => (
+                          <SelectItem key={venue} value={venue}>{venue}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
