@@ -80,7 +80,7 @@ export function SubmissionForm() {
       1: ['title', 'abstract', 'projectType'],
       2: [],
       3: [],
-      4: ['expectedOutcomes'],
+      4: ['expectedOutcomes', 'guidelinesAgreement'],
     }[currentStep] as (keyof FormData)[];
 
     const isValid = await form.trigger(fieldsToValidate);
@@ -113,9 +113,19 @@ export function SubmissionForm() {
 
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
-        let newCount = 1;
-        if (counterDoc.exists() && typeof counterDoc.data().count === 'number') {
-          newCount = counterDoc.data().count + 1;
+        let newCount;
+        
+        if (counterDoc.exists()) {
+          const currentCount = counterDoc.data()?.count;
+          if (typeof currentCount === 'number') {
+            newCount = currentCount + 1;
+          } else {
+            // Document exists but has malformed data, reset count.
+            newCount = 1;
+          }
+        } else {
+          // Document does not exist, start from 1.
+          newCount = 1;
         }
 
         const year = new Date().getFullYear();
@@ -282,7 +292,7 @@ export function SubmissionForm() {
             <div className="flex justify-between pt-4">
               <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1 || isSubmitting}>Previous</Button>
               {currentStep < 4 && <Button type="button" onClick={handleNext} disabled={isSubmitting}>Next</Button>}
-              {currentStep === 4 && <Button type="submit" disabled={isSubmitting}>{isSubmitting ? "Submitting..." : "Submit Project"}</Button>}
+              {currentStep === 4 && <Button type="submit" disabled={isSubmitting || !form.watch('guidelinesAgreement')}>{isSubmitting ? "Submitting..." : "Submit Project"}</Button>}
             </div>
           </form>
         </FormProvider>
