@@ -385,7 +385,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       handleStatusUpdate(status);
   }
 
-  const availableStatuses: Project['status'][] = ['Submitted', 'Under Review', 'Approved', 'Rejected', 'In Progress', 'Completed', 'Pending Completion Approval'];
+  const availableStatuses: Project['status'][] = ['Submitted', 'Under Review', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
   return (
     <>
