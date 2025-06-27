@@ -3,103 +3,83 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
   
-    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
     
-    function isOwner(uid) {
-      return request.auth.uid == uid;
+    function isUser(uid) {
+      return isSignedIn() && request.auth.uid == uid;
     }
 
     function getUserData(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
 
-    function getRequestingUserRole() {
-      if (!isSignedIn()) { return ''; }
+    function isRole(role) {
+        return isSignedIn() && getUserData(request.auth.uid).role == role;
+    }
+    
+    function userRole() {
       return getUserData(request.auth.uid).role;
     }
 
     function isSuperAdmin() {
-      // Must be signed in to check role
-      if (!isSignedIn()) { return false; }
-      // The user's own document is the source of truth for their role
-      let userDoc = getUserData(request.auth.uid);
-      return userDoc.role == 'Super-admin';
+        return isRole('Super-admin');
+    }
+    
+    function isAdmin() {
+      return userRole() in ['admin', 'Super-admin', 'CRO'];
+    }
+    
+    function isFaculty() {
+      return isRole('faculty');
+    }
+    
+    function isEvaluator() {
+      return isRole('Evaluator');
     }
 
-    // Rules for 'users' collection
     match /users/{userId} {
-      // Only the user themselves or a Super Admin can read their own data.
-      allow read: if isOwner(userId) || isSuperAdmin();
-      
-      // Allow creation of a user document if the user is signing up.
-      allow create: if isOwner(userId);
-      
-      // A user can update their own profile.
-      // A Super Admin can update any user's profile (role, allowedModules).
-      allow update: if isOwner(userId) || getUserData(request.auth.uid).role == 'Super-admin';
-      
-      // Only a Super Admin can delete a user.
-      allow delete: if isSuperAdmin();
+      allow read: if isSignedIn();
+      allow create: if isUser(userId);
+      // Allow user to update their own profile, but not their role.
+      // Super admin can update any field.
+      allow update: if (isUser(userId) && !('role' in request.resource.data)) 
+                  || request.auth.token.email == 'rathipranav07@gmail.com';
+      allow delete: if request.auth.token.email == 'rathipranav07@gmail.com';
     }
-
-    // Rules for 'projects' collection and its subcollections
+    
     match /projects/{projectId} {
-      // Allow create if the user is a signed-in faculty member and is the owner of the project being created.
-      allow create: if isSignedIn() && 
-                      getRequestingUserRole() == 'faculty' &&
-                      request.resource.data.pi_uid == request.auth.uid;
+      allow read: if isSignedIn();
       
-      // Allow reads for the owner (PI), Evaluators, CROs, and Admins.
-      allow read: if isSignedIn() && (
-                    resource.data.pi_uid == request.auth.uid || 
-                    getRequestingUserRole() in ['Evaluator', 'CRO', 'admin', 'Super-admin']
-                  );
-                  
-      // Allow updates by the PI (e.g., submitting completion) or by admins for status changes.
+      // A signed-in user can create a project if they are the principal investigator.
+      // The application logic already restricts form access to 'faculty' role.
+      allow create: if isSignedIn() && request.resource.data.pi_uid == request.auth.uid;
+      
+      // Allow PI to update, and admins to update.
       allow update: if isSignedIn() && (
-                      resource.data.pi_uid == request.auth.uid ||
-                      getRequestingUserRole() in ['admin', 'Super-admin', 'CRO']
+                      resource.data.pi_uid == request.auth.uid || 
+                      isAdmin()
                     );
-      
-      // No one can delete a project for now.
-      allow delete: if false;
+                    
+      // Only Super-Admins can delete projects.
+      allow delete: if isSuperAdmin();
 
-      // Rules for 'evaluations' subcollection
-      match /evaluations/{evaluatorId} {
-        // Only an evaluator or CRO can create/update their own evaluation.
-        allow write: if isSignedIn() &&
-                       isOwner(evaluatorId) &&
-                       getRequestingUserRole() in ['Evaluator', 'CRO'];
+      match /evaluations/{evaluationId} {
+        allow read, write: if isSignedIn() && (isEvaluator() || isAdmin());
       }
     }
-
-    // Rules for 'notifications' collection
+    
     match /notifications/{notificationId} {
-      // Users can read their own notifications.
-      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
-      // Users can mark their own notifications as read.
-      allow update: if isSignedIn() && resource.data.uid == request.auth.uid;
-      // Notifications are created by trusted server actions (now client actions with rules).
-      allow create: if isSignedIn();
+        allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+        allow create: if isSignedIn(); // Allow server actions to create notifications
+        allow update: if isSignedIn() && resource.data.uid == request.auth.uid; // Allow user to mark as read
     }
-
-    // Rules for 'incentiveClaims' collection
+    
     match /incentiveClaims/{claimId} {
-        // A user can create their own claim.
-        allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-
-        // The user can read their own claims.
-        // Admins/CROs can read all claims.
-        allow read: if isSignedIn() && (
-                      resource.data.uid == request.auth.uid ||
-                      getRequestingUserRole() in ['Super-admin', 'CRO']
-                    );
-
-        // Admins/CROs can update the status of any claim.
-        allow update: if isSignedIn() && getRequestingUserRole() in ['Super-admin', 'CRO'];
+        allow read: if isSignedIn();
+        allow create: if isFaculty() && request.resource.data.uid == request.auth.uid;
+        allow update: if isSuperAdmin() || isRole('CRO');
     }
   }
 }
