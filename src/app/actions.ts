@@ -4,7 +4,7 @@
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
 import { db } from '@/lib/firebase';
-import { doc, writeBatch, collection, setDoc } from 'firebase/firestore';
+import { doc, writeBatch, collection, setDoc, updateDoc } from 'firebase/firestore';
 import type { Project } from '@/types';
 
 
@@ -61,6 +61,21 @@ export async function scheduleMeetingForProjects(
   }
 }
 
+export async function updateUserModules(uid: string, allowedModules: string[]) {
+  if (!uid) {
+    return { success: false, error: 'User ID is required.' };
+  }
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    await updateDoc(userDocRef, { allowedModules });
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating user modules:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update modules.';
+    return { success: false, error: errorMessage };
+  }
+}
+
 export async function submitProject(
   projectPayload: {
     title: string;
@@ -76,8 +91,6 @@ export async function submitProject(
   }
 ) {
   try {
-    // Generate a new project document reference with an auto-generated ID.
-    // This avoids the permissions issue with the 'counters' collection.
     const projectDocRef = doc(collection(db, 'projects'));
 
     const projectData: Omit<Project, 'id'> = {
@@ -86,7 +99,6 @@ export async function submitProject(
       submissionDate: new Date().toISOString(),
     };
 
-    // Set the data for the new project document.
     await setDoc(projectDocRef, projectData);
     
     return { success: true };

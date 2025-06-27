@@ -30,6 +30,7 @@ import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOu
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
+import { getDefaultModulesForRole } from '@/lib/modules';
 
 const loginSchema = z.object({
   email: z
@@ -74,12 +75,14 @@ export default function LoginPage() {
       user = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
     } else {
       // Create new user if they don't exist in Firestore (e.g., first Google sign-in)
+      const role = determineUserRole(firebaseUser.email!);
       user = {
         uid: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
         email: firebaseUser.email!,
-        role: determineUserRole(firebaseUser.email!),
+        role: role,
         profileComplete: false,
+        allowedModules: getDefaultModulesForRole(role),
       };
     }
     
@@ -100,6 +103,11 @@ export default function LoginPage() {
     // For existing users, ensure roles that don't need profile setup are marked as complete
     if (['admin', 'Super-admin', 'Evaluator', 'CRO'].includes(user.role) && !user.profileComplete) {
         user.profileComplete = true;
+    }
+
+    // Set default modules for existing users if they don't have them
+    if (!user.allowedModules || user.allowedModules.length === 0) {
+      user.allowedModules = getDefaultModulesForRole(user.role);
     }
     
     await setDoc(userDocRef, user, { merge: true });
@@ -148,8 +156,16 @@ export default function LoginPage() {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
+      const email = firebaseUser.email;
 
-      const isAllowed = firebaseUser.email && (firebaseUser.email.endsWith('@paruluniversity.ac.in') || firebaseUser.email === 'rathipranav07@gmail.com');
+      const isAllowed = email && (email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com');
+      
+      if (email && /^\d+$/.test(email.split('@')[0]) && email !== 'rathipranav07@gmail.com') {
+        await signOut(auth);
+        toast({ variant: 'destructive', title: 'Access Denied', description: 'Access is for faculty members only. Student accounts are not permitted.' });
+        setIsSubmitting(false);
+        return;
+      }
       
       if (!isAllowed) {
         await signOut(auth);

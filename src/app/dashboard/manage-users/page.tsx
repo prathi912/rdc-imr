@@ -34,6 +34,7 @@ import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firesto
 import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getDefaultModulesForRole } from '@/lib/modules';
 
 const ROLES: User['role'][] = ['faculty', 'Evaluator', 'CRO', 'admin', 'Super-admin'];
 const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
@@ -88,8 +89,13 @@ export default function ManageUsersPage() {
   const handleRoleChange = useCallback(async (uid: string, newRole: User['role']) => {
     try {
       const userDoc = doc(db, 'users', uid);
-      await updateDoc(userDoc, { role: newRole });
-      toast({ title: 'Role Updated', description: "The user's role has been changed." });
+      // When role changes, also update their default module access list
+      const defaultModules = getDefaultModulesForRole(newRole);
+      await updateDoc(userDoc, { 
+        role: newRole,
+        allowedModules: defaultModules
+      });
+      toast({ title: 'Role Updated', description: "The user's role and permissions have been changed." });
       fetchUsers(); // Refresh the list
     } catch (error) {
        console.error("Error updating role:", error);

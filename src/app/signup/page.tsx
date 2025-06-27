@@ -30,6 +30,7 @@ import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, si
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
+import { getDefaultModulesForRole } from '@/lib/modules';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -37,8 +38,14 @@ const signupSchema = z.object({
     .string()
     .email('Invalid email address.')
     .refine(
-      (email) => email.endsWith('@paruluniversity.ac.in'),
-      'Only emails from paruluniversity.ac.in are allowed.'
+      (email) => email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
+      'Only emails from paruluniversity.ac.in domain are allowed.'
+    )
+    .refine(
+      (email) => {
+        if (email === 'rathipranav07@gmail.com') return true;
+        return !/^\d+$/.test(email.split('@')[0]);
+      }, 'Access is for faculty members only. Student accounts are not permitted.'
     ),
   password: z.string().min(8, 'Password must be at least 8 characters.'),
   confirmPassword: z.string(),
@@ -66,7 +73,10 @@ export default function SignupPage() {
   });
   
   const determineUserRole = (email: string): User['role'] => {
-    // New users are faculty by default. Admins can assign other roles.
+    if (email === 'rathipranav07@gmail.com') {
+      return 'Super-admin';
+    }
+    // New users are faculty by default. Super-admin can change roles.
     return 'faculty';
   }
 
@@ -91,7 +101,8 @@ export default function SignupPage() {
       email: firebaseUser.email!,
       photoURL: firebaseUser.photoURL || undefined,
       role: role,
-      profileComplete: role !== 'faculty', // Evaluators, CROs etc. don't need to complete the long profile form
+      profileComplete: role !== 'faculty',
+      allowedModules: getDefaultModulesForRole(role),
     };
     await setDoc(userDocRef, user);
 
@@ -138,10 +149,18 @@ export default function SignupPage() {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
+      const email = firebaseUser.email;
 
-      const isAllowed = firebaseUser.email && firebaseUser.email.endsWith('@paruluniversity.ac.in');
+      const isAllowedDomain = email && (email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com');
       
-      if (!isAllowed) {
+      if (email && /^\d+$/.test(email.split('@')[0]) && email !== 'rathipranav07@gmail.com') {
+        await signOut(auth);
+        toast({ variant: 'destructive', title: 'Access Denied', description: 'Access is for faculty members only. Student accounts are not permitted.' });
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (!isAllowedDomain) {
         await signOut(auth);
         toast({
             variant: 'destructive',

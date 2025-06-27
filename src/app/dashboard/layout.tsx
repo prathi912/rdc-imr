@@ -14,6 +14,7 @@ import {
   Home,
   LineChart,
   Settings,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 
@@ -37,6 +38,7 @@ import { auth, db } from '@/lib/firebase';
 import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
+import { getDefaultModulesForRole } from '@/lib/modules';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -53,6 +55,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
+          
+          // Client-side defaulting for users without the field.
+          if (!appUser.allowedModules || appUser.allowedModules.length === 0) {
+              appUser.allowedModules = getDefaultModulesForRole(appUser.role);
+          }
+
           setUser(appUser);
           localStorage.setItem('user', JSON.stringify(appUser));
         } else {
@@ -153,12 +161,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ); 
   }
 
-  const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(user.role);
-  const isSuperAdmin = user.role === 'Super-admin';
-  const canEvaluate = user.role === 'Evaluator' || user.role === 'CRO';
-  const isFaculty = user.role === 'faculty';
-
-
   return (
     <SidebarProvider>
       <Sidebar>
@@ -173,129 +175,101 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 Dashboard
               </SidebarMenuButton>
             </SidebarMenuItem>
-             {isFaculty && (
-              <>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/new-submission" tooltip="New Submission" isActive={pathname === '/dashboard/new-submission'}>
-                    <FilePlus2 />
-                    New Submission
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/my-projects" tooltip="My Projects" isActive={pathname === '/dashboard/my-projects'}>
-                    <Book />
-                    My Projects
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>
-                    <Award />
-                    Incentive Claims
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </>
+             {user.allowedModules?.includes('new-submission') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/new-submission" tooltip="New Submission" isActive={pathname === '/dashboard/new-submission'}>
+                  <FilePlus2 />
+                  New Submission
+                </SidebarMenuButton>
+              </SidebarMenuItem>
              )}
-            {canEvaluate && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
-                    <ClipboardCheck />
-                    Evaluation Queue
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+            {user.allowedModules?.includes('my-projects') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/my-projects" tooltip="My Projects" isActive={pathname === '/dashboard/my-projects'}>
+                  <Book />
+                  My Projects
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             )}
-            {isAdmin && !isSuperAdmin && (
-              <>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/schedule-meeting" tooltip="Schedule Meeting" isActive={pathname === '/dashboard/schedule-meeting'}>
-                    <CalendarClock />
-                    Schedule Meeting
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/pending-reviews" tooltip="Pending Reviews" isActive={pathname === '/dashboard/pending-reviews'}>
-                    <GanttChartSquare />
-                    Pending Reviews
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/completed-reviews" tooltip="Completed Reviews" isActive={pathname === '/dashboard/completed-reviews'}>
-                    <FileCheck2 />
-                    Completed Reviews
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/all-projects" tooltip="All Projects" isActive={pathname === '/dashboard/all-projects'}>
-                    <Book />
-                    All Projects
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/analytics" tooltip="Analytics" isActive={pathname === '/dashboard/analytics'}>
-                    <LineChart />
-                    Analytics
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/manage-users" tooltip="Manage Users" isActive={pathname === '/dashboard/manage-users'}>
-                    <Users />
-                    Manage Users
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 {user.role === 'CRO' && (
-                  <SidebarMenuItem>
-                    <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname === '/dashboard/manage-incentive-claims'}>
-                      <Award />
-                      Manage Claims
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                 )}
-              </>
+            {user.allowedModules?.includes('incentive-claim') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>
+                  <Award />
+                  Incentive Claims
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             )}
-            {isSuperAdmin && (
-                 <>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/schedule-meeting" tooltip="Schedule Meeting" isActive={pathname === '/dashboard/schedule-meeting'}>
-                    <CalendarClock />
-                    Schedule Meeting
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/pending-reviews" tooltip="Pending Reviews" isActive={pathname === '/dashboard/pending-reviews'}>
-                    <GanttChartSquare />
-                    Pending Reviews
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/completed-reviews" tooltip="Completed Reviews" isActive={pathname === '/dashboard/completed-reviews'}>
-                    <FileCheck2 />
-                    Completed Reviews
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/all-projects" tooltip="All Projects" isActive={pathname === '/dashboard/all-projects'}>
-                    <Book />
-                    All Projects
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/analytics" tooltip="Analytics" isActive={pathname === '/dashboard/analytics'}>
-                    <LineChart />
-                    Analytics
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/manage-users" tooltip="Manage Users" isActive={pathname === '/dashboard/manage-users'}>
-                    <Users />
-                    Manage Users
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname === '/dashboard/manage-incentive-claims'}>
-                      <Award />
-                      Manage Claims
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-              </>
+            {user.allowedModules?.includes('evaluator-dashboard') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
+                  <ClipboardCheck />
+                  Evaluation Queue
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('schedule-meeting') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/schedule-meeting" tooltip="Schedule Meeting" isActive={pathname === '/dashboard/schedule-meeting'}>
+                  <CalendarClock />
+                  Schedule Meeting
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('pending-reviews') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/pending-reviews" tooltip="Pending Reviews" isActive={pathname === '/dashboard/pending-reviews'}>
+                  <GanttChartSquare />
+                  Pending Reviews
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('completed-reviews') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/completed-reviews" tooltip="Completed Reviews" isActive={pathname === '/dashboard/completed-reviews'}>
+                  <FileCheck2 />
+                  Completed Reviews
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('all-projects') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/all-projects" tooltip="All Projects" isActive={pathname === '/dashboard/all-projects'}>
+                  <Book />
+                  All Projects
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('analytics') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/analytics" tooltip="Analytics" isActive={pathname === '/dashboard/analytics'}>
+                  <LineChart />
+                  Analytics
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('manage-users') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/manage-users" tooltip="Manage Users" isActive={pathname === '/dashboard/manage-users'}>
+                  <Users />
+                  Manage Users
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('manage-incentive-claims') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname === '/dashboard/manage-incentive-claims'}>
+                  <Award />
+                  Manage Claims
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('module-management') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/module-management" tooltip="Module Management" isActive={pathname === '/dashboard/module-management'}>
+                  <ShieldCheck />
+                  Module Management
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             )}
             <SidebarMenuItem>
               <SidebarMenuButton href="/dashboard/notifications" tooltip="Notifications" isActive={pathname === '/dashboard/notifications'}>

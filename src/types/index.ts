@@ -10,6 +10,7 @@ export type User = {
   phoneNumber?: string;
   profileComplete?: boolean;
   photoURL?: string;
+  allowedModules?: string[];
 };
 
 export type BankDetails = {
