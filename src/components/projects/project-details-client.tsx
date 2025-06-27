@@ -2,47 +2,37 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import * as z from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { format } from 'date-fns';
+import { useRouter } from 'next/navigation';
+
 import type { Project, User, GrantDetails, Evaluation } from '@/types';
+import { db, storage } from '@/lib/firebase';
+import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
-import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon } from 'lucide-react';
+
 import { GrantManagement } from './grant-management';
 import { EvaluationForm } from './evaluation-form';
 import { EvaluationsSummary } from './evaluations-summary';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface ProjectDetailsClientProps {
   project: Project;
@@ -57,6 +47,14 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
   'Rejected': 'destructive',
   'Completed': 'outline'
 };
+
+const scheduleSchema = z.object({
+  date: z.date({ required_error: 'A meeting date is required.' }),
+  time: z.string().min(1, 'Meeting time is required.'),
+  venue: z.string().min(1, 'Meeting venue is required.'),
+});
+type ScheduleFormData = z.infer<typeof scheduleSchema>;
+
 
 export function ProjectDetailsClient({ project: initialProject }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject);
@@ -76,6 +74,21 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
   const [revisedProposalFile, setRevisedProposalFile] = useState<File | null>(null);
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+
+  const scheduleForm = useForm<ScheduleFormData>({
+    resolver: zodResolver(scheduleSchema),
+  });
+
+  useEffect(() => {
+    if (initialProject.meetingDetails) {
+        scheduleForm.reset({
+            date: new Date(initialProject.meetingDetails.date),
+            time: initialProject.meetingDetails.time,
+            venue: initialProject.meetingDetails.venue,
+        });
+    }
+  }, [initialProject.meetingDetails, scheduleForm]);
 
   const refetchData = useCallback(async () => {
     try {
@@ -159,6 +172,39 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       setIsUpdating(false);
     }
   };
+
+  const handleScheduleUpdate = async (data: ScheduleFormData) => {
+    setIsUpdating(true);
+    try {
+        const projectRef = doc(db, 'projects', project.id);
+        const newMeetingDetails = {
+            date: data.date.toISOString(),
+            time: data.time,
+            venue: data.venue,
+        };
+
+        await updateDoc(projectRef, { meetingDetails: newMeetingDetails });
+        
+        await addDoc(collection(db, 'notifications'), {
+            uid: project.pi_uid,
+            title: `MEETING RESCHEDULED for your project: "${project.title}"`,
+            projectId: project.id,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+        });
+
+        setProject({ ...project, meetingDetails: newMeetingDetails });
+        toast({ title: 'Success', description: `Meeting schedule has been updated.` });
+        setIsScheduleDialogOpen(false);
+        
+    } catch (error) {
+        console.error('Error updating schedule:', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to update meeting schedule.' });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
+
 
   const handleAwardGrant = async () => {
     if (!grantAmount || grantAmount <= 0) {
@@ -432,7 +478,83 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
           {project.meetingDetails && (
             <>
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
-                <h3 className="font-semibold text-lg">IMR Evaluation Meeting Details</h3>
+                <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-lg">IMR Evaluation Meeting Details</h3>
+                    {isAdmin && (
+                        <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+                            <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">Edit Schedule</Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Edit Meeting Schedule</DialogTitle>
+                                    <DialogDescription>Update the date, time, or venue for this meeting.</DialogDescription>
+                                </DialogHeader>
+                                <Form {...scheduleForm}>
+                                    <form id="schedule-edit-form" onSubmit={scheduleForm.handleSubmit(handleScheduleUpdate)} className="space-y-4 py-4">
+                                        <FormField
+                                            control={scheduleForm.control}
+                                            name="date"
+                                            render={({ field }) => (
+                                                <FormItem className="flex flex-col">
+                                                <FormLabel>New Meeting Date</FormLabel>
+                                                <Popover>
+                                                    <PopoverTrigger asChild>
+                                                    <FormControl>
+                                                        <Button
+                                                        variant={"outline"}
+                                                        className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                                                        >
+                                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                        </Button>
+                                                    </FormControl>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-auto p-0" align="start">
+                                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < new Date()} initialFocus />
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={scheduleForm.control}
+                                            name="time"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                <FormLabel>New Meeting Time</FormLabel>
+                                                <FormControl>
+                                                    <Input type="time" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={scheduleForm.control}
+                                            name="venue"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                <FormLabel>New Venue</FormLabel>
+                                                <FormControl>
+                                                    <Input placeholder="e.g., RDC Conference Hall" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </form>
+                                </Form>
+                                <DialogFooter>
+                                    <Button type="submit" form="schedule-edit-form" disabled={isUpdating}>
+                                        {isUpdating ? 'Saving...' : 'Save Changes'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    )}
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                   <p><strong>Date:</strong> {formatDate(project.meetingDetails.date)}</p>
                   <p><strong>Time:</strong> {project.meetingDetails.time}</p>
