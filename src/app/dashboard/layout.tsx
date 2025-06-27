@@ -114,7 +114,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const lastSegment = segments.pop() || 'dashboard';
 
       if(lastSegment === 'project' && segments.includes('dashboard')) return "Project Details";
-      if(lastSegment === 'incentive-claim' && segments.includes('dashboard')) return "Incentive Claim";
+      if(lastSegment === 'incentive-claim' && segments.includes('dashboard')) return "Incentive Claims";
 
       if (lastSegment === 'dashboard') return 'Dashboard';
       return lastSegment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -184,14 +184,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     My Projects
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                 <SidebarMenuItem>
-                  <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claim" isActive={pathname === '/dashboard/incentive-claim'}>
-                    <Award />
-                    Incentive Claim
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
               </>
              )}
+            {(isFaculty || isSuperAdmin) && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>
+                  <Award />
+                  Incentive Claims
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
             {isEvaluator && (
                 <SidebarMenuItem>
                   <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
@@ -200,7 +202,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </SidebarMenuButton>
                 </SidebarMenuItem>
             )}
-            {isAdmin && (
+            {isAdmin && !isSuperAdmin && (
               <>
                  <SidebarMenuItem>
                   <SidebarMenuButton href="/dashboard/schedule-meeting" tooltip="Schedule Meeting" isActive={pathname === '/dashboard/schedule-meeting'}>
@@ -238,14 +240,52 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     Manage Users
                   </SidebarMenuButton>
                 </SidebarMenuItem>
-                {isSuperAdmin && (
+              </>
+            )}
+            {isSuperAdmin && (
+                 <>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/schedule-meeting" tooltip="Schedule Meeting" isActive={pathname === '/dashboard/schedule-meeting'}>
+                    <CalendarClock />
+                    Schedule Meeting
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/pending-reviews" tooltip="Pending Reviews" isActive={pathname === '/dashboard/pending-reviews'}>
+                    <GanttChartSquare />
+                    Pending Reviews
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/completed-reviews" tooltip="Completed Reviews" isActive={pathname === '/dashboard/completed-reviews'}>
+                    <FileCheck2 />
+                    Completed Reviews
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/all-projects" tooltip="All Projects" isActive={pathname === '/dashboard/all-projects'}>
+                    <Book />
+                    All Projects
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/analytics" tooltip="Analytics" isActive={pathname === '/dashboard/analytics'}>
+                    <LineChart />
+                    Analytics
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/manage-users" tooltip="Manage Users" isActive={pathname === '/dashboard/manage-users'}>
+                    <Users />
+                    Manage Users
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
                   <SidebarMenuItem>
                     <SidebarMenuButton href="/dashboard/incentive-claims-admin" tooltip="Incentive Claims" isActive={pathname === '/dashboard/incentive-claims-admin'}>
                       <Award />
                       Incentive Claims
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                )}
               </>
             )}
             <SidebarMenuItem>
