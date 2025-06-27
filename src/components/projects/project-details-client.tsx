@@ -631,6 +631,10 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                     <dt className="font-medium text-muted-foreground">Principal Investigator</dt>
                     <dd>{project.pi}</dd>
+                    <dt className="font-medium text-muted-foreground">Email</dt>
+                    <dd>{project.pi_email || 'N/A'}</dd>
+                    <dt className="font-medium text-muted-foreground">Phone</dt>
+                    <dd>{project.pi_phoneNumber || 'N/A'}</dd>
                     <dt className="font-medium text-muted-foreground">Faculty</dt>
                     <dd>{project.faculty}</dd>
                     <dt className="font-medium text-muted-foreground">Institute</dt>

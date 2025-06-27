@@ -155,6 +155,8 @@ export function SubmissionForm() {
         departmentName: user.department,
         pi: user.name,
         pi_uid: user.uid,
+        pi_email: user.email,
+        pi_phoneNumber: user.phoneNumber,
         teamInfo: teamInfo,
         timelineAndOutcomes: data.expectedOutcomes,
         status: 'Submitted' as const,
