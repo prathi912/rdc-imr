@@ -133,7 +133,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
           </div>
           <div className="flex-1">
-             <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
+             <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/90 px-4 backdrop-blur-md sm:px-6">
                  <Skeleton className="h-8 w-48" />
                    <div className="flex items-center gap-4">
                       <Skeleton className="h-9 w-9 rounded-md" />
@@ -252,7 +252,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-sm sm:px-6">
+        <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-background/90 px-4 backdrop-blur-md sm:px-6">
           <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
           <div className="flex items-center gap-4">
             <ThemeToggle />
