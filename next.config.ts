@@ -22,6 +22,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/assets/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'www.pierc.org',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 };
