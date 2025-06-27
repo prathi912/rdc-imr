@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Download } from "lucide-react";
+import { Input } from '@/components/ui/input';
+import { MoreHorizontal, Download, ArrowUpDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +33,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
+type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status'>;
+
 
 function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!claim) return null;
@@ -95,13 +98,15 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
 export default function ManageIncentiveClaimsPage() {
   const [allClaims, setAllClaims] = useState<IncentiveClaim[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [filteredClaims, setFilteredClaims] = useState<IncentiveClaim[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const router = useRouter();
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -123,13 +128,11 @@ export default function ManageIncentiveClaimsPage() {
     if (!currentUser) return;
     setLoading(true);
     try {
-      // Fetch users
       const usersCollection = collection(db, 'users');
       const userSnapshot = await getDocs(usersCollection);
       const userList = userSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
       setUsers(userList);
 
-      // Fetch claims
       const claimsCollection = collection(db, 'incentiveClaims');
       let q;
       if (currentUser.role === 'Super-admin') {
@@ -156,15 +159,43 @@ export default function ManageIncentiveClaimsPage() {
   useEffect(() => {
     fetchClaimsAndUsers();
   }, [fetchClaimsAndUsers]);
+  
+  const sortedAndFilteredClaims = useMemo(() => {
+    let filtered = [...allClaims];
 
-  useEffect(() => {
-    if (activeTab === 'all') {
-      setFilteredClaims(allClaims);
-    } else {
+    if (activeTab !== 'all') {
       const status = activeTab.charAt(0).toUpperCase() + activeTab.slice(1) as IncentiveClaim['status'];
-      setFilteredClaims(allClaims.filter(claim => claim.status === status));
+      filtered = filtered.filter(claim => claim.status === status);
     }
-  }, [activeTab, allClaims]);
+
+    if (searchTerm) {
+      filtered = filtered.filter(claim =>
+        claim.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        claim.paperTitle.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    filtered.sort((a, b) => {
+        if (a[sortConfig.key] < b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (a[sortConfig.key] > b[sortConfig.key]) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+    });
+
+    return filtered;
+  }, [allClaims, activeTab, searchTerm, sortConfig]);
+
+  const requestSort = (key: SortableKeys) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+        direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
 
   const handleStatusChange = useCallback(async (id: string, newStatus: IncentiveClaim['status']) => {
     try {
@@ -179,18 +210,15 @@ export default function ManageIncentiveClaimsPage() {
   }, [fetchClaimsAndUsers, toast]);
 
   const handleExport = () => {
-    if (filteredClaims.length === 0) {
+    if (sortedAndFilteredClaims.length === 0) {
       toast({ variant: 'destructive', title: "No Data", description: "There are no claims to export in the current view." });
       return;
     }
 
     const userDetailsMap = new Map(users.map(u => [u.uid, { misId: u.misId || '' }]));
     
-    const dataToExport = filteredClaims.map(claim => {
-      // Destructure to separate bankDetails and the rest of the claim
+    const dataToExport = sortedAndFilteredClaims.map(claim => {
       const { bankDetails, id, uid, ...rest } = claim;
-      
-      // Create a new flat object for export
       return {
         ...rest,
         misId: userDetailsMap.get(uid)?.misId || '',
@@ -206,23 +234,39 @@ export default function ManageIncentiveClaimsPage() {
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Claims");
-    XLSX.writeFile(workbook, `incentive_claims_${activeTab}.xlsx`);
-    toast({ title: "Export Started", description: `Downloading ${filteredClaims.length} claims.` });
+    XLSX.writeFile(workbook, `incentive_claims_${activeTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast({ title: "Export Started", description: `Downloading ${sortedAndFilteredClaims.length} claims.` });
   };
   
   const renderTable = () => (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Claimant</TableHead>
-          <TableHead className="hidden md:table-cell">Paper Title</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead>Status</TableHead>
+          <TableHead>
+             <Button variant="ghost" onClick={() => requestSort('userName')}>
+                Claimant <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </TableHead>
+          <TableHead className="hidden md:table-cell">
+             <Button variant="ghost" onClick={() => requestSort('paperTitle')}>
+                Paper Title <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </TableHead>
+          <TableHead>
+             <Button variant="ghost" onClick={() => requestSort('submissionDate')}>
+                Date <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </TableHead>
+          <TableHead>
+             <Button variant="ghost" onClick={() => requestSort('status')}>
+                Status <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </TableHead>
           <TableHead className="text-right">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {filteredClaims.map((claim) => (
+        {sortedAndFilteredClaims.map((claim) => (
             <TableRow key={claim.id}>
               <TableCell className="font-medium">{claim.userName}</TableCell>
               <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle}</TableCell>
@@ -276,6 +320,14 @@ export default function ManageIncentiveClaimsPage() {
          </Button>
       </PageHeader>
       <div className="mt-8">
+        <div className="flex items-center py-4">
+            <Input
+                placeholder="Filter by claimant or paper title..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                className="max-w-sm"
+            />
+        </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="all">All ({allClaims.length})</TabsTrigger>
@@ -289,11 +341,11 @@ export default function ManageIncentiveClaimsPage() {
                     <div className="space-y-4">
                         {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
                     </div>
-                 ) : filteredClaims.length > 0 ? (
+                 ) : sortedAndFilteredClaims.length > 0 ? (
                     renderTable()
                  ) : (
                     <div className="text-center py-10 text-muted-foreground">
-                        <p>No claims found for this category.</p>
+                        <p>No claims found for this category or search term.</p>
                     </div>
                  )}
               </CardContent>
