@@ -9,13 +9,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { db } from '@/lib/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ALL_MODULES } from '@/lib/modules';
 import { Loader2 } from 'lucide-react';
-import { updateUserModules } from '@/app/actions';
 
 
 export default function ModuleManagementPage() {
@@ -66,16 +65,14 @@ export default function ModuleManagementPage() {
     const modulesToSave = userModules[uid] || [];
     
     try {
-      const result = await updateUserModules(uid, modulesToSave);
-
-      if (!result.success) {
-        throw new Error(result.error || 'An unknown error occurred.');
-      }
+      const userDocRef = doc(db, 'users', uid);
+      await updateDoc(userDocRef, { allowedModules: modulesToSave });
       
       toast({ title: 'Permissions Updated', description: 'User modules have been saved successfully.' });
       await fetchUsers(); // Re-fetch users to reflect the changes in the UI
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
+      console.error('Error updating user modules:', error);
+      toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'Could not update permissions.' });
     } finally {
       setSavingUids(prev => prev.filter(id => id !== uid));
     }

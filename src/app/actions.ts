@@ -4,7 +4,7 @@
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
 import { db } from '@/lib/firebase';
-import { doc, collection, writeBatch, updateDoc } from 'firebase/firestore';
+import { doc, collection, writeBatch } from 'firebase/firestore';
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -57,15 +57,4 @@ export async function scheduleMeeting(
     console.error('Error scheduling meeting:', error);
     return { success: false, error: error.message || 'Failed to schedule meeting.' };
   }
-}
-
-export async function updateUserModules(uid: string, allowedModules: string[]) {
-    try {
-        const userDocRef = doc(db, 'users', uid);
-        await updateDoc(userDocRef, { allowedModules });
-        return { success: true };
-    } catch (error: any) {
-        console.error('Error updating user modules:', error);
-        return { success: false, error: error.message || 'Failed to update modules.' };
-    }
 }
