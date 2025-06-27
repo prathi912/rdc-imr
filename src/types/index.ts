@@ -1,4 +1,5 @@
 
+
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -89,6 +90,8 @@ export type Project = {
     time: string;
     venue: string;
   };
+  revisedProposalUrl?: string;
+  revisionSubmissionDate?: string;
 };
 
 export type Notification = {

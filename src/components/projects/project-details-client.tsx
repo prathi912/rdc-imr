@@ -71,6 +71,9 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const [utilizationCertificateFile, setUtilizationCertificateFile] = useState<File | null>(null);
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
   const [showApprovalAlert, setShowApprovalAlert] = useState(false);
+  const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
+  const [revisedProposalFile, setRevisedProposalFile] = useState<File | null>(null);
+  const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
 
   const refetchData = useCallback(async () => {
     try {
@@ -222,6 +225,36 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
     }
   };
   
+  const handleRevisionSubmit = async () => {
+    if (!revisedProposalFile) {
+        toast({ variant: 'destructive', title: 'File Missing', description: 'Please upload the revised proposal.' });
+        return;
+    }
+    setIsSubmittingRevision(true);
+    try {
+        const projectRef = doc(db, 'projects', project.id);
+        // In a real app, you'd upload to Firebase Storage here and get a URL
+        const revisedProposalUrl = `revisions/${project.id}/${revisedProposalFile.name}`;
+
+        const updateData = {
+          revisedProposalUrl: revisedProposalUrl,
+          revisionSubmissionDate: new Date().toISOString(),
+        };
+
+        await updateDoc(projectRef, updateData);
+        setProject({ ...project, ...updateData });
+
+        toast({ title: 'Revision Submitted', description: 'Your revised proposal has been submitted.' });
+        setIsRevisionDialogOpen(false);
+        setRevisedProposalFile(null);
+    } catch (error) {
+        console.error('Error submitting revision:', error);
+        toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not submit your revision.' });
+    } finally {
+        setIsSubmittingRevision(false);
+    }
+  };
+
   const formatDate = (isoString: string) => {
       if (!isoString) return 'N/A';
       try {
@@ -317,6 +350,30 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                       </DialogContent>
                     </Dialog>
                   )}
+                  {isPI && project.status === 'Under Review' && (
+                    <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Submit Revision</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Submit Revised Proposal</DialogTitle>
+                          <DialogDescription>Upload your revised proposal based on the feedback from the IMR evaluation meeting.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="revised-proposal" className="text-right">Proposal (PDF)</Label>
+                            <Input id="revised-proposal" type="file" accept=".pdf" onChange={(e) => setRevisedProposalFile(e.target.files ? e.target.files[0] : null)} className="col-span-3" />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button type="button" onClick={handleRevisionSubmit} disabled={isSubmittingRevision || !revisedProposalFile}>
+                            {isSubmittingRevision ? 'Submitting...' : 'Submit Revised Proposal'}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                   {isPI && (project.status === 'Approved' || project.status === 'In Progress') && (
                     <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
                       <DialogTrigger asChild>
@@ -403,6 +460,24 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
             <h3 className="font-semibold text-lg">Timeline and Outcomes</h3>
             <p className="text-muted-foreground whitespace-pre-wrap">{project.timelineAndOutcomes}</p>
           </div>
+          {project.revisedProposalUrl && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">Revised Proposal</h3>
+                    <p className="text-sm text-muted-foreground">
+                        The following revised proposal was submitted on {formatDate(project.revisionSubmissionDate!)}.
+                    </p>
+                    <ul className="list-disc list-inside text-sm space-y-1">
+                      <li>
+                        <Button variant="link" asChild className="p-0 h-auto">
+                            <a href={project.revisedProposalUrl} target="_blank" rel="noopener noreferrer">View Revised Proposal</a>
+                        </Button>
+                      </li>
+                    </ul>
+                </div>
+              </>
+          )}
           {project.completionReportUrl && (
               <>
                 <Separator />
