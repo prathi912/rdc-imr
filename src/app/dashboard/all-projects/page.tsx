@@ -99,15 +99,17 @@ export default function AllProjectsPage() {
     }
     
     const dataToExport = allProjects.map(p => ({
-      'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
       'Project Title': p.title,
+      'Project Type': p.type,
+      'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
+      'Abstract': p.abstract,
       'Principal Investigator': p.pi,
+      'PI Email': p.pi_email || 'N/A',
+      'PI Phone': p.pi_phoneNumber || 'N/A',
       'Faculty': p.faculty,
       'Institute': p.institute,
       'Department': p.departmentName,
       'Status': p.status,
-      'Grant Amount': p.grant?.amount ?? 'N/A',
-      'Grant Status': p.grant?.status ?? 'N/A',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
