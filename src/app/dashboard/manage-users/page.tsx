@@ -20,6 +20,13 @@ import {
   DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -39,11 +46,71 @@ import { getDefaultModulesForRole } from '@/lib/modules';
 const ROLES: User['role'][] = ['faculty', 'Evaluator', 'CRO', 'admin', 'Super-admin'];
 const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
 
+function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+    if (!user) return null;
+
+    const renderDetail = (label: string, value?: string | number) => {
+        if (!value && value !== 0) return null;
+        return (
+            <div className="grid grid-cols-3 gap-2 py-1.5">
+                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
+                <dd className="col-span-2">{value}</dd>
+            </div>
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>{user.name}'s Profile</DialogTitle>
+                    <DialogDescription>Viewing full profile details for {user.email}.</DialogDescription>
+                </DialogHeader>
+                <div className="max-h-[70vh] overflow-y-auto pr-4 space-y-4 text-sm">
+                    <div>
+                      <h4 className="font-semibold text-base mb-2">Personal & Contact</h4>
+                      {renderDetail("Full Name", user.name)}
+                      {renderDetail("Email", user.email)}
+                      {renderDetail("Phone", user.phoneNumber)}
+                      {renderDetail("Role", user.role)}
+                    </div>
+
+                    <div className="border-t pt-4">
+                      <h4 className="font-semibold text-base mb-2">Academic Details</h4>
+                      {renderDetail("MIS ID", user.misId)}
+                      {renderDetail("Faculty", user.faculty)}
+                      {renderDetail("Institute", user.institute)}
+                      {renderDetail("Department", user.department)}
+                    </div>
+                    
+                    {user.bankDetails ? (
+                        <div className="border-t pt-4">
+                            <h4 className="font-semibold text-base mb-2">Bank Account Details</h4>
+                            {renderDetail("Beneficiary Name", user.bankDetails.beneficiaryName)}
+                            {renderDetail("Account Number", user.bankDetails.accountNumber)}
+                            {renderDetail("Bank Name", user.bankDetails.bankName)}
+                            {renderDetail("Branch Name", user.bankDetails.branchName)}
+                            {renderDetail("City", user.bankDetails.city)}
+                            {renderDetail("IFSC Code", user.bankDetails.ifscCode)}
+                        </div>
+                    ) : (
+                       <div className="border-t pt-4">
+                            <h4 className="font-semibold text-base mb-2">Bank Account Details</h4>
+                            <p className="text-muted-foreground">No bank details have been added by this user.</p>
+                       </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function ManageUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToView, setUserToView] = useState<User | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -157,6 +224,7 @@ export default function ManageUsersPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => setUserToView(user)}>View Profile</DropdownMenuItem>
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
                                 <DropdownMenuPortal>
@@ -187,6 +255,7 @@ export default function ManageUsersPage() {
           </CardContent>
         </Card>
       </div>
+       <ProfileDetailsDialog user={userToView} open={!!userToView} onOpenChange={() => setUserToView(null)} />
        {userToDelete && (
           <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
               <AlertDialogContent>

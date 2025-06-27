@@ -94,6 +94,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
 
 export default function ManageIncentiveClaimsPage() {
   const [allClaims, setAllClaims] = useState<IncentiveClaim[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [filteredClaims, setFilteredClaims] = useState<IncentiveClaim[]>([]);
   const [activeTab, setActiveTab] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -118,10 +119,17 @@ export default function ManageIncentiveClaimsPage() {
   }, [router, toast]);
 
 
-  const fetchClaims = useCallback(async () => {
+  const fetchClaimsAndUsers = useCallback(async () => {
     if (!currentUser) return;
     setLoading(true);
     try {
+      // Fetch users
+      const usersCollection = collection(db, 'users');
+      const userSnapshot = await getDocs(usersCollection);
+      const userList = userSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
+      setUsers(userList);
+
+      // Fetch claims
       const claimsCollection = collection(db, 'incentiveClaims');
       let q;
       if (currentUser.role === 'Super-admin') {
@@ -138,16 +146,16 @@ export default function ManageIncentiveClaimsPage() {
       const claimList = claimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
       setAllClaims(claimList);
     } catch (error) {
-      console.error("Error fetching claims:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not fetch incentive claims." });
+      console.error("Error fetching data:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch incentive claims or user data." });
     } finally {
       setLoading(false);
     }
   }, [toast, currentUser]);
 
   useEffect(() => {
-    fetchClaims();
-  }, [fetchClaims]);
+    fetchClaimsAndUsers();
+  }, [fetchClaimsAndUsers]);
 
   useEffect(() => {
     if (activeTab === 'all') {
@@ -163,18 +171,20 @@ export default function ManageIncentiveClaimsPage() {
       const claimDoc = doc(db, 'incentiveClaims', id);
       await updateDoc(claimDoc, { status: newStatus });
       toast({ title: 'Status Updated', description: "The claim's status has been changed." });
-      fetchClaims(); 
+      fetchClaimsAndUsers(); 
     } catch (error) {
        console.error("Error updating status:", error);
        toast({ variant: 'destructive', title: "Error", description: "Could not update status." });
     }
-  }, [fetchClaims, toast]);
+  }, [fetchClaimsAndUsers, toast]);
 
   const handleExport = () => {
     if (filteredClaims.length === 0) {
       toast({ variant: 'destructive', title: "No Data", description: "There are no claims to export in the current view." });
       return;
     }
+
+    const userDetailsMap = new Map(users.map(u => [u.uid, { misId: u.misId || '' }]));
     
     const dataToExport = filteredClaims.map(claim => {
       // Destructure to separate bankDetails and the rest of the claim
@@ -183,6 +193,7 @@ export default function ManageIncentiveClaimsPage() {
       // Create a new flat object for export
       return {
         ...rest,
+        misId: userDetailsMap.get(uid)?.misId || '',
         beneficiaryName: bankDetails?.beneficiaryName || '',
         accountNumber: bankDetails?.accountNumber || '',
         bankName: bankDetails?.bankName || '',
