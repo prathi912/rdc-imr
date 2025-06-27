@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -52,6 +53,7 @@ export function SubmissionForm() {
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -139,8 +141,7 @@ export function SubmissionForm() {
         title: 'Project Submitted!',
         description: 'Your research project has been successfully submitted for review.',
       });
-      form.reset();
-      setCurrentStep(1);
+      router.push('/dashboard/my-projects');
     } catch (error: any) {
       console.error('Error adding document: ', error);
       toast({
