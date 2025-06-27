@@ -56,11 +56,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         } else {
           toast({ variant: 'destructive', title: 'Authentication Error', description: 'User profile not found.' });
           await signOut(auth);
-          router.replace('/');
+          router.replace('/login');
         }
       } else {
         localStorage.removeItem('user');
-        router.replace('/');
+        router.replace('/login');
         setUser(null);
       }
       setLoading(false);
@@ -96,7 +96,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     try {
       await signOut(auth);
       localStorage.removeItem('user');
-      router.push('/');
+      router.push('/login');
       toast({ title: 'Logged out successfully.' });
     } catch (error) {
       console.error('Logout error:', error);

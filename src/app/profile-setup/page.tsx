@@ -89,10 +89,10 @@ export default function ProfileSetupPage() {
           });
         } else {
           toast({ variant: 'destructive', title: 'Error', description: 'Could not find user profile.' });
-          router.replace('/');
+          router.replace('/login');
         }
       } else {
-        router.replace('/');
+        router.replace('/login');
       }
       setLoading(false);
     });

@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
         title: 'Check your email',
         description: "If an account exists, we've sent a password reset link.",
       });
-      router.push('/');
+      router.push('/login');
     } catch (error: any) {
        console.error('Password reset error:', error);
        toast({
@@ -104,7 +104,7 @@ export default function ForgotPasswordPage() {
             </Form>
           </CardContent>
           <CardFooter className="justify-center text-sm">
-             <Link href="/" passHref>
+             <Link href="/login" passHref>
                 <Button variant="link" className="p-0 h-auto">Back to Sign In</Button>
             </Link>
           </CardFooter>

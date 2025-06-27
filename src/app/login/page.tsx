@@ -26,146 +26,148 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
 
-const signupSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters.'),
+const loginSchema = z.object({
   email: z
     .string()
     .email('Invalid email address.')
     .refine(
-      (email) => email.endsWith('@paruluniversity.ac.in'),
+      (email) => email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
       'Only emails from paruluniversity.ac.in are allowed.'
     ),
-  password: z.string().min(8, 'Password must be at least 8 characters.'),
-  confirmPassword: z.string(),
-}).refine(data => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
+  password: z.string().min(1, 'Password is required.'),
 });
 
+type LoginFormValues = z.infer<typeof loginSchema>;
 
-type SignupFormValues = z.infer<typeof signupSchema>;
-
-export default function SignupPage() {
+export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const form = useForm<SignupFormValues>({
-    resolver: zodResolver(signupSchema),
+  
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
     defaultValues: {
-      name: '',
       email: '',
       password: '',
-      confirmPassword: '',
     },
   });
-  
+
   const determineUserRole = (email: string): User['role'] => {
+    if (email === 'rathipranav07@gmail.com') {
+      return 'Super-admin';
+    }
     if (REQUIRED_EVALUATOR_EMAILS.includes(email)) {
       return 'Evaluator';
     }
     return 'faculty';
   }
 
-  const processNewUser = async (firebaseUser: FirebaseUser, name?: string) => {
+  const processSignIn = async (firebaseUser: FirebaseUser) => {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDocSnap = await getDoc(userDocRef);
+    let user: User;
 
     if (userDocSnap.exists()) {
-      toast({
-        title: 'Account Exists',
-        description: 'This email is already registered. Please sign in.',
-      });
-      await signOut(auth);
-      router.push('/login');
-      return;
+      user = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
+    } else {
+      // Create new user if they don't exist in Firestore (e.g., first Google sign-in)
+      user = {
+        uid: firebaseUser.uid,
+        name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
+        email: firebaseUser.email!,
+        role: determineUserRole(firebaseUser.email!),
+        profileComplete: false,
+      };
+      await setDoc(userDocRef, user);
     }
     
-    const role = determineUserRole(firebaseUser.email!);
-    const user: User = {
-      uid: firebaseUser.uid,
-      name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
-      email: firebaseUser.email!,
-      role: role,
-      profileComplete: role !== 'faculty', // Evaluators don't need to complete the long profile form
-    };
-    await setDoc(userDocRef, user);
+    // Ensure admin and evaluator roles are correctly set and bypass profile setup for them
+    const specialRole = determineUserRole(user.email);
+    if (user.role !== specialRole || (specialRole !== 'faculty' && !user.profileComplete)) {
+        user.role = specialRole;
+        if(specialRole !== 'faculty') {
+            user.profileComplete = true;
+        }
+        await setDoc(userDocRef, user, { merge: true });
+    }
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(user));
     }
     
     if (user.profileComplete) {
-       toast({
-        title: 'Account Created',
-        description: "Welcome! Redirecting to your dashboard.",
+      toast({
+        title: 'Login Successful',
+        description: 'Redirecting to your dashboard...',
       });
       router.push('/dashboard');
     } else {
        toast({
-        title: 'Account Created',
-        description: "Let's complete your profile to continue.",
+        title: 'Profile Setup Required',
+        description: 'Please complete your profile to continue.',
       });
       router.push('/profile-setup');
     }
   };
 
-  const onEmailSubmit = async (data: SignupFormValues) => {
+  const onEmailSubmit = async (data: LoginFormValues) => {
     setIsSubmitting(true);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      await processNewUser(userCredential.user, data.name);
+      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
+      await processSignIn(userCredential.user);
     } catch (error: any) {
-      console.error('Signup Error:', error);
+      console.error('Login error:', error);
       toast({
         variant: 'destructive',
-        title: 'Sign Up Failed',
-        description: error.code === 'auth/email-already-in-use' 
-          ? 'This email is already registered.'
+        title: 'Login Failed',
+        description: error.code === 'auth/invalid-credential'
+          ? 'Invalid email or password.'
           : error.message || 'An unknown error occurred.',
       });
+    } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleGoogleSignUp = async () => {
+  const handleGoogleSignIn = async () => {
     setIsSubmitting(true);
     const provider = new GoogleAuthProvider();
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
 
-      const isAllowed = firebaseUser.email && firebaseUser.email.endsWith('@paruluniversity.ac.in');
+      const isAllowed = firebaseUser.email && (firebaseUser.email.endsWith('@paruluniversity.ac.in') || firebaseUser.email === 'rathipranav07@gmail.com');
       
       if (!isAllowed) {
         await signOut(auth);
         toast({
             variant: 'destructive',
             title: 'Access Denied',
-            description: 'Sign up is restricted to Parul University members.',
+            description: 'Access is restricted to Parul University members.',
         });
         setIsSubmitting(false);
         return;
       }
 
-      await processNewUser(firebaseUser);
-
+      await processSignIn(firebaseUser);
     } catch (error: any) {
-        console.error('Google Sign-up error:', error);
+        console.error('Google Sign-in error:', error);
         toast({
             variant: 'destructive',
-            title: 'Sign Up Failed',
-            description: error.message || 'Could not sign up with Google. Please try again.',
+            title: 'Sign In Failed',
+            description: error.message || 'Could not sign in with Google. Please try again.',
         });
-        setIsSubmitting(false);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -175,27 +177,14 @@ export default function SignupPage() {
             <div className="mx-auto mb-6 flex justify-center">
               <Logo />
             </div>
-            <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
+            <CardTitle className="text-2xl font-bold">Welcome Back!</CardTitle>
             <CardDescription>
-              Join the Parul University Research Portal.
+              Sign in to access the Research Portal.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <FormField
                   control={form.control}
                   name="email"
@@ -214,20 +203,12 @@ export default function SignupPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
+                       <div className="flex items-center justify-between">
+                        <FormLabel>Password</FormLabel>
+                        <Link href="/forgot-password" passHref>
+                           <Button variant="link" className="p-0 h-auto text-xs">Forgot password?</Button>
+                        </Link>
+                      </div>
                       <FormControl>
                         <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
                       </FormControl>
@@ -236,7 +217,7 @@ export default function SignupPage() {
                   )}
                 />
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? "Creating Account..." : "Sign Up with Email"}
+                  {isSubmitting ? "Signing In..." : "Sign In"}
                 </Button>
               </form>
             </Form>
@@ -250,18 +231,18 @@ export default function SignupPage() {
                 </span>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={handleGoogleSignUp} disabled={isSubmitting}>
-               <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="mr-2 h-4 w-4">
-                 <title>Google</title>
-                 <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.9-4.63 1.9-3.87 0-7-3.13-7-7s3.13-7 7-7c2.18 0 3.66.87 4.53 1.73l2.43-2.38C18.04 2.33 15.47 1 12.48 1 7.01 1 3 5.02 3 9.98s4.01 8.98 9.48 8.98c2.96 0 5.42-1 7.15-2.68 1.78-1.74 2.37-4.24 2.37-6.52 0-.6-.05-1.18-.15-1.72H12.48z" />
-               </svg>
-              Sign up with Google
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isSubmitting}>
+              <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="mr-2 h-4 w-4">
+                <title>Google</title>
+                <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.9-4.63 1.9-3.87 0-7-3.13-7-7s3.13-7 7-7c2.18 0 3.66.87 4.53 1.73l2.43-2.38C18.04 2.33 15.47 1 12.48 1 7.01 1 3 5.02 3 9.98s4.01 8.98 9.48 8.98c2.96 0 5.42-1 7.15-2.68 1.78-1.74 2.37-4.24 2.37-6.52 0-.6-.05-1.18-.15-1.72H12.48z" />
+              </svg>
+              Sign in with Google
             </Button>
           </CardContent>
           <CardFooter className="justify-center text-sm">
-            <p className="text-muted-foreground">Already have an account?&nbsp;</p>
-             <Link href="/login" passHref>
-                <Button variant="link" className="p-0 h-auto">Sign In</Button>
+            <p className="text-muted-foreground">Don't have an account?&nbsp;</p>
+            <Link href="/signup" passHref>
+                <Button variant="link" className="p-0 h-auto">Sign Up</Button>
             </Link>
           </CardFooter>
         </Card>

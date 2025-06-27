@@ -1,252 +1,118 @@
-'use client';
-
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Logo } from '@/components/logo';
-import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { auth, db } from '@/lib/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import type { User } from '@/types';
-import { useState } from 'react';
-import { REQUIRED_EVALUATOR_EMAILS } from '@/lib/constants';
+import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/logo';
+import Image from 'next/image';
+import { Award, BookCheck, GanttChartSquare } from 'lucide-react';
 
-const loginSchema = z.object({
-  email: z
-    .string()
-    .email('Invalid email address.')
-    .refine(
-      (email) => email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
-      'Only emails from paruluniversity.ac.in are allowed.'
-    ),
-  password: z.string().min(1, 'Password is required.'),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
-
-export default function LoginPage() {
-  const router = useRouter();
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
-  });
-
-  const determineUserRole = (email: string): User['role'] => {
-    if (email === 'rathipranav07@gmail.com') {
-      return 'Super-admin';
-    }
-    if (REQUIRED_EVALUATOR_EMAILS.includes(email)) {
-      return 'Evaluator';
-    }
-    return 'faculty';
-  }
-
-  const processSignIn = async (firebaseUser: FirebaseUser) => {
-    const userDocRef = doc(db, 'users', firebaseUser.uid);
-    const userDocSnap = await getDoc(userDocRef);
-    let user: User;
-
-    if (userDocSnap.exists()) {
-      user = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
-    } else {
-      // Create new user if they don't exist in Firestore (e.g., first Google sign-in)
-      user = {
-        uid: firebaseUser.uid,
-        name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
-        email: firebaseUser.email!,
-        role: determineUserRole(firebaseUser.email!),
-        profileComplete: false,
-      };
-      await setDoc(userDocRef, user);
-    }
-    
-    // Ensure admin and evaluator roles are correctly set and bypass profile setup for them
-    const specialRole = determineUserRole(user.email);
-    if (user.role !== specialRole || (specialRole !== 'faculty' && !user.profileComplete)) {
-        user.role = specialRole;
-        if(specialRole !== 'faculty') {
-            user.profileComplete = true;
-        }
-        await setDoc(userDocRef, user, { merge: true });
-    }
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('user', JSON.stringify(user));
-    }
-    
-    if (user.profileComplete) {
-      toast({
-        title: 'Login Successful',
-        description: 'Redirecting to your dashboard...',
-      });
-      router.push('/dashboard');
-    } else {
-       toast({
-        title: 'Profile Setup Required',
-        description: 'Please complete your profile to continue.',
-      });
-      router.push('/profile-setup');
-    }
-  };
-
-  const onEmailSubmit = async (data: LoginFormValues) => {
-    setIsSubmitting(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      await processSignIn(userCredential.user);
-    } catch (error: any) {
-      console.error('Login error:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Login Failed',
-        description: error.code === 'auth/invalid-credential'
-          ? 'Invalid email or password.'
-          : error.message || 'An unknown error occurred.',
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setIsSubmitting(true);
-    const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
-
-      const isAllowed = firebaseUser.email && (firebaseUser.email.endsWith('@paruluniversity.ac.in') || firebaseUser.email === 'rathipranav07@gmail.com');
-      
-      if (!isAllowed) {
-        await signOut(auth);
-        toast({
-            variant: 'destructive',
-            title: 'Access Denied',
-            description: 'Access is restricted to Parul University members.',
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      await processSignIn(firebaseUser);
-    } catch (error: any) {
-        console.error('Google Sign-in error:', error);
-        toast({
-            variant: 'destructive',
-            title: 'Sign In Failed',
-            description: error.message || 'Could not sign in with Google. Please try again.',
-        });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-
+export default function LandingPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <div className="w-full max-w-md">
-        <Card className="shadow-xl">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-6 flex justify-center">
-              <Logo />
-            </div>
-            <CardTitle className="text-2xl font-bold">Welcome Back!</CardTitle>
-            <CardDescription>
-              Sign in to access the Research Portal.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>University Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="your.name@paruluniversity.ac.in" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                       <div className="flex items-center justify-between">
-                        <FormLabel>Password</FormLabel>
-                        <Link href="/forgot-password" passHref>
-                           <Button variant="link" className="p-0 h-auto text-xs">Forgot password?</Button>
-                        </Link>
-                      </div>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? "Signing In..." : "Sign In"}
-                </Button>
-              </form>
-            </Form>
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
+    <div className="flex flex-col min-h-screen bg-background">
+      <header className="container mx-auto px-4 lg:px-6 h-20 flex items-center justify-between">
+        <Logo />
+        <nav className="flex gap-4 sm:gap-6">
+          <Link href="/login">
+            <Button variant="ghost">Sign In</Button>
+          </Link>
+          <Link href="/signup">
+            <Button>Sign Up</Button>
+          </Link>
+        </nav>
+      </header>
+      <main className="flex-1">
+        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
+          <div className="container px-4 md:px-6">
+            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+              <div className="flex flex-col justify-center space-y-4">
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
+                    Parul University Research Portal
+                  </h1>
+                  <p className="max-w-[600px] text-muted-foreground md:text-xl">
+                    Streamlining Intramural Research Funding from Submission to Completion.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                  <Link href="/signup">
+                    <Button size="lg">Get Started</Button>
+                  </Link>
+                  <Link href="/login">
+                    <Button variant="outline" size="lg">
+                      Sign In
+                    </Button>
+                  </Link>
+                </div>
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with
-                </span>
+              <Image
+                src="https://placehold.co/600x400.png"
+                width="600"
+                height="400"
+                alt="Hero"
+                data-ai-hint="research collaboration"
+                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last"
+              />
+            </div>
+          </div>
+        </section>
+        <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+              <div className="space-y-2">
+                <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm">Key Features</div>
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">A Better Way to Manage Research</h2>
+                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                  Our portal provides a centralized platform for managing the entire lifecycle of intramural research projects.
+                </p>
               </div>
             </div>
-            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isSubmitting}>
-              <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="mr-2 h-4 w-4">
-                <title>Google</title>
-                <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.85 3.18-1.73 4.1-1.02 1.02-2.62 1.9-4.63 1.9-3.87 0-7-3.13-7-7s3.13-7 7-7c2.18 0 3.66.87 4.53 1.73l2.43-2.38C18.04 2.33 15.47 1 12.48 1 7.01 1 3 5.02 3 9.98s4.01 8.98 9.48 8.98c2.96 0 5.42-1 7.15-2.68 1.78-1.74 2.37-4.24 2.37-6.52 0-.6-.05-1.18-.15-1.72H12.48z" />
-              </svg>
-              Sign in with Google
-            </Button>
-          </CardContent>
-          <CardFooter className="justify-center text-sm">
-            <p className="text-muted-foreground">Don't have an account?&nbsp;</p>
-            <Link href="/signup" passHref>
-                <Button variant="link" className="p-0 h-auto">Sign Up</Button>
-            </Link>
-          </CardFooter>
-        </Card>
-      </div>
-    </main>
+            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
+              <div className="grid gap-1 text-center">
+                <div className="flex justify-center items-center mb-4">
+                    <div className="p-4 rounded-full bg-primary/10 text-primary">
+                        <BookCheck className="h-8 w-8" />
+                    </div>
+                </div>
+                <h3 className="text-xl font-bold">Seamless Submissions</h3>
+                <p className="text-muted-foreground">
+                  A guided, multi-step form ensures all necessary project information is captured accurately.
+                </p>
+              </div>
+              <div className="grid gap-1 text-center">
+                <div className="flex justify-center items-center mb-4">
+                    <div className="p-4 rounded-full bg-primary/10 text-primary">
+                        <GanttChartSquare className="h-8 w-8" />
+                    </div>
+                </div>
+                <h3 className="text-xl font-bold">Transparent Evaluation</h3>
+                <p className="text-muted-foreground">
+                  A dedicated dashboard for evaluators with AI-powered prompts to ensure fair and consistent reviews.
+                </p>
+              </div>
+              <div className="grid gap-1 text-center">
+                <div className="flex justify-center items-center mb-4">
+                    <div className="p-4 rounded-full bg-primary/10 text-primary">
+                        <Award className="h-8 w-8" />
+                    </div>
+                </div>
+                <h3 className="text-xl font-bold">Efficient Grant Management</h3>
+                <p className="text-muted-foreground">
+                  Track grant disbursement and fund utilization from a single, unified interface.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
+        <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Parul University. All rights reserved.</p>
+        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
+          <Link className="text-xs hover:underline underline-offset-4" href="#">
+            Terms of Service
+          </Link>
+          <Link className="text-xs hover:underline underline-offset-4" href="#">
+            Privacy
+          </Link>
+        </nav>
+      </footer>
+    </div>
   );
 }
