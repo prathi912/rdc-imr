@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
+  Award,
   Bell,
   Book,
   CalendarClock,
@@ -113,6 +114,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const lastSegment = segments.pop() || 'dashboard';
 
       if(lastSegment === 'project' && segments.includes('dashboard')) return "Project Details";
+      if(lastSegment === 'incentive-claim' && segments.includes('dashboard')) return "Incentive Claim";
 
       if (lastSegment === 'dashboard') return 'Dashboard';
       return lastSegment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -179,6 +181,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <SidebarMenuButton href="/dashboard/my-projects" tooltip="My Projects" isActive={pathname === '/dashboard/my-projects'}>
                     <Book />
                     My Projects
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                 <SidebarMenuItem>
+                  <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claim" isActive={pathname === '/dashboard/incentive-claim'}>
+                    <Award />
+                    Incentive Claim
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </>
