@@ -68,6 +68,7 @@ export default function ModuleManagementPage() {
 
     if (result.success) {
       toast({ title: 'Permissions Updated', description: 'User modules have been saved successfully.' });
+      await fetchUsers(); // Re-fetch users to reflect the changes in the UI
     } else {
       toast({ variant: 'destructive', title: 'Update Failed', description: result.error });
     }
