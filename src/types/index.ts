@@ -84,3 +84,29 @@ export type Notification = {
   createdAt: string; // ISO String
   isRead: boolean;
 };
+
+export type IncentiveClaim = {
+    id: string;
+    uid: string;
+    userName: string;
+    userEmail: string;
+    status: 'Pending' | 'Accepted' | 'Rejected';
+    submissionDate: string; // ISO String
+    
+    // Form fields
+    claimType: string;
+    prefilledMonthlyStatusId?: string;
+    partialEnteredId?: string;
+    publicationType: string;
+    indexType: 'wos' | 'scopus' | 'both' | 'esci' | 'ft50';
+    wosType?: 'sci' | 'scie' | 'ahi';
+    impactFactor?: number;
+    totalAuthors: string;
+    totalInternalAuthors: string;
+    totalInternalCoAuthors: string;
+    authorType: string;
+    benefitMode: string;
+    journalName: string;
+    paperTitle: string;
+    publicationPhase: string;
+};

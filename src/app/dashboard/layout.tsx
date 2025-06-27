@@ -151,6 +151,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(user.role);
+  const isSuperAdmin = user.role === 'Super-admin';
   const isEvaluator = user.role === 'Evaluator';
   const isFaculty = user.role === 'faculty';
 
@@ -237,6 +238,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     Manage Users
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {isSuperAdmin && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton href="/dashboard/incentive-claims-admin" tooltip="Incentive Claims" isActive={pathname === '/dashboard/incentive-claims-admin'}>
+                      <Award />
+                      Incentive Claims
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </>
             )}
             <SidebarMenuItem>

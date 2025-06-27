@@ -4,66 +4,61 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper functions
-    function isAuth() {
+    // Helper function to check if a user is signed in
+    function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isUser(uid) {
-      return isAuth() && request.auth.uid == uid;
+
+    // Helper function to get user's role
+    function getUserRole(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.role;
     }
-    
-    function getUserData() {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-    
+
+    // Helper function to check if the user is an admin or super-admin
     function isAdmin() {
-      return isAuth() && getUserData().role in ['admin', 'Super-admin', 'CRO'];
-    }
-    
-    function isEvaluator() {
-        return isAuth() && getUserData().role == 'Evaluator';
+      // Ensure the user document exists before trying to access its data
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserRole(request.auth.uid) in ['admin', 'Super-admin'];
     }
 
-    // User profiles
+    // Secure users collection
     match /users/{userId} {
-      allow read, update: if isUser(userId) || isAdmin();
-      allow create: if isAuth();
-      allow delete: if isAdmin();
-    }
-    
-    // Project counters
-    match /counters/{docId} {
-        allow read, write: if isAuth();
-    }
-    
-    // Notifications
-    match /notifications/{docId} {
-        allow create: if isAuth(); // Allow clients to create notifications for now
-        allow read, update: if isUser(resource.data.uid); // Users can read/update their own notifications
+      allow read: if isSignedIn();
+      allow create: if request.auth.uid == userId; // Allow user to create their own doc on signup
+      allow update: if request.auth.uid == userId || isAdmin(); // Allow user to update own profile, or admin to update any
+      allow delete: if isAdmin(); // Only admins can delete users
     }
 
-    // Projects collection
+    // Secure projects collection
     match /projects/{projectId} {
-      allow read: if isAuth();
-      
-      allow create: if isAuth() && request.resource.data.pi_uid == request.auth.uid;
-      
-      // Admins can update.
-      // Evaluators can update a project if it's "Under Review".
-      // The PI can update if they are the owner.
-      allow update: if isAdmin() ||
-                     (isEvaluator() && resource.data.status == 'Under Review') ||
-                     isUser(resource.data.pi_uid);
+      allow read: if isSignedIn();
+      // Allow PI to create/update. Allow admin to update.
+      allow create: if request.auth.uid == request.resource.data.pi_uid;
+      allow update: if request.auth.uid == request.resource.data.pi_uid || isAdmin() || getUserRole(request.auth.uid) == 'Evaluator';
 
-      allow delete: if isAdmin();
-
-      // Evaluations subcollection
+      // Secure evaluations subcollection
       match /evaluations/{evaluatorId} {
-        // An evaluator can write to their own evaluation document. Admins and the evaluator can read.
-        allow read: if isAdmin() || isUser(evaluatorId);
-        allow write: if isUser(evaluatorId) && isEvaluator();
+        // Only the assigned evaluator can create/update their own evaluation.
+        allow write: if isSignedIn() && request.auth.uid == evaluatorId;
+        allow read: if isSignedIn();
       }
+    }
+
+    // Secure incentive claims collection
+    match /incentiveClaims/{claimId} {
+      allow read: if isSignedIn();
+      allow create: if request.auth.uid == request.resource.data.uid;
+      allow update: if isAdmin();
+    }
+
+    // Secure notifications collection
+    match /notifications/{notificationId} {
+      allow read, update: if isSignedIn() && request.auth.uid == resource.data.uid;
+      allow create: if isAdmin(); // Only admins (server actions) can create notifications
+    }
+
+    // Secure counters collection (for admins only)
+    match /counters/{counterId} {
+      allow read, write: if isAdmin();
     }
   }
 }
