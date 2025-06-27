@@ -1,85 +1,63 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
+    
+    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
-    
-    function isUser(uid) {
-      return isSignedIn() && request.auth.uid == uid;
+
+    function isOwner(uid) {
+      return request.auth.uid == uid;
     }
 
     function getUserData(uid) {
       return get(/databases/$(database)/documents/users/$(uid)).data;
     }
 
-    function isRole(role) {
-        return isSignedIn() && getUserData(request.auth.uid).role == role;
-    }
-    
-    function userRole() {
-      return getUserData(request.auth.uid).role;
-    }
-
-    function isSuperAdmin() {
-        return isRole('Super-admin');
-    }
-    
     function isAdmin() {
-      return userRole() in ['admin', 'Super-admin', 'CRO'];
-    }
-    
-    function isFaculty() {
-      return isRole('faculty');
+      let userData = getUserData(request.auth.uid);
+      return userData.role in ['admin', 'CRO', 'Super-admin'];
     }
     
     function isEvaluator() {
-      return isRole('Evaluator');
+      let userData = getUserData(request.auth.uid);
+      return userData.role in ['Evaluator', 'CRO', 'Super-admin', 'admin'];
     }
 
+    // Collection: users
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow create: if isUser(userId);
-      // Allow user to update their own profile, but not their role.
-      // Super admin can update any field.
-      allow update: if (isUser(userId) && !('role' in request.resource.data)) 
-                  || request.auth.token.email == 'rathipranav07@gmail.com';
-      allow delete: if request.auth.token.email == 'rathipranav07@gmail.com';
+      allow create: if !exists(/databases/$(database)/documents/users/$(userId));
+      allow update: if isOwner(userId) || getUserData(request.auth.uid).role == 'Super-admin';
     }
-    
+
+    // Collection: projects
     match /projects/{projectId} {
       allow read: if isSignedIn();
-      
-      // A signed-in user can create a project if they are the principal investigator.
-      // The application logic already restricts form access to 'faculty' role.
-      allow create: if isSignedIn() && request.resource.data.pi_uid == request.auth.uid;
-      
-      // Allow PI to update, and admins to update.
-      allow update: if isSignedIn() && (
-                      resource.data.pi_uid == request.auth.uid || 
-                      isAdmin()
-                    );
-                    
-      // Only Super-Admins can delete projects.
-      allow delete: if isSuperAdmin();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.pi_uid);
 
-      match /evaluations/{evaluationId} {
-        allow read, write: if isSignedIn() && (isEvaluator() || isAdmin());
+      // Subcollection: evaluations
+      match /evaluations/{evaluatorId} {
+        allow read: if isSignedIn() && (isAdmin() || isOwner(evaluatorId));
+        allow write: if isSignedIn() && isEvaluator() && isOwner(evaluatorId);
       }
     }
     
+    // Collection: notifications
     match /notifications/{notificationId} {
-        allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
-        allow create: if isSignedIn(); // Allow server actions to create notifications
-        allow update: if isSignedIn() && resource.data.uid == request.auth.uid; // Allow user to mark as read
+      allow read, update: if isSignedIn() && isOwner(get(/databases/$(database)/documents/notifications/$(notificationId)).data.uid);
+      allow create: if isSignedIn();
     }
     
+    // Collection: incentiveClaims
     match /incentiveClaims/{claimId} {
-        allow read: if isSignedIn();
-        allow create: if isFaculty() && request.resource.data.uid == request.auth.uid;
-        allow update: if isSuperAdmin() || isRole('CRO');
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.uid;
+      allow read: if isSignedIn() && (isOwner(resource.data.uid) || isAdmin());
+      allow update: if isSignedIn() && isAdmin();
     }
   }
 }
