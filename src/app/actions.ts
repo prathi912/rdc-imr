@@ -4,7 +4,7 @@
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
 import { db } from '@/lib/firebase';
-import { doc, writeBatch, collection, runTransaction } from 'firebase/firestore';
+import { doc, writeBatch, collection, setDoc } from 'firebase/firestore';
 import type { Project } from '@/types';
 
 
@@ -76,32 +76,18 @@ export async function submitProject(
   }
 ) {
   try {
-    const counterRef = doc(db, 'counters', 'projects');
+    // Generate a new project document reference with an auto-generated ID.
+    // This avoids the permissions issue with the 'counters' collection.
+    const projectDocRef = doc(collection(db, 'projects'));
 
-    await runTransaction(db, async (transaction) => {
-      const counterDoc = await transaction.get(counterRef);
-      
-      let newCount = 1;
-      if (counterDoc.exists() && typeof counterDoc.data()?.count === 'number') {
-          newCount = counterDoc.data().count + 1;
-      }
+    const projectData: Omit<Project, 'id'> = {
+      ...projectPayload,
+      status: 'Submitted' as const,
+      submissionDate: new Date().toISOString(),
+    };
 
-      const year = new Date().getFullYear();
-      const projectType = projectPayload.type.replace(/\s+/g, '_');
-      const paddedCount = String(newCount).padStart(4, '0');
-      const newProjectId = `${year}_${projectType}_${paddedCount}`;
-      
-      const projectDocRef = doc(db, 'projects', newProjectId);
-
-      const projectData: Omit<Project, 'id'> = {
-        ...projectPayload,
-        status: 'Submitted' as const,
-        submissionDate: new Date().toISOString(),
-      };
-
-      transaction.set(projectDocRef, projectData);
-      transaction.set(counterRef, { count: newCount }, { merge: true });
-    });
+    // Set the data for the new project document.
+    await setDoc(projectDocRef, projectData);
     
     return { success: true };
 
