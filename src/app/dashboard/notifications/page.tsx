@@ -35,8 +35,7 @@ export default function NotificationsPage() {
       try {
         const q = query(
           collection(db, 'notifications'),
-          where('uid', '==', user.uid),
-          orderBy('createdAt', 'desc')
+          where('uid', '==', user.uid)
         );
         const querySnapshot = await getDocs(q);
         const fetchedNotifications = querySnapshot.docs.map(doc => ({
@@ -44,6 +43,9 @@ export default function NotificationsPage() {
           ...doc.data()
         } as NotificationType));
         
+        // Sort notifications by date on the client side
+        fetchedNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
         setNotifications(fetchedNotifications);
       } catch (error) {
         console.error("Error fetching notifications:", error);

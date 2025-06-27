@@ -84,23 +84,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (user) {
       const q = query(
         collection(db, 'notifications'),
-        where('uid', '==', user.uid),
-        where('isRead', '==', false)
+        where('uid', '==', user.uid)
       );
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        setUnreadCount(querySnapshot.size);
+        const unread = querySnapshot.docs.filter(doc => !doc.data().isRead).length;
+        setUnreadCount(unread);
       }, (error) => {
         console.error("Firestore notification listener error:", error);
-        // The error message from Firestore often contains a link to create the index.
-        // We can guide the user based on that.
-        const isIndexError = error.message.includes("requires an index");
         toast({
           variant: "destructive",
           title: "Network Error",
-          description: isIndexError 
-            ? "Notifications require a database index. Please check the developer console for a link to create it." 
-            : "Could not fetch real-time notifications.",
+          description: "Could not fetch real-time notifications.",
         });
       });
 
