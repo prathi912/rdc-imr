@@ -69,6 +69,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
   const [completionReportFile, setCompletionReportFile] = useState<File | null>(null);
+  const [utilizationCertificateFile, setUtilizationCertificateFile] = useState<File | null>(null);
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false);
   const [showApprovalAlert, setShowApprovalAlert] = useState(false);
 
@@ -183,31 +184,40 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
     }
   };
 
+  const handleCertificateFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        setUtilizationCertificateFile(e.target.files[0]);
+    }
+  };
+
   const handleCompletionSubmit = async () => {
-    if (!completionReportFile) {
-        toast({ variant: 'destructive', title: 'No File Selected', description: 'Please upload the completion report.' });
+    if (!completionReportFile || !utilizationCertificateFile) {
+        toast({ variant: 'destructive', title: 'Files Missing', description: 'Please upload both the completion report and the utilization certificate.' });
         return;
     }
     setIsSubmittingCompletion(true);
     try {
         const projectRef = doc(db, 'projects', project.id);
         const reportUrl = `reports/${project.id}/${completionReportFile.name}`;
+        const certificateUrl = `reports/${project.id}/${utilizationCertificateFile.name}`;
 
         const updateData = {
           status: 'Pending Completion Approval',
           completionReportUrl: reportUrl,
+          utilizationCertificateUrl: certificateUrl,
           completionSubmissionDate: new Date().toISOString(),
         };
 
         await updateDoc(projectRef, updateData);
         setProject({ ...project, ...updateData });
 
-        toast({ title: 'Report Submitted', description: 'Your completion report has been submitted for review.' });
+        toast({ title: 'Documents Submitted', description: 'Your completion documents have been submitted for review.' });
         setIsCompletionDialogOpen(false);
         setCompletionReportFile(null);
+        setUtilizationCertificateFile(null);
     } catch (error) {
-        console.error('Error submitting completion report:', error);
-        toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not submit the completion report.' });
+        console.error('Error submitting completion documents:', error);
+        toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not submit the completion documents.' });
     } finally {
         setIsSubmittingCompletion(false);
     }
@@ -315,17 +325,21 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Submit Completion Report</DialogTitle>
-                          <DialogDescription>To request project closure, upload your final 'Project outcome-cum-completion report'.</DialogDescription>
+                          <DialogTitle>Submit Completion Documents</DialogTitle>
+                          <DialogDescription>To request project closure, please upload the final 'Project outcome-cum-completion report' and the 'Utilization Certificate'.</DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                           <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="completion-report" className="text-right">Report (PDF)</Label>
+                            <Label htmlFor="completion-report" className="text-right">Completion Report (PDF)</Label>
                             <Input id="completion-report" type="file" accept=".pdf" onChange={handleCompletionFileChange} className="col-span-3" />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="utilization-certificate" className="text-right">Utilization Certificate (PDF)</Label>
+                            <Input id="utilization-certificate" type="file" accept=".pdf" onChange={handleCertificateFileChange} className="col-span-3" />
                           </div>
                         </div>
                         <DialogFooter>
-                          <Button type="button" onClick={handleCompletionSubmit} disabled={isSubmittingCompletion || !completionReportFile}>
+                          <Button type="button" onClick={handleCompletionSubmit} disabled={isSubmittingCompletion || !completionReportFile || !utilizationCertificateFile}>
                             {isSubmittingCompletion ? 'Submitting...' : 'Submit for Review'}
                           </Button>
                         </DialogFooter>
@@ -394,13 +408,24 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
               <>
                 <Separator />
                 <div className="space-y-2">
-                    <h3 className="font-semibold text-lg">Completion Report</h3>
+                    <h3 className="font-semibold text-lg">Completion Documents</h3>
                     <p className="text-sm text-muted-foreground">
-                        The project outcome-cum-completion report was submitted on {formatDate(project.completionSubmissionDate!)}.
+                        The following documents were submitted on {formatDate(project.completionSubmissionDate!)}.
                     </p>
-                    <Button variant="link" asChild className="p-0 h-auto">
-                        <a href={project.completionReportUrl} target="_blank" rel="noopener noreferrer">View Submitted Report</a>
-                    </Button>
+                    <ul className="list-disc list-inside text-sm space-y-1">
+                      <li>
+                        <Button variant="link" asChild className="p-0 h-auto">
+                            <a href={project.completionReportUrl} target="_blank" rel="noopener noreferrer">Project outcome-cum-completion report</a>
+                        </Button>
+                      </li>
+                      {project.utilizationCertificateUrl && (
+                        <li>
+                          <Button variant="link" asChild className="p-0 h-auto">
+                              <a href={project.utilizationCertificateUrl} target="_blank" rel="noopener noreferrer">Utilization Certificate</a>
+                          </Button>
+                        </li>
+                      )}
+                    </ul>
                 </div>
               </>
           )}

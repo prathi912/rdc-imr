@@ -67,6 +67,7 @@ export type Project = {
   submissionDate: string; // Should be ISO string
   grant?: GrantDetails;
   completionReportUrl?: string;
+  utilizationCertificateUrl?: string;
   completionSubmissionDate?: string; // ISO String
   evaluatedBy?: string[];
   meetingDetails?: {
