@@ -61,6 +61,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           if (!appUser.allowedModules || appUser.allowedModules.length === 0) {
               appUser.allowedModules = getDefaultModulesForRole(appUser.role);
           }
+          
+          // Add special permission for Unnati Joshi
+          if (appUser.email === 'unnati.joshi22950@paruluniversity.ac.in') {
+            if (!appUser.allowedModules.includes('all-projects')) {
+              appUser.allowedModules.push('all-projects');
+            }
+          }
 
           setUser(appUser);
           localStorage.setItem('user', JSON.stringify(appUser));
@@ -88,7 +95,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       );
 
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const unread = querySnapshot.docs.filter(doc => !doc.data().isRead).length;
+        const sortedNotifications = querySnapshot.docs.map(doc => doc.data()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        const unread = sortedNotifications.filter(doc => !doc.isRead).length;
         setUnreadCount(unread);
       }, (error) => {
         console.error("Firestore notification listener error:", error);

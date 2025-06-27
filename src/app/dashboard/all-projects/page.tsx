@@ -34,6 +34,7 @@ export default function AllProjectsPage() {
 
         const isAdmin = ['admin', 'Super-admin'].includes(user.role);
         const isCro = user.role === 'CRO';
+        const isSpecialUser = user.email === 'unnati.joshi22950@paruluniversity.ac.in';
 
         if (isAdmin) {
           q = query(projectsCol, orderBy('submissionDate', 'desc'));
@@ -41,6 +42,12 @@ export default function AllProjectsPage() {
           q = query(
             projectsCol, 
             where('faculty', '==', user.faculty),
+            orderBy('submissionDate', 'desc')
+          );
+        } else if (isSpecialUser) {
+          q = query(
+            projectsCol, 
+            where('faculty', '==', 'Faculty of Engineering & Technology'),
             orderBy('submissionDate', 'desc')
           );
         } else {
@@ -64,9 +71,20 @@ export default function AllProjectsPage() {
     getProjects();
   }, [user]);
   
+  const isAdmin = user && ['admin', 'Super-admin'].includes(user.role);
   const isCro = user?.role === 'CRO';
-  const pageTitle = isCro ? `Projects from ${user?.faculty}` : "All Projects";
-  const pageDescription = isCro ? "Browse all projects submitted from your faculty." : "Browse and manage all projects in the system.";
+  const isSpecialUser = user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
+  
+  let pageTitle = "All Projects";
+  let pageDescription = "Browse and manage all projects in the system.";
+
+  if (isCro) {
+    pageTitle = `Projects from ${user.faculty}`;
+    pageDescription = "Browse all projects submitted from your faculty.";
+  } else if (isSpecialUser && !isAdmin) {
+    pageTitle = "Projects from Faculty of Engineering & Technology";
+    pageDescription = "Browse all projects submitted from the Faculty of Engineering & Technology.";
+  }
 
   return (
     <div className="container mx-auto py-10">
@@ -83,7 +101,7 @@ export default function AllProjectsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={allProjects} userRole={user!.role} />
+          <ProjectList projects={allProjects} userRole={isSpecialUser ? 'CRO' : user!.role} />
         )}
       </div>
     </div>
