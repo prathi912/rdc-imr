@@ -45,7 +45,7 @@ export default function DashboardPage() {
   const isFaculty = user.role === 'faculty';
 
   return (
-    <div className="transition-all duration-300">
+    <div className="animate-in fade-in-0 duration-500">
       {adminRoles.includes(user.role) && <AdminDashboard />}
       {isFaculty && <FacultyDashboard user={user} />}
     </div>

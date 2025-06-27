@@ -71,8 +71,12 @@ export function AdminDashboard() {
     <div className="flex flex-col gap-6">
       <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((card) => (
-          <Card key={card.title}>
+        {statCards.map((card, index) => (
+          <Card 
+            key={card.title} 
+            className="animate-in fade-in-0 slide-in-from-bottom-4"
+            style={{ animationFillMode: 'backwards', animationDelay: `${index * 120}ms` }}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
               <card.icon className="h-4 w-4 text-muted-foreground" />
@@ -83,7 +87,7 @@ export function AdminDashboard() {
           </Card>
         ))}
       </div>
-      <div>
+      <div className="animate-in fade-in-0 slide-in-from-bottom-4" style={{ animationFillMode: 'backwards', animationDelay: '500ms' }}>
         <div className="mb-4 flex items-center justify-between">
             <h3 className="text-2xl font-bold tracking-tight">Recent Submissions</h3>
             <Link href="/dashboard/all-projects" passHref>

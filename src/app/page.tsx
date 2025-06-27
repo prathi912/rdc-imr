@@ -22,7 +22,7 @@ export default function LandingPage() {
         <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
           <div className="container px-4 md:px-6">
             <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
-              <div className="flex flex-col justify-center space-y-4">
+              <div className="flex flex-col justify-center space-y-4 animate-in fade-in slide-in-from-left-8 duration-700">
                 <div className="space-y-2">
                   <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
                     Parul University Research Portal
@@ -43,11 +43,11 @@ export default function LandingPage() {
                 </div>
               </div>
               <Image
-                src="https://www.pierc.org/_next/static/media/mainBgImage.05039c52.png"
+                src="https://www.pierc.org/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FmainBgImage.05039c52.png&w=1920&q=75"
                 width="600"
                 height="400"
                 alt="Hero"
-                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last"
+                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last animate-in fade-in slide-in-from-right-8 duration-700"
               />
             </div>
           </div>
@@ -64,7 +64,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
-              <div className="grid gap-1 text-center">
+              <div className="grid gap-1 text-center animate-in fade-in-0 slide-in-from-bottom-8 duration-700" style={{ animationDelay: '100ms' }}>
                 <div className="flex justify-center items-center mb-4">
                     <div className="p-4 rounded-full bg-primary/10 text-primary">
                         <BookCheck className="h-8 w-8" />
@@ -75,7 +75,7 @@ export default function LandingPage() {
                   A guided, multi-step form ensures all necessary project information is captured accurately.
                 </p>
               </div>
-              <div className="grid gap-1 text-center">
+              <div className="grid gap-1 text-center animate-in fade-in-0 slide-in-from-bottom-8 duration-700" style={{ animationDelay: '200ms' }}>
                 <div className="flex justify-center items-center mb-4">
                     <div className="p-4 rounded-full bg-primary/10 text-primary">
                         <GanttChartSquare className="h-8 w-8" />
@@ -86,7 +86,7 @@ export default function LandingPage() {
                   A dedicated dashboard for evaluators with AI-powered prompts to ensure fair and consistent reviews.
                 </p>
               </div>
-              <div className="grid gap-1 text-center">
+              <div className="grid gap-1 text-center animate-in fade-in-0 slide-in-from-bottom-8 duration-700" style={{ animationDelay: '300ms' }}>
                 <div className="flex justify-center items-center mb-4">
                     <div className="p-4 rounded-full bg-primary/10 text-primary">
                         <Award className="h-8 w-8" />
