@@ -14,7 +14,6 @@ import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ALL_MODULES } from '@/lib/modules';
-import { updateUserModules } from '@/app/admin-actions';
 import { Loader2 } from 'lucide-react';
 
 
@@ -64,15 +63,28 @@ export default function ModuleManagementPage() {
   const handleSaveChanges = async (uid: string) => {
     setSavingUids(prev => [...prev, uid]);
     const modulesToSave = userModules[uid] || [];
-    const result = await updateUserModules(uid, modulesToSave);
+    
+    try {
+      const response = await fetch('/api/update-modules', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ uid, allowedModules: modulesToSave }),
+      });
 
-    if (result.success) {
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'An unknown error occurred.');
+      }
+      
       toast({ title: 'Permissions Updated', description: 'User modules have been saved successfully.' });
       await fetchUsers(); // Re-fetch users to reflect the changes in the UI
-    } else {
-      toast({ variant: 'destructive', title: 'Update Failed', description: result.error });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
+    } finally {
+      setSavingUids(prev => prev.filter(id => id !== uid));
     }
-    setSavingUids(prev => prev.filter(id => id !== uid));
   };
   
   if (loading) {

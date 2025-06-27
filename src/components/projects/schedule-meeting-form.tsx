@@ -20,7 +20,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { scheduleMeetingForProjects } from '@/app/admin-actions';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 
@@ -97,15 +96,24 @@ export function ScheduleMeetingForm() {
     const projectsToSchedule = projects.filter(p => selectedProjects.includes(p.id))
       .map(p => ({ id: p.id, pi_uid: p.pi_uid, title: p.title }));
 
-    const result = await scheduleMeetingForProjects(projectsToSchedule, meetingDetails);
+    try {
+      const response = await fetch('/api/schedule-meeting', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectsToSchedule, meetingDetails }),
+      });
+      
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to schedule meeting.');
+      }
 
-    if (result.success) {
       toast({ title: 'Meeting Scheduled!', description: 'The meeting has been scheduled and PIs have been notified.' });
       setSelectedProjects([]);
       form.reset();
       await fetchProjects();
-    } else {
-      toast({ variant: 'destructive', title: 'Scheduling Failed', description: result.error });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Scheduling Failed', description: error.message });
     }
   };
 
