@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -13,9 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { User } from '@/types';
+import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
-import { submitProject } from '@/app/actions';
+import { db } from '@/lib/firebase';
+import { collection, doc, setDoc } from 'firebase/firestore';
 
 const formSchema = z.object({
   // Step 1
@@ -114,7 +116,9 @@ export function SubmissionForm() {
       }
       const teamInfo = teamInfoParts.join('; ');
 
-      const projectPayload = {
+      const projectDocRef = doc(collection(db, 'projects'));
+
+      const projectData: Omit<Project, 'id'> = {
         title: data.title,
         abstract: data.abstract,
         type: data.projectType,
@@ -125,13 +129,11 @@ export function SubmissionForm() {
         pi_uid: user.uid,
         teamInfo: teamInfo,
         timelineAndOutcomes: data.expectedOutcomes,
+        status: 'Submitted' as const,
+        submissionDate: new Date().toISOString(),
       };
 
-      const result = await submitProject(projectPayload);
-
-      if (!result.success) {
-        throw new Error(result.error);
-      }
+      await setDoc(projectDocRef, projectData);
       
       toast({
         title: 'Project Submitted!',
