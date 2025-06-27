@@ -37,7 +37,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
-import type { User } from '@/types';
+import type { User, IncentiveClaim } from '@/types';
 import { Loader2 } from 'lucide-react';
 
 const incentiveSchema = z
@@ -98,6 +98,16 @@ export function IncentiveForm() {
       claimType: 'Research Papers',
       publicationType: 'Referred paper in journal listed by WOS/Scopus',
       benefitMode: 'incentives',
+      prefilledMonthlyStatusId: '',
+      partialEnteredId: '',
+      impactFactor: '' as any, // Initialize to empty string to make it a controlled component
+      totalAuthors: '',
+      totalInternalAuthors: '',
+      totalInternalCoAuthors: '',
+      authorType: '',
+      journalName: '',
+      paperTitle: '',
+      publicationPhase: '',
     },
   });
   
@@ -117,14 +127,15 @@ export function IncentiveForm() {
     }
     setIsSubmitting(true);
     try {
-        await addDoc(collection(db, 'incentiveClaims'), {
+        const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
             uid: user.uid,
             userName: user.name,
             userEmail: user.email,
             status: 'Pending',
             submissionDate: new Date().toISOString(),
-        });
+        };
+        await addDoc(collection(db, 'incentiveClaims'), claimData);
         toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
         form.reset();
     } catch (error) {
@@ -153,7 +164,7 @@ export function IncentiveForm() {
                 render={({ field }) => (
                   <FormItem className="flex-grow">
                     <FormLabel>Please Select</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a claim type" />
@@ -182,7 +193,7 @@ export function IncentiveForm() {
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Please Select the Prefilled Monthly Status id</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl>
                                 <SelectContent></SelectContent>
                             </Select>
@@ -199,7 +210,7 @@ export function IncentiveForm() {
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Please Select the Partial Entered id</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl>
                                 <SelectContent></SelectContent>
                             </Select>
@@ -216,7 +227,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Please Select</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Select publication type" />
@@ -241,7 +252,7 @@ export function IncentiveForm() {
                         <FormControl>
                             <RadioGroup
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                             className="flex flex-wrap items-center gap-x-6 gap-y-2"
                             disabled={isSubmitting}
                             >
@@ -267,7 +278,7 @@ export function IncentiveForm() {
                             <FormControl>
                                 <RadioGroup
                                 onValueChange={field.onChange}
-                                defaultValue={field.value}
+                                value={field.value}
                                 className="flex items-center space-x-6"
                                 disabled={isSubmitting}
                                 >
@@ -300,7 +311,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Total No. of Authors</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                         </FormControl>
@@ -317,7 +328,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Total No. of Internal Authors</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                         </FormControl>
@@ -333,7 +344,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Total No. of Internal Co Authors</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                         </FormControl>
@@ -349,7 +360,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Author Type</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                         </FormControl>
@@ -369,7 +380,7 @@ export function IncentiveForm() {
                         <FormControl>
                             <RadioGroup
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                             className="flex items-center space-x-6"
                             disabled={isSubmitting}
                             >
@@ -416,7 +427,7 @@ export function IncentiveForm() {
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Publication Phase</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                                 <FormControl>
                                     <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                                 </FormControl>
