@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { collection, query, where, getDocs, orderBy, writeBatch, doc } from 'firebase/firestore';
-import { format } from 'date-fns';
+import { format, startOfToday } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 
 import { db } from '@/lib/firebase';
@@ -219,7 +219,7 @@ export function ScheduleMeetingForm() {
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < new Date()} initialFocus />
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />

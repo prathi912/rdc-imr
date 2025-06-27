@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format } from 'date-fns';
+import { format, startOfToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 import type { Project, User, GrantDetails, Evaluation } from '@/types';
@@ -511,7 +511,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                                                     </FormControl>
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-auto p-0" align="start">
-                                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < new Date()} initialFocus />
+                                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus />
                                                     </PopoverContent>
                                                 </Popover>
                                                 <FormMessage />
