@@ -59,6 +59,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     {renderDetail("Status", claim.status)}
                     {renderDetail("Submission Date", new Date(claim.submissionDate).toLocaleString())}
                     <hr className="my-2" />
+                    <h4 className="font-semibold text-base mt-2">Claim Information</h4>
                     {renderDetail("Paper Title", claim.paperTitle)}
                     {renderDetail("Journal Name", claim.journalName)}
                     {renderDetail("Claim Type", claim.claimType)}
@@ -72,6 +73,19 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     {renderDetail("Total Authors", claim.totalAuthors)}
                     {renderDetail("Total Internal Authors", claim.totalInternalAuthors)}
                     {renderDetail("Total Internal Co-Authors", claim.totalInternalCoAuthors)}
+                    
+                    {claim.bankDetails && (
+                        <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Bank Account Details</h4>
+                            {renderDetail("Beneficiary Name", claim.bankDetails.beneficiaryName)}
+                            {renderDetail("Account Number", claim.bankDetails.accountNumber)}
+                            {renderDetail("Bank Name", claim.bankDetails.bankName)}
+                            {renderDetail("Branch Name", claim.bankDetails.branchName)}
+                            {renderDetail("City", claim.bankDetails.city)}
+                            {renderDetail("IFSC Code", claim.bankDetails.ifscCode)}
+                        </>
+                    )}
                 </div>
             </DialogContent>
         </Dialog>

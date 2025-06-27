@@ -4,6 +4,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -32,13 +33,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 const incentiveSchema = z
   .object({
@@ -91,6 +93,7 @@ export function IncentiveForm() {
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   
   const form = useForm<IncentiveFormValues>({
     resolver: zodResolver(incentiveSchema),
@@ -114,15 +117,19 @@ export function IncentiveForm() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      if (!parsedUser.bankDetails) {
+        setBankDetailsMissing(true);
+      }
     }
   }, []);
 
   const indexType = form.watch('indexType');
 
   async function onSubmit(data: IncentiveFormValues) {
-    if (!user || !user.faculty) {
-        toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in and have a faculty set in your profile to submit a claim.' });
+    if (!user || !user.faculty || !user.bankDetails) {
+        toast({ variant: 'destructive', title: 'Bank Details Missing', description: 'You must add your bank details in Settings to submit a claim.' });
         return;
     }
     setIsSubmitting(true);
@@ -135,6 +142,7 @@ export function IncentiveForm() {
             faculty: user.faculty,
             status: 'Pending',
             submissionDate: new Date().toISOString(),
+            bankDetails: user.bankDetails,
         };
         await addDoc(collection(db, 'incentiveClaims'), claimData);
         toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
@@ -158,6 +166,17 @@ export function IncentiveForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6">
+             {bankDetailsMissing && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Bank Details Required</AlertTitle>
+                    <AlertDescription>
+                        Please add your salary bank account details in your profile before you can submit an incentive claim.
+                        <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <div className="flex items-center gap-4">
               <FormField
                 control={form.control}
@@ -165,7 +184,7 @@ export function IncentiveForm() {
                 render={({ field }) => (
                   <FormItem className="flex-grow">
                     <FormLabel>Please Select</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a claim type" />
@@ -194,7 +213,7 @@ export function IncentiveForm() {
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Please Select the Prefilled Monthly Status id</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl>
                                 <SelectContent></SelectContent>
                             </Select>
@@ -211,7 +230,7 @@ export function IncentiveForm() {
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Please Select the Partial Entered id</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                                 <FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl>
                                 <SelectContent></SelectContent>
                             </Select>
@@ -228,7 +247,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Please Select</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                         <FormControl>
                             <SelectTrigger>
                             <SelectValue placeholder="Select publication type" />
@@ -255,7 +274,7 @@ export function IncentiveForm() {
                             onValueChange={field.onChange}
                             value={field.value}
                             className="flex flex-wrap items-center gap-x-6 gap-y-2"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || bankDetailsMissing}
                             >
                             <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="wos" /></FormControl><FormLabel className="font-normal">WoS</FormLabel></FormItem>
                             <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scopus" /></FormControl><FormLabel className="font-normal">Scopus</FormLabel></FormItem>
@@ -281,7 +300,7 @@ export function IncentiveForm() {
                                 onValueChange={field.onChange}
                                 value={field.value}
                                 className="flex items-center space-x-6"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || bankDetailsMissing}
                                 >
                                 <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="sci" /></FormControl><FormLabel className="font-normal">SCI</FormLabel></FormItem>
                                 <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scie" /></FormControl><FormLabel className="font-normal">SCIE</FormLabel></FormItem>
@@ -300,7 +319,7 @@ export function IncentiveForm() {
                         <FormItem>
                         <FormLabel>Impact factor</FormLabel>
                         <FormControl>
-                            <Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting} />
+                            <Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting || bankDetailsMissing} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -312,7 +331,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Total No. of Authors</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                         </FormControl>
@@ -329,7 +348,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Total No. of Internal Authors</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                         </FormControl>
@@ -345,7 +364,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Total No. of Internal Co Authors</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                         </FormControl>
@@ -361,7 +380,7 @@ export function IncentiveForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Author Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                         <FormControl>
                           <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                         </FormControl>
@@ -383,7 +402,7 @@ export function IncentiveForm() {
                             onValueChange={field.onChange}
                             value={field.value}
                             className="flex items-center space-x-6"
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || bankDetailsMissing}
                             >
                             <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="incentives" /></FormControl><FormLabel className="font-normal">Incentives</FormLabel></FormItem>
                             </RadioGroup>
@@ -402,7 +421,7 @@ export function IncentiveForm() {
                         <FormItem>
                         <FormLabel>Name of Journal/Proceedings</FormLabel>
                         <FormControl>
-                            <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting} />
+                            <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -415,7 +434,7 @@ export function IncentiveForm() {
                         <FormItem>
                         <FormLabel>Title of the Paper published</FormLabel>
                         <FormControl>
-                            <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting} />
+                            <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
                         </FormControl>
                         <FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription>
                         <FormMessage />
@@ -428,7 +447,7 @@ export function IncentiveForm() {
                     render={({ field }) => (
                         <FormItem>
                             <FormLabel>Publication Phase</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                                 <FormControl>
                                     <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
                                 </FormControl>
@@ -441,7 +460,7 @@ export function IncentiveForm() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>

@@ -1,3 +1,13 @@
+
+export type UserBankDetails = {
+  bankName: string;
+  accountNumber: string;
+  beneficiaryName: string;
+  city: string;
+  branchName: string;
+  ifscCode: string;
+};
+
 export type User = {
   uid: string;
   name: string;
@@ -11,6 +21,7 @@ export type User = {
   profileComplete?: boolean;
   photoURL?: string;
   allowedModules?: string[];
+  bankDetails?: UserBankDetails;
 };
 
 export type BankDetails = {
@@ -97,6 +108,7 @@ export type IncentiveClaim = {
     status: 'Pending' | 'Accepted' | 'Rejected';
     submissionDate: string; // ISO String
     faculty: string;
+    bankDetails?: UserBankDetails;
     
     // Form fields
     claimType: string;

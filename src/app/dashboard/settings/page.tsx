@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -19,6 +20,7 @@ import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Banknote } from 'lucide-react';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -40,6 +42,16 @@ const passwordSchema = z.object({
     path: ["confirmPassword"],
 });
 type PasswordFormValues = z.infer<typeof passwordSchema>;
+
+const bankDetailsSchema = z.object({
+  beneficiaryName: z.string().min(2, "Beneficiary's name is required."),
+  accountNumber: z.string().min(5, "A valid account number is required."),
+  bankName: z.string().min(1, "Please select a bank."),
+  branchName: z.string().min(2, "Branch name is required."),
+  city: z.string().min(2, "City is required."),
+  ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC code format."),
+});
+type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>;
 
 const faculties = [
     "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
@@ -63,6 +75,7 @@ const institutes = [
     "Faculty of Public Health",
 ];
 
+const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"];
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -70,6 +83,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
+  const [isSubmittingBank, setIsSubmittingBank] = useState(false);
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -95,6 +109,18 @@ export default function SettingsPage() {
           confirmPassword: '',
       }
   });
+  
+  const bankForm = useForm<BankDetailsFormValues>({
+    resolver: zodResolver(bankDetailsSchema),
+    defaultValues: {
+      beneficiaryName: '',
+      accountNumber: '',
+      bankName: '',
+      branchName: '',
+      city: '',
+      ifscCode: '',
+    },
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -114,6 +140,9 @@ export default function SettingsPage() {
             misId: appUser.misId || '',
             phoneNumber: appUser.phoneNumber || '',
           });
+          if (appUser.bankDetails) {
+            bankForm.reset(appUser.bankDetails);
+          }
         }
       }
       setLoading(false);
@@ -142,6 +171,26 @@ export default function SettingsPage() {
         toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update your profile.' });
     } finally {
         setIsSubmittingProfile(false);
+    }
+  }
+  
+  async function onBankDetailsSubmit(data: BankDetailsFormValues) {
+    if (!user) return;
+    setIsSubmittingBank(true);
+    try {
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, { bankDetails: data });
+        
+        const updatedUser = { ...user, bankDetails: data };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+
+        toast({ title: 'Bank details updated successfully!' });
+    } catch (error) {
+        console.error("Bank details update error:", error);
+        toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update your bank details.' });
+    } finally {
+        setIsSubmittingBank(false);
     }
   }
 
@@ -325,6 +374,34 @@ export default function SettingsPage() {
             </Card>
           </form>
         </Form>
+        
+        <Form {...bankForm}>
+          <form onSubmit={bankForm.handleSubmit(onBankDetailsSubmit)}>
+            <Card>
+              <CardHeader>
+                 <div className="flex items-center gap-2">
+                    <Banknote />
+                    <CardTitle>Salary Bank Account Details</CardTitle>
+                </div>
+                <CardDescription>This information is required for incentive claims and grant disbursal.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                 <FormField name="beneficiaryName" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>Beneficiary Name</FormLabel><FormControl><Input placeholder="Name as per bank records" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="accountNumber" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input placeholder="Your bank account number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="bankName" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>Bank Name</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your bank" /></SelectTrigger></FormControl><SelectContent>{salaryBanks.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField name="branchName" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>Branch Name</FormLabel><FormControl><Input placeholder="e.g., Akota" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField name="city" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input placeholder="e.g., Vadodara" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                </div>
+                <FormField name="ifscCode" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>IFSC Code</FormLabel><FormControl><Input placeholder="e.g., HDFC0000001" {...field} /></FormControl><FormMessage /></FormItem> )} />
+              </CardContent>
+              <CardFooter className="border-t px-6 py-4">
+                <Button type="submit" disabled={isSubmittingBank}>{isSubmittingBank ? 'Saving...' : 'Save Bank Details'}</Button>
+              </CardFooter>
+            </Card>
+          </form>
+        </Form>
+
 
          <Form {...passwordForm}>
           <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>

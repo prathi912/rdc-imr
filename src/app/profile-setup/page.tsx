@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -13,19 +14,27 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db, storage } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import type { User } from '@/types';
+import type { User, UserBankDetails } from '@/types';
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 
 const profileSetupSchema = z.object({
+  // Profile
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
   department: z.string().min(2, 'Department name is required.'),
   misId: z.string().min(1, 'MIS ID is required.'),
   phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
+  // Bank Details
+  beneficiaryName: z.string().min(2, "Beneficiary's name is required."),
+  accountNumber: z.string().min(5, "A valid account number is required."),
+  bankName: z.string().min(1, "Please select a bank."),
+  branchName: z.string().min(2, "Branch name is required."),
+  city: z.string().min(2, "City is required."),
+  ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC code format."),
 });
 
 type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
@@ -52,6 +61,8 @@ const institutes = [
     "Faculty of Public Health",
 ];
 
+const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"];
+
 export default function ProfileSetupPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -69,6 +80,12 @@ export default function ProfileSetupPage() {
       department: '',
       misId: '',
       phoneNumber: '',
+      beneficiaryName: '',
+      accountNumber: '',
+      bankName: '',
+      branchName: '',
+      city: '',
+      ifscCode: '',
     },
   });
 
@@ -91,6 +108,12 @@ export default function ProfileSetupPage() {
             department: appUser.department || '',
             misId: appUser.misId || '',
             phoneNumber: appUser.phoneNumber || '',
+            beneficiaryName: appUser.bankDetails?.beneficiaryName || '',
+            accountNumber: appUser.bankDetails?.accountNumber || '',
+            bankName: appUser.bankDetails?.bankName || '',
+            branchName: appUser.bankDetails?.branchName || '',
+            city: appUser.bankDetails?.city || '',
+            ifscCode: appUser.bankDetails?.ifscCode || '',
           });
         } else {
           toast({ variant: 'destructive', title: 'Error', description: 'Could not find user profile.' });
@@ -125,11 +148,25 @@ export default function ProfileSetupPage() {
         await uploadBytes(storageRef, profilePicFile);
         photoURL = await getDownloadURL(storageRef);
       }
+      
+      const bankDetails: UserBankDetails = {
+          bankName: data.bankName,
+          accountNumber: data.accountNumber,
+          beneficiaryName: data.beneficiaryName,
+          city: data.city,
+          branchName: data.branchName,
+          ifscCode: data.ifscCode,
+      };
 
       const updateData = {
-        ...data,
+        faculty: data.faculty,
+        institute: data.institute,
+        department: data.department,
+        misId: data.misId,
+        phoneNumber: data.phoneNumber,
         photoURL: photoURL,
         profileComplete: true,
+        bankDetails: bankDetails,
       };
 
       await updateDoc(userDocRef, updateData);
@@ -191,6 +228,8 @@ export default function ProfileSetupPage() {
                         <Input id="picture" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" className="max-w-xs" />
                     </FormControl>
                 </div>
+                
+                <h3 className="text-lg font-semibold border-t pt-4">Academic Details</h3>
                 <FormField name="faculty" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
@@ -206,7 +245,19 @@ export default function ProfileSetupPage() {
                 <FormField control={form.control} name="phoneNumber" render={({ field }) => (
                   <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
+
+                <h3 className="text-lg font-semibold border-t pt-4">Salary Bank Account Details</h3>
+                <p className="text-sm text-muted-foreground -mt-3">These details are required for incentive claims.</p>
+                <FormField name="beneficiaryName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Beneficiary Name</FormLabel><FormControl><Input placeholder="Name as per bank records" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="accountNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input placeholder="Your bank account number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="bankName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Bank Name</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your bank" /></SelectTrigger></FormControl><SelectContent>{salaryBanks.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField name="branchName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Branch Name</FormLabel><FormControl><Input placeholder="e.g., Akota" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField name="city" control={form.control} render={({ field }) => ( <FormItem><FormLabel>City</FormLabel><FormControl><Input placeholder="e.g., Vadodara" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                </div>
+                <FormField name="ifscCode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>IFSC Code</FormLabel><FormControl><Input placeholder="e.g., HDFC0000001" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                
+                <Button type="submit" className="w-full !mt-8" disabled={isSubmitting}>
                   {isSubmitting ? "Saving..." : "Save and Continue"}
                 </Button>
               </form>
