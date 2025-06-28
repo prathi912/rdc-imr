@@ -62,7 +62,7 @@ export async function scheduleMeeting(
 
 export async function uploadFileToServer(fileDataUrl: string, path: string): Promise<{success: boolean; url?: string; error?: string}> {
   try {
-    const bucket = adminStorage.bucket();
+    const bucket = adminStorage().bucket();
     const file = bucket.file(path);
 
     // Extract mime type and base64 data from data URL
