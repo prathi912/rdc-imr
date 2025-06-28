@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -185,7 +186,7 @@ export default function SignupPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4 dark:bg-transparent">
       <div className="w-full max-w-md">
         <Card className="shadow-xl">
           <CardHeader className="text-center">

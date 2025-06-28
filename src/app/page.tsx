@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
@@ -6,7 +7,7 @@ import { Award, BookCheck, GanttChartSquare, Check, Users, ShieldCheck, FilePlus
 
 export default function LandingPage() {
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
       <header className="container mx-auto px-4 lg:px-6 h-20 flex items-center justify-between sticky top-0 z-50 bg-background/80 backdrop-blur-lg">
         <Logo />
         <nav className="flex gap-4 sm:gap-6">

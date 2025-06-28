@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -193,7 +194,7 @@ export default function LoginPage() {
 
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4 dark:bg-transparent">
       <div className="w-full max-w-md">
         <Card className="shadow-xl animate-in fade-in-0 zoom-in-95 duration-500">
           <CardHeader className="text-center">
