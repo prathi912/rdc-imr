@@ -16,6 +16,11 @@ const initializeAdmin = () => {
 
     try {
         const serviceAccount = JSON.parse(serviceAccountJson);
+        
+        // The private key from the env var has escaped newlines.
+        // We need to replace them with actual newline characters for the SDK.
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+
         return admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
             storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
