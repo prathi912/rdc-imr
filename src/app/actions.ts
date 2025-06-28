@@ -62,6 +62,9 @@ export async function scheduleMeeting(
 
 export async function uploadFileToServer(fileDataUrl: string, path: string): Promise<{success: boolean; url?: string; error?: string}> {
   try {
+    if (!fileDataUrl) {
+      throw new Error('Empty file data URL.');
+    }
     const bucket = adminStorage().bucket();
     const file = bucket.file(path);
 
@@ -84,6 +87,8 @@ export async function uploadFileToServer(fileDataUrl: string, path: string): Pro
 
     // Get the public URL
     const downloadUrl = file.publicUrl();
+
+    console.log(`File uploaded successfully to ${path}, URL: ${downloadUrl}`);
 
     return { success: true, url: downloadUrl };
   } catch (error: any) {

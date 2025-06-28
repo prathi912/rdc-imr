@@ -153,6 +153,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         const dataUrl = await fileToDataUrl(file);
         const path = `projects/${projectId}/${folder}/${file.name}`;
         const result = await uploadFileToServer(dataUrl, path);
+        console.log('Upload result for', file.name, ':', result);
         if (result.success && result.url) return result.url;
         throw new Error(result.error || `Failed to upload ${file.name}`);
       };
