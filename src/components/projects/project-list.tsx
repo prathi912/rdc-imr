@@ -1,4 +1,6 @@
 
+'use client';
+
 import { useState, useMemo } from 'react';
 import {
   Table,
@@ -118,18 +120,10 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
           <TableBody>
             {sortedProjects.map((project) => {
               const meetingDate = project.meetingDetails?.date ? new Date(project.meetingDetails.date) : null;
-              let isToday = false;
-              if (meetingDate) {
-                const todayDate = new Date();
-                isToday = todayDate.getFullYear() === meetingDate.getFullYear() &&
-                          todayDate.getMonth() === meetingDate.getMonth() &&
-                          todayDate.getDate() === meetingDate.getDate();
-              }
-              const evaluationEnabled = !isEvaluator || isToday;
-
+             
               const viewAction = (
-                <Link href={`/dashboard/project/${project.id}`} className={!evaluationEnabled ? 'pointer-events-none' : ''}>
-                  <Button variant="outline" size="icon" aria-label="View Project Details" disabled={!evaluationEnabled}>
+                <Link href={`/dashboard/project/${project.id}`}>
+                  <Button variant="outline" size="icon" aria-label="View Project Details">
                     <Eye className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -151,23 +145,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                       {isEvaluator ? (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              {/* Span wrapper is necessary for tooltips on disabled elements */}
-                              <span>{viewAction}</span> 
-                            </TooltipTrigger>
-                            {!evaluationEnabled && (
-                              <TooltipContent>
-                                <p>Evaluation opens on meeting day: {meetingDate?.toLocaleDateString()}</p>
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
-                        </TooltipProvider>
-                      ) : (
-                        viewAction
-                      )}
+                      {viewAction}
                       {isAdmin && <ProjectSummary project={project} />}
                     </div>
                   </TableCell>

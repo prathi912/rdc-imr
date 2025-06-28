@@ -136,17 +136,6 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const canEvaluate = user && ['Evaluator', 'CRO'].includes(user.role);
   const allEvaluationsIn = evaluations.length >= 3; // Require at least 3 evaluations
 
-  const meetingDate = project.meetingDetails?.date ? new Date(project.meetingDetails.date) : null;
-  let isToday = false;
-  if (meetingDate) {
-    const todayDate = new Date();
-    isToday = todayDate.getFullYear() === meetingDate.getFullYear() &&
-              todayDate.getMonth() === meetingDate.getMonth() &&
-              todayDate.getDate() === meetingDate.getDate();
-  }
-  
-  // Evaluators can only evaluate on the meeting day. Others (like CRO) are not restricted by date.
-  const isEvaluationAllowed = user?.role === 'Evaluator' ? isToday : true;
   const showEvaluationForm = canEvaluate && project.status === 'Under Review' && user;
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
@@ -757,23 +746,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       {isAdmin && project.status === 'Under Review' && <EvaluationsSummary project={project} evaluations={evaluations} />}
 
       {showEvaluationForm && (
-        isEvaluationAllowed ? (
-          <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchData} />
-        ) : (
-          <Card className="mt-8 border-primary/50">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                  <Clock className="h-6 w-6" />
-                  <CardTitle>Evaluation Closed</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                You can only submit your evaluation for this project on the day of the scheduled meeting: {meetingDate?.toLocaleDateString()}.
-              </p>
-            </CardContent>
-          </Card>
-        )
+        <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchData} />
       )}
       
       {project.grant && user && (
