@@ -60,7 +60,7 @@ export default function MyProjectsPage() {
   if (loading) {
     return (
        <div className="container mx-auto py-10">
-        <PageHeader title="My Projects" description="A list of all projects you have submitted." />
+        <PageHeader title="My Projects" description="A list of all projects you have submitted or saved as drafts." />
         <div className="mt-8">
           <Card>
             <CardContent className="pt-6">
@@ -78,7 +78,7 @@ export default function MyProjectsPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title="My Projects" description="A list of all projects you have submitted." />
+      <PageHeader title="My Projects" description="A list of all projects you have submitted or saved as drafts." />
       <div className="flex items-center py-4">
         <Input
             placeholder="Filter by title..."

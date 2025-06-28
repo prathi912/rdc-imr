@@ -7,13 +7,13 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
+import { GanttChartSquare, Microscope, Users, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -42,6 +42,10 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+interface SubmissionFormProps {
+  project?: Project;
+}
+
 const steps = [
   { id: 1, title: 'Project Details', icon: Microscope },
   { id: 2, title: 'Team Info', icon: Users },
@@ -58,10 +62,10 @@ const fileToDataUrl = (file: File): Promise<string> => {
   });
 };
 
-export function SubmissionForm() {
+export function SubmissionForm({ project }: SubmissionFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [user, setUser] = useState<User | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   
@@ -85,11 +89,31 @@ export function SubmissionForm() {
     }
   }, []);
 
+  useEffect(() => {
+    if (project) {
+        const teamInfo = project.teamInfo || '';
+        const coPiRegex = /Co-PIs: (.*?)(; Students:|$)/;
+        const studentRegex = /Students: (.*)/;
+        const coPiMatch = teamInfo.match(coPiRegex);
+        const studentMatch = teamInfo.match(studentRegex);
+
+        form.reset({
+            title: project.title,
+            abstract: project.abstract,
+            projectType: project.type,
+            coPiNames: coPiMatch ? coPiMatch[1].trim() : '',
+            studentInfo: studentMatch ? studentMatch[1].trim() : '',
+            expectedOutcomes: project.timelineAndOutcomes,
+            guidelinesAgreement: project.status !== 'Draft',
+        });
+    }
+  }, [project, form]);
+
   const handleNext = async () => {
     const fieldsToValidate = {
       1: ['title', 'abstract', 'projectType'],
-      2: [],
-      3: ['proposalUpload'],
+      2: [], // No required fields in step 2
+      3: project ? [] : ['proposalUpload'], // Proposal only required for new submissions, not for drafts being updated
       4: ['expectedOutcomes', 'guidelinesAgreement'],
     }[currentStep] as (keyof FormData)[];
 
@@ -107,57 +131,48 @@ export function SubmissionForm() {
     }
   };
 
-  const onSubmit = async (data: FormData) => {
+  const handleSave = async (status: 'Draft' | 'Submitted') => {
     if (!user || !user.faculty || !user.institute || !user.department) {
       toast({
         variant: 'destructive',
         title: 'Profile Incomplete',
-        description: 'Please complete your profile in Settings before submitting a project.',
+        description: 'Please complete your profile in Settings before submitting.',
       });
       return;
     }
 
-    setIsSubmitting(true);
+    setIsSaving(true);
+    const data = form.getValues();
+
     try {
-      const projectDocRef = doc(collection(db, 'projects'));
-      const projectId = projectDocRef.id;
+      const projectId = project?.id || doc(collection(db, 'projects')).id;
 
       const uploadFile = async (file: File, folder: string): Promise<string> => {
         const dataUrl = await fileToDataUrl(file);
         const path = `projects/${projectId}/${folder}/${file.name}`;
         const result = await uploadFileToServer(dataUrl, path);
-        if (result.success && result.url) {
-          return result.url;
-        } else {
-          throw new Error(result.error || `Failed to upload ${file.name}`);
-        }
+        if (result.success && result.url) return result.url;
+        throw new Error(result.error || `Failed to upload ${file.name}`);
       };
 
-      let cvUrl: string | undefined;
+      let cvUrl = project?.cvUrl;
       if (data.cvUpload && data.cvUpload.length > 0) {
         cvUrl = await uploadFile(data.cvUpload[0], 'cv');
       }
-      
-      const proposalFile = data.proposalUpload?.[0];
-      if (!proposalFile) {
-        toast({ variant: 'destructive', title: 'Missing File', description: 'Project proposal is required.' });
-        setIsSubmitting(false);
-        return;
+
+      let proposalUrl = project?.proposalUrl;
+      if (data.proposalUpload && data.proposalUpload.length > 0) {
+        proposalUrl = await uploadFile(data.proposalUpload[0], 'proposal');
       }
-      const proposalUrl = await uploadFile(proposalFile, 'proposal');
-      
-      let ethicsUrl: string | undefined;
+
+      let ethicsUrl = project?.ethicsUrl;
       if (data.ethicsUpload && data.ethicsUpload.length > 0) {
         ethicsUrl = await uploadFile(data.ethicsUpload[0], 'ethics');
       }
-
+      
       const teamInfoParts = [];
-      if (data.coPiNames && data.coPiNames.trim() !== '') {
-        teamInfoParts.push(`Co-PIs: ${data.coPiNames}`);
-      }
-      if (data.studentInfo && data.studentInfo.trim() !== '') {
-        teamInfoParts.push(`Students: ${data.studentInfo}`);
-      }
+      if (data.coPiNames && data.coPiNames.trim() !== '') teamInfoParts.push(`Co-PIs: ${data.coPiNames}`);
+      if (data.studentInfo && data.studentInfo.trim() !== '') teamInfoParts.push(`Students: ${data.studentInfo}`);
       const teamInfo = teamInfoParts.join('; ');
 
       const projectData: Omit<Project, 'id'> = {
@@ -171,40 +186,40 @@ export function SubmissionForm() {
         pi_uid: user.uid,
         pi_email: user.email,
         pi_phoneNumber: user.phoneNumber,
-        teamInfo: teamInfo,
+        teamInfo,
         timelineAndOutcomes: data.expectedOutcomes,
-        status: 'Submitted' as const,
-        submissionDate: new Date().toISOString(),
+        status: status,
+        submissionDate: project?.submissionDate || new Date().toISOString(),
         proposalUrl,
         cvUrl,
         ethicsUrl,
       };
 
-      await setDoc(projectDocRef, projectData);
+      await setDoc(doc(db, 'projects', projectId), projectData, { merge: true });
       
-      toast({
-        title: 'Project Submitted!',
-        description: 'Your research project has been successfully submitted for review.',
-      });
-      router.push('/dashboard/my-projects');
+      if (status === 'Draft') {
+        toast({ title: 'Draft Saved!', description: "You can continue editing from 'My Projects'." });
+        if (!project?.id) router.push(`/dashboard/edit-submission/${projectId}`);
+      } else {
+        toast({ title: 'Project Submitted!', description: 'Your project is now under review.' });
+        router.push('/dashboard/my-projects');
+      }
     } catch (error: any) {
-      console.error('Error adding document: ', error);
-      toast({
-        variant: 'destructive',
-        title: 'Submission Failed',
-        description: error.message || 'There was an error submitting your project. Please try again.',
-      });
+      console.error('Error saving project: ', error);
+      toast({ variant: 'destructive', title: 'Save Failed', description: error.message || 'An error occurred.' });
     } finally {
-        setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
+
+  const onFinalSubmit = () => handleSave('Submitted');
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Step {currentStep}: {steps[currentStep - 1].title}</CardTitle>
+            <CardTitle>{project ? 'Edit Submission' : 'New Submission'} - Step {currentStep}: {steps[currentStep - 1].title}</CardTitle>
             <CardDescription>Follow the steps to complete your submission.</CardDescription>
           </div>
           <div className="text-right">
@@ -213,11 +228,11 @@ export function SubmissionForm() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <FormProvider {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <FormProvider {...form}>
+        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+          <CardContent className="space-y-8">
             {currentStep === 1 && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-in fade-in-0">
                 <FormField name="title" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Project Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -225,7 +240,7 @@ export function SubmissionForm() {
                   <FormItem><FormLabel>Abstract</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField name="projectType" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Research">Research</SelectItem><SelectItem value="Development">Development</SelectItem><SelectItem value="Clinical Trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Research">Research</SelectItem><SelectItem value="Development">Development</SelectItem><SelectItem value="Clinical Trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                 )} />
                  <div className="p-4 border rounded-lg bg-muted/50 text-sm text-muted-foreground">
                     <p><span className="font-semibold text-foreground">Faculty:</span> {user?.faculty || 'Not set'}</p>
@@ -236,7 +251,7 @@ export function SubmissionForm() {
               </div>
             )}
             {currentStep === 2 && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-in fade-in-0">
                 <FormItem>
                   <FormLabel>Principal Investigator (PI)</FormLabel>
                   <Input disabled value={user?.name || 'Loading...'} />
@@ -252,14 +267,10 @@ export function SubmissionForm() {
                   control={form.control}
                   render={({ field: { value, onChange, ...fieldProps } }) => (
                     <FormItem>
-                      <FormLabel>Upload CVs (ZIP file)</FormLabel>
+                      <FormLabel>Upload CVs (single ZIP file)</FormLabel>
+                      {project?.cvUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.cvUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded CVs</a>. Uploading a new file will replace it.</p>}
                       <FormControl>
-                        <Input
-                          {...fieldProps}
-                          type="file"
-                          accept=".zip"
-                          onChange={(e) => onChange(e.target.files)}
-                        />
+                        <Input {...fieldProps} type="file" accept=".zip" onChange={(e) => onChange(e.target.files)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -268,20 +279,16 @@ export function SubmissionForm() {
               </div>
             )}
             {currentStep === 3 && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-in fade-in-0">
                 <FormField
                   name="proposalUpload"
                   control={form.control}
                   render={({ field: { value, onChange, ...fieldProps } }) => (
                     <FormItem>
                       <FormLabel>Project Proposal (PDF)</FormLabel>
+                       {project?.proposalUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.proposalUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded Proposal</a>. Uploading a new file will replace it.</p>}
                       <FormControl>
-                        <Input
-                          {...fieldProps}
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) => onChange(e.target.files)}
-                        />
+                        <Input {...fieldProps} type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -292,14 +299,10 @@ export function SubmissionForm() {
                   control={form.control}
                   render={({ field: { value, onChange, ...fieldProps } }) => (
                     <FormItem>
-                      <FormLabel>Ethics Approval (if applicable)</FormLabel>
+                      <FormLabel>Ethics Approval (PDF, if applicable)</FormLabel>
+                       {project?.ethicsUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.ethicsUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded Ethics Approval</a>. Uploading a new file will replace it.</p>}
                       <FormControl>
-                        <Input
-                          {...fieldProps}
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) => onChange(e.target.files)}
-                        />
+                        <Input {...fieldProps} type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -308,7 +311,7 @@ export function SubmissionForm() {
               </div>
             )}
             {currentStep === 4 && (
-              <div className="space-y-6">
+              <div className="space-y-6 animate-in fade-in-0">
                 <FormField name="expectedOutcomes" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Expected Outcomes & Impact</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -318,15 +321,10 @@ export function SubmissionForm() {
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                       <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                       </FormControl>
                       <div className="space-y-1 leading-none">
-                        <FormLabel>
-                          Declaration
-                        </FormLabel>
+                        <FormLabel>Declaration</FormLabel>
                         <FormMessage />
                           <p className="text-sm text-muted-foreground">
                           I declare that I have gone through all the guidelines of the{" "}
@@ -346,14 +344,19 @@ export function SubmissionForm() {
                 />
               </div>
             )}
-            <div className="flex justify-between pt-4">
-              <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1 || isSubmitting}>Previous</Button>
-              {currentStep < 4 && <Button type="button" onClick={handleNext} disabled={isSubmitting}>Next</Button>}
-              {currentStep === 4 && <Button type="submit" disabled={isSubmitting || !form.watch('guidelinesAgreement')}>{isSubmitting ? "Submitting..." : "Submit Project"}</Button>}
+          </CardContent>
+          <CardFooter className="flex justify-between border-t pt-6">
+              <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1 || isSaving}>Previous</Button>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="ghost" onClick={() => handleSave('Draft')} disabled={isSaving}>
+                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : 'Save as Draft'}
+              </Button>
+              {currentStep < 4 && <Button type="button" onClick={handleNext} disabled={isSaving}>Next</Button>}
+              {currentStep === 4 && <Button type="submit" disabled={isSaving || !form.watch('guidelinesAgreement')}>{isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Submitting...</> : "Submit Project"}</Button>}
             </div>
-          </form>
-        </FormProvider>
-      </CardContent>
+          </CardFooter>
+        </form>
+      </FormProvider>
     </Card>
   );
 }

@@ -1,5 +1,6 @@
 
 
+
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -82,7 +83,7 @@ export type Project = {
   pi_uid: string;
   pi_email?: string;
   pi_phoneNumber?: string;
-  status: 'Submitted' | 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed' | 'Pending Completion Approval';
+  status: 'Draft' | 'Submitted' | 'Under Review' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed' | 'Pending Completion Approval';
   teamInfo: string;
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string

@@ -13,7 +13,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, ArrowUpDown } from 'lucide-react';
+import { Eye, ArrowUpDown, Edit } from 'lucide-react';
 import { type Project, type User } from '@/types';
 import { ProjectSummary } from './project-summary';
 import Link from 'next/link';
@@ -30,6 +30,7 @@ interface ProjectListProps {
 }
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
+  'Draft': 'secondary',
   'Submitted': 'secondary',
   'Approved': 'default',
   'In Progress': 'default',
@@ -121,13 +122,25 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
             {sortedProjects.map((project) => {
               const meetingDate = project.meetingDetails?.date ? new Date(project.meetingDetails.date) : null;
              
-              const viewAction = (
-                <Link href={`/dashboard/project/${project.id}`}>
-                  <Button variant="outline" size="icon" aria-label="View Project Details">
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                </Link>
-              );
+              let actionButton;
+              if (project.status === 'Draft') {
+                actionButton = (
+                  <Link href={`/dashboard/edit-submission/${project.id}`}>
+                    <Button variant="outline" size="sm">
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Draft
+                    </Button>
+                  </Link>
+                );
+              } else {
+                actionButton = (
+                   <Link href={`/dashboard/project/${project.id}`}>
+                    <Button variant="outline" size="icon" aria-label="View Project Details">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                )
+              }
 
               return (
                 <TableRow key={project.id}>
@@ -145,8 +158,8 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      {viewAction}
-                      {isAdmin && <ProjectSummary project={project} />}
+                      {actionButton}
+                      {isAdmin && project.status !== 'Draft' && <ProjectSummary project={project} />}
                     </div>
                   </TableCell>
                 </TableRow>
