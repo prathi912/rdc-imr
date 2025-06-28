@@ -6,22 +6,16 @@ const initializeAdmin = () => {
         return admin.app();
     }
 
-    const serviceAccount = {
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // The private key must be correctly formatted.
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    };
-
-    // This check is important to avoid crashes if env vars are not set.
-    if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
-        const errorMessage = 'Firebase Admin SDK credentials are not fully set in environment variables. Server-side Firebase features will not work.';
+    const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    
+    if (!serviceAccountJson) {
+        const errorMessage = 'FIREBASE_SERVICE_ACCOUNT_JSON is not set in environment variables. Server-side Firebase features will not work.';
         console.error(errorMessage);
-        // Throwing an error is better than letting the app continue in a broken state.
         throw new Error(errorMessage);
     }
 
     try {
+        const serviceAccount = JSON.parse(serviceAccountJson);
         return admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
             storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
