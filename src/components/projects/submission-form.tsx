@@ -66,6 +66,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [user, setUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [progress, setProgress] = useState(0);
   const { toast } = useToast();
   const router = useRouter();
   
@@ -142,6 +143,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     }
 
     setIsSaving(true);
+    setProgress(5);
     const data = form.getValues();
 
     try {
@@ -158,16 +160,19 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       let cvUrl = project?.cvUrl;
       if (data.cvUpload && data.cvUpload.length > 0) {
         cvUrl = await uploadFile(data.cvUpload[0], 'cv');
+        setProgress(30);
       }
 
       let proposalUrl = project?.proposalUrl;
       if (data.proposalUpload && data.proposalUpload.length > 0) {
         proposalUrl = await uploadFile(data.proposalUpload[0], 'proposal');
+        setProgress(60);
       }
 
       let ethicsUrl = project?.ethicsUrl;
       if (data.ethicsUpload && data.ethicsUpload.length > 0) {
         ethicsUrl = await uploadFile(data.ethicsUpload[0], 'ethics');
+        setProgress(90);
       }
       
       const teamInfoParts = [];
@@ -196,6 +201,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       };
 
       await setDoc(doc(db, 'projects', projectId), projectData, { merge: true });
+      setProgress(100);
       
       if (status === 'Draft') {
         toast({ title: 'Draft Saved!', description: "You can continue editing from 'My Projects'." });
@@ -209,6 +215,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       toast({ variant: 'destructive', title: 'Save Failed', description: error.message || 'An error occurred.' });
     } finally {
       setIsSaving(false);
+      setProgress(0);
     }
   };
 
@@ -345,14 +352,22 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
               </div>
             )}
           </CardContent>
-          <CardFooter className="flex justify-between border-t pt-6">
+          <CardFooter className="flex-col items-stretch gap-4 border-t pt-6">
+            {isSaving && (
+              <div className="w-full flex items-center gap-4 text-sm text-muted-foreground">
+                <Progress value={progress} className="w-full" />
+                <span>{`${Math.round(progress)}%`}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
               <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1 || isSaving}>Previous</Button>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="ghost" onClick={() => handleSave('Draft')} disabled={isSaving}>
-                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : 'Save as Draft'}
-              </Button>
-              {currentStep < 4 && <Button type="button" onClick={handleNext} disabled={isSaving}>Next</Button>}
-              {currentStep === 4 && <Button type="submit" disabled={isSaving || !form.watch('guidelinesAgreement')}>{isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Submitting...</> : "Submit Project"}</Button>}
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="ghost" onClick={() => handleSave('Draft')} disabled={isSaving}>
+                  {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : 'Save as Draft'}
+                </Button>
+                {currentStep < 4 && <Button type="button" onClick={handleNext} disabled={isSaving}>Next</Button>}
+                {currentStep === 4 && <Button type="submit" disabled={isSaving || !form.watch('guidelinesAgreement')}>{isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Submitting...</> : "Submit Project"}</Button>}
+              </div>
             </div>
           </CardFooter>
         </form>
