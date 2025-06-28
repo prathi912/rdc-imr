@@ -3,9 +3,9 @@
 
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
+import { adminStorage } from '@/lib/firebase-admin';
 import { doc, collection, writeBatch } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -62,12 +62,32 @@ export async function scheduleMeeting(
 
 export async function uploadFileToServer(fileDataUrl: string, path: string): Promise<{success: boolean; url?: string; error?: string}> {
   try {
-    const storageRef = ref(storage, path);
-    const snapshot = await uploadString(storageRef, fileDataUrl, 'data_url');
-    const downloadUrl = await getDownloadURL(snapshot.ref);
+    const bucket = adminStorage.bucket();
+    const file = bucket.file(path);
+
+    // Extract mime type and base64 data from data URL
+    const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/);
+    if (!match) {
+        throw new Error('Invalid data URL.');
+    }
+    const mimeType = match[1];
+    const base64Data = match[2];
+    const buffer = Buffer.from(base64Data, 'base64');
+    
+    // Upload the file buffer
+    await file.save(buffer, {
+      metadata: {
+        contentType: mimeType,
+      },
+      public: true, // Make the file public
+    });
+
+    // Get the public URL
+    const downloadUrl = file.publicUrl();
+
     return { success: true, url: downloadUrl };
   } catch (error: any) {
-    console.error('Error uploading file:', error);
-    return { success: false, error: 'Failed to upload file.' };
+    console.error('Error uploading file via admin:', error);
+    return { success: false, error: error.message || 'Failed to upload file.' };
   }
 }
