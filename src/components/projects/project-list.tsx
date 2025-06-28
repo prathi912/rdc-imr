@@ -1,3 +1,5 @@
+
+import { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -9,7 +11,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye } from 'lucide-react';
+import { Eye, ArrowUpDown } from 'lucide-react';
 import { type Project, type User } from '@/types';
 import { ProjectSummary } from './project-summary';
 import Link from 'next/link';
@@ -39,25 +41,82 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
   const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(userRole);
   const isEvaluator = userRole === 'Evaluator';
 
+  type SortableKeys = keyof Pick<Project, 'title' | 'faculty' | 'pi' | 'status'> | 'meetingDate';
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'title', direction: 'ascending' });
+
+  const sortedProjects = useMemo(() => {
+    let sortableItems = [...projects];
+    sortableItems.sort((a, b) => {
+        let aValue, bValue;
+        const key = sortConfig.key;
+
+        if (key === 'meetingDate') {
+            aValue = a.meetingDetails?.date ? new Date(a.meetingDetails.date).getTime() : 0;
+            bValue = b.meetingDetails?.date ? new Date(b.meetingDetails.date).getTime() : 0;
+        } else {
+            aValue = a[key as keyof Project] || '';
+            bValue = b[key as keyof Project] || '';
+        }
+
+        if (aValue < bValue) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+    });
+    return sortableItems;
+  }, [projects, sortConfig]);
+
+  const requestSort = (key: SortableKeys) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+        direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+
   return (
     <Card>
-      <CardContent className="pt-6">
+      <CardContent className="pt-0">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Title</TableHead>
+              <TableHead>
+                <Button variant="ghost" onClick={() => requestSort('title')}>
+                    Title <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
                {isEvaluator ? (
-                <TableHead className="hidden md:table-cell">Meeting Date</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  <Button variant="ghost" onClick={() => requestSort('meetingDate')}>
+                      Meeting Date <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
               ) : (
-                <TableHead className="hidden md:table-cell">Faculty</TableHead>
+                <TableHead className="hidden md:table-cell">
+                  <Button variant="ghost" onClick={() => requestSort('faculty')}>
+                      Faculty <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
               )}
-              <TableHead className="hidden sm:table-cell">PI</TableHead>
-              <TableHead className="hidden md:table-cell">Status</TableHead>
+              <TableHead className="hidden sm:table-cell">
+                <Button variant="ghost" onClick={() => requestSort('pi')}>
+                    PI <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead className="hidden md:table-cell">
+                <Button variant="ghost" onClick={() => requestSort('status')}>
+                    Status <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {projects.map((project) => {
+            {sortedProjects.map((project) => {
               const meetingDate = project.meetingDetails?.date ? new Date(project.meetingDetails.date) : null;
               let isToday = false;
               if (meetingDate) {

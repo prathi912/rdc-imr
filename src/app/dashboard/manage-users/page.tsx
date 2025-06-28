@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,9 +42,12 @@ import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDefaultModulesForRole } from '@/lib/modules';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const ROLES: User['role'][] = ['faculty', 'Evaluator', 'CRO', 'admin', 'Super-admin'];
 const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
+type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role'>;
 
 function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!user) return null;
@@ -113,6 +116,9 @@ export default function ManageUsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userToView, setUserToView] = useState<User | null>(null);
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'name', direction: 'ascending' });
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -139,6 +145,46 @@ export default function ManageUsersPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+  
+  const sortedAndFilteredUsers = useMemo(() => {
+    let filtered = [...users];
+
+    if (roleFilter !== 'all') {
+      filtered = filtered.filter(user => user.role === roleFilter);
+    }
+
+    if (searchTerm) {
+      const lowerCaseSearch = searchTerm.toLowerCase();
+      filtered = filtered.filter(user =>
+        user.name.toLowerCase().includes(lowerCaseSearch) ||
+        user.email.toLowerCase().includes(lowerCaseSearch)
+      );
+    }
+
+    filtered.sort((a, b) => {
+        const key = sortConfig.key;
+        const aValue = a[key] || '';
+        const bValue = b[key] || '';
+
+        if (aValue < bValue) {
+            return sortConfig.direction === 'ascending' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+            return sortConfig.direction === 'ascending' ? 1 : -1;
+        }
+        return 0;
+    });
+
+    return filtered;
+  }, [users, searchTerm, roleFilter, sortConfig]);
+
+  const requestSort = (key: SortableKeys) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig.key === key && sortConfig.direction === 'ascending') {
+        direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
 
   const handleDeleteUser = useCallback(async (uid: string) => {
     try {
@@ -191,20 +237,53 @@ export default function ManageUsersPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Manage Users" description="View and manage user roles and permissions." />
-      <div className="mt-8">
+      
+      <div className="flex items-center py-4 gap-4">
+          <Input
+              placeholder="Filter by name or email..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              className="max-w-sm"
+          />
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by role" />
+              </SelectTrigger>
+              <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {ROLES.map(role => (
+                      <SelectItem key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</SelectItem>
+                  ))}
+              </SelectContent>
+          </Select>
+      </div>
+
+      <div className="mt-4">
         <Card>
           <CardContent className="pt-6">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden sm:table-cell">Email</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>
+                     <Button variant="ghost" onClick={() => requestSort('name')}>
+                        Name <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                     <Button variant="ghost" onClick={() => requestSort('email')}>
+                        Email <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                     <Button variant="ghost" onClick={() => requestSort('role')}>
+                        Role <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => {
+                {sortedAndFilteredUsers.map((user) => {
                    const isSuperAdminUser = user.email === SUPER_ADMIN_EMAIL;
                    const isCurrentUser = user.uid === currentUser?.uid;
 

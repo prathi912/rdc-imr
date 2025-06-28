@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/firebase';
@@ -8,10 +9,12 @@ import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import type { Project } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 export default function CompletedReviewsPage() {
   const [completedProjects, setCompletedProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     async function getCompletedProjects() {
@@ -37,11 +40,27 @@ export default function CompletedReviewsPage() {
     getCompletedProjects();
   }, []);
 
+  const filteredProjects = useMemo(() => {
+    if (!searchTerm) return completedProjects;
+    return completedProjects.filter(p => 
+      p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.pi.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [completedProjects, searchTerm]);
+
 
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Completed Reviews" description="Projects that have already been reviewed and finalized." />
-      <div className="mt-8">
+      <div className="flex items-center py-4">
+        <Input
+            placeholder="Filter by title or PI..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="max-w-sm"
+        />
+      </div>
+      <div className="mt-4">
         {loading ? (
           <Card>
             <CardContent className="pt-6">
@@ -53,7 +72,7 @@ export default function CompletedReviewsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={completedProjects} userRole="admin" />
+          <ProjectList projects={filteredProjects} userRole="admin" />
         )}
       </div>
     </div>

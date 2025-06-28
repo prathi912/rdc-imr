@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
@@ -13,6 +13,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Approved', 'Rejected', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
 export default function AllProjectsPage() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
@@ -20,6 +24,8 @@ export default function AllProjectsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -98,15 +104,32 @@ export default function AllProjectsPage() {
     pageDescription = "Browse all projects submitted from your faculty.";
   }
 
+  const filteredProjects = useMemo(() => {
+    return allProjects
+      .filter(project => {
+        if (statusFilter !== 'all' && project.status !== statusFilter) {
+          return false;
+        }
+        if (searchTerm === '') {
+          return true;
+        }
+        const lowerCaseSearch = searchTerm.toLowerCase();
+        return (
+          project.title.toLowerCase().includes(lowerCaseSearch) ||
+          project.pi.toLowerCase().includes(lowerCaseSearch)
+        );
+      });
+  }, [allProjects, searchTerm, statusFilter]);
+
   const handleExport = () => {
-    if (allProjects.length === 0) {
-      toast({ variant: 'destructive', title: "No Data", description: "There are no projects to export." });
+    if (filteredProjects.length === 0) {
+      toast({ variant: 'destructive', title: "No Data", description: "There are no projects to export in the current view." });
       return;
     }
     
     const userDetailsMap = new Map(users.map(u => [u.uid, { misId: u.misId || '', designation: u.designation || '' }]));
     
-    const dataToExport = allProjects.map(p => {
+    const dataToExport = filteredProjects.map(p => {
       const userDetails = userDetailsMap.get(p.pi_uid);
       return {
         'Project ID': p.id,
@@ -138,7 +161,7 @@ export default function AllProjectsPage() {
     }
     
     XLSX.writeFile(workbook, fileName);
-    toast({ title: "Export Started", description: `Downloading ${allProjects.length} projects.` });
+    toast({ title: "Export Started", description: `Downloading ${filteredProjects.length} projects.` });
   };
 
 
@@ -146,13 +169,34 @@ export default function AllProjectsPage() {
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
         {(isAdmin || isCro || isSpecialUser) && (
-            <Button onClick={handleExport} disabled={loading || allProjects.length === 0}>
+            <Button onClick={handleExport} disabled={loading || filteredProjects.length === 0}>
                 <Download className="mr-2 h-4 w-4" />
                 Export XLSX
             </Button>
         )}
       </PageHeader>
-      <div className="mt-8">
+      
+      <div className="flex items-center py-4 gap-4">
+        <Input
+            placeholder="Filter by title or PI..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="max-w-sm"
+        />
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {STATUSES.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+            </SelectContent>
+        </Select>
+      </div>
+
+      <div className="mt-4">
         {loading ? (
            <Card>
             <CardContent className="pt-6">
@@ -164,7 +208,7 @@ export default function AllProjectsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={allProjects} userRole={isSpecialUser ? 'CRO' : user!.role} />
+          <ProjectList projects={filteredProjects} userRole={isSpecialUser ? 'CRO' : user!.role} />
         )}
       </div>
     </div>

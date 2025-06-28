@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/firebase';
@@ -8,10 +9,12 @@ import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import type { Project } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 export default function PendingReviewsPage() {
   const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     async function getPendingProjects() {
@@ -37,10 +40,26 @@ export default function PendingReviewsPage() {
     getPendingProjects();
   }, []);
 
+  const filteredProjects = useMemo(() => {
+    if (!searchTerm) return pendingProjects;
+    return pendingProjects.filter(p => 
+      p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.pi.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [pendingProjects, searchTerm]);
+
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Pending Reviews" description="Projects awaiting initial review or completion approval." />
-      <div className="mt-8">
+      <div className="flex items-center py-4">
+        <Input
+            placeholder="Filter by title or PI..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="max-w-sm"
+        />
+      </div>
+      <div className="mt-4">
          {loading ? (
           <Card>
             <CardContent className="pt-6">
@@ -52,7 +71,7 @@ export default function PendingReviewsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={pendingProjects} userRole="admin" />
+          <ProjectList projects={filteredProjects} userRole="admin" />
         )}
       </div>
     </div>

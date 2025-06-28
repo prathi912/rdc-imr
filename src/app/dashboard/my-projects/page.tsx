@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { type Project, type User } from '@/types';
@@ -9,12 +10,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
 
 export default function MyProjectsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [myProjects, setMyProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -47,6 +50,13 @@ export default function MyProjectsPage() {
     }
   }, [toast]);
 
+  const filteredProjects = useMemo(() => {
+    if (!searchTerm) return myProjects;
+    return myProjects.filter(p => 
+      p.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [myProjects, searchTerm]);
+
   if (loading) {
     return (
        <div className="container mx-auto py-10">
@@ -69,15 +79,23 @@ export default function MyProjectsPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="My Projects" description="A list of all projects you have submitted." />
-      <div className="mt-8">
-        {myProjects.length === 0 ? (
+      <div className="flex items-center py-4">
+        <Input
+            placeholder="Filter by title..."
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            className="max-w-sm"
+        />
+      </div>
+      <div className="mt-4">
+        {filteredProjects.length === 0 && !loading ? (
           <Card>
             <CardContent className="pt-6 text-center text-muted-foreground">
               You have not submitted any projects yet.
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={myProjects} userRole="faculty" />
+          <ProjectList projects={filteredProjects} userRole="faculty" />
         )}
       </div>
     </div>
