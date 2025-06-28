@@ -57,8 +57,8 @@
   }
 
   .dark body {
-    background-image: radial-gradient(at 15% 95%, hsla(170, 80%, 45%, 0.2) 0px, transparent 50%),
-      radial-gradient(at 85% 95%, hsla(220, 90%, 55%, 0.2) 0px, transparent 50%);
+    background-image: radial-gradient(at 5% 95%, hsla(170, 70%, 40%, 0.2) 0px, transparent 50%),
+      radial-gradient(at 95% 95%, hsla(260, 80%, 50%, 0.2) 0px, transparent 50%);
     background-attachment: fixed;
   }
 }
