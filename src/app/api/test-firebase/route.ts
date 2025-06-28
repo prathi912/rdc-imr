@@ -12,38 +12,50 @@ export async function GET(request: NextRequest) {
 
     // Debug environment variables (without exposing sensitive data)
     results.debug.environment = {
-      hasServiceAccount: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
-      hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      hasStorageBucket: !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      // Public vars
+      hasPublicProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      hasPublicStorageBucket: !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      publicProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      publicStorageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     };
 
     results.debug.initializationStatusBeforeTest = isAdminInitialized() ? "Already Initialized" : "Not Initialized";
     
-    // Test service account parsing first, as it's the root of all other issues
+    // Test service account variables
     try {
-      const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-      if (serviceAccountJson) {
-        const serviceAccount = JSON.parse(serviceAccountJson);
+      const projectId = process.env.FIREBASE_PROJECT_ID;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+      if (projectId && clientEmail && privateKey) {
         results.tests.serviceAccount = {
           status: "success",
-          message: "Service account JSON is valid.",
-          projectId: serviceAccount.project_id,
-          clientEmail: serviceAccount.client_email,
-          hasPrivateKey: !!serviceAccount.private_key,
+          message: "All required service account environment variables are present.",
+          projectId: projectId,
+          clientEmail: clientEmail,
+          hasPrivateKey: true,
         };
       } else {
+        const missingVars = [
+            !projectId && 'FIREBASE_PROJECT_ID',
+            !clientEmail && 'FIREBASE_CLIENT_EMAIL',
+            !privateKey && 'FIREBASE_PRIVATE_KEY'
+        ].filter(Boolean).join(', ');
+        
         results.tests.serviceAccount = {
           status: "error",
-          message: "FIREBASE_SERVICE_ACCOUNT_JSON not found in environment variables.",
+          message: `Missing service account environment variables: ${missingVars}.`,
+          hasPrivateKey: !!privateKey,
         };
       }
     } catch (error: any) {
-      results.tests.serviceAccount = {
-        status: "error",
-        message: `Service account JSON parsing error: ${error.message}`,
-      };
+        results.tests.serviceAccount = {
+            status: "error",
+            message: `Service account environment variable check error: ${error.message}`,
+        };
     }
     
     // Test Firestore connection
@@ -74,7 +86,7 @@ export async function GET(request: NextRequest) {
     // Test Firebase Auth
     try {
       const auth = adminAuth();
-      const listUsersResult = await auth.listUsers(1); // Test an actual API call
+      await auth.listUsers(1); // Test an actual API call
       results.tests.auth = {
         status: "success",
         message: "Firebase Auth connection successful.",

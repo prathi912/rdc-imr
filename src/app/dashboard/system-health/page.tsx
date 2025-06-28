@@ -25,13 +25,16 @@ interface HealthCheckResult {
   }
   debug: {
     environment: {
-      hasServiceAccount: boolean
-      hasProjectId: boolean
-      hasStorageBucket: boolean
-      projectId: string
-      storageBucket: string
+      hasProjectId: boolean;
+      hasClientEmail: boolean;
+      hasPrivateKey: boolean;
+      hasPublicProjectId: boolean;
+      hasPublicStorageBucket: boolean;
+      publicProjectId?: string;
+      publicStorageBucket?: string;
     }
-    initialization: string
+    initializationStatusBeforeTest: string
+    initializationStatusAfterTest: string
   }
 }
 
@@ -43,6 +46,7 @@ export default function SystemHealthPage() {
   const runHealthCheck = async () => {
     setLoading(true)
     setError(null)
+    setHealthData(null);
 
     try {
       const response = await fetch("/api/test-firebase")
@@ -65,7 +69,7 @@ export default function SystemHealthPage() {
     runHealthCheck()
   }, [])
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status?: string) => {
     switch (status) {
       case "success":
         return <CheckCircle className="h-5 w-5 text-green-500" />
@@ -78,7 +82,8 @@ export default function SystemHealthPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status?: string) => {
+    if (!status) return null;
     const variants = {
       success: "default",
       error: "destructive",
@@ -109,6 +114,15 @@ export default function SystemHealthPage() {
         </Button>
       </div>
 
+      {loading && !healthData && (
+        <Card>
+            <CardContent className="p-6 flex justify-center items-center">
+                <Loader2 className="h-6 w-6 animate-spin mr-4" />
+                <p>Running health checks...</p>
+            </CardContent>
+        </Card>
+      )}
+
       {error && (
         <Card className="border-red-200 bg-red-50">
           <CardHeader>
@@ -134,45 +148,32 @@ export default function SystemHealthPage() {
             <CardContent>
               <div className="space-y-3">
                 <div>
-                  <h4 className="font-medium mb-2">Environment Variables</h4>
+                  <h4 className="font-medium mb-2">Server Environment Variables</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex justify-between">
-                      <span>Service Account:</span>
-                      <span
-                        className={healthData.debug.environment.hasServiceAccount ? "text-green-600" : "text-red-600"}
-                      >
-                        {healthData.debug.environment.hasServiceAccount ? "✓" : "✗"}
+                      <span>FIREBASE_PROJECT_ID:</span>
+                      <span className={healthData.debug.environment.hasProjectId ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                        {healthData.debug.environment.hasProjectId ? "Set" : "Missing"}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Project ID:</span>
-                      <span className={healthData.debug.environment.hasProjectId ? "text-green-600" : "text-red-600"}>
-                        {healthData.debug.environment.hasProjectId ? "✓" : "✗"}
+                      <span>FIREBASE_CLIENT_EMAIL:</span>
+                      <span className={healthData.debug.environment.hasClientEmail ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                        {healthData.debug.environment.hasClientEmail ? "Set" : "Missing"}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Storage Bucket:</span>
-                      <span
-                        className={healthData.debug.environment.hasStorageBucket ? "text-green-600" : "text-red-600"}
-                      >
-                        {healthData.debug.environment.hasStorageBucket ? "✓" : "✗"}
+                      <span>FIREBASE_PRIVATE_KEY:</span>
+                      <span className={healthData.debug.environment.hasPrivateKey ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                        {healthData.debug.environment.hasPrivateKey ? "Set" : "Missing"}
                       </span>
                     </div>
                   </div>
-                  {healthData.debug.environment.projectId && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Project: {healthData.debug.environment.projectId}
-                    </p>
-                  )}
-                  {healthData.debug.environment.storageBucket && (
-                    <p className="text-sm text-muted-foreground">
-                      Bucket: {healthData.debug.environment.storageBucket}
-                    </p>
-                  )}
                 </div>
-                <div>
-                  <h4 className="font-medium mb-2">Initialization</h4>
-                  <p className="text-sm text-muted-foreground">{healthData.debug.initialization}</p>
+                 <div>
+                  <h4 className="font-medium mb-2">Firebase Admin SDK Initialization</h4>
+                  <p className="text-sm text-muted-foreground">Before Test: {healthData.debug.initializationStatusBeforeTest}</p>
+                  <p className="text-sm text-muted-foreground">After Test: {healthData.debug.initializationStatusAfterTest}</p>
                 </div>
               </div>
             </CardContent>
@@ -204,12 +205,6 @@ export default function SystemHealthPage() {
                     <div className="flex justify-between">
                       <span>Client Email:</span>
                       <span className="text-sm font-mono break-all">{healthData.tests.serviceAccount.clientEmail}</span>
-                    </div>
-                  )}
-                  {healthData.tests.serviceAccount.hasPrivateKey !== undefined && (
-                    <div className="flex justify-between">
-                      <span>Has Private Key:</span>
-                      <span>{healthData.tests.serviceAccount.hasPrivateKey ? "Yes" : "No"}</span>
                     </div>
                   )}
                   <p className="text-sm text-muted-foreground mt-2">{healthData.tests.serviceAccount.message}</p>
@@ -260,12 +255,6 @@ export default function SystemHealthPage() {
                     <span>Status:</span>
                     {getStatusBadge(healthData.tests.auth.status)}
                   </div>
-                  {healthData.tests.auth.userCount !== undefined && (
-                    <div className="flex justify-between">
-                      <span>Users Found:</span>
-                      <span>{healthData.tests.auth.userCount}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between">
                     <span>Can List Users:</span>
                     <span>{healthData.tests.auth.canListUsers ? "Yes" : "No"}</span>
@@ -300,16 +289,6 @@ export default function SystemHealthPage() {
                     <div className="flex justify-between">
                       <span>Bucket:</span>
                       <span className="text-sm font-mono">{healthData.tests.storage.bucketName}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span>Can List Files:</span>
-                    <span>{healthData.tests.storage.canListFiles ? "Yes" : "No"}</span>
-                  </div>
-                  {healthData.tests.storage.fileCount !== undefined && (
-                    <div className="flex justify-between">
-                      <span>Files Found:</span>
-                      <span>{healthData.tests.storage.fileCount}</span>
                     </div>
                   )}
                   <p className="text-sm text-muted-foreground mt-2">{healthData.tests.storage.message}</p>

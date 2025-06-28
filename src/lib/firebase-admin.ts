@@ -3,25 +3,25 @@ import * as admin from 'firebase-admin';
 
 // This function ensures Firebase Admin is initialized only once.
 const initializeAdmin = () => {
+  // Check if an app is already initialized.
   if (admin.apps.length > 0) {
     return admin.app();
   }
 
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-  if (!serviceAccountJson) {
-    throw new Error('Firebase service account credentials are not set in environment variables.');
+  // Construct the service account object from individual environment variables.
+  const serviceAccount = {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    // The private key from the environment variable needs its escaped newlines replaced with actual newlines.
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  };
+
+  // Validate that all required service account properties are present.
+  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
+    throw new Error('Firebase server-side credentials (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) are not set in environment variables.');
   }
 
   try {
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    
-    // This is the crucial part to fix the "Invalid PEM" error.
-    // The private key from the environment variable has escaped newlines (\\n).
-    // We need to replace them with actual newline characters for the SDK.
-    if (serviceAccount.private_key) {
-      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-
     const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
@@ -31,26 +31,29 @@ const initializeAdmin = () => {
     return app;
   } catch (error: any) {
     console.error("Firebase admin initialization error:", error);
+    // Throw a more specific error to help with debugging.
     throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
   }
 };
 
-// Initialize the app once
+// A global variable to hold the initialized app.
 let adminApp: admin.app.App | null = null;
 
+// A getter function to ensure initialization happens only once.
 const getAdminApp = () => {
   if (!adminApp) {
     try {
       adminApp = initializeAdmin();
     } catch (error) {
       console.error("Failed to get admin app:", error);
+      // Re-throw the error to ensure consuming code knows about the failure.
       throw error;
     }
   }
   return adminApp;
 };
 
-// Lazily initialized services with error handling
+// Lazily initialized services that use the getter.
 export const adminDb = () => {
   try {
     return getAdminApp().firestore();
@@ -78,23 +81,12 @@ export const adminAuth = () => {
   }
 };
 
-// Helper function to check if admin is initialized
+// Helper function to check initialization status for debugging.
 export const isAdminInitialized = () => {
   try {
     return admin.apps.length > 0 && adminApp !== null;
   } catch (error) {
     console.error("Error checking admin initialization:", error);
     return false;
-  }
-};
-
-// Force initialization function for testing
-export const forceInitializeAdmin = () => {
-  try {
-    adminApp = null;
-    return getAdminApp();
-  } catch (error) {
-    console.error("Force initialization failed:", error);
-    throw error;
   }
 };
