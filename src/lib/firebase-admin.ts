@@ -1,92 +1,63 @@
 
 import * as admin from 'firebase-admin';
 
-// This function ensures Firebase Admin is initialized only once.
-const initializeAdmin = () => {
-  // Check if an app is already initialized.
+// A global variable to hold the initialized app instance.
+// This prevents re-initializing the app on every hot-reload in development.
+let adminApp: admin.app.App | null = null;
+
+function initializeAdmin() {
   if (admin.apps.length > 0) {
-    return admin.app();
+    adminApp = admin.app();
+    return adminApp;
   }
 
-  // Construct the service account object from individual environment variables.
-  const serviceAccount = {
-    projectId: process.env.FIREBASE_PROJECT_ID,
-    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    // The private key from the environment variable needs its escaped newlines replaced with actual newlines.
-    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-  };
+  // Pull credentials from environment variables
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  // Validate that all required service account properties are present.
-  if (!serviceAccount.projectId || !serviceAccount.clientEmail || !serviceAccount.privateKey) {
-    throw new Error('Firebase server-side credentials (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) are not set in environment variables.');
+  // Validate that all required environment variables are present.
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new Error(
+      'Firebase server-side credentials are not fully set in environment variables. ' +
+      'Please ensure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set.'
+    );
   }
+
+  // The private key from the environment variable needs its escaped newlines replaced with actual newlines.
+  const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
 
   try {
     const app = admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+      credential: admin.credential.cert({
+        projectId,
+        clientEmail,
+        privateKey: formattedPrivateKey,
+      }),
       storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     });
 
     console.log("Firebase Admin SDK initialized successfully");
+    adminApp = app;
     return app;
   } catch (error: any) {
     console.error("Firebase admin initialization error:", error);
     // Throw a more specific error to help with debugging.
     throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
   }
-};
-
-// A global variable to hold the initialized app.
-let adminApp: admin.app.App | null = null;
+}
 
 // A getter function to ensure initialization happens only once.
 const getAdminApp = () => {
   if (!adminApp) {
-    try {
-      adminApp = initializeAdmin();
-    } catch (error) {
-      console.error("Failed to get admin app:", error);
-      // Re-throw the error to ensure consuming code knows about the failure.
-      throw error;
-    }
+    return initializeAdmin();
   }
   return adminApp;
 };
 
+
 // Lazily initialized services that use the getter.
-export const adminDb = () => {
-  try {
-    return getAdminApp().firestore();
-  } catch (error) {
-    console.error("Error getting Firestore admin instance:", error);
-    throw error;
-  }
-};
-
-export const adminStorage = () => {
-  try {
-    return getAdminApp().storage();
-  } catch (error) {
-    console.error("Error getting Storage admin instance:", error);
-    throw error;
-  }
-};
-
-export const adminAuth = () => {
-  try {
-    return getAdminApp().auth();
-  } catch (error) {
-    console.error("Error getting Auth admin instance:", error);
-    throw error;
-  }
-};
-
-// Helper function to check initialization status for debugging.
-export const isAdminInitialized = () => {
-  try {
-    return admin.apps.length > 0 && adminApp !== null;
-  } catch (error) {
-    console.error("Error checking admin initialization:", error);
-    return false;
-  }
-};
+export const adminDb = () => getAdminApp().firestore();
+export const adminStorage = () => getAdminApp().storage();
+export const adminAuth = () => getAdminApp().auth();
+export const isAdminInitialized = () => admin.apps.length > 0 && adminApp !== null;
