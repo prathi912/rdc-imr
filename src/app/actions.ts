@@ -3,8 +3,9 @@
 
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { doc, collection, writeBatch } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -56,5 +57,17 @@ export async function scheduleMeeting(
   } catch (error: any) {
     console.error('Error scheduling meeting:', error);
     return { success: false, error: error.message || 'Failed to schedule meeting.' };
+  }
+}
+
+export async function uploadFileToServer(fileDataUrl: string, path: string): Promise<{success: boolean; url?: string; error?: string}> {
+  try {
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadString(storageRef, fileDataUrl, 'data_url');
+    const downloadUrl = await getDownloadURL(snapshot.ref);
+    return { success: true, url: downloadUrl };
+  } catch (error: any) {
+    console.error('Error uploading file:', error);
+    return { success: false, error: 'Failed to upload file.' };
   }
 }

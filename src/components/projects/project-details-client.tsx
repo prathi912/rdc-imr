@@ -9,9 +9,9 @@ import { format, startOfToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 import type { Project, User, GrantDetails, Evaluation, BankDetails } from '@/types';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFileToServer } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -57,6 +57,15 @@ const scheduleSchema = z.object({
 type ScheduleFormData = z.infer<typeof scheduleSchema>;
 
 const venues = ["RDC Committee Room, PIMSR", "Micro-Nano R&D Center Colab Space, D-Block"];
+
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
 
 export function ProjectDetailsClient({ project: initialProject }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject);
@@ -299,14 +308,19 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
     setIsSubmittingCompletion(true);
     try {
         const projectRef = doc(db, 'projects', project.id);
+
+        const uploadFile = async (file: File, folder: string): Promise<string> => {
+            const dataUrl = await fileToDataUrl(file);
+            const path = `reports/${project.id}/${folder}/${file.name}`;
+            const result = await uploadFileToServer(dataUrl, path);
+            if (!result.success || !result.url) {
+                throw new Error(result.error || `Failed to upload ${file.name}`);
+            }
+            return result.url;
+        };
         
-        const reportStorageRef = ref(storage, `reports/${project.id}/${completionReportFile.name}`);
-        await uploadBytes(reportStorageRef, completionReportFile);
-        const reportUrl = await getDownloadURL(reportStorageRef);
-        
-        const certificateStorageRef = ref(storage, `reports/${project.id}/${utilizationCertificateFile.name}`);
-        await uploadBytes(certificateStorageRef, utilizationCertificateFile);
-        const certificateUrl = await getDownloadURL(certificateStorageRef);
+        const reportUrl = await uploadFile(completionReportFile, 'completion-report');
+        const certificateUrl = await uploadFile(utilizationCertificateFile, 'utilization-certificate');
 
         const updateData = {
           status: 'Pending Completion Approval',
@@ -339,9 +353,14 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
     try {
         const projectRef = doc(db, 'projects', project.id);
 
-        const storageRef = ref(storage, `revisions/${project.id}/${revisedProposalFile.name}`);
-        await uploadBytes(storageRef, revisedProposalFile);
-        const revisedProposalUrl = await getDownloadURL(storageRef);
+        const dataUrl = await fileToDataUrl(revisedProposalFile);
+        const path = `revisions/${project.id}/${revisedProposalFile.name}`;
+        const result = await uploadFileToServer(dataUrl, path);
+        
+        if (!result.success || !result.url) {
+            throw new Error(result.error || "Revision upload failed");
+        }
+        const revisedProposalUrl = result.url;
 
         const updateData = {
           revisedProposalUrl: revisedProposalUrl,

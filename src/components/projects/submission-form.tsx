@@ -17,9 +17,9 @@ import { GanttChartSquare, Microscope, Users, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { collection, doc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFileToServer } from '@/app/actions';
 
 const formSchema = z.object({
   // Step 1
@@ -48,6 +48,15 @@ const steps = [
   { id: 3, title: 'File Uploads', icon: FileText },
   { id: 4, title: 'Timeline & Outcomes', icon: GanttChartSquare },
 ];
+
+const fileToDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+};
 
 export function SubmissionForm() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -114,9 +123,14 @@ export function SubmissionForm() {
       const projectId = projectDocRef.id;
 
       const uploadFile = async (file: File, folder: string): Promise<string> => {
-        const storageRef = ref(storage, `projects/${projectId}/${folder}/${file.name}`);
-        await uploadBytes(storageRef, file);
-        return await getDownloadURL(storageRef);
+        const dataUrl = await fileToDataUrl(file);
+        const path = `projects/${projectId}/${folder}/${file.name}`;
+        const result = await uploadFileToServer(dataUrl, path);
+        if (result.success && result.url) {
+          return result.url;
+        } else {
+          throw new Error(result.error || `Failed to upload ${file.name}`);
+        }
       };
 
       let cvUrl: string | undefined;

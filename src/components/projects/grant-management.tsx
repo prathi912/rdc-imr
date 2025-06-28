@@ -10,9 +10,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { db, storage } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { uploadFileToServer } from '@/app/actions';
 import { useState, useEffect } from 'react';
 import { DollarSign, Banknote, FileText, CheckCircle, PlusCircle, AlertCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -56,6 +56,15 @@ const transactionSchema = z.object({
     message: "GST number is required for registered vendors.",
     path: ["gstNumber"],
 });
+
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
 
 
 export function GrantManagement({ project, user, onUpdate }: GrantManagementProps) {
@@ -126,9 +135,13 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
         let invoiceUrl: string | undefined;
         const invoiceFile = values.invoice?.[0];
         if (invoiceFile) {
-            const storageRef = ref(storage, `invoices/${project.id}/${new Date().toISOString()}-${invoiceFile.name}`);
-            await uploadBytes(storageRef, invoiceFile);
-            invoiceUrl = await getDownloadURL(storageRef);
+            const dataUrl = await fileToDataUrl(invoiceFile);
+            const path = `invoices/${project.id}/${new Date().toISOString()}-${invoiceFile.name}`;
+            const result = await uploadFileToServer(dataUrl, path);
+            if (!result.success || !result.url) {
+              throw new Error(result.error || "Invoice upload failed");
+            }
+            invoiceUrl = result.url;
         }
 
         const newTransaction: Transaction = {

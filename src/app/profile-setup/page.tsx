@@ -12,8 +12,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
-import { auth, db, storage } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { uploadFileToServer } from '@/app/actions';
 import type { User, UserBankDetails } from '@/types';
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
@@ -63,6 +64,15 @@ const institutes = [
 ];
 
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"];
+
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
 
 export default function ProfileSetupPage() {
   const router = useRouter();
@@ -147,9 +157,13 @@ export default function ProfileSetupPage() {
       let photoURL = user.photoURL || '';
 
       if (profilePicFile) {
-        const storageRef = ref(storage, `profile-pictures/${user.uid}`);
-        await uploadBytes(storageRef, profilePicFile);
-        photoURL = await getDownloadURL(storageRef);
+        const dataUrl = await fileToDataUrl(profilePicFile);
+        const path = `profile-pictures/${user.uid}`;
+        const result = await uploadFileToServer(dataUrl, path);
+        if (!result.success || !result.url) {
+            throw new Error(result.error || "File upload failed");
+        }
+        photoURL = result.url;
       }
       
       const bankDetails: UserBankDetails = {
