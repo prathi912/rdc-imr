@@ -215,13 +215,15 @@ export default function ManageIncentiveClaimsPage() {
       return;
     }
 
-    const userDetailsMap = new Map(users.map(u => [u.uid, { misId: u.misId || '' }]));
+    const userDetailsMap = new Map(users.map(u => [u.uid, { misId: u.misId || '', designation: u.designation || '' }]));
     
     const dataToExport = sortedAndFilteredClaims.map(claim => {
       const { bankDetails, id, uid, ...rest } = claim;
+      const userDetails = userDetailsMap.get(uid);
       return {
         ...rest,
-        misId: userDetailsMap.get(uid)?.misId || '',
+        misId: userDetails?.misId || '',
+        designation: userDetails?.designation || '',
         beneficiaryName: bankDetails?.beneficiaryName || '',
         accountNumber: bankDetails?.accountNumber || '',
         bankName: bankDetails?.bankName || '',

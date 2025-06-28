@@ -18,6 +18,7 @@ export default function AllProjectsPage() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -32,9 +33,14 @@ export default function AllProjectsPage() {
   useEffect(() => {
     if (!user) return;
 
-    async function getProjects() {
+    async function getProjectsAndUsers() {
       setLoading(true);
       try {
+        const usersCol = collection(db, 'users');
+        const userSnapshot = await getDocs(usersCol);
+        const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+        setUsers(userList);
+
         const projectsCol = collection(db, 'projects');
         let q;
 
@@ -69,12 +75,12 @@ export default function AllProjectsPage() {
         } as Project));
         setAllProjects(projectList);
       } catch (error) {
-        console.error("Error fetching projects: ", error);
+        console.error("Error fetching data: ", error);
       } finally {
         setLoading(false);
       }
     }
-    getProjects();
+    getProjectsAndUsers();
   }, [user]);
   
   const isAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
@@ -98,20 +104,27 @@ export default function AllProjectsPage() {
       return;
     }
     
-    const dataToExport = allProjects.map(p => ({
-      'Project ID': p.id,
-      'Project Title': p.title,
-      'Project Type': p.type,
-      'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
-      'Abstract': p.abstract,
-      'Principal Investigator': p.pi,
-      'PI Email': p.pi_email || 'N/A',
-      'PI Phone': p.pi_phoneNumber || 'N/A',
-      'Faculty': p.faculty,
-      'Institute': p.institute,
-      'Department': p.departmentName,
-      'Status': p.status,
-    }));
+    const userDetailsMap = new Map(users.map(u => [u.uid, { misId: u.misId || '', designation: u.designation || '' }]));
+    
+    const dataToExport = allProjects.map(p => {
+      const userDetails = userDetailsMap.get(p.pi_uid);
+      return {
+        'Project ID': p.id,
+        'Project Title': p.title,
+        'Project Type': p.type,
+        'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
+        'Abstract': p.abstract,
+        'Principal Investigator': p.pi,
+        'PI Email': p.pi_email || 'N/A',
+        'PI Phone': p.pi_phoneNumber || 'N/A',
+        'MIS ID': userDetails?.misId || 'N/A',
+        'Designation': userDetails?.designation || 'N/A',
+        'Faculty': p.faculty,
+        'Institute': p.institute,
+        'Department': p.departmentName,
+        'Status': p.status,
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
