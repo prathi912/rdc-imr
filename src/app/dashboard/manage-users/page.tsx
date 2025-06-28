@@ -73,6 +73,7 @@ function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null,
                       {renderDetail("Email", user.email)}
                       {renderDetail("Phone", user.phoneNumber)}
                       {renderDetail("Role", user.role)}
+                      {renderDetail("Designation", user.designation)}
                     </div>
 
                     <div className="border-t pt-4">

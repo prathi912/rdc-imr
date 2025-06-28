@@ -26,6 +26,7 @@ const profileSetupSchema = z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
   department: z.string().min(2, 'Department name is required.'),
+  designation: z.string().min(1, 'Please select a designation.'),
   misId: z.string().min(1, 'MIS ID is required.'),
   phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
   // Bank Details
@@ -63,6 +64,8 @@ const institutes = [
 
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"];
 
+const designations = ["Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Head of Department", "Dean", "Research Associate"];
+
 export default function ProfileSetupPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -78,6 +81,7 @@ export default function ProfileSetupPage() {
       faculty: '',
       institute: '',
       department: '',
+      designation: '',
       misId: '',
       phoneNumber: '',
       beneficiaryName: '',
@@ -106,6 +110,7 @@ export default function ProfileSetupPage() {
             faculty: appUser.faculty || '',
             institute: appUser.institute || '',
             department: appUser.department || '',
+            designation: appUser.designation || '',
             misId: appUser.misId || '',
             phoneNumber: appUser.phoneNumber || '',
             beneficiaryName: appUser.bankDetails?.beneficiaryName || '',
@@ -162,6 +167,7 @@ export default function ProfileSetupPage() {
         faculty: data.faculty,
         institute: data.institute,
         department: data.department,
+        designation: data.designation,
         misId: data.misId,
         phoneNumber: data.phoneNumber,
         photoURL: photoURL,
@@ -238,6 +244,9 @@ export default function ProfileSetupPage() {
                 )} />
                 <FormField control={form.control} name="department" render={({ field }) => (
                   <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField name="designation" control={form.control} render={({ field }) => (
+                  <FormItem><FormLabel>Designation</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your designation" /></SelectTrigger></FormControl><SelectContent>{designations.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="misId" render={({ field }) => (
                   <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>

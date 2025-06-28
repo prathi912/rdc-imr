@@ -14,6 +14,7 @@ export type User = {
   name: string;
   email: string;
   role: 'admin' | 'faculty' | 'Evaluator' | 'CRO' | 'Super-admin';
+  designation?: string;
   faculty?: string;
   institute?: string;
   department?: string;
