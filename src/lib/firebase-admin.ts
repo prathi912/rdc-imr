@@ -22,7 +22,7 @@ const initializeAdmin = () => {
     // The private key from the env var has escaped newlines.
     // We need to replace them with actual newline characters for the SDK.
     if (serviceAccount.private_key) {
-      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n")
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
 
     // Validate required fields
@@ -44,7 +44,7 @@ const initializeAdmin = () => {
 
     const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      storageBucket: 'rdc-pu.appspot.com',
     })
 
     console.log("Firebase Admin SDK initialized successfully")
