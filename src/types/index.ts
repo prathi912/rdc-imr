@@ -48,6 +48,7 @@ export type Transaction = {
 
 export type GrantDetails = {
     amount: number;
+    sanctionNumber?: string;
     status: 'Pending Bank Details' | 'Bank Details Submitted' | 'Disbursed' | 'Utilization Submitted' | 'Completed';
     disbursementDate?: string; // ISO String
     bankDetails?: BankDetails;

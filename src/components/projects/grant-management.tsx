@@ -258,6 +258,12 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     <h4 className="font-semibold">Bank Account Details</h4>
                 </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    {grant.sanctionNumber && (
+                        <>
+                          <dt className="font-medium text-muted-foreground">Sanction Number</dt>
+                          <dd className="font-semibold">{grant.sanctionNumber}</dd>
+                        </>
+                    )}
                     <dt className="font-medium text-muted-foreground">Account Holder</dt>
                     <dd>{grant.bankDetails.accountHolderName}</dd>
                     <dt className="font-medium text-muted-foreground">Account Number</dt>

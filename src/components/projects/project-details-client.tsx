@@ -66,6 +66,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const { toast } = useToast();
   const router = useRouter();
   const [grantAmount, setGrantAmount] = useState<number | ''>('');
+  const [sanctionNumber, setSanctionNumber] = useState('');
   const [isAwarding, setIsAwarding] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
@@ -213,6 +214,10 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid grant amount.' });
       return;
     }
+    if (!sanctionNumber || sanctionNumber.trim() === '') {
+        toast({ variant: 'destructive', title: 'Sanction Number Required', description: 'Please enter the sanction number.' });
+        return;
+    }
     setIsAwarding(true);
     try {
       const projectRef = doc(db, 'projects', project.id);
@@ -239,6 +244,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
           
           newGrant = {
             amount: grantAmount,
+            sanctionNumber: sanctionNumber.trim(),
             status: 'Bank Details Submitted',
             bankDetails: grantBankDetails
           };
@@ -246,6 +252,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
           // Bank details don't exist
           newGrant = {
             amount: grantAmount,
+            sanctionNumber: sanctionNumber.trim(),
             status: 'Pending Bank Details',
           };
         }
@@ -253,6 +260,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
         // PI user document not found, proceed without bank details
         newGrant = {
           amount: grantAmount,
+          sanctionNumber: sanctionNumber.trim(),
           status: 'Pending Bank Details',
         };
         toast({ variant: 'destructive', title: 'Warning', description: "Could not find PI's user profile to fetch bank details." });
@@ -273,6 +281,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
       toast({ title: 'Grant Awarded!', description: `A grant of ₹${grantAmount.toLocaleString('en-IN')} has been awarded.` });
       setIsDialogOpen(false);
       setGrantAmount('');
+      setSanctionNumber('');
     } catch (error) {
       console.error('Error awarding grant:', error);
       toast({ variant: 'destructive', title: 'Error', description: 'Failed to award grant.' });
@@ -436,7 +445,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                       <DialogContent>
                         <DialogHeader>
                           <DialogTitle>Award Grant</DialogTitle>
-                          <DialogDescription>Enter the grant amount for "{project.title}".</DialogDescription>
+                          <DialogDescription>Enter the grant amount and sanction number for "{project.title}".</DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
                           <div className="grid grid-cols-4 items-center gap-4">
@@ -448,6 +457,16 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                               onChange={(e) => setGrantAmount(Number(e.target.value))}
                               className="col-span-3"
                               placeholder="e.g., 400000"
+                            />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="sanction-number" className="text-right">Sanction No.</Label>
+                            <Input
+                              id="sanction-number"
+                              value={sanctionNumber}
+                              onChange={(e) => setSanctionNumber(e.target.value)}
+                              className="col-span-3"
+                              placeholder="e.g., RDC/IMSL/122"
                             />
                           </div>
                         </div>
