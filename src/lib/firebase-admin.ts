@@ -1,4 +1,7 @@
 import * as admin from 'firebase-admin';
+import { config } from 'dotenv';
+
+config(); // Explicitly load .env variables
 
 // This function ensures Firebase Admin is initialized only once.
 const initializeAdmin = () => {
