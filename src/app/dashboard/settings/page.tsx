@@ -28,7 +28,7 @@ const profileSchema = z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
   department: z.string().min(2, 'Department name is required.'),
-  designation: z.string().min(1, 'Please select a designation.'),
+  designation: z.string().min(2, 'Designation is required.'),
   misId: z.string().min(1, 'MIS ID is required.'),
   phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
 });
@@ -77,8 +77,6 @@ const institutes = [
 ];
 
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"];
-
-const designations = ["Professor", "Associate Professor", "Assistant Professor", "Lecturer", "Head of Department", "Dean", "Research Associate"];
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -364,8 +362,8 @@ export default function SettingsPage() {
                 <FormField control={profileForm.control} name="department" render={({ field }) => (
                   <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField name="designation" control={profileForm.control} render={({ field }) => (
-                  <FormItem><FormLabel>Designation</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your designation" /></SelectTrigger></FormControl><SelectContent>{designations.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormField control={profileForm.control} name="designation" render={({ field }) => (
+                  <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={profileForm.control} name="misId" render={({ field }) => (
