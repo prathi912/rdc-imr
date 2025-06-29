@@ -12,40 +12,25 @@ export async function GET(request: NextRequest) {
 
     // Debug environment variables
     results.debug.environment = {
-      hasServiceAccountJson: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       hasPublicProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       hasPublicStorageBucket: !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      publicProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      publicStorageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     };
 
     results.debug.initializationStatusBeforeTest = isAdminInitialized() ? "Already Initialized" : "Not Initialized";
     
-    // Test service account variables
-    try {
-      const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-      if (!serviceAccountJson) {
-        throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not set.");
-      }
-      const serviceAccount = JSON.parse(serviceAccountJson);
-
-      if (serviceAccount.project_id && serviceAccount.client_email && serviceAccount.private_key) {
+    // Test Service Account Variables
+    if (results.debug.environment.hasClientEmail && results.debug.environment.hasPrivateKey) {
         results.tests.serviceAccount = {
-          status: "success",
-          message: "FIREBASE_SERVICE_ACCOUNT_JSON is present and seems valid.",
-          projectId: serviceAccount.project_id,
-          clientEmail: serviceAccount.client_email,
+            status: "success",
+            message: "FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY are present.",
         };
-      } else {
-        results.tests.serviceAccount = {
-          status: "error",
-          message: `FIREBASE_SERVICE_ACCOUNT_JSON is present but missing required fields (project_id, client_email, private_key).`,
-        };
-      }
-    } catch (error: any) {
-        results.tests.serviceAccount = {
+    } else {
+         results.tests.serviceAccount = {
             status: "error",
-            message: `Service account JSON check error: ${error.message}`,
+            message: "One or more Firebase Admin SDK environment variables are missing.",
         };
     }
     
