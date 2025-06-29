@@ -25,9 +25,7 @@ interface HealthCheckResult {
   }
   debug: {
     environment: {
-      hasProjectId: boolean;
-      hasClientEmail: boolean;
-      hasPrivateKey: boolean;
+      hasServiceAccountJson: boolean;
       hasPublicProjectId: boolean;
       hasPublicStorageBucket: boolean;
       publicProjectId?: string;
@@ -149,23 +147,11 @@ export default function SystemHealthPage() {
               <div className="space-y-3">
                 <div>
                   <h4 className="font-medium mb-2">Server Environment Variables</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-1 gap-2 text-sm">
                     <div className="flex justify-between">
-                      <span>FIREBASE_PROJECT_ID:</span>
-                      <span className={healthData.debug.environment.hasProjectId ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                        {healthData.debug.environment.hasProjectId ? "Set" : "Missing"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>FIREBASE_CLIENT_EMAIL:</span>
-                      <span className={healthData.debug.environment.hasClientEmail ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                        {healthData.debug.environment.hasClientEmail ? "Set" : "Missing"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>FIREBASE_PRIVATE_KEY:</span>
-                      <span className={healthData.debug.environment.hasPrivateKey ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                        {healthData.debug.environment.hasPrivateKey ? "Set" : "Missing"}
+                      <span>FIREBASE_SERVICE_ACCOUNT_JSON:</span>
+                      <span className={healthData.debug.environment.hasServiceAccountJson ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                        {healthData.debug.environment.hasServiceAccountJson ? "Set" : "Missing"}
                       </span>
                     </div>
                   </div>

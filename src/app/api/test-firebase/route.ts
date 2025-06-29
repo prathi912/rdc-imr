@@ -10,12 +10,9 @@ export async function GET(request: NextRequest) {
       debug: {} as Record<string, any>,
     };
 
-    // Debug environment variables (without exposing sensitive data)
+    // Debug environment variables
     results.debug.environment = {
-      hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
-      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
-      // Public vars
+      hasServiceAccountJson: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
       hasPublicProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       hasPublicStorageBucket: !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
       publicProjectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
@@ -26,35 +23,29 @@ export async function GET(request: NextRequest) {
     
     // Test service account variables
     try {
-      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-      const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+      if (!serviceAccountJson) {
+        throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is not set.");
+      }
+      const serviceAccount = JSON.parse(serviceAccountJson);
 
-      if (projectId && clientEmail && privateKey) {
+      if (serviceAccount.project_id && serviceAccount.client_email && serviceAccount.private_key) {
         results.tests.serviceAccount = {
           status: "success",
-          message: "All required service account environment variables are present.",
-          projectId: projectId,
-          clientEmail: clientEmail,
-          hasPrivateKey: true,
+          message: "FIREBASE_SERVICE_ACCOUNT_JSON is present and seems valid.",
+          projectId: serviceAccount.project_id,
+          clientEmail: serviceAccount.client_email,
         };
       } else {
-        const missingVars = [
-            !projectId && 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
-            !clientEmail && 'FIREBASE_CLIENT_EMAIL',
-            !privateKey && 'FIREBASE_PRIVATE_KEY'
-        ].filter(Boolean).join(', ');
-        
         results.tests.serviceAccount = {
           status: "error",
-          message: `Missing service account environment variables: ${missingVars}.`,
-          hasPrivateKey: !!privateKey,
+          message: `FIREBASE_SERVICE_ACCOUNT_JSON is present but missing required fields (project_id, client_email, private_key).`,
         };
       }
     } catch (error: any) {
         results.tests.serviceAccount = {
             status: "error",
-            message: `Service account environment variable check error: ${error.message}`,
+            message: `Service account JSON check error: ${error.message}`,
         };
     }
     
