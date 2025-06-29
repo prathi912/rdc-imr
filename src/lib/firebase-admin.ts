@@ -1,63 +1,62 @@
 
 import * as admin from 'firebase-admin';
 
-// A global variable to hold the initialized app instance.
-// This prevents re-initializing the app on every hot-reload in development.
-let adminApp: admin.app.App | null = null;
-
-function initializeAdmin() {
-  if (admin.apps.length > 0) {
-    adminApp = admin.app();
-    return adminApp;
+// This function will initialize the admin app if it's not already initialized.
+// It's designed to be safe to call multiple times.
+function getFirebaseAdminApp() {
+  // If the app is already initialized, return it.
+  if (admin.apps.length > 0 && admin.apps[0]) {
+    return admin.apps[0];
   }
 
-  // Pull credentials from environment variables
+  // If not initialized, create a new app instance.
   const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  // The private key from the environment variable needs its escaped newlines replaced with actual newlines.
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
   // Validate that all required environment variables are present.
   if (!projectId || !clientEmail || !privateKey) {
-    throw new Error(
-      'Firebase server-side credentials are not fully set in environment variables. ' +
-      'Please ensure FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY are set.'
-    );
+    const missingVars = [
+        !projectId && 'FIREBASE_PROJECT_ID',
+        !clientEmail && 'FIREBASE_CLIENT_EMAIL',
+        !privateKey && 'FIREBASE_PRIVATE_KEY'
+    ].filter(Boolean).join(', ');
+    throw new Error(`Firebase server-side credentials are not fully set. Missing: ${missingVars}`);
   }
-
-  // The private key from the environment variable needs its escaped newlines replaced with actual newlines.
-  const formattedPrivateKey = privateKey.replace(/\\n/g, '\n');
 
   try {
     const app = admin.initializeApp({
       credential: admin.credential.cert({
         projectId,
         clientEmail,
-        privateKey: formattedPrivateKey,
+        privateKey,
       }),
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      // Use the .appspot.com domain for the admin SDK storage bucket
+      storageBucket: `${projectId}.appspot.com`,
     });
-
-    console.log("Firebase Admin SDK initialized successfully");
-    adminApp = app;
     return app;
   } catch (error: any) {
     console.error("Firebase admin initialization error:", error);
-    // Throw a more specific error to help with debugging.
+    // Provide a more specific error message for common issues.
+    if (error.code === 'auth/invalid-credential') {
+      throw new Error("Failed to initialize Firebase Admin SDK: The credentials provided are invalid. Please check your service account details.");
+    }
+    if (error.message.includes('PEM')) {
+        throw new Error(`Failed to initialize Firebase Admin SDK: Invalid private key format. Please check the FIREBASE_PRIVATE_KEY environment variable. Original error: ${error.message}`);
+    }
     throw new Error(`Failed to initialize Firebase Admin SDK: ${error.message}`);
   }
 }
 
-// A getter function to ensure initialization happens only once.
-const getAdminApp = () => {
-  if (!adminApp) {
-    return initializeAdmin();
-  }
-  return adminApp;
-};
+// Export a single function to get a service instance.
+// This ensures initialization is handled correctly every time.
+function getAdminService<T>(serviceFactory: (app: admin.app.App) => T): T {
+  const app = getFirebaseAdminApp();
+  return serviceFactory(app);
+}
 
-
-// Lazily initialized services that use the getter.
-export const adminDb = () => getAdminApp().firestore();
-export const adminStorage = () => getAdminApp().storage();
-export const adminAuth = () => getAdminApp().auth();
-export const isAdminInitialized = () => admin.apps.length > 0 && adminApp !== null;
+export const adminDb = () => getAdminService(app => app.firestore());
+export const adminStorage = () => getAdminService(app => app.storage());
+export const adminAuth = () => getAdminService(app => app.auth());
+export const isAdminInitialized = () => admin.apps.length > 0;
