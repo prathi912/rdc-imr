@@ -66,14 +66,27 @@ export default function LandingPage() {
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <Link href="/signup">
-                    <Button size="lg">Get Started</Button>
-                  </Link>
-                  <Link href="/login">
-                    <Button variant="outline" size="lg">
-                      Sign In
-                    </Button>
-                  </Link>
+                  {loading ? (
+                    <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                        <Skeleton className="h-12 w-32" />
+                        <Skeleton className="h-12 w-32" />
+                    </div>
+                  ) : user ? (
+                    <Link href="/dashboard">
+                      <Button size="lg">Go to Dashboard</Button>
+                    </Link>
+                  ) : (
+                    <>
+                      <Link href="/signup">
+                        <Button size="lg">Get Started</Button>
+                      </Link>
+                      <Link href="/login">
+                        <Button variant="outline" size="lg">
+                          Sign In
+                        </Button>
+                      </Link>
+                    </>
+                  )}
                 </div>
               </div>
               <Image
