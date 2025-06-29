@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     // Debug environment variables (without exposing sensitive data)
     results.debug.environment = {
-      hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+      hasProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
       hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
       // Public vars
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     
     // Test service account variables
     try {
-      const projectId = process.env.FIREBASE_PROJECT_ID;
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
       const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
       const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
         };
       } else {
         const missingVars = [
-            !projectId && 'FIREBASE_PROJECT_ID',
+            !projectId && 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
             !clientEmail && 'FIREBASE_CLIENT_EMAIL',
             !privateKey && 'FIREBASE_PRIVATE_KEY'
         ].filter(Boolean).join(', ');

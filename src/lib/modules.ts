@@ -1,3 +1,4 @@
+
 import type { User } from '@/types';
 
 export const ALL_MODULES = [
@@ -14,6 +15,7 @@ export const ALL_MODULES = [
   { id: 'manage-users', label: 'Manage Users' },
   { id: 'manage-incentive-claims', label: 'Manage Incentive Claims' },
   { id: 'module-management', label: 'Module Management' },
+  { id: 'system-health', label: 'System Health' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -21,7 +23,7 @@ export const ALL_MODULES = [
 const facultyModules = ['dashboard', 'new-submission', 'my-projects', 'incentive-claim', 'notifications', 'settings'];
 const evaluatorModules = ['dashboard', 'evaluator-dashboard', 'notifications', 'settings'];
 const croModules = [...new Set([...evaluatorModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'all-projects', 'analytics', 'manage-users', 'manage-incentive-claims'])];
-const adminModules = [...croModules];
+const adminModules = [...croModules, 'system-health'];
 const superAdminModules = [...adminModules, 'module-management'];
 
 export function getDefaultModulesForRole(role: User['role']): string[] {

@@ -14,6 +14,7 @@ import {
   GanttChartSquare,
   Home,
   LineChart,
+  Server,
   Settings,
   ShieldCheck,
   Users,
@@ -277,6 +278,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarMenuButton href="/dashboard/module-management" tooltip="Module Management" isActive={pathname === '/dashboard/module-management'}>
                   <ShieldCheck />
                   Module Management
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('system-health') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/system-health" tooltip="System Health" isActive={pathname === '/dashboard/system-health'}>
+                  <Server />
+                  System Health
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}

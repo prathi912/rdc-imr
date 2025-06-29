@@ -8,7 +8,7 @@ function initializeAdminApp() {
   }
 
   // Retrieve credentials from environment variables.
-  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   // This is the most critical part. The private key from an env var
   // needs to have its escaped newlines replaced with actual newlines.
@@ -17,7 +17,7 @@ function initializeAdminApp() {
   // Validate that all required environment variables are present.
   if (!projectId || !clientEmail || !privateKey) {
     const missingVars = [
-        !projectId && 'FIREBASE_PROJECT_ID',
+        !projectId && 'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
         !clientEmail && 'FIREBASE_CLIENT_EMAIL',
         !privateKey && 'FIREBASE_PRIVATE_KEY'
     ].filter(Boolean).join(', ');
