@@ -30,6 +30,12 @@ function ensureAdminInitialized() {
   try {
     const serviceAccount: ServiceAccount = JSON.parse(serviceAccountJson);
     
+    // This is the critical fix: Ensure private_key has correct newline characters.
+    // The value from .env might have \\n as string literals instead of actual newlines.
+    if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+
     app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       storageBucket: `${serviceAccount.project_id}.appspot.com`,
