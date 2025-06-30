@@ -9,7 +9,7 @@ import { format, startOfToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 import type { Project, User, GrantDetails, Evaluation, BankDetails } from '@/types';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
 import { uploadFileToServer } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';

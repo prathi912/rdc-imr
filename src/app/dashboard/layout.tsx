@@ -36,7 +36,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Logo } from '@/components/logo';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { auth, db } from '@/lib/firebase';
+import { auth, db } from '@/lib/config';
 import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';

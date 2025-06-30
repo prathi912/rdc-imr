@@ -13,7 +13,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
 import type { IncentiveClaim } from '@/types';
 import { useToast } from '@/hooks/use-toast';

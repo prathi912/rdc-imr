@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent } from "@/components/ui/card";
 import { Bell, FileCheck2, GanttChartSquare, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, query, where, getDocs, doc, updateDoc, orderBy } from 'firebase/firestore';
 import { type Notification as NotificationType, type User } from '@/types';
 import { useToast } from '@/hooks/use-toast';

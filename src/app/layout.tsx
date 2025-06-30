@@ -1,9 +1,10 @@
+
 import type { Metadata } from 'next';
 import { Inter, Source_Code_Pro } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
-import { isFirebaseInitialized } from '@/lib/firebase';
+import { isFirebaseInitialized } from '@/lib/config';
 import { FirebaseNotConfigured } from '@/components/firebase-not-configured';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });

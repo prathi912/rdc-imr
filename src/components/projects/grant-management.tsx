@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { doc, updateDoc } from 'firebase/firestore';
 import { uploadFileToServer } from '@/app/actions';
 import { useState, useEffect } from 'react';

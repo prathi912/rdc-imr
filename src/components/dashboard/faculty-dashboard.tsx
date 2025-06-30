@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ProjectList } from '@/components/projects/project-list';
 import { FilePlus2, CheckCircle, Clock, ArrowRight, BookOpenCheck } from 'lucide-react';
 import type { User, Project } from '@/types';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 

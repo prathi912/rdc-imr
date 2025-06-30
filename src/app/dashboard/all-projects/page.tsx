@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';

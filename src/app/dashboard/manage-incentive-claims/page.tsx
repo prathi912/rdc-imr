@@ -26,7 +26,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, getDocs, doc, updateDoc, orderBy, query, where } from 'firebase/firestore';
 import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';

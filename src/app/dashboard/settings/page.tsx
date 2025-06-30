@@ -13,7 +13,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { db, auth } from '@/lib/firebase';
+import { db, auth } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { uploadFileToServer } from '@/app/actions';
 import type { User } from '@/types';

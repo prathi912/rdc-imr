@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
 import Image from 'next/image';
 import { Award, BookCheck, GanttChartSquare, Check, Users, ShieldCheck, FilePlus, Bot } from 'lucide-react';
-import { auth } from '@/lib/firebase';
+import { auth } from '@/lib/config';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 

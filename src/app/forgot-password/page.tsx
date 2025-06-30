@@ -26,7 +26,7 @@ import {
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { auth } from '@/lib/firebase';
+import { auth } from '@/lib/config';
 import { sendPasswordResetEmail } from 'firebase/auth';
 
 const forgotPasswordSchema = z.object({

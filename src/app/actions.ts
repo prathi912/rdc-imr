@@ -3,8 +3,8 @@
 
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
-import { db } from '@/lib/firebase';
-import { adminStorage } from '@/lib/firebase-admin';
+import { db } from '@/lib/config';
+import { adminStorage } from '@/lib/admin';
 import { doc, collection, writeBatch } from 'firebase/firestore';
 
 

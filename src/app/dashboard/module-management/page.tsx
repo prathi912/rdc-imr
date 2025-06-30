@@ -8,7 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';

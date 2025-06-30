@@ -8,7 +8,7 @@ import { IncentiveClaimsList } from '@/components/incentives/incentive-claims-li
 import { Card, CardContent } from '@/components/ui/card';
 import type { User, IncentiveClaim } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 

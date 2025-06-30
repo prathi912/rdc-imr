@@ -7,7 +7,7 @@ import { ProjectList } from '@/components/projects/project-list';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { ArrowRight } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, getDocs } from 'firebase/firestore';
 import type { Project } from '@/types';
 import { Skeleton } from '../ui/skeleton';

@@ -7,7 +7,7 @@ import { ProjectList } from '@/components/projects/project-list';
 import { type Project, type User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';

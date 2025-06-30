@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import type { Project } from '@/types';
 import { PageHeader } from '@/components/page-header';
 import { SubmissionForm } from '@/components/projects/submission-form';

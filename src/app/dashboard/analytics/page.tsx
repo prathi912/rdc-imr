@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project } from '@/types';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, getDocs } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -36,7 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useToast } from '@/hooks/use-toast';

@@ -9,7 +9,7 @@ import { collection, query, where, getDocs, orderBy, writeBatch, doc } from 'fir
 import { format, startOfToday } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import type { Project } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';

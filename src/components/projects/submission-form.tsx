@@ -17,7 +17,7 @@ import { GanttChartSquare, Microscope, Users, FileText, Loader2 } from 'lucide-r
 import { useToast } from '@/hooks/use-toast';
 import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
-import { db } from '@/lib/firebase';
+import { db } from '@/lib/config';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { uploadFileToServer } from '@/app/actions';
 

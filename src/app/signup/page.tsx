@@ -26,7 +26,7 @@ import {
 import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { auth, db } from '@/lib/firebase';
+import { auth, db } from '@/lib/config';
 import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User } from '@/types';
