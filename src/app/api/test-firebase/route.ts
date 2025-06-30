@@ -12,19 +12,21 @@ export async function GET(request: NextRequest) {
 
     // Debug environment variables
     results.debug.environment = {
-      hasServiceAccountJson: !!process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+      hasProjectId: !!process.env.FIREBASE_PROJECT_ID,
+      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
     };
     
     // Test Service Account Variable
-    if (results.debug.environment.hasServiceAccountJson) {
+    if (results.debug.environment.hasProjectId && results.debug.environment.hasClientEmail && results.debug.environment.hasPrivateKey) {
         results.tests.serviceAccount = {
             status: "success",
-            message: "FIREBASE_SERVICE_ACCOUNT_JSON environment variable is present.",
+            message: "All required Firebase Admin environment variables are present.",
         };
     } else {
          results.tests.serviceAccount = {
             status: "error",
-            message: "The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is missing.",
+            message: "One or more required Firebase Admin environment variables (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) are missing.",
         };
     }
     

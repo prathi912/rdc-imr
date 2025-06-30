@@ -25,7 +25,9 @@ interface HealthCheckResult {
   }
   debug: {
     environment: {
-      hasServiceAccountJson: boolean;
+      hasProjectId: boolean;
+      hasClientEmail: boolean;
+      hasPrivateKey: boolean;
     }
   }
 }
@@ -85,6 +87,18 @@ export default function SystemHealthPage() {
     return <Badge variant={variants[status as keyof typeof variants] || "outline"}>{status.toUpperCase()}</Badge>
   }
 
+  const renderEnvVarStatus = (label: string, isSet?: boolean) => {
+    if (isSet === undefined) return null;
+    return (
+      <div className="flex justify-between">
+          <span>{label}:</span>
+          <span className={isSet ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+              {isSet ? "Set" : "Missing"}
+          </span>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title="System Health" description="Monitor the health and connectivity of Firebase services" />
@@ -140,12 +154,9 @@ export default function SystemHealthPage() {
             <CardContent>
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>FIREBASE_SERVICE_ACCOUNT_JSON:</span>
-                    <span className={healthData.debug.environment.hasServiceAccountJson ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                      {healthData.debug.environment.hasServiceAccountJson ? "Set" : "Missing"}
-                    </span>
-                  </div>
+                  {renderEnvVarStatus("FIREBASE_PROJECT_ID", healthData.debug.environment.hasProjectId)}
+                  {renderEnvVarStatus("FIREBASE_CLIENT_EMAIL", healthData.debug.environment.hasClientEmail)}
+                  {renderEnvVarStatus("FIREBASE_PRIVATE_KEY", healthData.debug.environment.hasPrivateKey)}
                 </div>
               </div>
             </CardContent>

@@ -1,70 +1,60 @@
 import admin from 'firebase-admin';
 import type { ServiceAccount } from 'firebase-admin';
 
-// This new structure ensures Firebase Admin is initialized only when one of its services is first accessed.
-// This is safer for Next.js and provides better error handling.
-
 let app: admin.app.App | null = null;
 
 function ensureAdminInitialized() {
-  // If already initialized, do nothing.
   if (app) return;
 
-  // If another part of the code initialized an app, use it.
   if (admin.apps.length > 0 && admin.apps[0]) {
     app = admin.apps[0];
     console.log("Firebase Admin SDK re-used existing instance.");
     return;
   }
 
-  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-  if (!serviceAccountJson) {
-     console.error(
-      "Firebase Admin SDK initialization skipped. The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set. \n" +
-      "For local development, copy the entire content of your service account JSON file into a .env.local file. For production, set this in your hosting provider's environment variable settings."
+  if (!projectId || !clientEmail || !privateKey) {
+    console.error(
+      "Firebase Admin SDK initialization skipped. One or more required environment variables (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) are not set."
     );
-    return; // Exit without initializing, app remains null
+    return;
   }
 
   try {
-    const serviceAccount: ServiceAccount = JSON.parse(serviceAccountJson);
+    const serviceAccount: ServiceAccount = {
+      projectId,
+      clientEmail,
+      // This is the critical fix: Ensure private_key has correct newline characters.
+      privateKey: privateKey.replace(/\\n/g, '\n'),
+    };
     
-    // This is the critical fix: Ensure private_key has correct newline characters.
-    // The value from .env might have \\n as string literals instead of actual newlines.
-    if (serviceAccount.private_key) {
-        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-    }
-
     app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      storageBucket: `${serviceAccount.project_id}.appspot.com`,
+      storageBucket: `${projectId}.appspot.com`,
     });
     console.log("Firebase Admin SDK initialized successfully.");
 
   } catch (error: any) {
     console.error(
-      "Firebase Admin SDK initialization error. This is likely due to an incorrectly formatted FIREBASE_SERVICE_ACCOUNT_JSON environment variable. Please ensure it's a valid, single-line JSON string. Error:",
+      "Firebase Admin SDK initialization error. This is likely due to an incorrectly formatted private key. Error:",
       error.message
     );
-    // Don't re-throw, app will remain null
   }
 }
 
-// A helper function to safely get a service, throwing an error only when the service is accessed.
 function getService<T>(serviceGetter: () => T): T {
   ensureAdminInitialized();
   if (!app) {
     throw new Error(
-      "Firebase Admin SDK is not initialized. Check server logs for configuration errors. The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is likely missing or malformed."
+      "Firebase Admin SDK is not initialized. Check server logs for configuration errors. Required environment variables are likely missing or malformed."
     );
   }
   return serviceGetter();
 }
 
-// We use a Proxy to create lazy-loaded exports.
-// This means getService() is only called when you access a property
-// on adminAuth, adminDb, or adminStorage for the first time.
 export const adminAuth = new Proxy({} as admin.auth.Auth, {
   get(target, prop) {
     return getService(() => admin.auth(app!))[prop as keyof admin.auth.Auth];
