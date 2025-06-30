@@ -1,6 +1,6 @@
 
 import { type NextRequest, NextResponse } from "next/server";
-import { adminDb, adminAuth, adminStorage, isAdminInitialized } from "@/lib/firebase-admin";
+import { adminDb, adminAuth, adminStorage } from "@/lib/firebase-admin";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,8 +18,6 @@ export async function GET(request: NextRequest) {
       hasPublicProjectId: !!process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       hasPublicStorageBucket: !!process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     };
-
-    results.debug.initializationStatusBeforeTest = isAdminInitialized() ? "Already Initialized" : "Not Initialized";
     
     // Test Service Account Variables
     if (results.debug.environment.hasClientEmail && results.debug.environment.hasPrivateKey) {
@@ -36,8 +34,7 @@ export async function GET(request: NextRequest) {
     
     // Test Firestore connection
     try {
-      const db = adminDb(); // This will trigger initialization if needed
-      const testCollection = db.collection("_health_check");
+      const testCollection = adminDb.collection("_health_check");
       await testCollection.doc("write_test").set({ timestamp: new Date() });
       const docSnapshot = await testCollection.doc("write_test").get();
       const canRead = docSnapshot.exists;
@@ -61,8 +58,7 @@ export async function GET(request: NextRequest) {
 
     // Test Firebase Auth
     try {
-      const auth = adminAuth();
-      await auth.listUsers(1); // Test an actual API call
+      await adminAuth.listUsers(1); // Test an actual API call
       results.tests.auth = {
         status: "success",
         message: "Firebase Auth connection successful.",
@@ -79,8 +75,7 @@ export async function GET(request: NextRequest) {
 
     // Test Firebase Storage
     try {
-      const storage = adminStorage();
-      const bucket = storage.bucket();
+      const bucket = adminStorage.bucket();
       const [exists] = await bucket.exists();
       results.tests.storage = {
         status: "success",
@@ -96,9 +91,6 @@ export async function GET(request: NextRequest) {
         bucketExists: false,
       };
     }
-
-    // Final initialization status check
-    results.debug.initializationStatusAfterTest = isAdminInitialized() ? "Initialized" : "Initialization Failed";
 
     // Overall status
     const hasErrors = Object.values(results.tests).some((test) => test.status === "error");
