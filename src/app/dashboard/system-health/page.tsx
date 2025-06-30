@@ -28,6 +28,7 @@ interface HealthCheckResult {
       hasProjectId: boolean;
       hasClientEmail: boolean;
       hasPrivateKey: boolean;
+      hasStorageBucket: boolean;
     }
   }
 }
@@ -90,8 +91,8 @@ export default function SystemHealthPage() {
   const renderEnvVarStatus = (label: string, isSet?: boolean) => {
     if (isSet === undefined) return null;
     return (
-      <div className="flex justify-between">
-          <span>{label}:</span>
+      <div className="flex justify-between items-center">
+          <span className="font-mono text-xs">{label}:</span>
           <span className={isSet ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
               {isSet ? "Set" : "Missing"}
           </span>
@@ -130,15 +131,15 @@ export default function SystemHealthPage() {
       )}
 
       {error && (
-        <Card className="border-red-200 bg-red-50">
+        <Card className="border-red-200 bg-red-50 dark:bg-red-950/20">
           <CardHeader>
-            <CardTitle className="text-red-800 flex items-center gap-2">
+            <CardTitle className="text-red-800 dark:text-red-200 flex items-center gap-2">
               <XCircle className="h-5 w-5" />
               Health Check Failed
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-red-700">{error}</p>
+            <p className="text-red-700 dark:text-red-300">{error}</p>
           </CardContent>
         </Card>
       )}
@@ -154,9 +155,10 @@ export default function SystemHealthPage() {
             <CardContent>
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-2 text-sm">
-                  {renderEnvVarStatus("FIREBASE_PROJECT_ID", healthData.debug.environment.hasProjectId)}
+                  {renderEnvVarStatus("NEXT_PUBLIC_FIREBASE_PROJECT_ID", healthData.debug.environment.hasProjectId)}
                   {renderEnvVarStatus("FIREBASE_CLIENT_EMAIL", healthData.debug.environment.hasClientEmail)}
                   {renderEnvVarStatus("FIREBASE_PRIVATE_KEY", healthData.debug.environment.hasPrivateKey)}
+                  {renderEnvVarStatus("NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET", healthData.debug.environment.hasStorageBucket)}
                 </div>
               </div>
             </CardContent>
