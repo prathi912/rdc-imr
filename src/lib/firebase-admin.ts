@@ -1,14 +1,14 @@
-import admin from "firebase-admin";
+import admin from 'firebase-admin';
+import type { ServiceAccount } from 'firebase-admin';
 
 // This new structure ensures Firebase Admin is initialized only when one of its services is first accessed.
 // This is safer for Next.js and provides better error handling.
 
 let app: admin.app.App | null = null;
-let initAttempted = false;
 
 function ensureAdminInitialized() {
-  if (initAttempted) return; // Only attempt to initialize once
-  initAttempted = true;
+  // If already initialized, do nothing.
+  if (app) return;
 
   // If another part of the code initialized an app, use it.
   if (admin.apps.length > 0 && admin.apps[0]) {
@@ -17,41 +17,28 @@ function ensureAdminInitialized() {
     return;
   }
 
-  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey =
-    "-----BEGIN PRIVATE KEY-----\n" +
-    (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n") +
-    "\n-----END PRIVATE KEY-----\n";
-  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
-  // Check if all required environment variables are present.
-  if (!projectId || !clientEmail || !privateKey || !storageBucket) {
-    // Log a clear error to the server console instead of throwing.
-    // This prevents the entire server from crashing on startup if env vars are missing.
-    console.error(
-      "Firebase Admin SDK initialization skipped. This is expected during client-side rendering, but if you see this error on your server during a server-side action, it means required environment variables are missing. \n" +
-        "Please ensure NEXT_PUBLIC_FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY, and NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET are set. \n" +
-        "For local development, use a .env.local file. For production, set these in your hosting provider's environment variable settings."
+  if (!serviceAccountJson) {
+     console.error(
+      "Firebase Admin SDK initialization skipped. The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set. \n" +
+      "For local development, copy the entire content of your service account JSON file into a .env.local file. For production, set this in your hosting provider's environment variable settings."
     );
     return; // Exit without initializing, app remains null
   }
 
   try {
-    // The replace call is crucial for production environments where the key is stored as a single line.
-    const formattedPrivateKey = privateKey.replace(/\\n/g, "\n");
-
+    const serviceAccount: ServiceAccount = JSON.parse(serviceAccountJson);
+    
     app = admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: projectId,
-        clientEmail: clientEmail,
-        privateKey: formattedPrivateKey,
-      }),
-      storageBucket,
+      credential: admin.credential.cert(serviceAccount),
+      storageBucket: `${serviceAccount.project_id}.appspot.com`,
     });
+    console.log("Firebase Admin SDK initialized successfully.");
+
   } catch (error: any) {
     console.error(
-      "Firebase Admin SDK initialization error. Check service account credentials.",
+      "Firebase Admin SDK initialization error. This is likely due to an incorrectly formatted FIREBASE_SERVICE_ACCOUNT_JSON environment variable. Please ensure it's a valid, single-line JSON string. Error:",
       error.message
     );
     // Don't re-throw, app will remain null
@@ -63,7 +50,7 @@ function getService<T>(serviceGetter: () => T): T {
   ensureAdminInitialized();
   if (!app) {
     throw new Error(
-      "Firebase Admin SDK is not initialized. Check server logs for configuration errors. This usually means the required server-side environment variables (FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) are missing from your hosting environment. If running locally, ensure they are in a .env.local file and that you have restarted the development server."
+      "Firebase Admin SDK is not initialized. Check server logs for configuration errors. The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is likely missing or malformed."
     );
   }
   return serviceGetter();
@@ -74,26 +61,18 @@ function getService<T>(serviceGetter: () => T): T {
 // on adminAuth, adminDb, or adminStorage for the first time.
 export const adminAuth = new Proxy({} as admin.auth.Auth, {
   get(target, prop) {
-    const service = getService(() => admin.auth());
-    return Reflect.get(service, prop);
+    return getService(() => admin.auth(app!))[prop as keyof admin.auth.Auth];
   },
 });
 
 export const adminDb = new Proxy({} as admin.firestore.Firestore, {
   get(target, prop) {
-    const service = getService(() => admin.firestore());
-    return Reflect.get(service, prop);
+    return getService(() => admin.firestore(app!))[prop as keyof admin.firestore.Firestore];
   },
 });
 
 export const adminStorage = new Proxy({} as admin.storage.Storage, {
   get(target, prop) {
-    const service = getService(() => admin.storage());
-    return Reflect.get(service, prop);
+    return getService(() => admin.storage(app!))[prop as keyof admin.storage.Storage];
   },
 });
-
-
-export function isAdminInitialized() {
-  return !!app;
-}

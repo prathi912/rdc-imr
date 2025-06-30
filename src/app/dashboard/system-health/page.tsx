@@ -25,11 +25,7 @@ interface HealthCheckResult {
   }
   debug: {
     environment: {
-      hasClientEmail: boolean;
-      hasPrivateKey: boolean;
-      clientEmail?: string;
-      hasPublicProjectId: boolean;
-      hasPublicStorageBucket: boolean;
+      hasServiceAccountJson: boolean;
     }
   }
 }
@@ -145,15 +141,9 @@ export default function SystemHealthPage() {
               <div className="space-y-3">
                 <div className="grid grid-cols-1 gap-2 text-sm">
                   <div className="flex justify-between">
-                    <span>FIREBASE_CLIENT_EMAIL:</span>
-                    <span className={healthData.debug.environment.hasClientEmail ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                      {healthData.debug.environment.hasClientEmail ? "Set" : "Missing"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>FIREBASE_PRIVATE_KEY:</span>
-                    <span className={healthData.debug.environment.hasPrivateKey ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-                      {healthData.debug.environment.hasPrivateKey ? "Set" : "Missing"}
+                    <span>FIREBASE_SERVICE_ACCOUNT_JSON:</span>
+                    <span className={healthData.debug.environment.hasServiceAccountJson ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+                      {healthData.debug.environment.hasServiceAccountJson ? "Set" : "Missing"}
                     </span>
                   </div>
                 </div>
