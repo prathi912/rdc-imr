@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -8,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, ArrowUpDown } from "lucide-react";
+import Link from 'next/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -325,7 +325,15 @@ export default function ManageUsersPage() {
 
                    return (
                     <TableRow key={user.uid}>
-                      <TableCell className="font-medium">{user.name}</TableCell>
+                      <TableCell className="font-medium">
+                        {user.misId ? (
+                            <Link href={`/profile/${user.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
+                                {user.name}
+                            </Link>
+                        ) : (
+                            user.name
+                        )}
+                      </TableCell>
                       <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
                       <TableCell>
                         <Badge variant={user.role === 'admin' || user.role === 'Super-admin' ? 'default' : 'secondary'}>{user.role}</Badge>
@@ -341,7 +349,7 @@ export default function ManageUsersPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={() => setUserToView(user)}>View Profile</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => setUserToView(user)}>View Details</DropdownMenuItem>
                             <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
                                 <DropdownMenuPortal>
