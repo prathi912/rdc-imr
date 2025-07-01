@@ -11,12 +11,12 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const ResearchDomainInputSchema = z.object({
+const ResearchDomainInputSchema = z.object({
   paperTitles: z.array(z.string()).describe('A list of research paper titles.'),
 });
 export type ResearchDomainInput = z.infer<typeof ResearchDomainInputSchema>;
 
-export const ResearchDomainOutputSchema = z.object({
+const ResearchDomainOutputSchema = z.object({
   domain: z.string().describe("The suggested core research domain based on the paper titles, limited to 3-5 words."),
 });
 export type ResearchDomainOutput = z.infer<typeof ResearchDomainOutputSchema>;
