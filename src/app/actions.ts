@@ -3,6 +3,7 @@
 
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
+import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
 import { db } from '@/lib/config';
 import { adminStorage } from '@/lib/admin';
 import { doc, collection, writeBatch } from 'firebase/firestore';
@@ -25,6 +26,16 @@ export async function getEvaluationPrompts(input: EvaluationPromptsInput) {
   } catch (error) {
     console.error('Error generating evaluation prompts:', error);
     return { success: false, error: 'Failed to generate prompts.' };
+  }
+}
+
+export async function getResearchDomain(input: ResearchDomainInput) {
+  try {
+    const result = await getResearchDomainSuggestion(input);
+    return { success: true, domain: result.domain };
+  } catch (error) {
+    console.error('Error generating research domain:', error);
+    return { success: false, error: 'Failed to generate research domain.' };
   }
 }
 
