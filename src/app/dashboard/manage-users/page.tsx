@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { db } from '@/lib/config';
 import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import type { User } from '@/types';
+import type { User, IncentiveClaim } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getDefaultModulesForRole } from '@/lib/modules';
@@ -47,7 +47,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const ROLES: User['role'][] = ['faculty', 'Evaluator', 'CRO', 'admin', 'Super-admin'];
 const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
-type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role'>;
+type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role'> | 'claimsCount';
 
 function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!user) return null;
@@ -109,8 +109,14 @@ function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null,
     );
 }
 
+interface UserWithClaims extends User {
+  claimsCount: number;
+}
+
+
 export default function ManageUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
+  const [claimsCount, setClaimsCount] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -127,27 +133,45 @@ export default function ManageUsersPage() {
     }
   }, []);
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsersAndClaims = useCallback(async () => {
     setLoading(true);
     try {
       const usersCollection = collection(db, 'users');
       const userSnapshot = await getDocs(usersCollection);
       const userList = userSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User));
       setUsers(userList);
+
+      const claimsCollection = collection(db, 'incentiveClaims');
+      const claimsSnapshot = await getDocs(claimsCollection);
+      const claimsList = claimsSnapshot.docs.map(doc => doc.data() as IncentiveClaim);
+      
+      const counts: Record<string, number> = {};
+      for (const claim of claimsList) {
+          counts[claim.uid] = (counts[claim.uid] || 0) + 1;
+      }
+      setClaimsCount(counts);
+
     } catch (error) {
-      console.error("Error fetching users:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not fetch users." });
+      console.error("Error fetching users or claims:", error);
+      toast({ variant: 'destructive', title: "Error", description: "Could not fetch users or claims data." });
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    fetchUsersAndClaims();
+  }, [fetchUsersAndClaims]);
+  
+  const usersWithClaims = useMemo(() => {
+    return users.map(user => ({
+      ...user,
+      claimsCount: claimsCount[user.uid] || 0
+    }));
+  }, [users, claimsCount]);
   
   const sortedAndFilteredUsers = useMemo(() => {
-    let filtered = [...users];
+    let filtered: UserWithClaims[] = [...usersWithClaims];
 
     if (roleFilter !== 'all') {
       filtered = filtered.filter(user => user.role === roleFilter);
@@ -163,8 +187,15 @@ export default function ManageUsersPage() {
 
     filtered.sort((a, b) => {
         const key = sortConfig.key;
-        const aValue = a[key] || '';
-        const bValue = b[key] || '';
+        let aValue, bValue;
+
+        if (key === 'claimsCount') {
+          aValue = a.claimsCount;
+          bValue = b.claimsCount;
+        } else {
+          aValue = a[key as keyof User] || '';
+          bValue = b[key as keyof User] || '';
+        }
 
         if (aValue < bValue) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
@@ -176,7 +207,7 @@ export default function ManageUsersPage() {
     });
 
     return filtered;
-  }, [users, searchTerm, roleFilter, sortConfig]);
+  }, [usersWithClaims, searchTerm, roleFilter, sortConfig]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -190,14 +221,14 @@ export default function ManageUsersPage() {
     try {
       await deleteDoc(doc(db, 'users', uid));
       toast({ title: 'User Deleted', description: 'The user has been successfully deleted.' });
-      fetchUsers(); // Refresh the list
+      fetchUsersAndClaims(); // Refresh the list
     } catch (error) {
        console.error("Error deleting user:", error);
        toast({ variant: 'destructive', title: "Error", description: "Could not delete user." });
     } finally {
       setUserToDelete(null);
     }
-  }, [fetchUsers, toast]);
+  }, [fetchUsersAndClaims, toast]);
 
 
   const handleRoleChange = useCallback(async (uid: string, newRole: User['role']) => {
@@ -210,12 +241,12 @@ export default function ManageUsersPage() {
         allowedModules: defaultModules
       });
       toast({ title: 'Role Updated', description: "The user's role and permissions have been changed." });
-      fetchUsers(); // Refresh the list
+      fetchUsersAndClaims(); // Refresh the list
     } catch (error) {
        console.error("Error updating role:", error);
        toast({ variant: 'destructive', title: "Error", description: "Could not update role." });
     }
-  }, [fetchUsers, toast]);
+  }, [fetchUsersAndClaims, toast]);
   
   if (loading) {
     return (
@@ -279,6 +310,11 @@ export default function ManageUsersPage() {
                         Role <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
+                   <TableHead>
+                     <Button variant="ghost" onClick={() => requestSort('claimsCount')}>
+                        Claims <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -294,6 +330,7 @@ export default function ManageUsersPage() {
                       <TableCell>
                         <Badge variant={user.role === 'admin' || user.role === 'Super-admin' ? 'default' : 'secondary'}>{user.role}</Badge>
                       </TableCell>
+                       <TableCell className="font-medium text-center">{user.claimsCount}</TableCell>
                       <TableCell className="text-right">
                          <DropdownMenu>
                           <DropdownMenuTrigger asChild>

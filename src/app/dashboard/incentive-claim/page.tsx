@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 
 function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
     if (claims.length === 0) {
@@ -25,10 +27,14 @@ function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
     return (
         <div className="space-y-4">
             {claims.map(claim => (
-                <Card key={claim.id}>
-                    <CardContent className="pt-6">
-                        <p className="font-semibold">{claim.paperTitle}</p>
-                        <p className="text-sm text-muted-foreground">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
+                 <Card key={claim.id}>
+                    <CardContent className="p-4 flex justify-between items-start">
+                         <div>
+                            <p className="font-semibold">{claim.paperTitle}</p>
+                            {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
+                            <p className="text-sm text-muted-foreground">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
+                        </div>
+                        <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                     </CardContent>
                 </Card>
             ))}
