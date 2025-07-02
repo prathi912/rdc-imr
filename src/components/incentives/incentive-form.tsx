@@ -145,13 +145,18 @@ export function IncentiveForm() {
         return;
     }
 
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant. Please log in again.' });
+        return;
+    }
+
     setIsFetchingScopus(true);
     toast({ title: 'Fetching Scopus Data', description: 'Please wait...' });
 
     try {
-        const result = await fetchScopusDataByUrl(link);
+        const result = await fetchScopusDataByUrl(link, user.name);
         if (result.success && result.data) {
-            const { title, journalName, totalAuthors, totalInternalAuthors, totalInternalCoAuthors } = result.data;
+            const { title, journalName, totalAuthors, totalInternalAuthors, totalInternalCoAuthors, isClaimantAnAuthor } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate: true });
             
@@ -172,7 +177,16 @@ export function IncentiveForm() {
                 form.setValue('totalInternalCoAuthors', totalInternalCoAuthorsStr, { shouldValidate: true });
             }
             
-            toast({ title: 'Success', description: 'Form fields have been pre-filled.' });
+            if (isClaimantAnAuthor) {
+                toast({ title: 'Success', description: 'Form fields have been pre-filled. Claimant verified as an author.' });
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: 'Author Not Found',
+                    description: `Warning: Your name "${user.name}" was not found in the list of authors. Please verify the link or fill the form manually.`,
+                    duration: 10000,
+                });
+            }
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
         }
