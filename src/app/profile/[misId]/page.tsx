@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/config';
 import type { User, IncentiveClaim, Project } from '@/types';
 import { PageHeader } from '@/components/page-header';
@@ -13,34 +13,67 @@ import { Card, CardContent } from '@/components/ui/card';
 export default function ProfilePage() {
   const params = useParams();
   const misId = params.misId as string;
-  const [user, setUser] = useState<User | null>(null);
+  
+  const [profileUser, setProfileUser] = useState<User | null>(null);
   const [claims, setClaims] = useState<IncentiveClaim[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionUser, setSessionUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (!misId) return;
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+        setSessionUser(JSON.parse(storedUser));
+    } else {
+        // If there's no user, we can't fetch anything. Let rules handle it or show error early.
+        setLoading(false);
+        setError("You must be logged in to view profiles.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!misId || !sessionUser) {
+      return; // Wait for session user to be loaded
+    }
 
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch user by MIS ID
-        const usersRef = collection(db, 'users');
-        const userQuery = query(usersRef, where('misId', '==', misId), limit(1));
-        const userSnapshot = await getDocs(userQuery);
+        let fetchedUser: User | null = null;
+        const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
 
-        if (userSnapshot.empty) {
-          setError('User not found.');
-          setLoading(false);
-          return;
+        if (isAdmin) {
+          // Admins can query by misId, this is allowed by `list` security rule
+          const usersRef = collection(db, 'users');
+          const userQuery = query(usersRef, where('misId', '==', misId), limit(1));
+          const userSnapshot = await getDocs(userQuery);
+          if (!userSnapshot.empty) {
+            fetchedUser = { uid: userSnapshot.docs[0].id, ...userSnapshot.docs[0].data() } as User;
+          }
+        } else {
+          // Non-admins can only view their own profile.
+          if (sessionUser.misId === misId) {
+            // Fetch directly by UID, this is allowed by `get` security rule
+            const userRef = doc(db, 'users', sessionUser.uid);
+            const userSnapshot = await getDoc(userRef);
+            if (userSnapshot.exists()) {
+              fetchedUser = { uid: userSnapshot.id, ...userSnapshot.data() } as User;
+            }
+          } else {
+            // Trying to view someone else's profile
+            throw new Error("Access Denied: You do not have permission to view this profile.");
+          }
         }
 
-        const fetchedUser = { uid: userSnapshot.docs[0].id, ...userSnapshot.docs[0].data() } as User;
-        setUser(fetchedUser);
+        if (!fetchedUser) {
+          throw new Error('User not found.');
+        }
+        
+        setProfileUser(fetchedUser);
 
-        // Fetch user's incentive claims
+        // Fetch user's incentive claims (assuming admins can read all claims, and users their own)
         const claimsRef = collection(db, 'incentiveClaims');
         const claimsQuery = query(claimsRef, where('uid', '==', fetchedUser.uid), orderBy('submissionDate', 'desc'));
         const claimsSnapshot = await getDocs(claimsQuery);
@@ -56,8 +89,12 @@ export default function ProfilePage() {
             .filter(p => p.status !== 'Draft');
         setProjects(fetchedProjects);
 
-      } catch (err) {
-        setError('Failed to load profile data.');
+      } catch (err: any) {
+        if (err.code === 'permission-denied') {
+            setError("Access Denied: You do not have permission to view this profile.");
+        } else {
+            setError(err.message || 'Failed to load profile data.');
+        }
         console.error(err);
       } finally {
         setLoading(false);
@@ -65,7 +102,7 @@ export default function ProfilePage() {
     };
 
     fetchData();
-  }, [misId]);
+  }, [misId, sessionUser]);
 
   if (loading) {
     return (
@@ -84,7 +121,7 @@ export default function ProfilePage() {
     );
   }
 
-  if (error || !user) {
+  if (error || !profileUser) {
     return (
       <div className="container mx-auto max-w-5xl py-10">
         <PageHeader title="Error" description={error || 'Could not load profile.'} showBackButton={true} backButtonHref="/dashboard" />
@@ -95,12 +132,12 @@ export default function ProfilePage() {
   return (
     <div className="container mx-auto max-w-5xl py-10">
       <PageHeader
-        title={`${user.name}'s Profile`}
+        title={`${profileUser.name}'s Profile`}
         description="Public research profile and contributions."
         showBackButton={false}
       />
       <div className="mt-8">
-        <ProfileClient user={user} claims={claims} projects={projects} />
+        <ProfileClient user={profileUser} claims={claims} projects={projects} />
       </div>
     </div>
   );
