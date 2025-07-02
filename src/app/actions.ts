@@ -5,7 +5,7 @@ import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
 import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
 import { db } from '@/lib/config';
-import { adminStorage } from '@/lib/admin';
+import { adminDb, adminStorage } from '@/lib/admin';
 import { doc, collection, writeBatch, query, where, getDocs } from 'firebase/firestore';
 
 
@@ -141,5 +141,31 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
   } catch (error: any) {
     console.error('Error notifying admins:', error);
     return { success: false, error: error.message || 'Failed to notify admins.' };
+  }
+}
+
+export async function checkMisIdExists(misId: string, currentUid: string): Promise<{exists: boolean}> {
+  try {
+    const usersRef = adminDb.collection('users');
+    const q = usersRef.where('misId', '==', misId).limit(1);
+    const querySnapshot = await q.get();
+
+    if (querySnapshot.empty) {
+      return { exists: false };
+    }
+
+    const foundUserDoc = querySnapshot.docs[0];
+    if (foundUserDoc.id === currentUid) {
+      // The only user with this MIS ID is the current user. This can happen if they are re-saving their profile.
+      return { exists: false };
+    }
+
+    // A different user has this MIS ID.
+    return { exists: true };
+
+  } catch (error: any) {
+    console.error('Error checking MIS ID uniqueness:', error);
+    // Rethrow to let the client know something went wrong with the check.
+    throw new Error('Failed to verify MIS ID due to a server error. Please try again.');
   }
 }
