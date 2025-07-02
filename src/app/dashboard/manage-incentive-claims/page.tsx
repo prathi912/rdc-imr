@@ -34,7 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
-const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books'];
+const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies'];
 type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
 
@@ -165,6 +165,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                             {renderLinkDetail("Participation Certificate", claim.participationCertificateUrl)}
                             {renderLinkDetail("Prize Proof", claim.prizeProofUrl)}
                             {renderLinkDetail("Travel Receipts", claim.travelReceiptsUrl)}
+                            {renderLinkDetail("Flight Tickets", claim.flightTicketsUrl)}
                             {renderLinkDetail("Proof of Govt. Funding Request", claim.govtFundingRequestProofUrl)}
                         </>
                     )}
@@ -194,6 +195,17 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                             {renderLinkDetail("Publication Proof", claim.bookProofUrl)}
                             {renderLinkDetail("Scopus Proof", claim.scopusProofUrl)}
                             {renderDetail("Self Declaration", claim.bookSelfDeclaration)}
+                        </>
+                    )}
+
+                    {claim.claimType === 'Membership of Professional Bodies' && (
+                        <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Professional Body Membership Details</h4>
+                            {renderDetail("Professional Body Name", claim.professionalBodyName)}
+                            {renderDetail("Membership Fee (INR)", claim.membershipFee?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderLinkDetail("Proof of Membership", claim.membershipProofUrl)}
+                            {renderDetail("Self Declaration", claim.membershipSelfDeclaration)}
                         </>
                     )}
 
@@ -308,7 +320,8 @@ export default function ManageIncentiveClaimsPage() {
         (claim.paperTitle && claim.paperTitle.toLowerCase().includes(lowerCaseSearch)) ||
         (claim.patentTitle && claim.patentTitle.toLowerCase().includes(lowerCaseSearch)) ||
         (claim.conferencePaperTitle && claim.conferencePaperTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.publicationTitle && claim.publicationTitle.toLowerCase().includes(lowerCaseSearch))
+        (claim.publicationTitle && claim.publicationTitle.toLowerCase().includes(lowerCaseSearch)) ||
+        (claim.professionalBodyName && claim.professionalBodyName.toLowerCase().includes(lowerCaseSearch))
       );
     }
 
@@ -415,7 +428,7 @@ export default function ManageIncentiveClaimsPage() {
         {sortedAndFilteredClaims.map((claim) => (
             <TableRow key={claim.id}>
               <TableCell className="font-medium">{claim.userName}</TableCell>
-              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle}</TableCell>
+              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName}</TableCell>
               <TableCell className="hidden lg:table-cell">{claim.claimType}</TableCell>
               <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
               <TableCell>

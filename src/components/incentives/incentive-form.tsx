@@ -117,6 +117,7 @@ const incentiveSchema = z
     travelPlaceVisited: z.string().optional(),
     travelMode: z.enum(['Bus', 'Train', 'Air', 'Other']).optional(),
     travelReceipts: z.any().optional(),
+    flightTickets: z.any().optional(),
     conferenceSelfDeclaration: z.boolean().optional(),
     orcidId: z.string().optional(),
 
@@ -143,6 +144,12 @@ const incentiveSchema = z
     scopusProof: z.any().optional(),
     publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
     bookSelfDeclaration: z.boolean().optional(),
+    
+    // Professional Body Membership fields
+    professionalBodyName: z.string().optional(),
+    membershipFee: z.coerce.number().optional(),
+    membershipProof: z.any().optional(),
+    membershipSelfDeclaration: z.boolean().optional(),
   })
   .refine((data) => {
       if (data.claimType !== 'Research Papers') return true;
@@ -241,7 +248,12 @@ const incentiveSchema = z
   .refine(data => data.claimType !== 'Books' || !!data.publisherType, { message: 'Publisher type is required.', path: ['publisherType'] })
   .refine(data => data.claimType !== 'Books' || !!data.isbn, { message: 'ISBN is required.', path: ['isbn'] })
   .refine(data => data.claimType !== 'Books' || (!!data.bookProof && data.bookProof.length > 0), { message: 'Proof of book/chapter is required.', path: ['bookProof'] })
-  .refine(data => data.claimType !== 'Books' || data.bookSelfDeclaration === true, { message: 'You must agree to the self-declaration.', path: ['bookSelfDeclaration'] });
+  .refine(data => data.claimType !== 'Books' || data.bookSelfDeclaration === true, { message: 'You must agree to the self-declaration.', path: ['bookSelfDeclaration'] })
+  // Professional Body Membership validations
+  .refine(data => data.claimType !== 'Professional Bodies' || (!!data.professionalBodyName && data.professionalBodyName.length > 2), { message: 'Name of the professional body is required.', path: ['professionalBodyName'] })
+  .refine(data => data.claimType !== 'Professional Bodies' || (!!data.membershipFee && data.membershipFee > 0), { message: 'A valid membership fee is required.', path: ['membershipFee'] })
+  .refine(data => data.claimType !== 'Professional Bodies' || (!!data.membershipProof && data.membershipProof.length > 0), { message: 'Proof of membership/payment is required.', path: ['membershipProof'] })
+  .refine(data => data.claimType !== 'Professional Bodies' || data.membershipSelfDeclaration === true, { message: 'You must agree to the self-declaration.', path: ['membershipSelfDeclaration'] });
 
 type IncentiveFormValues = z.infer<typeof incentiveSchema>;
 
@@ -365,6 +377,7 @@ export function IncentiveForm() {
       travelPlaceVisited: '',
       travelMode: undefined,
       travelReceipts: undefined,
+      flightTickets: undefined,
       conferenceSelfDeclaration: false,
       orcidId: '',
       // Book/Book Chapter fields
@@ -390,6 +403,11 @@ export function IncentiveForm() {
       scopusProof: undefined,
       publicationOrderInYear: undefined,
       bookSelfDeclaration: false,
+      // Professional Body Membership fields
+      professionalBodyName: '',
+      membershipFee: 0,
+      membershipProof: undefined,
+      membershipSelfDeclaration: false,
     },
   });
   
@@ -412,6 +430,7 @@ export function IncentiveForm() {
   const conferenceVenue = form.watch('conferenceVenue');
   const patentFiledFromIprCell = form.watch('patentFiledFromIprCell');
   const conferenceMode = form.watch('conferenceMode');
+  const travelMode = form.watch('travelMode');
   const wonPrize = form.watch('wonPrize');
   const bookApplicationType = form.watch('bookApplicationType');
   const isScopusIndexed = form.watch('isScopusIndexed');
@@ -609,8 +628,10 @@ export function IncentiveForm() {
         const participationCertificateUrl = await uploadFileHelper(data.participationCertificate?.[0], 'conference-cert');
         const prizeProofUrl = await uploadFileHelper(data.prizeProof?.[0], 'conference-prize-proof');
         const travelReceiptsUrl = await uploadFileHelper(data.travelReceipts?.[0], 'conference-travel-receipts');
+        const flightTicketsUrl = await uploadFileHelper(data.flightTickets?.[0], 'conference-flight-tickets');
         const bookProofUrl = await uploadFileHelper(data.bookProof?.[0], 'book-proof');
         const scopusProofUrl = await uploadFileHelper(data.scopusProof?.[0], 'book-scopus-proof');
+        const membershipProofUrl = await uploadFileHelper(data.membershipProof?.[0], 'membership-proof');
 
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
@@ -624,8 +645,10 @@ export function IncentiveForm() {
             participationCertificateUrl,
             prizeProofUrl,
             travelReceiptsUrl,
+            flightTicketsUrl,
             bookProofUrl,
             scopusProofUrl,
+            membershipProofUrl,
             uid: user.uid,
             userName: user.name,
             userEmail: user.email,
@@ -686,6 +709,7 @@ export function IncentiveForm() {
                         <SelectItem value="Patents">Patents</SelectItem>
                         <SelectItem value="Conference Presentations">Assistance for Paper Presentation/Workshop/FDP/STTP</SelectItem>
                         <SelectItem value="Books">Books</SelectItem>
+                        <SelectItem value="Professional Bodies">Membership of Professional Bodies</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -1102,6 +1126,9 @@ export function IncentiveForm() {
                                     <FormField name="travelMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Mode</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select travel mode" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Bus">Bus</SelectItem><SelectItem value="Train">Train</SelectItem><SelectItem value="Air">Air</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
                                     <FormField name="travelFare" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Fare Incurred (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     <FormField name="travelReceipts" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach All Tickets/Travel Receipts</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                                    {travelMode === 'Air' && (
+                                       <FormField name="flightTickets" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Upload Flight Ticket(s)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                                    )}
                                 </div>
                             )}
                             {conferenceVenue && conferenceVenue !== 'India' && (
@@ -1216,6 +1243,17 @@ export function IncentiveForm() {
 
                    <FormField control={form.control} name="bookSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
               </div>
+            )}
+
+            {claimType === 'Professional Bodies' && (
+                <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
+                    <h3 className="font-semibold text-sm -mb-2">MEMBERSHIP DETAILS</h3>
+                    <Separator />
+                    <FormField name="professionalBodyName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Professional Body</FormLabel><FormControl><Input placeholder="e.g., Institute of Electrical and Electronics Engineers" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="membershipFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Membership Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10000" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="membershipProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof of Membership/Payment (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="membershipSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby certify that this is the only application for Professional Body Membership incentive in the current calendar year.</p></div></FormItem> )} />
+                </div>
             )}
 
 

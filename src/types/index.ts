@@ -188,6 +188,7 @@ export type IncentiveClaim = {
     travelPlaceVisited?: string;
     travelMode?: 'Bus' | 'Train' | 'Air' | 'Other';
     travelReceiptsUrl?: string;
+    flightTicketsUrl?: string;
     conferenceSelfDeclaration?: boolean;
 
     // Book/Book Chapter Fields
@@ -213,4 +214,10 @@ export type IncentiveClaim = {
     scopusProofUrl?: string;
     publicationOrderInYear?: 'First' | 'Second' | 'Third';
     bookSelfDeclaration?: boolean;
+
+    // Professional Body Membership fields
+    professionalBodyName?: string;
+    membershipFee?: number;
+    membershipProofUrl?: string;
+    membershipSelfDeclaration?: boolean;
 };
