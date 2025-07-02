@@ -3,6 +3,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import { format, isAfter, isBefore, startOfToday } from 'date-fns';
+import type { DateRange } from 'react-day-picker';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/config';
@@ -11,12 +13,35 @@ import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Calendar as CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Approved', 'Rejected', 'In Progress', 'Completed', 'Pending Completion Approval'];
+
+const EXPORT_COLUMNS = [
+  { id: 'id', label: 'Project ID' },
+  { id: 'title', label: 'Project Title' },
+  { id: 'type', label: 'Project Type' },
+  { id: 'submissionDate', label: 'Submission Date' },
+  { id: 'abstract', label: 'Abstract' },
+  { id: 'pi', label: 'Principal Investigator' },
+  { id: 'pi_email', label: 'PI Email' },
+  { id: 'pi_phoneNumber', label: 'PI Phone' },
+  { id: 'misId', label: 'MIS ID' },
+  { id: 'designation', label: 'Designation' },
+  { id: 'faculty', label: 'Faculty' },
+  { id: 'institute', label: 'Institute' },
+  { id: 'departmentName', label: 'Department' },
+  { id: 'status', label: 'Status' },
+];
 
 export default function AllProjectsPage() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
@@ -26,6 +51,11 @@ export default function AllProjectsPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  // State for export dialog
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>(undefined);
+  const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(EXPORT_COLUMNS.map(c => c.id));
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -100,7 +130,7 @@ export default function AllProjectsPage() {
     pageTitle = "Projects from Faculty of Engineering & Technology";
     pageDescription = "Browse all projects submitted from the Faculty of Engineering & Technology.";
   } else if (isCro) {
-    pageTitle = `Projects from ${user.faculty}`;
+    pageTitle = `Projects from ${user?.faculty}`;
     pageDescription = "Browse all projects submitted from your faculty.";
   }
 
@@ -121,38 +151,66 @@ export default function AllProjectsPage() {
       });
   }, [allProjects, searchTerm, statusFilter]);
 
-  const handleExport = () => {
-    if (filteredProjects.length === 0) {
-      toast({ variant: 'destructive', title: "No Data", description: "There are no projects to export in the current view." });
+  const handleColumnSelectionChange = (columnId: string, checked: boolean) => {
+    setSelectedExportColumns(prev => {
+      if (checked) {
+        return [...prev, columnId];
+      } else {
+        return prev.filter(id => id !== columnId);
+      }
+    });
+  };
+
+  const handleConfirmExport = () => {
+    let projectsToExport = [...filteredProjects];
+
+    if (exportDateRange?.from && exportDateRange?.to) {
+      projectsToExport = projectsToExport.filter(p => {
+        const submissionDate = new Date(p.submissionDate);
+        return isAfter(submissionDate, exportDateRange.from!) && isBefore(submissionDate, exportDateRange.to!);
+      });
+    }
+
+    if (projectsToExport.length === 0) {
+      toast({ variant: 'destructive', title: "No Data", description: "There are no projects to export with the selected filters." });
       return;
     }
     
     const userDetailsMap = new Map(users.map(u => [u.uid, { misId: u.misId || '', designation: u.designation || '' }]));
     
-    const dataToExport = filteredProjects.map(p => {
+    const dataToExport = projectsToExport.map(p => {
       const userDetails = userDetailsMap.get(p.pi_uid);
-      return {
-        'Project ID': p.id,
-        'Project Title': p.title,
-        'Project Type': p.type,
-        'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
-        'Abstract': p.abstract,
-        'Principal Investigator': p.pi,
-        'PI Email': p.pi_email || 'N/A',
-        'PI Phone': p.pi_phoneNumber || 'N/A',
-        'MIS ID': userDetails?.misId || 'N/A',
-        'Designation': userDetails?.designation || 'N/A',
-        'Faculty': p.faculty,
-        'Institute': p.institute,
-        'Department': p.departmentName,
-        'Status': p.status,
+      const projectData: { [key: string]: any } = {
+        id: p.id,
+        title: p.title,
+        type: p.type,
+        submissionDate: new Date(p.submissionDate).toLocaleDateString(),
+        abstract: p.abstract,
+        pi: p.pi,
+        pi_email: p.pi_email || 'N/A',
+        pi_phoneNumber: p.pi_phoneNumber || 'N/A',
+        misId: userDetails?.misId || 'N/A',
+        designation: userDetails?.designation || 'N/A',
+        faculty: p.faculty,
+        institute: p.institute,
+        departmentName: p.departmentName,
+        status: p.status,
       };
+
+      const row: { [key: string]: any } = {};
+      selectedExportColumns.forEach(colId => {
+        const column = EXPORT_COLUMNS.find(c => c.id === colId);
+        if (column) {
+            row[column.label] = projectData[colId];
+        }
+      });
+      return row;
     });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Projects");
-
+    
     let fileName = `all_projects_${new Date().toISOString().split('T')[0]}.xlsx`;
     if (isCro && user?.faculty) {
         fileName = `projects_${user.faculty.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -161,7 +219,8 @@ export default function AllProjectsPage() {
     }
     
     XLSX.writeFile(workbook, fileName);
-    toast({ title: "Export Started", description: `Downloading ${filteredProjects.length} projects.` });
+    toast({ title: "Export Started", description: `Downloading ${projectsToExport.length} projects.` });
+    setIsExportDialogOpen(false);
   };
 
 
@@ -169,10 +228,79 @@ export default function AllProjectsPage() {
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
         {(isAdmin || isCro || isSpecialUser) && (
-            <Button onClick={handleExport} disabled={loading || filteredProjects.length === 0}>
-                <Download className="mr-2 h-4 w-4" />
-                Export XLSX
-            </Button>
+            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                <DialogTrigger asChild>
+                    <Button disabled={loading || filteredProjects.length === 0}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export XLSX
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Custom Export</DialogTitle>
+                        <DialogDescription>Select filters and columns for your Excel export.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-6 py-4">
+                        <div>
+                            <Label>Filter by Submission Date</Label>
+                             <Popover>
+                                <PopoverTrigger asChild>
+                                <Button
+                                    id="date"
+                                    variant={"outline"}
+                                    className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}
+                                >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {exportDateRange?.from ? (
+                                    exportDateRange.to ? (
+                                        <>
+                                        {format(exportDateRange.from, "LLL dd, y")} -{" "}
+                                        {format(exportDateRange.to, "LLL dd, y")}
+                                        </>
+                                    ) : (
+                                        format(exportDateRange.from, "LLL dd, y")
+                                    )
+                                    ) : (
+                                    <span>Pick a date range</span>
+                                    )}
+                                </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                    initialFocus
+                                    mode="range"
+                                    defaultMonth={exportDateRange?.from}
+                                    selected={exportDateRange}
+                                    onSelect={setExportDateRange}
+                                    numberOfMonths={2}
+                                />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+                        <div>
+                            <Label>Select Columns to Export</Label>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-2 p-4 border rounded-md max-h-60 overflow-y-auto">
+                                {EXPORT_COLUMNS.map(column => (
+                                    <div key={column.id} className="flex items-center space-x-2">
+                                        <Checkbox 
+                                            id={`col-${column.id}`} 
+                                            checked={selectedExportColumns.includes(column.id)}
+                                            onCheckedChange={(checked) => handleColumnSelectionChange(column.id, !!checked)}
+                                        />
+                                        <label htmlFor={`col-${column.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                                            {column.label}
+                                        </label>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                        <Button onClick={handleConfirmExport}>Confirm & Export</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         )}
       </PageHeader>
       
