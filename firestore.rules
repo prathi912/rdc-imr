@@ -3,8 +3,37 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-    // Users Collection
+    function isOwner(uid) {
+      return request.auth.uid == uid;
+    }
+
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function isAdmin() {
+      let userData = getUserData(request.auth.uid);
+      return userData.role in ['admin', 'CRO', 'Super-admin'];
+    }
+    
+    function isEvaluator() {
+      let userData = getUserData(request.auth.uid);
+      return userData.role in ['Evaluator', 'CRO', 'Super-admin', 'admin'];
+    }
+
+    // Collection: users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if !exists(/databases/$(database)/documents/users/$(userId));
+      allow update: if isOwner(userId) || getUserData(request.auth.uid).role == 'Super-admin';
+    }
+     // Users Collection
     // - Anyone can read individual user profiles (for public profile pages).
     // - Users can create their own profile.
     // - Users can update their own profile, admins can update any profile.
@@ -15,7 +44,19 @@ service cloud.firestore {
       allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin'];
     }
 
-    // Projects Collection
+    // Collection: projects
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.pi_uid);
+
+      // Subcollection: evaluations
+      match /evaluations/{evaluatorId} {
+        allow read: if isSignedIn() && (isAdmin() || isOwner(evaluatorId));
+        allow write: if isSignedIn() && isEvaluator() && isOwner(evaluatorId);
+      }
+    }
+        // Projects Collection
     // - Any authenticated user can read projects.
     // - Users can only create projects for themselves.
     // - PIs and admins can update projects.
@@ -30,8 +71,13 @@ service cloud.firestore {
         allow read, write: if request.auth.uid == evaluatorId;
       }
     }
-
-    // Notifications Collection
+    // Collection: notifications
+    match /notifications/{notificationId} {
+      allow read, update: if isSignedIn() && isOwner(get(/databases/$(database)/documents/notifications/$(notificationId)).data.uid);
+      allow create: if isSignedIn();
+    }
+    
+       // Notifications Collection
     // - A user can read/update their own notifications.
     // - Creation is server-side only.
     match /notifications/{notificationId} {
@@ -46,6 +92,13 @@ service cloud.firestore {
       allow create: if request.auth.uid == request.resource.data.uid;
       allow read: if request.auth != null && (resource.data.uid == request.auth.uid || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Super-admin', 'CRO']);
       allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Super-admin', 'CRO'];
+    }
+    
+    // Collection: incentiveClaims
+    match /incentiveClaims/{claimId} {
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.uid;
+      allow read: if isSignedIn() && (isOwner(resource.data.uid) || isAdmin());
+      allow update: if isSignedIn() && isAdmin();
     }
   }
 }

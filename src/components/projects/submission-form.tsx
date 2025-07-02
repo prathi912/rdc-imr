@@ -19,7 +19,7 @@ import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/config';
 import { collection, doc, setDoc } from 'firebase/firestore';
-import { uploadFileToServer } from '@/app/actions';
+import { uploadFileToServer, notifyAdminsOnProjectSubmission } from '@/app/actions';
 
 const formSchema = z.object({
   // Step 1
@@ -208,6 +208,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         toast({ title: 'Draft Saved!', description: "You can continue editing from 'My Projects'." });
         if (!project?.id) router.push(`/dashboard/edit-submission/${projectId}`);
       } else {
+        await notifyAdminsOnProjectSubmission(projectId, data.title, user.name);
         toast({ title: 'Project Submitted!', description: 'Your project is now under review.' });
         router.push('/dashboard/my-projects');
       }

@@ -6,7 +6,7 @@ import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flo
 import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
 import { db } from '@/lib/config';
 import { adminStorage } from '@/lib/admin';
-import { doc, collection, writeBatch } from 'firebase/firestore';
+import { doc, collection, writeBatch, query, where, getDocs } from 'firebase/firestore';
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -105,5 +105,41 @@ export async function uploadFileToServer(fileDataUrl: string, path: string): Pro
   } catch (error: any) {
     console.error('Error uploading file via admin:', error);
     return { success: false, error: error.message || 'Failed to upload file.' };
+  }
+}
+
+export async function notifyAdminsOnProjectSubmission(projectId: string, projectTitle: string, piName: string) {
+  try {
+    const adminRoles = ['admin', 'Super-admin', 'CRO'];
+    const usersRef = collection(db, 'users');
+    const q = query(usersRef, where('role', 'in', adminRoles));
+
+    const adminUsersSnapshot = await getDocs(q);
+    if (adminUsersSnapshot.empty) {
+      console.log('No admin users found to notify.');
+      return { success: true, message: 'No admins to notify.' };
+    }
+
+    const batch = writeBatch(db);
+    const notificationTitle = `New Project Submitted: "${projectTitle}" by ${piName}`;
+
+    adminUsersSnapshot.forEach(userDoc => {
+      // userDoc.id is the UID of the admin user
+      const notificationRef = doc(collection(db, 'notifications'));
+      batch.set(notificationRef, {
+        uid: userDoc.id,
+        projectId: projectId,
+        title: notificationTitle,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      });
+    });
+
+    await batch.commit();
+    return { success: true };
+
+  } catch (error: any) {
+    console.error('Error notifying admins:', error);
+    return { success: false, error: error.message || 'Failed to notify admins.' };
   }
 }
