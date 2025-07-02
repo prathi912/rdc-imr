@@ -83,10 +83,29 @@ const incentiveSchema = z
     conferencePaperTitle: z.string().optional(),
     conferenceType: z.enum(['International', 'National', 'Regional/State']).optional(),
     conferenceVenue: z.enum(['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American']).optional(),
-    presentationType: z.enum(['Oral', 'Poster']).optional(),
+    presentationType: z.enum(['Oral', 'Poster', 'Other']).optional(),
     govtFundingRequestProof: z.any().optional(),
     registrationFee: z.coerce.number().optional(),
-    travelExpenses: z.coerce.number().optional(),
+    travelFare: z.coerce.number().optional(),
+    conferenceMode: z.enum(['Online', 'Offline']).optional(),
+    onlinePresentationOrder: z.enum(['First', 'Second', 'Third', 'Additional']).optional(),
+    wasPresentingAuthor: z.boolean().optional(),
+    isPuNamePresent: z.boolean().optional(),
+    abstractUpload: z.any().optional(),
+    organizerName: z.string().optional(),
+    eventWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+    conferenceDate: z.string().optional(),
+    presentationDate: z.string().optional(),
+    registrationFeeProof: z.any().optional(),
+    participationCertificate: z.any().optional(),
+    wonPrize: z.boolean().optional(),
+    prizeDetails: z.string().optional(),
+    prizeProof: z.any().optional(),
+    attendedOtherConference: z.boolean().optional(),
+    travelPlaceVisited: z.string().optional(),
+    travelMode: z.enum(['Bus', 'Train', 'Air', 'Other']).optional(),
+    travelReceipts: z.any().optional(),
+    conferenceSelfDeclaration: z.boolean().optional(),
   })
   .refine((data) => {
       if (data.claimType !== 'Research Papers') return true;
@@ -98,6 +117,7 @@ const incentiveSchema = z
       }
       return true;
   }, { message: 'For WoS or Both, you must select a WoS Type.', path: ['wosType'] })
+  // Conference validations
   .refine((data) => {
       if (data.claimType !== 'Conference Presentations') return true;
       return !!data.conferenceName && data.conferenceName.length > 2;
@@ -124,6 +144,14 @@ const incentiveSchema = z
       }
       return true;
   }, { message: 'Proof of government funding request is required for conferences outside India.', path: ['govtFundingRequestProof']})
+  .refine((data) => {
+    if (data.claimType !== 'Conference Presentations') return true;
+    return !!data.participationCertificate && data.participationCertificate.length > 0;
+  }, { message: 'Participation certificate is required.', path: ['participationCertificate']})
+  .refine((data) => {
+    if (data.claimType !== 'Conference Presentations') return true;
+    return data.conferenceSelfDeclaration === true;
+  }, { message: 'You must agree to the self-declaration.', path: ['conferenceSelfDeclaration']})
   // Patent validations
   .refine((data) => {
       if (data.claimType !== 'Patents') return true;
@@ -232,6 +260,8 @@ export function IncentiveForm() {
   const conferenceType = form.watch('conferenceType');
   const conferenceVenue = form.watch('conferenceVenue');
   const patentFiledFromIprCell = form.watch('patentFiledFromIprCell');
+  const conferenceMode = form.watch('conferenceMode');
+  const wonPrize = form.watch('wonPrize');
   
   const handleFetchScopusData = async () => {
     const link = form.getValues('relevantLink');
@@ -339,6 +369,12 @@ export function IncentiveForm() {
         const patentApprovalProofUrl = await uploadFileHelper(data.patentApprovalProof?.[0], 'patent-approval');
         const patentForm1Url = await uploadFileHelper(data.patentForm1?.[0], 'patent-form1');
         const patentGovtReceiptUrl = await uploadFileHelper(data.patentGovtReceipt?.[0], 'patent-govt-receipt');
+        const abstractUrl = await uploadFileHelper(data.abstractUpload?.[0], 'conference-abstract');
+        const registrationFeeProofUrl = await uploadFileHelper(data.registrationFeeProof?.[0], 'conference-reg-proof');
+        const participationCertificateUrl = await uploadFileHelper(data.participationCertificate?.[0], 'conference-cert');
+        const prizeProofUrl = await uploadFileHelper(data.prizeProof?.[0], 'conference-prize-proof');
+        const travelReceiptsUrl = await uploadFileHelper(data.travelReceipts?.[0], 'conference-travel-receipts');
+
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
@@ -346,6 +382,11 @@ export function IncentiveForm() {
             patentApprovalProofUrl,
             patentForm1Url,
             patentGovtReceiptUrl,
+            abstractUrl,
+            registrationFeeProofUrl,
+            participationCertificateUrl,
+            prizeProofUrl,
+            travelReceiptsUrl,
             uid: user.uid,
             userName: user.name,
             userEmail: user.email,
@@ -404,7 +445,7 @@ export function IncentiveForm() {
                       <SelectContent>
                         <SelectItem value="Research Papers">Research Papers</SelectItem>
                         <SelectItem value="Patents">Patents</SelectItem>
-                        <SelectItem value="Conference Presentations">Conference Presentations</SelectItem>
+                        <SelectItem value="Conference Presentations">Assistance for Paper Presentation/Workshop/FDP/STTP</SelectItem>
                         <SelectItem value="Books">Books (Coming Soon)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -738,43 +779,107 @@ export function IncentiveForm() {
             )}
 
             {claimType === 'Conference Presentations' && (
-                <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
-                    <h3 className="font-semibold text-sm -mb-2">CONFERENCE PRESENTATION DETAILS</h3>
-                    <Separator />
-                    <FormField name="conferencePaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Paper Title</FormLabel><FormControl><Input placeholder="Title of the paper presented" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                    <FormField name="conferenceName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Name</FormLabel><FormControl><Input placeholder="Full name of the conference" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField name="conferenceType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="International">International</SelectItem><SelectItem value="National">National</SelectItem><SelectItem value="Regional/State">Regional/State</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
-                        <FormField name="presentationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Oral">Oral</SelectItem><SelectItem value="Poster">Poster</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                <div className="rounded-lg border p-4 space-y-6 animate-in fade-in-0">
+                    <div>
+                        <h3 className="font-semibold text-sm -mb-2">EVENT &amp; PRESENTATION DETAILS</h3>
+                        <Separator className="mt-4"/>
+                        <div className="space-y-4 mt-4">
+                            <FormField name="conferencePaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Paper Title</FormLabel><FormControl><Input placeholder="Title of the paper presented" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField name="conferenceName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference/Event Name</FormLabel><FormControl><Input placeholder="Full name of the conference" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField name="organizerName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Organizer Name</FormLabel><FormControl><Input placeholder="e.g., IEEE, Springer" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                             <FormField name="eventWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Event Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                               <FormField name="conferenceDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                               <FormField name="presentationDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your Presentation Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField name="conferenceType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="International">International</SelectItem><SelectItem value="National">National</SelectItem><SelectItem value="Regional/State">Regional/State</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                                <FormField name="presentationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Oral">Oral</SelectItem><SelectItem value="Poster">Poster</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                            </div>
+                             <FormField
+                                control={form.control}
+                                name="conferenceVenue"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Conference Venue/Location</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value} disabled={!conferenceType}>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue placeholder="Select venue" /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {(conferenceVenueOptions[conferenceType as keyof typeof conferenceVenueOptions] || []).map(venue => (
+                                                    <SelectItem key={venue} value={venue}>{venue}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField name="conferenceMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Mode</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Online" /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Offline" /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                             {conferenceMode === 'Online' && (
+                                <FormField name="onlinePresentationOrder" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Online Presentation Order</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem><SelectItem value="Additional">Additional</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                             )}
+                            <FormField name="abstractUpload" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Full Abstract (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField name="participationCertificate" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Participation/Presentation Certificate (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                        </div>
                     </div>
-                     <FormField
-                        control={form.control}
-                        name="conferenceVenue"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Conference Venue/Location</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value} disabled={!conferenceType}>
-                                    <FormControl>
-                                        <SelectTrigger><SelectValue placeholder="Select venue" /></SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        {(conferenceVenueOptions[conferenceType as keyof typeof conferenceVenueOptions] || []).map(venue => (
-                                            <SelectItem key={venue} value={venue}>{venue}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    {conferenceVenue && conferenceVenue !== 'India' && (
-                         <FormField name="govtFundingRequestProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Govt. Funding Request</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormDescription>Required for conferences outside India.</FormDescription><FormMessage /></FormItem> )} />
-                    )}
-                    <Separator />
-                    <p className="text-sm font-medium">Expenses</p>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField name="registrationFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Registration Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                        <FormField name="travelExpenses" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Expenses (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 20000" {...field} /></FormControl><FormMessage /></FormItem> )} />
+
+                     <div>
+                        <h3 className="font-semibold text-sm -mb-2">EXPENSE &amp; TRAVEL DETAILS</h3>
+                        <Separator className="mt-4"/>
+                        <div className="space-y-4 mt-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <FormField name="registrationFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Registration Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField name="registrationFeeProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Registration Fee Payment</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                            </div>
+                            {conferenceMode === 'Offline' && (
+                                <div className="space-y-4">
+                                    <FormField name="travelPlaceVisited" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Place Visited</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField name="travelMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Mode</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select travel mode" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Bus">Bus</SelectItem><SelectItem value="Train">Train</SelectItem><SelectItem value="Air">Air</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                                    <FormField name="travelFare" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Fare Incurred (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField name="travelReceipts" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach All Tickets/Travel Receipts</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                                </div>
+                            )}
+                            {conferenceVenue && conferenceVenue !== 'India' && (
+                                <FormField name="govtFundingRequestProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Govt. Funding Request</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormDescription>Required for conferences outside India.</FormDescription><FormMessage /></FormItem> )} />
+                            )}
+                        </div>
+                     </div>
+
+                    <div>
+                        <h3 className="font-semibold text-sm -mb-2">DECLARATIONS</h3>
+                        <Separator className="mt-4"/>
+                        <div className="space-y-4 mt-4">
+                           <FormField name="wasPresentingAuthor" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Were you the presenting author?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
+                           <FormField name="isPuNamePresent" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Is "Parul University" name present in the paper?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
+                           <FormField name="wonPrize" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Did your paper win a prize?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
+                           {wonPrize && (
+                             <div className="space-y-4 pl-4 border-l-2">
+                                <FormField name="prizeDetails" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Prize Details</FormLabel><FormControl><Input placeholder="e.g., Best Paper Award" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField name="prizeProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Prize Certificate (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                             </div>
+                           )}
+                           <FormField name="attendedOtherConference" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Have you attended any other conference this year?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
+                            <FormField
+                              control={form.control}
+                              name="conferenceSelfDeclaration"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                  <FormControl>
+                                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                  </FormControl>
+                                  <div className="space-y-1 leading-none">
+                                    <FormLabel>Self Declaration</FormLabel>
+                                    <FormMessage />
+                                    <p className="text-xs text-muted-foreground">
+                                        I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier & Certified that I have availed only this conference in the calendar year.
+                                    </p>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                        </div>
                     </div>
                 </div>
             )}

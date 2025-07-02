@@ -41,7 +41,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
 
     const renderDetail = (label: string, value?: string | number | boolean) => {
         if (value === undefined || value === null || value === '') return null;
-        let displayValue = value;
+        let displayValue = String(value);
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
         }
@@ -60,7 +60,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
           <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
           <dd className="col-span-2">
             <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-              {value}
+              View Document
             </a>
           </dd>
         </div>
@@ -123,14 +123,46 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     {claim.claimType === 'Conference Presentations' && (
                          <>
                             <hr className="my-2" />
-                            <h4 className="font-semibold text-base mt-2">Conference Details</h4>
+                            <h4 className="font-semibold text-base mt-2">Conference & Event Details</h4>
                             {renderDetail("Paper Title", claim.conferencePaperTitle)}
                             {renderDetail("Conference Name", claim.conferenceName)}
+                            {renderDetail("Organizer", claim.organizerName)}
+                            {renderLinkDetail("Event Website", claim.eventWebsite)}
+                            {renderDetail("Conference Date", claim.conferenceDate ? new Date(claim.conferenceDate).toLocaleDateString() : '')}
+                            {renderDetail("Presentation Date", claim.presentationDate ? new Date(claim.presentationDate).toLocaleDateString() : '')}
                             {renderDetail("Conference Type", claim.conferenceType)}
                             {renderDetail("Presentation Type", claim.presentationType)}
-                            {renderDetail("Venue/Location", claim.conferenceVenue)}
+                            {renderDetail("Presentation Mode", claim.conferenceMode)}
+                            {renderDetail("Online Presentation Order", claim.onlinePresentationOrder)}
+                            
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Expense & Travel Details</h4>
                             {renderDetail("Registration Fee", claim.registrationFee?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
-                            {renderDetail("Travel Expenses", claim.travelExpenses?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Venue/Location", claim.conferenceVenue)}
+                            {claim.conferenceMode === 'Offline' && (
+                                <>
+                                {renderDetail("Place Visited", claim.travelPlaceVisited)}
+                                {renderDetail("Travel Mode", claim.travelMode)}
+                                {renderDetail("Travel Fare", claim.travelFare?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                                </>
+                            )}
+                            
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Declarations & Proofs</h4>
+                            {renderDetail("Presenting Author?", claim.wasPresentingAuthor)}
+                            {renderDetail("PU Name in Paper?", claim.isPuNamePresent)}
+                            {renderDetail("Won a Prize?", claim.wonPrize)}
+                            {renderDetail("Prize Details", claim.prizeDetails)}
+                            {renderDetail("Attended Other Conference?", claim.attendedOtherConference)}
+                            {renderDetail("Self-Declaration Agreed?", claim.conferenceSelfDeclaration)}
+
+                             <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Uploaded Documents</h4>
+                            {renderLinkDetail("Abstract", claim.abstractUrl)}
+                            {renderLinkDetail("Registration Fee Proof", claim.registrationFeeProofUrl)}
+                            {renderLinkDetail("Participation Certificate", claim.participationCertificateUrl)}
+                            {renderLinkDetail("Prize Proof", claim.prizeProofUrl)}
+                            {renderLinkDetail("Travel Receipts", claim.travelReceiptsUrl)}
                             {renderLinkDetail("Proof of Govt. Funding Request", claim.govtFundingRequestProofUrl)}
                         </>
                     )}

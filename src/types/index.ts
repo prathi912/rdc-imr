@@ -166,8 +166,27 @@ export type IncentiveClaim = {
     conferencePaperTitle?: string;
     conferenceType?: 'International' | 'National' | 'Regional/State';
     conferenceVenue?: 'India' | 'Indian Subcontinent' | 'South Korea, Japan, Australia and Middle East' | 'Europe' | 'African/South American/North American';
-    presentationType?: 'Oral' | 'Poster';
+    presentationType?: 'Oral' | 'Poster' | 'Other';
     govtFundingRequestProofUrl?: string;
     registrationFee?: number;
-    travelExpenses?: number;
+    travelFare?: number;
+    conferenceMode?: 'Online' | 'Offline';
+    onlinePresentationOrder?: 'First' | 'Second' | 'Third' | 'Additional';
+    wasPresentingAuthor?: boolean;
+    isPuNamePresent?: boolean;
+    abstractUrl?: string;
+    organizerName?: string;
+    eventWebsite?: string;
+    conferenceDate?: string; // ISO String
+    presentationDate?: string; // ISO String
+    registrationFeeProofUrl?: string;
+    participationCertificateUrl?: string;
+    wonPrize?: boolean;
+    prizeDetails?: string;
+    prizeProofUrl?: string;
+    attendedOtherConference?: boolean;
+    travelPlaceVisited?: string;
+    travelMode?: 'Bus' | 'Train' | 'Air' | 'Other';
+    travelReceiptsUrl?: string;
+    conferenceSelfDeclaration?: boolean;
 };
