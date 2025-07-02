@@ -181,7 +181,7 @@ export async function checkMisIdExists(misId: string, currentUid: string): Promi
   }
 }
 
-export async function fetchScopusDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; totalInternalAuthors: number; totalInternalCoAuthors: number; isClaimantAnAuthor: boolean; }; error?: string }> {
+export async function fetchScopusDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; totalInternalAuthors: number; totalInternalCoAuthors: number; }; error?: string }> {
   const apiKey = process.env.SCOPUS_API_KEY;
   if (!apiKey) {
     console.error('Scopus API key is not configured.');
@@ -251,27 +251,6 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
     }
     const totalInternalCoAuthors = Math.max(0, totalInternalAuthors - 1);
 
-    let isClaimantAnAuthor = false;
-    if (Array.isArray(authors) && claimantName) {
-      const claimantLastName = claimantName.split(' ').pop()?.toLowerCase();
-      if (claimantLastName) {
-        isClaimantAnAuthor = authors.some(author => {
-          // 'ce:indexed-name' is usually in the format "Lastname F."
-          const scopusAuthorName = author['ce:indexed-name']?.toLowerCase();
-          // Fallback to 'ce:surname' if indexed-name is not present
-          const scopusSurname = author['ce:surname']?.toLowerCase();
-          
-          if (scopusAuthorName) {
-            return scopusAuthorName.includes(claimantLastName);
-          }
-          if (scopusSurname) {
-            return scopusSurname.includes(claimantLastName);
-          }
-          return false;
-        });
-      }
-    }
-
     return {
       success: true,
       data: {
@@ -280,7 +259,6 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
         totalAuthors,
         totalInternalAuthors,
         totalInternalCoAuthors,
-        isClaimantAnAuthor,
       },
     };
   } catch (error: any) {
