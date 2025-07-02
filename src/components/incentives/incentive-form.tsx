@@ -317,6 +317,30 @@ export function IncentiveForm() {
                 />
                 <FormField
                     control={form.control}
+                    name="indexType"
+                    render={({ field }) => (
+                        <FormItem className="space-y-3">
+                        <FormLabel>Select Type</FormLabel>
+                        <FormControl>
+                            <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex flex-wrap items-center gap-x-6 gap-y-2"
+                            disabled={isSubmitting || bankDetailsMissing}
+                            >
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="wos" /></FormControl><FormLabel className="font-normal">WoS</FormLabel></FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scopus" /></FormControl><FormLabel className="font-normal">Scopus</FormLabel></FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="both" /></FormControl><FormLabel className="font-normal">Both</FormLabel></FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="esci" /></FormControl><FormLabel className="font-normal">ESCI</FormLabel></FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="ft50" /></FormControl><FormLabel className="font-normal">FT-50</FormLabel></FormItem>
+                            </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
                     name="relevantLink"
                     render={({ field }) => (
                         <FormItem>
@@ -337,30 +361,6 @@ export function IncentiveForm() {
                                 <span className="sr-only">Fetch from Scopus</span>
                             </Button>
                         </div>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="indexType"
-                    render={({ field }) => (
-                        <FormItem className="space-y-3">
-                        <FormLabel>Select Type</FormLabel>
-                        <FormControl>
-                            <RadioGroup
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            className="flex flex-wrap items-center gap-x-6 gap-y-2"
-                            disabled={isSubmitting || bankDetailsMissing}
-                            >
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="wos" /></FormControl><FormLabel className="font-normal">WoS</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scopus" /></FormControl><FormLabel className="font-normal">Scopus</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="both" /></FormControl><FormLabel className="font-normal">Both</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="esci" /></FormControl><FormLabel className="font-normal">ESCI</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="ft50" /></FormControl><FormLabel className="font-normal">FT-50</FormLabel></FormItem>
-                            </RadioGroup>
-                        </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}

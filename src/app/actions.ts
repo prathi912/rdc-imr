@@ -180,22 +180,22 @@ export async function fetchScopusDataByUrl(url: string): Promise<{ success: bool
   let identifier: string | null = null;
   let type: 'doi' | 'eid' | null = null;
 
-  // Try to extract DOI
-  const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
-  if (doiMatch && doiMatch[1]) {
-    identifier = doiMatch[1];
-    type = 'doi';
+  // Prioritize EID extraction from Scopus URLs as it's more specific
+  const eidMatch = url.match(/eid=([^&]+)/);
+  if (eidMatch && eidMatch[1]) {
+    identifier = eidMatch[1];
+    type = 'eid';
   } else {
-    // Try to extract EID from common Scopus URL format
-    const eidMatch = url.match(/eid=([^&]+)/);
-    if (eidMatch && eidMatch[1]) {
-      identifier = eidMatch[1];
-      type = 'eid';
+    // If no EID is found, fall back to looking for a DOI anywhere in the string
+    const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+    if (doiMatch && doiMatch[1]) {
+      identifier = doiMatch[1];
+      type = 'doi';
     }
   }
 
   if (!identifier || !type) {
-    return { success: false, error: 'Could not find a valid DOI or Scopus EID in the provided link.' };
+    return { success: false, error: 'Could not find a valid Scopus EID or DOI in the provided link.' };
   }
 
   const scopusApiUrl = `https://api.elsevier.com/content/abstract/${type}/${encodeURIComponent(identifier)}`;
