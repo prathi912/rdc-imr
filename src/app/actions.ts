@@ -3,7 +3,7 @@
 
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
-import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
+import { getResearchDomain, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
 import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal-website-finder';
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
@@ -292,6 +292,78 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
   } catch (error: any) {
     console.error('Error calling Scopus API:', error);
     return { success: false, error: error.message || 'An unexpected error occurred while fetching Scopus data.' };
+  }
+}
+
+export async function fetchWosDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; }; error?: string; claimantIsAuthor?: boolean; }> {
+  const apiKey = process.env.WOS_API_KEY;
+  if (!apiKey) {
+    console.error('Web of Science API key is not configured.');
+    return { success: false, error: 'Web of Science integration is not configured on the server.' };
+  }
+
+  const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+  if (!doiMatch || !doiMatch[1]) {
+    return { success: false, error: 'Could not find a valid DOI in the provided link.' };
+  }
+  const doi = doiMatch[1];
+
+  const wosApiUrl = `https://api.clarivate.com/api/wos/?databaseId=WOS&usr_query=DO=${encodeURIComponent(doi)}&count=1&firstRecord=1`;
+
+  try {
+    const response = await fetch(wosApiUrl, {
+      headers: {
+        'X-ApiKey': apiKey,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = errorData?.message || 'Failed to fetch data from Web of Science.';
+      return { success: false, error: `WoS API Error: ${errorMessage}` };
+    }
+
+    const data = await response.json();
+    const record = data?.Data?.Records?.records?.item?.[0];
+
+    if (!record) {
+      return { success: false, error: 'No matching record found in Web of Science for the provided DOI.' };
+    }
+
+    const title = record.title?.title?.[0]?.value || '';
+    const journalName = record.source?.source_title?.[0]?.value || '';
+    
+    const authors = record.static_data?.fullrecord_metadata?.authors?.author;
+    const authorList = Array.isArray(authors) ? authors : (authors ? [authors] : []);
+    const totalAuthors = authorList.length;
+
+    const nameParts = claimantName.trim().toLowerCase().split(/\s+/);
+    const claimantLastName = nameParts.pop() || '---';
+
+    const isClaimantAnAuthor = authorList.some((author: any) => {
+        const wosFullName = (author.full_name || '').toLowerCase();
+        // WoS format is often "Lastname, F." or "Lastname, Firstname"
+        if (wosFullName.includes(',')) {
+            const [wosLastName] = wosFullName.split(',').map((p:string) => p.trim());
+            return wosLastName === claimantLastName;
+        }
+        // Fallback for "Firstname Lastname" format
+        return wosFullName.includes(claimantLastName);
+    });
+
+    return {
+      success: true,
+      data: {
+        title,
+        journalName,
+        totalAuthors
+      },
+      claimantIsAuthor,
+    };
+  } catch (error: any) {
+    console.error('Error calling Web of Science API:', error);
+    return { success: false, error: error.message || 'An unexpected error occurred while fetching WoS data.' };
   }
 }
 

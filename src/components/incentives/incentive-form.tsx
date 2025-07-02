@@ -41,7 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { fetchScopusDataByUrl, getJournalWebsite, uploadFileToServer } from '@/app/actions';
+import { fetchScopusDataByUrl, getJournalWebsite, uploadFileToServer, fetchWosDataByUrl } from '@/app/actions';
 import { Loader2, AlertCircle, Bot } from 'lucide-react';
 
 const incentiveSchema = z
@@ -266,6 +266,7 @@ export function IncentiveForm() {
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingScopus, setIsFetchingScopus] = useState(false);
+  const [isFetchingWos, setIsFetchingWos] = useState(false);
   const [isFindingWebsite, setIsFindingWebsite] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   
@@ -356,6 +357,53 @@ export function IncentiveForm() {
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
     } finally {
         setIsFetchingScopus(false);
+    }
+  };
+
+  const handleFetchWosData = async () => {
+    const link = form.getValues('relevantLink');
+    if (!link) {
+      toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a link to fetch data from.' });
+      return;
+    }
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant. Please log in again.' });
+        return;
+    }
+
+    setIsFetchingWos(true);
+    toast({ title: 'Fetching WoS Data', description: 'Please wait...' });
+
+    try {
+        const result = await fetchWosDataByUrl(link, user.name);
+        if (result.success && result.data) {
+            const { title, journalName, totalAuthors } = result.data;
+            form.setValue('paperTitle', title, { shouldValidate: true });
+            form.setValue('journalName', journalName, { shouldValidate:true });
+            
+            const formatCount = (count: number) => count >= 10 ? '10+' : count.toString();
+            const totalAuthorsStr = formatCount(totalAuthors);
+            if (authorCountOptions.includes(totalAuthorsStr)) {
+                form.setValue('totalAuthors', totalAuthorsStr, { shouldValidate: true });
+            }
+            
+            toast({ title: 'Success', description: 'Form fields have been pre-filled from Web of Science.' });
+
+            if (result.claimantIsAuthor === false) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Author Not Found',
+                    description: `Could not verify "${user.name}" in the author list. Please check the publication link and your profile name.`,
+                    duration: 8000,
+                });
+            }
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFetchingWos(false);
     }
   };
 
@@ -560,13 +608,24 @@ export function IncentiveForm() {
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    size="icon"
+                                    size="sm"
                                     onClick={handleFetchScopusData}
                                     disabled={isSubmitting || bankDetailsMissing || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')}
                                     title="Fetch data from Scopus"
                                 >
                                     {isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                                    <span className="sr-only">Fetch from Scopus</span>
+                                    Scopus
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleFetchWosData}
+                                    disabled={isSubmitting || bankDetailsMissing || isFetchingWos || !relevantLink || (indexType !== 'wos' && indexType !== 'both')}
+                                    title="Fetch data from Web of Science"
+                                >
+                                    {isFetchingWos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                    WoS
                                 </Button>
                             </div>
                             <FormMessage />
