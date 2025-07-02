@@ -178,6 +178,15 @@ export function IncentiveForm() {
             }
             
             toast({ title: 'Success', description: 'Form fields have been pre-filled.' });
+
+            if (result.claimantIsAuthor === false) { // check for explicit false
+                toast({
+                    variant: 'destructive',
+                    title: 'Author Not Found',
+                    description: `Could not verify "${user.name}" in the author list. Please check the publication link and your profile name.`,
+                    duration: 8000,
+                });
+            }
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
         }

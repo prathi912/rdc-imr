@@ -181,7 +181,7 @@ export async function checkMisIdExists(misId: string, currentUid: string): Promi
   }
 }
 
-export async function fetchScopusDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; totalInternalAuthors: number; totalInternalCoAuthors: number; }; error?: string }> {
+export async function fetchScopusDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; totalInternalAuthors: number; totalInternalCoAuthors: number; }; error?: string; claimantIsAuthor?: boolean; }> {
   const apiKey = process.env.SCOPUS_API_KEY;
   if (!apiKey) {
     console.error('Scopus API key is not configured.');
@@ -251,6 +251,33 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
     }
     const totalInternalCoAuthors = Math.max(0, totalInternalAuthors - 1);
 
+    const nameParts = claimantName.trim().toLowerCase().split(/\s+/);
+    const claimantLastName = nameParts.pop() || '---';
+    const claimantFirstName = nameParts[0] || '---';
+    
+    const isClaimantAnAuthor = Array.isArray(authors) && authors.some(author => {
+        const indexedName = (author['ce:indexed-name'] || '').toLowerCase(); // "joshi, r." or "joshi, rajesh"
+        
+        // Strategy 1: Use the indexed name which is usually reliable.
+        if (indexedName.includes(',')) {
+            const [scopusLastName, scopusFirstNamePart] = indexedName.split(',').map(p => p.trim());
+            if (scopusLastName === claimantLastName) {
+                // Last names match. Now check first name/initial.
+                if (scopusFirstNamePart.startsWith(claimantFirstName.charAt(0))) {
+                    return true; // Match found (e.g., "joshi" and "a" from "anand")
+                }
+            }
+        }
+        
+        // Strategy 2: Fallback to structured name fields if they exist.
+        const surname = (author['ce:surname'] || '').toLowerCase();
+        if (surname && surname === claimantLastName) {
+           return true; // Match on surname as a fallback
+        }
+
+        return false;
+    });
+
     return {
       success: true,
       data: {
@@ -260,6 +287,7 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
         totalInternalAuthors,
         totalInternalCoAuthors,
       },
+      claimantIsAuthor,
     };
   } catch (error: any) {
     console.error('Error calling Scopus API:', error);
