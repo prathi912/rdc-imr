@@ -19,10 +19,7 @@ function ensureAdminInitialized() {
 
   const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey =
-    "-----BEGIN PRIVATE KEY-----\n" +
-    (process.env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, "\n") +
-    "\n-----END PRIVATE KEY-----\n";
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
   const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
 
   // Check if all required environment variables are present.
