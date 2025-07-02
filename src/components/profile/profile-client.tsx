@@ -46,8 +46,8 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
     }, [projects]);
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-            <div className="md:col-span-1 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
+            <div className="lg:col-span-1 space-y-6">
                 <Card>
                     <CardContent className="p-6 text-center">
                         <Avatar className="h-28 w-28 mx-auto mb-4">
@@ -55,7 +55,7 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
                             <AvatarFallback>{user.name?.[0].toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <h1 className="text-2xl font-bold">{user.name}</h1>
-                        <p className="text-muted-foreground">{user.email}</p>
+                        <p className="text-muted-foreground break-words">{user.email}</p>
                     </CardContent>
                 </Card>
                 <Card>
@@ -92,7 +92,7 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
                     </CardContent>
                 </Card>
             </div>
-            <div className="md:col-span-2">
+            <div className="lg:col-span-3">
                 <Tabs defaultValue="projects" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="projects">Projects ({projects.length})</TabsTrigger>

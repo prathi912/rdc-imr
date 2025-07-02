@@ -106,7 +106,7 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto max-w-5xl py-10">
+      <div className="container mx-auto max-w-7xl py-10">
         <PageHeader title="Loading Profile..." description="Please wait..." showBackButton={true} backButtonHref="/dashboard" />
         <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="md:col-span-1">
@@ -123,14 +123,14 @@ export default function ProfilePage() {
 
   if (error || !profileUser) {
     return (
-      <div className="container mx-auto max-w-5xl py-10">
+      <div className="container mx-auto max-w-7xl py-10">
         <PageHeader title="Error" description={error || 'Could not load profile.'} showBackButton={true} backButtonHref="/dashboard" />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto max-w-5xl py-10">
+    <div className="container mx-auto max-w-7xl py-10">
       <PageHeader
         title={`${profileUser.name}'s Profile`}
         description="Public research profile and contributions."
