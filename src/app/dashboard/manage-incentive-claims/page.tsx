@@ -48,6 +48,20 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
             </div>
         );
     };
+    
+    const renderLinkDetail = (label: string, value?: string) => {
+      if (!value) return null;
+      return (
+        <div className="grid grid-cols-3 gap-2 py-1">
+          <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
+          <dd className="col-span-2">
+            <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+              {value}
+            </a>
+          </dd>
+        </div>
+      );
+    }
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -64,6 +78,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     <hr className="my-2" />
                     <h4 className="font-semibold text-base mt-2">Claim Information</h4>
                     {renderDetail("Paper Title", claim.paperTitle)}
+                    {renderLinkDetail("Relevant Link", claim.relevantLink)}
                     {renderDetail("Journal Name", claim.journalName)}
                     {renderDetail("Claim Type", claim.claimType)}
                     {renderDetail("Publication Type", claim.publicationType)}

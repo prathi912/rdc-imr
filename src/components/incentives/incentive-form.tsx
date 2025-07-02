@@ -61,6 +61,7 @@ const incentiveSchema = z
     journalName: z.string().min(5, 'Journal name is required.'),
     paperTitle: z.string().min(5, 'Paper title is required.'),
     publicationPhase: z.string().min(1, 'Please select the publication phase.'),
+    relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   })
   .refine(
     (data) => {
@@ -111,6 +112,7 @@ export function IncentiveForm() {
       journalName: '',
       paperTitle: '',
       publicationPhase: '',
+      relevantLink: '',
     },
   });
   
@@ -437,6 +439,19 @@ export function IncentiveForm() {
                             <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
                         </FormControl>
                         <FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="relevantLink"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Relevant Link (e.g., DOI, Article URL)</FormLabel>
+                        <FormControl>
+                            <Input placeholder="https://example.com/your-paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                        </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}

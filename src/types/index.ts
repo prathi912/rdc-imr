@@ -1,6 +1,5 @@
 
 
-
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -139,4 +138,5 @@ export type IncentiveClaim = {
     journalName: string;
     paperTitle: string;
     publicationPhase: string;
+    relevantLink?: string;
 };
