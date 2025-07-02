@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/config';
 import type { User, IncentiveClaim, Project } from '@/types';
 import { PageHeader } from '@/components/page-header';
@@ -43,16 +43,18 @@ export default function ProfilePage() {
 
         // Fetch user's incentive claims
         const claimsRef = collection(db, 'incentiveClaims');
-        const claimsQuery = query(claimsRef, where('uid', '==', fetchedUser.uid));
+        const claimsQuery = query(claimsRef, where('uid', '==', fetchedUser.uid), orderBy('submissionDate', 'desc'));
         const claimsSnapshot = await getDocs(claimsQuery);
         const fetchedClaims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
         setClaims(fetchedClaims);
 
         // Fetch user's projects
         const projectsRef = collection(db, 'projects');
-        const projectsQuery = query(projectsRef, where('pi_uid', '==', fetchedUser.uid), where('status', '!=', 'Draft'));
+        const projectsQuery = query(projectsRef, where('pi_uid', '==', fetchedUser.uid), orderBy('submissionDate', 'desc'));
         const projectsSnapshot = await getDocs(projectsQuery);
-        const fetchedProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        const fetchedProjects = projectsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Project))
+            .filter(p => p.status !== 'Draft');
         setProjects(fetchedProjects);
 
       } catch (err) {
