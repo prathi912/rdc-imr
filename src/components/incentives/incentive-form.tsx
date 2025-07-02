@@ -40,7 +40,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { fetchScopusDataByUrl } from '@/app/actions';
+import { fetchScopusDataByUrl, getJournalWebsite } from '@/app/actions';
 import { Loader2, AlertCircle, Bot } from 'lucide-react';
 
 const incentiveSchema = z
@@ -98,6 +98,7 @@ export function IncentiveForm() {
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingScopus, setIsFetchingScopus] = useState(false);
+  const [isFindingWebsite, setIsFindingWebsite] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   
   const form = useForm<IncentiveFormValues>({
@@ -135,6 +136,7 @@ export function IncentiveForm() {
 
   const indexType = form.watch('indexType');
   const relevantLink = form.watch('relevantLink');
+  const journalName = form.watch('journalName');
   
   const handleFetchScopusData = async () => {
     const link = form.getValues('relevantLink');
@@ -178,6 +180,31 @@ export function IncentiveForm() {
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
     } finally {
         setIsFetchingScopus(false);
+    }
+  };
+
+  const handleFindWebsite = async () => {
+    const name = form.getValues('journalName');
+    if (!name) {
+        toast({ variant: 'destructive', title: 'No Journal Name', description: 'Please enter a journal name to find its website.' });
+        return;
+    }
+
+    setIsFindingWebsite(true);
+    toast({ title: 'Finding Website', description: 'AI is searching for the journal website...' });
+
+    try {
+        const result = await getJournalWebsite({ journalName: name });
+        if (result.success && result.url) {
+            form.setValue('journalWebsite', result.url, { shouldValidate: true });
+            toast({ title: 'Success', description: 'Journal website link has been filled.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to find website.' });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFindingWebsite(false);
     }
   };
 
@@ -423,9 +450,22 @@ export function IncentiveForm() {
                     render={({ field }) => (
                         <FormItem>
                         <FormLabel>Name of Journal/Proceedings</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                        </FormControl>
+                        <div className="flex items-center gap-2">
+                            <FormControl>
+                                <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                            </FormControl>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={handleFindWebsite}
+                                disabled={isSubmitting || bankDetailsMissing || isFindingWebsite || !journalName}
+                                title="Find Journal Website with AI"
+                            >
+                                {isFindingWebsite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                <span className="sr-only">Find Website</span>
+                            </Button>
+                        </div>
                         <FormMessage />
                         </FormItem>
                     )}

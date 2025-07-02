@@ -4,6 +4,7 @@
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
 import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
+import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal-website-finder';
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
 import { doc, collection, writeBatch, query, where, getDocs } from 'firebase/firestore';
@@ -36,6 +37,16 @@ export async function getResearchDomain(input: ResearchDomainInput) {
   } catch (error) {
     console.error('Error generating research domain:', error);
     return { success: false, error: 'Failed to generate research domain.' };
+  }
+}
+
+export async function getJournalWebsite(input: JournalWebsiteInput) {
+  try {
+    const result = await findJournalWebsite(input);
+    return { success: true, url: result.websiteUrl };
+  } catch (error) {
+    console.error('Error finding journal website:', error);
+    return { success: false, error: 'Failed to find journal website.' };
   }
 }
 
