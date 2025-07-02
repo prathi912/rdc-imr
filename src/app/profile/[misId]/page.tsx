@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -95,7 +94,14 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto max-w-5xl py-10">
-      <ProfileClient user={user} claims={claims} projects={projects} />
+      <PageHeader
+        title={`${user.name}'s Profile`}
+        description="Public research profile and contributions."
+        showBackButton={false}
+      />
+      <div className="mt-8">
+        <ProfileClient user={user} claims={claims} projects={projects} />
+      </div>
     </div>
   );
 }
