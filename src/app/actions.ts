@@ -170,7 +170,7 @@ export async function checkMisIdExists(misId: string, currentUid: string): Promi
   }
 }
 
-export async function fetchScopusDataByUrl(url: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number }; error?: string }> {
+export async function fetchScopusDataByUrl(url: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; totalInternalAuthors: number; totalInternalCoAuthors: number; }; error?: string }> {
   const apiKey = process.env.SCOPUS_API_KEY;
   if (!apiKey) {
     console.error('Scopus API key is not configured.');
@@ -225,6 +225,20 @@ export async function fetchScopusDataByUrl(url: string): Promise<{ success: bool
     const title = coredata['dc:title'] || '';
     const journalName = coredata['prism:publicationName'] || '';
     const totalAuthors = Array.isArray(authors) ? authors.length : 0;
+    
+    let totalInternalAuthors = 0;
+    if (Array.isArray(authors)) {
+        authors.forEach(author => {
+            const affiliations = Array.isArray(author.affiliation) ? author.affiliation : [author.affiliation];
+            const isInternal = affiliations.some(affil => 
+                affil && affil.affilname && affil.affilname.toLowerCase().includes('parul')
+            );
+            if (isInternal) {
+                totalInternalAuthors++;
+            }
+        });
+    }
+    const totalInternalCoAuthors = Math.max(0, totalInternalAuthors - 1);
 
     return {
       success: true,
@@ -232,6 +246,8 @@ export async function fetchScopusDataByUrl(url: string): Promise<{ success: bool
         title,
         journalName,
         totalAuthors,
+        totalInternalAuthors,
+        totalInternalCoAuthors
       },
     };
   } catch (error: any) {

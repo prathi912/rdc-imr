@@ -147,13 +147,25 @@ export function IncentiveForm() {
     try {
         const result = await fetchScopusDataByUrl(link);
         if (result.success && result.data) {
-            const { title, journalName, totalAuthors } = result.data;
+            const { title, journalName, totalAuthors, totalInternalAuthors, totalInternalCoAuthors } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate: true });
             
-            const authorsStr = totalAuthors > 10 ? '10+' : totalAuthors.toString();
-            if (authorCountOptions.includes(authorsStr)) {
-                form.setValue('totalAuthors', authorsStr, { shouldValidate: true });
+            const formatCount = (count: number) => count >= 10 ? '10+' : count.toString();
+
+            const totalAuthorsStr = formatCount(totalAuthors);
+            if (authorCountOptions.includes(totalAuthorsStr)) {
+                form.setValue('totalAuthors', totalAuthorsStr, { shouldValidate: true });
+            }
+            
+            const totalInternalAuthorsStr = formatCount(totalInternalAuthors);
+            if (authorCountOptions.includes(totalInternalAuthorsStr)) {
+                form.setValue('totalInternalAuthors', totalInternalAuthorsStr, { shouldValidate: true });
+            }
+
+            const totalInternalCoAuthorsStr = formatCount(totalInternalCoAuthors);
+            if (authorCountOptions.includes(totalInternalCoAuthorsStr)) {
+                form.setValue('totalInternalCoAuthors', totalInternalCoAuthorsStr, { shouldValidate: true });
             }
             
             toast({ title: 'Success', description: 'Form fields have been pre-filled.' });
@@ -303,7 +315,7 @@ export function IncentiveForm() {
                     </FormItem>
                   )}
                 />
-                 <FormField
+                <FormField
                     control={form.control}
                     name="relevantLink"
                     render={({ field }) => (
