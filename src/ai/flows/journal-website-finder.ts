@@ -57,7 +57,8 @@ const journalWebsiteFlow = ai.defineFlow(
           const data = await response.json();
           // Check for records and a valid URL in the first record
           if (data.records && data.records.length > 0 && data.records[0].url && data.records[0].url.length > 0) {
-            const springerUrl = data.records[0].url.find((u: { format: string; platform: string; value: string; }) => u.format === '' && u.platform === 'springerlink');
+            // Find the URL for the 'springerlink' platform. This is more reliable than checking the 'format' field, which can be inconsistent.
+            const springerUrl = data.records[0].url.find((u: { platform: string; value: string; }) => u.platform === 'springerlink');
             if (springerUrl && springerUrl.value) {
                 return { websiteUrl: springerUrl.value };
             }
