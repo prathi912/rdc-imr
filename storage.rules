@@ -1,66 +1,33 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-
-    // Helper function to check if a user is an admin or CRO
-    function isPrivilegedUser() {
-      // Check if the user document exists and has a role of admin, Super-admin, or CRO
-      return exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
-             get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin', 'CRO'];
-    }
-
-    // Helper function to check if a user is an evaluator
-    function isEvaluator() {
-      // Check if the user document exists and has a role of Evaluator
-      return exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
-             get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'Evaluator';
-    }
-
-    // Helper function to check if the user is the owner (PI) of a project
-    function isProjectOwner(projectId) {
-      // Check if the project document exists and the current user is the PI
-      return exists(/databases/(default)/documents/projects/$(projectId)) &&
-             request.auth.uid == get(/databases/(default)/documents/projects/$(projectId)).data.pi_uid;
-    }
-
-    // Profile Pictures: /profile-pictures/{userId}/...
-    match /profile-pictures/{userId}/{allPaths=**} {
-      // Anyone can read profile pictures, as they are used in the public UI
+    
+    // Profile pictures: public read, but only user can write their own.
+    match /profile-pictures/{userId} {
       allow read: if true;
-      // Only the authenticated owner can write (upload, update, delete) their own picture
       allow write: if request.auth != null && request.auth.uid == userId;
     }
-
-    // Project files: proposals, cvs, ethics approvals
-    // /projects/{projectId}/...
-    match /projects/{projectId}/{allPaths=**} {
-      // Allow read access to the project owner (PI), admins, and evaluators
-      allow read: if request.auth != null &&
-                   (isProjectOwner(projectId) || isPrivilegedUser() || isEvaluator());
-      // Allow write access only to the project owner (PI)
-      allow write: if request.auth != null && isProjectOwner(projectId);
-    }
-
-    // Revised proposal files
-    // /revisions/{projectId}/...
-    match /revisions/{projectId}/{allPaths=**} {
-      allow read: if request.auth != null && (isProjectOwner(projectId) || isPrivilegedUser());
-      allow write: if request.auth != null && isProjectOwner(projectId);
-    }
     
-    // Completion reports and utilization certificates
-    // /reports/{projectId}/...
-    match /reports/{projectId}/{allPaths=**} {
-      allow read: if request.auth != null && (isProjectOwner(projectId) || isPrivilegedUser());
-      allow write: if request.auth != null && isProjectOwner(projectId);
+    // Project documents (proposals, reports, etc.)
+    // Only authenticated users should be able to read them.
+    // Writes are done via server-side admin SDK, so client writes are disallowed.
+    match /projects/{projectId}/{folder}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false; 
     }
-
-    // Invoices for grant utilization
-    // /invoices/{projectId}/...
-    match /invoices/{projectId}/{allPaths=**} {
-      allow read: if request.auth != null && (isProjectOwner(projectId) || isPrivilegedUser());
-      allow write: if request.auth != null && isProjectOwner(projectId);
+    match /reports/{projectId}/{folder}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /invoices/{projectId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+     match /revisions/{projectId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if false;
     }
   }
 }
