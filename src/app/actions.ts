@@ -266,3 +266,64 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
     return { success: false, error: error.message || 'An unexpected error occurred while fetching Scopus data.' };
   }
 }
+
+export async function bulkUploadProjects(projectsData: any[]): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const batch = writeBatch(db);
+    const usersRef = adminDb.collection('users');
+    let projectCount = 0;
+
+    for (const project of projectsData) {
+      // Basic validation
+      if (!project.pi_email || !project.project_title || !project.status) {
+        console.warn('Skipping incomplete project record:', project);
+        continue;
+      }
+
+      let pi_uid = '';
+      let pi_name = project.pi_email.split('@')[0]; // Default name
+
+      // Find user by email to get UID
+      const userQuery = await usersRef.where('email', '==', project.pi_email).limit(1).get();
+      if (!userQuery.empty) {
+        const userDoc = userQuery.docs[0];
+        pi_uid = userDoc.id;
+        pi_name = userDoc.data().name || pi_name;
+      }
+
+      const projectRef = doc(collection(db, 'projects'));
+      
+      const newProjectData = {
+        title: project.project_title,
+        pi_email: project.pi_email,
+        status: project.status,
+        pi_uid: pi_uid, // Will be empty if user not found yet
+        pi: pi_name,
+        // Add default values for other required fields
+        abstract: "Historical data migrated from bulk upload.",
+        type: "Research", // Default type
+        faculty: "Unknown", // Default
+        institute: "Unknown",
+        departmentName: "Unknown",
+        teamInfo: "Historical data, team info not available.",
+        timelineAndOutcomes: "Historical data, outcomes not available.",
+        submissionDate: project.sanction_date || new Date().toISOString(),
+        grant: {
+            amount: project.grant_amount || 0,
+            status: 'Completed', // Assume old grants are completed
+            disbursementDate: project.sanction_date || new Date().toISOString(),
+        }
+      };
+
+      batch.set(projectRef, newProjectData);
+      projectCount++;
+    }
+
+    await batch.commit();
+    return { success: true, count: projectCount };
+
+  } catch (error: any) {
+    console.error('Error during bulk upload:', error);
+    return { success: false, count: 0, error: error.message || 'Failed to upload projects.' };
+  }
+}

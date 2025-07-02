@@ -17,6 +17,7 @@ import {
   Server,
   Settings,
   ShieldCheck,
+  Upload,
   Users,
 } from 'lucide-react';
 
@@ -270,6 +271,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname === '/dashboard/manage-incentive-claims'}>
                   <Award />
                   Manage Claims
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('bulk-upload') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/bulk-upload" tooltip="Bulk Upload" isActive={pathname === '/dashboard/bulk-upload'}>
+                  <Upload />
+                  Bulk Upload
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}

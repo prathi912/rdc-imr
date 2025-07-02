@@ -14,6 +14,7 @@ export const ALL_MODULES = [
   { id: 'analytics', label: 'Analytics' },
   { id: 'manage-users', label: 'Manage Users' },
   { id: 'manage-incentive-claims', label: 'Manage Incentive Claims' },
+  { id: 'bulk-upload', label: 'Bulk Upload' },
   { id: 'module-management', label: 'Module Management' },
   { id: 'system-health', label: 'System Health' },
   { id: 'notifications', label: 'Notifications' },
@@ -23,7 +24,7 @@ export const ALL_MODULES = [
 const facultyModules = ['dashboard', 'new-submission', 'my-projects', 'incentive-claim', 'notifications', 'settings'];
 const evaluatorModules = ['dashboard', 'evaluator-dashboard', 'notifications', 'settings'];
 const croModules = [...new Set([...evaluatorModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'all-projects', 'analytics', 'manage-users', 'manage-incentive-claims'])];
-const adminModules = [...croModules, 'system-health'];
+const adminModules = [...croModules, 'system-health', 'bulk-upload'];
 const superAdminModules = [...adminModules, 'module-management'];
 
 export function getDefaultModulesForRole(role: User['role']): string[] {

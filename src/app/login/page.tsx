@@ -28,7 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { auth, db } from '@/lib/config';
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
@@ -112,6 +112,25 @@ export default function LoginPage() {
     }
     
     await setDoc(userDocRef, user, { merge: true });
+
+    // Back-fill pi_uid for migrated projects
+    try {
+      const projectsRef = collection(db, 'projects');
+      const q = query(projectsRef, where('pi_email', '==', user.email), where('pi_uid', '==', ''));
+      const projectsSnapshot = await getDocs(q);
+
+      if (!projectsSnapshot.empty) {
+        const batch = writeBatch(db);
+        projectsSnapshot.forEach(projectDoc => {
+          batch.update(projectDoc.ref, { pi_uid: user.uid });
+        });
+        await batch.commit();
+        console.log(`Updated ${projectsSnapshot.size} historical projects for user ${user.email}`);
+      }
+    } catch (e) {
+      console.error("Failed to back-fill historical projects for user:", e);
+      // Don't block login for this, just log it.
+    }
 
     if (typeof window !== 'undefined') {
       localStorage.setItem('user', JSON.stringify(user));
