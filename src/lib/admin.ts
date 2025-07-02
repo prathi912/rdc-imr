@@ -35,14 +35,11 @@ function ensureAdminInitialized() {
   }
 
   try {
-    // The replace call is crucial for production environments where the key is stored as a single line.
-    const formattedPrivateKey = privateKey.replace(/\\n/g, "\n");
-
     app = admin.initializeApp({
       credential: admin.credential.cert({
         projectId: projectId,
         clientEmail: clientEmail,
-        privateKey: formattedPrivateKey,
+        privateKey: privateKey,
       }),
       storageBucket,
     });
