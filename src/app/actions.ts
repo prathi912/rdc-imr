@@ -3,7 +3,7 @@
 
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
-import { getResearchDomain, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
+import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
 import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal-website-finder';
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
