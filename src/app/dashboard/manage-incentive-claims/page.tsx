@@ -68,26 +68,44 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Incentive Claim Details</DialogTitle>
-                    <DialogDescription>Full submission details for {claim.paperTitle}.</DialogDescription>
+                    <DialogDescription>Full submission details for claimant: {claim.userName}.</DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-2 text-sm">
                     {renderDetail("Claimant Name", claim.userName)}
                     {renderDetail("Claimant Email", claim.userEmail)}
+                    {renderDetail("Claim Type", claim.claimType)}
                     {renderDetail("Status", claim.status)}
                     {renderDetail("Submission Date", new Date(claim.submissionDate).toLocaleString())}
+                    
+                    {claim.claimType === 'Research Papers' && (
+                        <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
+                            {renderDetail("Paper Title", claim.paperTitle)}
+                            {renderLinkDetail("Relevant Link", claim.relevantLink)}
+                            {renderDetail("Journal Name", claim.journalName)}
+                            {renderLinkDetail("Journal Website", claim.journalWebsite)}
+                            {renderDetail("Publication Type", claim.publicationType)}
+                            {renderDetail("Index Type", claim.indexType?.toUpperCase())}
+                            {renderDetail("Journal Classification", claim.journalClassification)}
+                            {renderDetail("WoS Type", claim.wosType)}
+                            {renderDetail("Impact Factor", claim.impactFactor)}
+                            {renderDetail("Publication Phase", claim.publicationPhase)}
+                        </>
+                    )}
+
+                    {claim.claimType === 'Patents' && (
+                         <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Patent Details</h4>
+                            {renderDetail("Patent Title", claim.patentTitle)}
+                            {renderDetail("Patent Status", claim.patentStatus)}
+                            {renderDetail("Applicant Type", claim.patentApplicantType === 'Sole' ? 'Parul University as Sole Applicant' : 'Parul University as Joint Applicant')}
+                        </>
+                    )}
+
                     <hr className="my-2" />
-                    <h4 className="font-semibold text-base mt-2">Claim Information</h4>
-                    {renderDetail("Paper Title", claim.paperTitle)}
-                    {renderLinkDetail("Relevant Link", claim.relevantLink)}
-                    {renderDetail("Journal Name", claim.journalName)}
-                    {renderLinkDetail("Journal Website", claim.journalWebsite)}
-                    {renderDetail("Claim Type", claim.claimType)}
-                    {renderDetail("Publication Type", claim.publicationType)}
-                    {renderDetail("Index Type", claim.indexType.toUpperCase())}
-                    {renderDetail("Journal Classification", claim.journalClassification)}
-                    {renderDetail("WoS Type", claim.wosType)}
-                    {renderDetail("Impact Factor", claim.impactFactor)}
-                    {renderDetail("Publication Phase", claim.publicationPhase)}
+                    <h4 className="font-semibold text-base mt-2">Author & Benefit Details</h4>
                     {renderDetail("Author Type", claim.authorType)}
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Total Authors", claim.totalAuthors)}
@@ -186,9 +204,11 @@ export default function ManageIncentiveClaimsPage() {
     }
 
     if (searchTerm) {
+      const lowerCaseSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(claim =>
-        claim.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        claim.paperTitle.toLowerCase().includes(searchTerm.toLowerCase())
+        claim.userName.toLowerCase().includes(lowerCaseSearch) ||
+        (claim.paperTitle && claim.paperTitle.toLowerCase().includes(lowerCaseSearch)) ||
+        (claim.patentTitle && claim.patentTitle.toLowerCase().includes(lowerCaseSearch))
       );
     }
 
@@ -268,7 +288,7 @@ export default function ManageIncentiveClaimsPage() {
           </TableHead>
           <TableHead className="hidden md:table-cell">
              <Button variant="ghost" onClick={() => requestSort('paperTitle')}>
-                Paper Title <ArrowUpDown className="ml-2 h-4 w-4" />
+                Title <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </TableHead>
           <TableHead>
@@ -288,7 +308,7 @@ export default function ManageIncentiveClaimsPage() {
         {sortedAndFilteredClaims.map((claim) => (
             <TableRow key={claim.id}>
               <TableCell className="font-medium">{claim.userName}</TableCell>
-              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle}</TableCell>
+              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle}</TableCell>
               <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
               <TableCell>
                 <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
@@ -341,7 +361,7 @@ export default function ManageIncentiveClaimsPage() {
       <div className="mt-8">
         <div className="flex items-center py-4">
             <Input
-                placeholder="Filter by claimant or paper title..."
+                placeholder="Filter by claimant or title..."
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 className="max-w-sm"

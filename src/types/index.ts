@@ -122,23 +122,30 @@ export type IncentiveClaim = {
     faculty: string;
     bankDetails?: UserBankDetails;
     
-    // Form fields
+    // Main selector
     claimType: string;
-    prefilledMonthlyStatusId?: string;
-    partialEnteredId?: string;
-    publicationType: string;
-    indexType: 'wos' | 'scopus' | 'both' | 'esci';
+
+    // Common fields
+    totalAuthors?: string;
+    totalInternalAuthors?: string;
+    totalInternalCoAuthors?: string;
+    authorType?: string;
+    benefitMode: string;
+    
+    // Research Paper Fields
+    publicationType?: string;
+    indexType?: 'wos' | 'scopus' | 'both' | 'esci';
     journalClassification?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
     wosType?: 'sci' | 'scie' | 'ahi';
     impactFactor?: number;
-    totalAuthors: string;
-    totalInternalAuthors: string;
-    totalInternalCoAuthors: string;
-    authorType: string;
-    benefitMode: string;
-    journalName: string;
+    journalName?: string;
     journalWebsite?: string;
-    paperTitle: string;
-    publicationPhase: string;
+    paperTitle?: string;
+    publicationPhase?: string;
     relevantLink?: string;
+
+    // Patent Fields
+    patentTitle?: string;
+    patentStatus?: 'Application Published' | 'Granted';
+    patentApplicantType?: 'Sole' | 'Joint';
 };

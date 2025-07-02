@@ -46,29 +46,69 @@ import { Loader2, AlertCircle, Bot } from 'lucide-react';
 const incentiveSchema = z
   .object({
     claimType: z.string().min(1, 'Please select a claim type.'),
-    prefilledMonthlyStatusId: z.string().optional(),
-    partialEnteredId: z.string().optional(),
-    publicationType: z.string().min(1, 'Please select a publication type.'),
-    indexType: z.enum(['wos', 'scopus', 'both', 'esci'], {
-      required_error: 'You need to select an index type.',
-    }),
+    publicationType: z.string().optional(),
+    indexType: z.enum(['wos', 'scopus', 'both', 'esci']).optional(),
     relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     journalClassification: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
     wosType: z.enum(['sci', 'scie', 'ahi']).optional(),
     impactFactor: z.coerce.number().optional(),
-    totalAuthors: z.string().min(1, 'Please select the total number of authors.'),
-    totalInternalAuthors: z.string().min(1, 'Please select the number of internal authors.'),
-    totalInternalCoAuthors: z.string().min(1, 'Please select the number of internal co-authors.'),
-    authorType: z.string().min(1, 'Please select the author type.'),
+    totalAuthors: z.string().optional(),
+    totalInternalAuthors: z.string().optional(),
+    totalInternalCoAuthors: z.string().optional(),
+    authorType: z.string().optional(),
     benefitMode: z.string().default('incentives'),
-    journalName: z.string().min(5, 'Journal name is required.'),
+    journalName: z.string().optional(),
     journalWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-    paperTitle: z.string().min(5, 'Paper title is required.'),
-    publicationPhase: z.string().min(1, 'Please select the publication phase.'),
+    paperTitle: z.string().optional(),
+    publicationPhase: z.string().optional(),
+    // Patent fields
+    patentTitle: z.string().optional(),
+    patentStatus: z.enum(['Application Published', 'Granted']).optional(),
+    patentApplicantType: z.enum(['Sole', 'Joint']).optional(),
   })
   .refine(
     (data) => {
-      if (data.indexType === 'wos' || data.indexType === 'both') {
+        if (data.claimType !== 'Research Papers') return true;
+        return !!data.paperTitle && data.paperTitle.length >= 5;
+    },
+    {
+        message: 'Paper title is required.',
+        path: ['paperTitle'],
+    }
+  )
+   .refine(
+    (data) => {
+        if (data.claimType !== 'Patents') return true;
+        return !!data.patentTitle && data.patentTitle.length >= 5;
+    },
+    {
+        message: 'Patent title is required.',
+        path: ['patentTitle'],
+    }
+  )
+  .refine(
+    (data) => {
+        if (data.claimType !== 'Patents') return true;
+        return !!data.patentStatus;
+    },
+    {
+        message: 'Patent status is required.',
+        path: ['patentStatus'],
+    }
+  )
+  .refine(
+    (data) => {
+        if (data.claimType !== 'Patents') return true;
+        return !!data.patentApplicantType;
+    },
+    {
+        message: 'Applicant type is required.',
+        path: ['patentApplicantType'],
+    }
+  )
+  .refine(
+    (data) => {
+      if ((data.indexType === 'wos' || data.indexType === 'both') && data.claimType === 'Research Papers') {
         return !!data.wosType;
       }
       return true;
@@ -107,8 +147,6 @@ export function IncentiveForm() {
       claimType: 'Research Papers',
       publicationType: 'Referred paper in journal listed by WOS/Scopus',
       benefitMode: 'incentives',
-      prefilledMonthlyStatusId: '',
-      partialEnteredId: '',
       relevantLink: '',
       impactFactor: '' as any, // Initialize to empty string to make it a controlled component
       totalAuthors: '',
@@ -134,6 +172,7 @@ export function IncentiveForm() {
     }
   }, []);
 
+  const claimType = form.watch('claimType');
   const indexType = form.watch('indexType');
   const relevantLink = form.watch('relevantLink');
   const journalName = form.watch('journalName');
@@ -253,9 +292,9 @@ export function IncentiveForm() {
   return (
     <Card className="mt-4">
       <CardHeader>
-        <CardTitle>Research Paper Incentive Claim Form</CardTitle>
+        <CardTitle>Incentive Claim Form</CardTitle>
         <CardDescription>
-          Fill out the details below to apply for the incentive. For Scopus-indexed papers, you can use the fetch button to auto-fill details.
+          Fill out the details below to apply for the incentive. Select the claim type to see relevant fields.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -278,7 +317,7 @@ export function IncentiveForm() {
                 name="claimType"
                 render={({ field }) => (
                   <FormItem className="flex-grow">
-                    <FormLabel>Please Select</FormLabel>
+                    <FormLabel>Claim Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
                       <FormControl>
                         <SelectTrigger>
@@ -287,8 +326,8 @@ export function IncentiveForm() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="Research Papers">Research Papers</SelectItem>
-                        <SelectItem value="Books">Books</SelectItem>
                         <SelectItem value="Patents">Patents</SelectItem>
+                        <SelectItem value="Books">Books (Coming Soon)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -297,149 +336,272 @@ export function IncentiveForm() {
               />
               <Button variant="link" type="button" className="self-end pb-2 h-auto">Important Information</Button>
             </div>
+            
+            {claimType === 'Research Papers' && (
+                <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
+                    <h3 className="font-semibold text-sm -mb-2">RESEARCH PAPER DETAILS</h3>
+                    <Separator />
 
-            <div className="rounded-lg border p-4 space-y-4">
-                <h3 className="font-semibold text-sm -mb-2">RESEARCH PAPER</h3>
-                <Separator />
-                
-                <FormField
+                    <FormField
                     control={form.control}
-                    name="prefilledMonthlyStatusId"
+                    name="publicationType"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Please Select the Prefilled Monthly Status id</FormLabel>
+                        <FormLabel>Please Select</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl>
-                                <SelectContent></SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                
-                <div className="text-center font-bold text-sm">Or</div>
-                
-                <FormField
-                    control={form.control}
-                    name="partialEnteredId"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Please Select the Partial Entered id</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl>
-                                <SelectContent></SelectContent>
-                            </Select>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                
-                <div className="text-center font-bold text-sm">Or</div>
-
-                <FormField
-                  control={form.control}
-                  name="publicationType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Please Select</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
-                        <FormControl>
-                            <SelectTrigger>
-                            <SelectValue placeholder="Select publication type" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                            <SelectItem value="Referred paper in journal listed by WOS/Scopus">
-                            Referred paper in journal listed by WOS/Scopus
-                            </SelectItem>
-                        </SelectContent>
-                        </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                    control={form.control}
-                    name="indexType"
-                    render={({ field }) => (
-                        <FormItem className="space-y-3">
-                        <FormLabel>Select Type</FormLabel>
-                        <FormControl>
-                            <RadioGroup
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            className="flex flex-wrap items-center gap-x-6 gap-y-2"
-                            disabled={isSubmitting || bankDetailsMissing}
-                            >
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="wos" /></FormControl><FormLabel className="font-normal">WoS</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scopus" /></FormControl><FormLabel className="font-normal">Scopus</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="both" /></FormControl><FormLabel className="font-normal">Both</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="esci" /></FormControl><FormLabel className="font-normal">ESCI</FormLabel></FormItem>
-                            </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                    control={form.control}
-                    name="relevantLink"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Relevant Link (e.g., DOI, Scopus URL)</FormLabel>
-                        <div className="flex items-center gap-2">
                             <FormControl>
-                                <Input placeholder="https://www.scopus.com/record/display.uri?eid=..." {...field} disabled={isSubmitting || bankDetailsMissing} />
+                                <SelectTrigger>
+                                <SelectValue placeholder="Select publication type" />
+                                </SelectTrigger>
                             </FormControl>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={handleFetchScopusData}
-                                disabled={isSubmitting || bankDetailsMissing || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')}
-                                title="Fetch data from Scopus"
-                            >
-                                {isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                                <span className="sr-only">Fetch from Scopus</span>
-                            </Button>
-                        </div>
+                            <SelectContent>
+                                <SelectItem value="Referred paper in journal listed by WOS/Scopus">
+                                Referred paper in journal listed by WOS/Scopus
+                                </SelectItem>
+                            </SelectContent>
+                            </Select>
                         <FormMessage />
                         </FormItem>
                     )}
-                />
-                
-                <FormField
-                    control={form.control}
-                    name="journalClassification"
-                    render={({ field }) => (
-                        <FormItem className="space-y-3">
-                        <FormLabel>Journal Classification</FormLabel>
-                        <FormControl>
-                            <RadioGroup
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            className="flex flex-wrap items-center gap-x-6 gap-y-2"
-                            disabled={isSubmitting || bankDetailsMissing}
-                            >
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q1" /></FormControl><FormLabel className="font-normal">Q1</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q2" /></FormControl><FormLabel className="font-normal">Q2</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q3" /></FormControl><FormLabel className="font-normal">Q3</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q4" /></FormControl><FormLabel className="font-normal">Q4</FormLabel></FormItem>
-                            </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-
-                {(indexType === 'wos' || indexType === 'both') && (
+                    />
                     <FormField
                         control={form.control}
-                        name="wosType"
+                        name="indexType"
                         render={({ field }) => (
                             <FormItem className="space-y-3">
-                            <FormLabel>Type of WoS</FormLabel>
+                            <FormLabel>Select Type</FormLabel>
+                            <FormControl>
+                                <RadioGroup
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                className="flex flex-wrap items-center gap-x-6 gap-y-2"
+                                disabled={isSubmitting || bankDetailsMissing}
+                                >
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="wos" /></FormControl><FormLabel className="font-normal">WoS</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scopus" /></FormControl><FormLabel className="font-normal">Scopus</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="both" /></FormControl><FormLabel className="font-normal">Both</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="esci" /></FormControl><FormLabel className="font-normal">ESCI</FormLabel></FormItem>
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="relevantLink"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Relevant Link (e.g., DOI, Scopus URL)</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormControl>
+                                    <Input placeholder="https://www.scopus.com/record/display.uri?eid=..." {...field} disabled={isSubmitting || bankDetailsMissing} />
+                                </FormControl>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleFetchScopusData}
+                                    disabled={isSubmitting || bankDetailsMissing || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')}
+                                    title="Fetch data from Scopus"
+                                >
+                                    {isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                    <span className="sr-only">Fetch from Scopus</span>
+                                </Button>
+                            </div>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    
+                    <FormField
+                        control={form.control}
+                        name="journalClassification"
+                        render={({ field }) => (
+                            <FormItem className="space-y-3">
+                            <FormLabel>Journal Classification</FormLabel>
+                            <FormControl>
+                                <RadioGroup
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                className="flex flex-wrap items-center gap-x-6 gap-y-2"
+                                disabled={isSubmitting || bankDetailsMissing}
+                                >
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q1" /></FormControl><FormLabel className="font-normal">Q1</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q2" /></FormControl><FormLabel className="font-normal">Q2</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q3" /></FormControl><FormLabel className="font-normal">Q3</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q4" /></FormControl><FormLabel className="font-normal">Q4</FormLabel></FormItem>
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+
+                    {(indexType === 'wos' || indexType === 'both') && (
+                        <FormField
+                            control={form.control}
+                            name="wosType"
+                            render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                <FormLabel>Type of WoS</FormLabel>
+                                <FormControl>
+                                    <RadioGroup
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                    className="flex items-center space-x-6"
+                                    disabled={isSubmitting || bankDetailsMissing}
+                                    >
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="sci" /></FormControl><FormLabel className="font-normal">SCI</FormLabel></FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scie" /></FormControl><FormLabel className="font-normal">SCIE</FormLabel></FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="ahi" /></FormControl><FormLabel className="font-normal">A&amp;HI</FormLabel></FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    )}
+                    <Separator />
+                    <FormField
+                        control={form.control}
+                        name="journalName"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Name of Journal/Proceedings</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormControl>
+                                    <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                                </FormControl>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={handleFindWebsite}
+                                    disabled={isSubmitting || bankDetailsMissing || isFindingWebsite || !journalName}
+                                    title="Find Journal Website with AI"
+                                >
+                                    {isFindingWebsite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                    <span className="sr-only">Find Website</span>
+                                </Button>
+                            </div>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="journalWebsite"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Journal Website Link</FormLabel>
+                            <FormControl>
+                                <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="paperTitle"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Title of the Paper published</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                            </FormControl>
+                            <FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="impactFactor"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Impact factor</FormLabel>
+                            <FormControl>
+                                <Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="totalAuthors"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Total No. of Authors</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
+                            <FormControl>
+                            <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <FormDescription className="text-destructive text-xs">* Note:-More than Two First Authors or More than Two Corresponding Authors are Not Allowed. In this case you have to select more Co-Authors only.</FormDescription>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="totalInternalAuthors"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Total No. of Internal Authors</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
+                            <FormControl>
+                            <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="totalInternalCoAuthors"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Total No. of Internal Co Authors</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
+                            <FormControl>
+                            <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="authorType"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Author Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
+                            <FormControl>
+                            <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>{authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+
+                    <FormField
+                        control={form.control}
+                        name="benefitMode"
+                        render={({ field }) => (
+                            <FormItem className="space-y-3">
+                            <FormLabel>Benefit Mode</FormLabel>
                             <FormControl>
                                 <RadioGroup
                                 onValueChange={field.onChange}
@@ -447,190 +609,88 @@ export function IncentiveForm() {
                                 className="flex items-center space-x-6"
                                 disabled={isSubmitting || bankDetailsMissing}
                                 >
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="sci" /></FormControl><FormLabel className="font-normal">SCI</FormLabel></FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scie" /></FormControl><FormLabel className="font-normal">SCIE</FormLabel></FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="ahi" /></FormControl><FormLabel className="font-normal">A&amp;HI</FormLabel></FormItem>
+                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="incentives" /></FormControl><FormLabel className="font-normal">Incentives</FormLabel></FormItem>
                                 </RadioGroup>
                             </FormControl>
                             <FormMessage />
                             </FormItem>
                         )}
                     />
-                )}
-                <Separator />
-                 <FormField
-                    control={form.control}
-                    name="journalName"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Name of Journal/Proceedings</FormLabel>
-                        <div className="flex items-center gap-2">
-                            <FormControl>
-                                <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                            </FormControl>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={handleFindWebsite}
-                                disabled={isSubmitting || bankDetailsMissing || isFindingWebsite || !journalName}
-                                title="Find Journal Website with AI"
-                            >
-                                {isFindingWebsite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                                <span className="sr-only">Find Website</span>
-                            </Button>
-                        </div>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="journalWebsite"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Journal Website Link</FormLabel>
-                        <FormControl>
-                            <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="paperTitle"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Title of the Paper published</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                        </FormControl>
-                        <FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="impactFactor"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Impact factor</FormLabel>
-                        <FormControl>
-                            <Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="totalAuthors"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total No. of Authors</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <FormDescription className="text-destructive text-xs">* Note:-More than Two First Authors or More than Two Corresponding Authors are Not Allowed. In this case you have to select more Co-Authors only.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="totalInternalAuthors"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total No. of Internal Authors</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="totalInternalCoAuthors"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Total No. of Internal Co Authors</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                 <FormField
-                  control={form.control}
-                  name="authorType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Author Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>{authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    
+                    <FormField
+                        control={form.control}
+                        name="publicationPhase"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Publication Phase</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+            )}
 
-                <FormField
-                    control={form.control}
-                    name="benefitMode"
-                    render={({ field }) => (
-                        <FormItem className="space-y-3">
-                        <FormLabel>Benefit Mode</FormLabel>
-                        <FormControl>
-                            <RadioGroup
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            className="flex items-center space-x-6"
-                            disabled={isSubmitting || bankDetailsMissing}
-                            >
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="incentives" /></FormControl><FormLabel className="font-normal">Incentives</FormLabel></FormItem>
-                            </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                
-                <FormField
-                    control={form.control}
-                    name="publicationPhase"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Publication Phase</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
-                                <FormControl>
-                                    <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
-                                </FormControl>
-                                <SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                            </Select>
+            {claimType === 'Patents' && (
+                 <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
+                    <h3 className="font-semibold text-sm -mb-2">PATENT DETAILS</h3>
+                    <Separator />
+                    <FormField
+                        control={form.control}
+                        name="patentTitle"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Title of the Patent</FormLabel>
+                            <FormControl>
+                                <Textarea placeholder="Enter the full title of your patent" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                            </FormControl>
                             <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            </div>
+                            </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="patentStatus"
+                        render={({ field }) => (
+                            <FormItem className="space-y-3">
+                            <FormLabel>Patent Status</FormLabel>
+                            <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6" disabled={isSubmitting || bankDetailsMissing}>
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Application Published" /></FormControl><FormLabel className="font-normal">Application Published</FormLabel></FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Granted" /></FormControl><FormLabel className="font-normal">Granted</FormLabel></FormItem>
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                     <FormField
+                        control={form.control}
+                        name="patentApplicantType"
+                        render={({ field }) => (
+                            <FormItem className="space-y-3">
+                            <FormLabel>Applicant Type</FormLabel>
+                            <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6" disabled={isSubmitting || bankDetailsMissing}>
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Sole" /></FormControl><FormLabel className="font-normal">Parul University as Sole Applicant</FormLabel></FormItem>
+                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Joint" /></FormControl><FormLabel className="font-normal">Parul University as Joint Applicant</FormLabel></FormItem>
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                 </div>
+            )}
+
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || claimType === 'Books'}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>
