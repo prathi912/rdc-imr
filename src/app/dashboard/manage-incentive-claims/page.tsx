@@ -31,9 +31,11 @@ import { collection, getDocs, doc, updateDoc, orderBy, query, where } from 'fire
 import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
-type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status'>;
+const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations'];
+type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
 
 function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void }) {
@@ -204,6 +206,7 @@ export default function ManageIncentiveClaimsPage() {
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [claimTypeFilter, setClaimTypeFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
 
   useEffect(() => {
@@ -266,6 +269,10 @@ export default function ManageIncentiveClaimsPage() {
       filtered = filtered.filter(claim => claim.status === status);
     }
 
+    if (claimTypeFilter !== 'all') {
+      filtered = filtered.filter(claim => claim.claimType === claimTypeFilter);
+    }
+
     if (searchTerm) {
       const lowerCaseSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(claim =>
@@ -277,17 +284,19 @@ export default function ManageIncentiveClaimsPage() {
     }
 
     filtered.sort((a, b) => {
-        if (a[sortConfig.key] < b[sortConfig.key]) {
+        const aValue = a[sortConfig.key] || '';
+        const bValue = b[sortConfig.key] || '';
+        if (aValue < bValue) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
         }
-        if (a[sortConfig.key] > b[sortConfig.key]) {
+        if (aValue > bValue) {
             return sortConfig.direction === 'ascending' ? 1 : -1;
         }
         return 0;
     });
 
     return filtered;
-  }, [allClaims, activeTab, searchTerm, sortConfig]);
+  }, [allClaims, activeTab, searchTerm, sortConfig, claimTypeFilter]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -355,6 +364,11 @@ export default function ManageIncentiveClaimsPage() {
                 Title <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           </TableHead>
+          <TableHead className="hidden lg:table-cell">
+            <Button variant="ghost" onClick={() => requestSort('claimType')}>
+                Claim Type <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>
+          </TableHead>
           <TableHead>
              <Button variant="ghost" onClick={() => requestSort('submissionDate')}>
                 Date <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -373,6 +387,7 @@ export default function ManageIncentiveClaimsPage() {
             <TableRow key={claim.id}>
               <TableCell className="font-medium">{claim.userName}</TableCell>
               <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle}</TableCell>
+              <TableCell className="hidden lg:table-cell">{claim.claimType}</TableCell>
               <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
               <TableCell>
                 <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
@@ -423,20 +438,31 @@ export default function ManageIncentiveClaimsPage() {
          </Button>
       </PageHeader>
       <div className="mt-8">
-        <div className="flex items-center py-4">
+        <div className="flex items-center py-4 gap-4">
             <Input
                 placeholder="Filter by claimant or title..."
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 className="max-w-sm"
             />
+            <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
+                <SelectTrigger className="w-[240px]">
+                    <SelectValue placeholder="Filter by claim type" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Claim Types</SelectItem>
+                    {CLAIM_TYPES.map(type => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="all">All ({allClaims.length})</TabsTrigger>
-                <TabsTrigger value="pending">Pending ({allClaims.filter(c => c.status === 'Pending').length})</TabsTrigger>
-                <TabsTrigger value="accepted">Accepted ({allClaims.filter(c => c.status === 'Accepted').length})</TabsTrigger>
-                <TabsTrigger value="rejected">Rejected ({allClaims.filter(c => c.status === 'Rejected').length})</TabsTrigger>
+                <TabsTrigger value="all">All ({allClaims.filter(c => claimTypeFilter === 'all' || c.claimType === claimTypeFilter).length})</TabsTrigger>
+                <TabsTrigger value="pending">Pending ({allClaims.filter(c => c.status === 'Pending' && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
+                <TabsTrigger value="accepted">Accepted ({allClaims.filter(c => c.status === 'Accepted' && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
+                <TabsTrigger value="rejected">Rejected ({allClaims.filter(c => c.status === 'Rejected' && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
             </TabsList>
             <Card className="mt-4">
               <CardContent className="pt-6">
