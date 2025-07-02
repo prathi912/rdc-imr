@@ -34,7 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
-const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations'];
+const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books'];
 type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
 
@@ -79,6 +79,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                 <div className="max-h-[70vh] overflow-y-auto pr-4 space-y-2 text-sm">
                     {renderDetail("Claimant Name", claim.userName)}
                     {renderDetail("Claimant Email", claim.userEmail)}
+                    {renderDetail("ORCID ID", claim.orcidId)}
                     {renderDetail("Claim Type", claim.claimType)}
                     {renderDetail("Status", claim.status)}
                     {renderDetail("Submission Date", new Date(claim.submissionDate).toLocaleString())}
@@ -105,7 +106,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Patent Details</h4>
                             {renderDetail("Patent Title", claim.patentTitle)}
-                            {renderDetail("ORCID ID", claim.patentOrcidId)}
                             {renderDetail("Specification Type", claim.patentSpecificationType)}
                             {renderDetail("Application/Ref No.", claim.patentApplicationNumber)}
                             {renderDetail("Patent Status", claim.patentStatus)}
@@ -166,6 +166,34 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                             {renderLinkDetail("Prize Proof", claim.prizeProofUrl)}
                             {renderLinkDetail("Travel Receipts", claim.travelReceiptsUrl)}
                             {renderLinkDetail("Proof of Govt. Funding Request", claim.govtFundingRequestProofUrl)}
+                        </>
+                    )}
+
+                    {claim.claimType === 'Books' && (
+                        <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Book/Chapter Details</h4>
+                            {renderDetail("Application Type", claim.bookApplicationType)}
+                            {renderDetail("Title", claim.publicationTitle)}
+                            {claim.bookApplicationType === 'Book Chapter' && renderDetail("Book Title", claim.bookTitleForChapter)}
+                            {renderDetail("Author(s)", claim.bookAuthors)}
+                            {claim.bookApplicationType === 'Book Chapter' && renderDetail("Editor(s)", claim.bookEditor)}
+                            {renderDetail("Publisher", claim.publisherName)}
+                            {renderDetail("Publisher Type", claim.publisherType)}
+                            {renderDetail("Publisher Website", claim.publisherWebsite)}
+                            {renderDetail("ISBN", claim.isbn)}
+                            {renderDetail("Publication Year Order", claim.publicationOrderInYear)}
+                            {renderDetail("Total PU Authors", claim.totalPuAuthors)}
+                            {renderDetail("Total PU Students", claim.totalPuStudents)}
+                            {renderDetail("Student Names", claim.puStudentNames)}
+                            {claim.bookApplicationType === 'Book Chapter' ? renderDetail("Chapter Pages", claim.bookChapterPages) : renderDetail("Total Book Pages", claim.bookTotalPages)}
+                            {renderDetail("Self Published", claim.isSelfPublished)}
+                            {renderDetail("Scopus Indexed", claim.isScopusIndexed)}
+                            {renderDetail("Book Type", claim.bookType)}
+                            {renderDetail("Author/Editor Role", claim.authorRole)}
+                            {renderLinkDetail("Publication Proof", claim.bookProofUrl)}
+                            {renderLinkDetail("Scopus Proof", claim.scopusProofUrl)}
+                            {renderDetail("Self Declaration", claim.bookSelfDeclaration)}
                         </>
                     )}
 
@@ -279,7 +307,8 @@ export default function ManageIncentiveClaimsPage() {
         claim.userName.toLowerCase().includes(lowerCaseSearch) ||
         (claim.paperTitle && claim.paperTitle.toLowerCase().includes(lowerCaseSearch)) ||
         (claim.patentTitle && claim.patentTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.conferencePaperTitle && claim.conferencePaperTitle.toLowerCase().includes(lowerCaseSearch))
+        (claim.conferencePaperTitle && claim.conferencePaperTitle.toLowerCase().includes(lowerCaseSearch)) ||
+        (claim.publicationTitle && claim.publicationTitle.toLowerCase().includes(lowerCaseSearch))
       );
     }
 
@@ -386,7 +415,7 @@ export default function ManageIncentiveClaimsPage() {
         {sortedAndFilteredClaims.map((claim) => (
             <TableRow key={claim.id}>
               <TableCell className="font-medium">{claim.userName}</TableCell>
-              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle}</TableCell>
+              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle}</TableCell>
               <TableCell className="hidden lg:table-cell">{claim.claimType}</TableCell>
               <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
               <TableCell>

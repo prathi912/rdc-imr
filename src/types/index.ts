@@ -131,6 +131,7 @@ export type IncentiveClaim = {
     totalInternalCoAuthors?: string;
     authorType?: string;
     benefitMode: string;
+    orcidId?: string;
     
     // Research Paper Fields
     publicationType?: string;
@@ -148,7 +149,6 @@ export type IncentiveClaim = {
     patentTitle?: string;
     patentStatus?: 'Filed' | 'Published' | 'Granted';
     patentApplicantType?: 'Sole' | 'Joint';
-    patentOrcidId?: string;
     patentSpecificationType?: 'Full' | 'Provisional';
     patentApplicationNumber?: string;
     patentTotalStudents?: number;
@@ -189,4 +189,28 @@ export type IncentiveClaim = {
     travelMode?: 'Bus' | 'Train' | 'Air' | 'Other';
     travelReceiptsUrl?: string;
     conferenceSelfDeclaration?: boolean;
+
+    // Book/Book Chapter Fields
+    bookApplicationType?: 'Book Chapter' | 'Book';
+    publicationTitle?: string; // Title of the book chapter/Book
+    bookAuthors?: string;
+    bookTitleForChapter?: string; // Title of the Book (for Book Chapter)
+    bookEditor?: string; // Name Of the Editor (for Book Chapter)
+    bookChapterPages?: number;
+    bookTotalPages?: number;
+    bookType?: 'Textbook' | 'Reference Book';
+    authorRole?: 'Editor' | 'Author';
+    totalPuAuthors?: number;
+    totalPuStudents?: number;
+    puStudentNames?: string;
+    publisherName?: string;
+    isSelfPublished?: boolean;
+    publisherType?: 'National' | 'International';
+    isScopusIndexed?: boolean;
+    isbn?: string;
+    publisherWebsite?: string;
+    bookProofUrl?: string;
+    scopusProofUrl?: string;
+    publicationOrderInYear?: 'First' | 'Second' | 'Third';
+    bookSelfDeclaration?: boolean;
 };

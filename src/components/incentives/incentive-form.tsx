@@ -106,6 +106,31 @@ const incentiveSchema = z
     travelMode: z.enum(['Bus', 'Train', 'Air', 'Other']).optional(),
     travelReceipts: z.any().optional(),
     conferenceSelfDeclaration: z.boolean().optional(),
+    orcidId: z.string().optional(),
+
+    // Book/Book Chapter fields
+    bookApplicationType: z.enum(['Book Chapter', 'Book']).optional(),
+    publicationTitle: z.string().optional(),
+    bookAuthors: z.string().optional(),
+    bookTitleForChapter: z.string().optional(),
+    bookEditor: z.string().optional(),
+    totalPuAuthors: z.coerce.number().optional(),
+    totalPuStudents: z.coerce.number().optional(),
+    puStudentNames: z.string().optional(),
+    bookChapterPages: z.coerce.number().optional(),
+    bookTotalPages: z.coerce.number().optional(),
+    publisherName: z.string().optional(),
+    isSelfPublished: z.boolean().optional(),
+    publisherType: z.enum(['National', 'International']).optional(),
+    isScopusIndexed: z.boolean().optional(),
+    authorRole: z.enum(['Editor', 'Author']).optional(),
+    isbn: z.string().optional(),
+    bookType: z.enum(['Textbook', 'Reference Book']).optional(),
+    publisherWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+    bookProof: z.any().optional(),
+    scopusProof: z.any().optional(),
+    publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
+    bookSelfDeclaration: z.boolean().optional(),
   })
   .refine((data) => {
       if (data.claimType !== 'Research Papers') return true;
@@ -194,7 +219,17 @@ const incentiveSchema = z
   .refine((data) => {
       if (data.claimType !== 'Patents') return true;
       return !!data.patentSelfDeclaration && data.patentSelfDeclaration === true;
-  }, { message: 'You must agree to the self declaration.', path: ['patentSelfDeclaration'] });
+  }, { message: 'You must agree to the self declaration.', path: ['patentSelfDeclaration'] })
+  // Book/Book Chapter validations
+  .refine(data => data.claimType !== 'Books' || !!data.bookApplicationType, { message: 'Please select an application type.', path: ['bookApplicationType'] })
+  .refine(data => data.claimType !== 'Books' || (!!data.publicationTitle && data.publicationTitle.length > 2), { message: 'Title is required.', path: ['publicationTitle'] })
+  .refine(data => !(data.claimType === 'Books' && data.bookApplicationType === 'Book Chapter') || (!!data.bookTitleForChapter && data.bookTitleForChapter.length > 2), { message: 'Book title is required for a book chapter.', path: ['bookTitleForChapter'] })
+  .refine(data => data.claimType !== 'Books' || !!data.publisherName, { message: 'Publisher name is required.', path: ['publisherName'] })
+  .refine(data => data.claimType !== 'Books' || data.isSelfPublished !== undefined, { message: 'This field is required.', path: ['isSelfPublished'] })
+  .refine(data => data.claimType !== 'Books' || !!data.publisherType, { message: 'Publisher type is required.', path: ['publisherType'] })
+  .refine(data => data.claimType !== 'Books' || !!data.isbn, { message: 'ISBN is required.', path: ['isbn'] })
+  .refine(data => data.claimType !== 'Books' || (!!data.bookProof && data.bookProof.length > 0), { message: 'Proof of book/chapter is required.', path: ['bookProof'] })
+  .refine(data => data.claimType !== 'Books' || data.bookSelfDeclaration === true, { message: 'You must agree to the self-declaration.', path: ['bookSelfDeclaration'] });
 
 type IncentiveFormValues = z.infer<typeof incentiveSchema>;
 
@@ -262,6 +297,8 @@ export function IncentiveForm() {
   const patentFiledFromIprCell = form.watch('patentFiledFromIprCell');
   const conferenceMode = form.watch('conferenceMode');
   const wonPrize = form.watch('wonPrize');
+  const bookApplicationType = form.watch('bookApplicationType');
+  const isScopusIndexed = form.watch('isScopusIndexed');
   
   const handleFetchScopusData = async () => {
     const link = form.getValues('relevantLink');
@@ -374,6 +411,8 @@ export function IncentiveForm() {
         const participationCertificateUrl = await uploadFileHelper(data.participationCertificate?.[0], 'conference-cert');
         const prizeProofUrl = await uploadFileHelper(data.prizeProof?.[0], 'conference-prize-proof');
         const travelReceiptsUrl = await uploadFileHelper(data.travelReceipts?.[0], 'conference-travel-receipts');
+        const bookProofUrl = await uploadFileHelper(data.bookProof?.[0], 'book-proof');
+        const scopusProofUrl = await uploadFileHelper(data.scopusProof?.[0], 'book-scopus-proof');
 
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
@@ -387,6 +426,8 @@ export function IncentiveForm() {
             participationCertificateUrl,
             prizeProofUrl,
             travelReceiptsUrl,
+            bookProofUrl,
+            scopusProofUrl,
             uid: user.uid,
             userName: user.name,
             userEmail: user.email,
@@ -446,7 +487,7 @@ export function IncentiveForm() {
                         <SelectItem value="Research Papers">Research Papers</SelectItem>
                         <SelectItem value="Patents">Patents</SelectItem>
                         <SelectItem value="Conference Presentations">Assistance for Paper Presentation/Workshop/FDP/STTP</SelectItem>
-                        <SelectItem value="Books">Books (Coming Soon)</SelectItem>
+                        <SelectItem value="Books">Books</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -759,7 +800,7 @@ export function IncentiveForm() {
                  <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                     <h3 className="font-semibold text-sm -mb-2">PATENT DETAILS</h3>
                     <Separator />
-                    <FormField name="patentOrcidId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0002-1825-0097" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="orcidId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0002-1825-0097" {...field} /></FormControl><FormMessage /></FormItem> )} />
                     <FormField name="patentTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Patent</FormLabel><FormControl><Textarea placeholder="Enter the full title of your patent" {...field} /></FormControl><FormMessage /></FormItem> )} />
                     <FormField name="patentSpecificationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Specification Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Full" /></FormControl><FormLabel className="font-normal">Full</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Provisional" /></FormControl><FormLabel className="font-normal">Provisional</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                     <FormField name="patentApplicationNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Ref. No/Application Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
@@ -884,10 +925,81 @@ export function IncentiveForm() {
                 </div>
             )}
 
+            {claimType === 'Books' && (
+              <div className="rounded-lg border p-4 space-y-6 animate-in fade-in-0">
+                  <h3 className="font-semibold text-sm -mb-2">BOOK/BOOK CHAPTER DETAILS</h3>
+                  <Separator />
+
+                  <FormField name="orcidId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0002-1825-0097" {...field} /></FormControl><FormMessage /></FormItem> )} />
+
+                  <FormField name="bookApplicationType" control={form.control} render={({ field }) => (
+                      <FormItem className="space-y-3">
+                          <FormLabel>Type of Application</FormLabel>
+                          <FormControl>
+                              <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6">
+                                  <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Book Chapter" /></FormControl><FormLabel className="font-normal">Book Chapter Publication</FormLabel></FormItem>
+                                  <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Book" /></FormControl><FormLabel className="font-normal">Book Publication</FormLabel></FormItem>
+                              </RadioGroup>
+                          </FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+
+                  <FormField name="publicationTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the {bookApplicationType || 'Publication'}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+
+                  {bookApplicationType === 'Book Chapter' && (
+                    <FormField name="bookTitleForChapter" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Book (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  )}
+
+                  <FormField name="bookAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Author(s)</FormLabel><FormControl><Textarea placeholder="Comma-separated list of authors" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  
+                  {bookApplicationType === 'Book Chapter' && (
+                    <FormField name="bookEditor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the Editor (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField name="totalPuAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Authors from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                      <FormField name="totalPuStudents" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Students from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  </div>
+                  
+                  <FormField name="puStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Students from PU</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
+
+                  {bookApplicationType === 'Book Chapter' ? (
+                     <FormField name="bookChapterPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book chapter</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  ) : (
+                     <FormField name="bookTotalPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  )}
+
+                  <FormField name="publisherName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the publisher</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+
+                  <FormField name="isSelfPublished" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether self Published</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                  
+                  <FormField name="publisherType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether National/International Publisher</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="National" /></FormControl><FormLabel className="font-normal">National</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="International" /></FormControl><FormLabel className="font-normal">International</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+
+                  <FormField name="isScopusIndexed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether Scopus Indexed</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+
+                  {bookApplicationType === 'Book' && <FormField name="authorRole" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether acting by Editor / Author</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Editor" /></FormControl><FormLabel className="font-normal">Editor</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Author" /></FormControl><FormLabel className="font-normal">Author</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />}
+                  
+                  <FormField name="isbn" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number of the Book</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+
+                  {bookApplicationType === 'Book' && <FormField name="bookType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether Textbook or Reference Book</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Textbook" /></FormControl><FormLabel className="font-normal">Textbook</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Reference Book" /></FormControl><FormLabel className="font-normal">Reference Book</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />}
+
+                  <FormField name="publisherWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Publisher Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  
+                  <FormField name="publicationOrderInYear" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select publication order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+
+                  <FormField name="bookProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach copy of Book / Book Chapter (First Page, Publisher Page, Index, Abstract) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+
+                  {isScopusIndexed && <FormField name="scopusProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof of indexed in Scopus (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />}
+
+                   <FormField control={form.control} name="bookSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
+              </div>
+            )}
+
 
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || claimType === 'Books'}>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>
