@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
@@ -63,8 +64,20 @@ const incentiveSchema = z
     publicationPhase: z.string().optional(),
     // Patent fields
     patentTitle: z.string().optional(),
-    patentStatus: z.enum(['Application Published', 'Granted']).optional(),
+    patentStatus: z.enum(['Filed', 'Published', 'Granted']).optional(),
     patentApplicantType: z.enum(['Sole', 'Joint']).optional(),
+    patentOrcidId: z.string().optional(),
+    patentSpecificationType: z.enum(['Full', 'Provisional']).optional(),
+    patentApplicationNumber: z.string().optional(),
+    patentTotalStudents: z.coerce.number().optional(),
+    patentStudentNames: z.string().optional(),
+    patentFiledInPuName: z.boolean().optional(),
+    patentFiledFromIprCell: z.boolean().optional(),
+    patentPermissionTaken: z.boolean().optional(),
+    patentApprovalProof: z.any().optional(),
+    patentForm1: z.any().optional(),
+    patentGovtReceipt: z.any().optional(),
+    patentSelfDeclaration: z.boolean().optional(),
     // Conference fields
     conferenceName: z.string().optional(),
     conferencePaperTitle: z.string().optional(),
@@ -75,58 +88,16 @@ const incentiveSchema = z
     registrationFee: z.coerce.number().optional(),
     travelExpenses: z.coerce.number().optional(),
   })
-  .refine(
-    (data) => {
-        if (data.claimType !== 'Research Papers') return true;
-        return !!data.paperTitle && data.paperTitle.length >= 5;
-    },
-    {
-        message: 'Paper title is required.',
-        path: ['paperTitle'],
-    }
-  )
-   .refine(
-    (data) => {
-        if (data.claimType !== 'Patents') return true;
-        return !!data.patentTitle && data.patentTitle.length >= 5;
-    },
-    {
-        message: 'Patent title is required.',
-        path: ['patentTitle'],
-    }
-  )
-  .refine(
-    (data) => {
-        if (data.claimType !== 'Patents') return true;
-        return !!data.patentStatus;
-    },
-    {
-        message: 'Patent status is required.',
-        path: ['patentStatus'],
-    }
-  )
-  .refine(
-    (data) => {
-        if (data.claimType !== 'Patents') return true;
-        return !!data.patentApplicantType;
-    },
-    {
-        message: 'Applicant type is required.',
-        path: ['patentApplicantType'],
-    }
-  )
-  .refine(
-    (data) => {
+  .refine((data) => {
+      if (data.claimType !== 'Research Papers') return true;
+      return !!data.paperTitle && data.paperTitle.length >= 5;
+  }, { message: 'Paper title is required.', path: ['paperTitle'] })
+  .refine((data) => {
       if ((data.indexType === 'wos' || data.indexType === 'both') && data.claimType === 'Research Papers') {
         return !!data.wosType;
       }
       return true;
-    },
-    {
-      message: 'For WoS or Both, you must select a WoS Type.',
-      path: ['wosType'],
-    }
-  )
+  }, { message: 'For WoS or Both, you must select a WoS Type.', path: ['wosType'] })
   .refine((data) => {
       if (data.claimType !== 'Conference Presentations') return true;
       return !!data.conferenceName && data.conferenceName.length > 2;
@@ -152,7 +123,50 @@ const incentiveSchema = z
           return !!data.govtFundingRequestProof && data.govtFundingRequestProof.length > 0;
       }
       return true;
-  }, { message: 'Proof of government funding request is required for conferences outside India.', path: ['govtFundingRequestProof']});
+  }, { message: 'Proof of government funding request is required for conferences outside India.', path: ['govtFundingRequestProof']})
+  // Patent validations
+  .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return !!data.patentTitle && data.patentTitle.length > 2;
+  }, { message: 'Patent title is required.', path: ['patentTitle'] })
+  .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return !!data.patentSpecificationType;
+  }, { message: 'Specification type is required.', path: ['patentSpecificationType'] })
+  .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return !!data.patentApplicationNumber && data.patentApplicationNumber.length > 2;
+  }, { message: 'Application number is required.', path: ['patentApplicationNumber'] })
+  .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return data.patentFiledInPuName !== undefined;
+  }, { message: 'This field is required.', path: ['patentFiledInPuName'] })
+    .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return data.patentFiledFromIprCell !== undefined;
+  }, { message: 'This field is required.', path: ['patentFiledFromIprCell'] })
+  .refine((data) => {
+      if (data.claimType === 'Patents' && data.patentFiledFromIprCell === false) {
+          return data.patentPermissionTaken !== undefined;
+      }
+      return true;
+  }, { message: 'This field is required.', path: ['patentPermissionTaken'] })
+  .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return !!data.patentStatus;
+  }, { message: 'Patent status is required.', path: ['patentStatus'] })
+  .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return !!data.patentForm1 && data.patentForm1.length > 0;
+  }, { message: 'Proof (Form 1) is required.', path: ['patentForm1'] })
+    .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return !!data.patentGovtReceipt && data.patentGovtReceipt.length > 0;
+  }, { message: 'Proof (Govt. Receipt) is required.', path: ['patentGovtReceipt'] })
+  .refine((data) => {
+      if (data.claimType !== 'Patents') return true;
+      return !!data.patentSelfDeclaration && data.patentSelfDeclaration === true;
+  }, { message: 'You must agree to the self declaration.', path: ['patentSelfDeclaration'] });
 
 type IncentiveFormValues = z.infer<typeof incentiveSchema>;
 
@@ -196,19 +210,7 @@ export function IncentiveForm() {
     resolver: zodResolver(incentiveSchema),
     defaultValues: {
       claimType: 'Research Papers',
-      publicationType: 'Referred paper in journal listed by WOS/Scopus',
       benefitMode: 'incentives',
-      relevantLink: '',
-      impactFactor: '' as any, // Initialize to empty string to make it a controlled component
-      totalAuthors: '',
-      totalInternalAuthors: '',
-      totalInternalCoAuthors: '',
-      authorType: '',
-      journalName: '',
-      journalWebsite: '',
-      paperTitle: '',
-      publicationPhase: '',
-      journalClassification: undefined,
     },
   });
   
@@ -229,6 +231,7 @@ export function IncentiveForm() {
   const journalName = form.watch('journalName');
   const conferenceType = form.watch('conferenceType');
   const conferenceVenue = form.watch('conferenceVenue');
+  const patentFiledFromIprCell = form.watch('patentFiledFromIprCell');
   
   const handleFetchScopusData = async () => {
     const link = form.getValues('relevantLink');
@@ -321,21 +324,28 @@ export function IncentiveForm() {
     }
     setIsSubmitting(true);
     try {
-        let govtFundingRequestProofUrl: string | undefined;
-        const proofFile = data.govtFundingRequestProof?.[0];
-        if (proofFile) {
-            const dataUrl = await fileToDataUrl(proofFile);
-            const path = `incentive-proofs/${user.uid}/${new Date().toISOString()}-${proofFile.name}`;
+        const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
+            if (!file || !user) return undefined;
+            const dataUrl = await fileToDataUrl(file);
+            const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
             const result = await uploadFileToServer(dataUrl, path);
             if (!result.success || !result.url) {
-                throw new Error(result.error || "Proof document upload failed");
+                throw new Error(result.error || `File upload failed for ${folderName}`);
             }
-            govtFundingRequestProofUrl = result.url;
-        }
+            return result.url;
+        };
+
+        const govtFundingRequestProofUrl = await uploadFileHelper(data.govtFundingRequestProof?.[0], 'conference-funding-proof');
+        const patentApprovalProofUrl = await uploadFileHelper(data.patentApprovalProof?.[0], 'patent-approval');
+        const patentForm1Url = await uploadFileHelper(data.patentForm1?.[0], 'patent-form1');
+        const patentGovtReceiptUrl = await uploadFileHelper(data.patentGovtReceipt?.[0], 'patent-govt-receipt');
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
-            govtFundingRequestProofUrl: govtFundingRequestProofUrl,
+            govtFundingRequestProofUrl,
+            patentApprovalProofUrl,
+            patentForm1Url,
+            patentGovtReceiptUrl,
             uid: user.uid,
             userName: user.name,
             userEmail: user.email,
@@ -344,12 +354,13 @@ export function IncentiveForm() {
             submissionDate: new Date().toISOString(),
             bankDetails: user.bankDetails,
         };
+
         await addDoc(collection(db, 'incentiveClaims'), claimData);
         toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
         form.reset();
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error submitting claim: ', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit claim. Please try again.' });
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit claim. Please try again.' });
     } finally {
         setIsSubmitting(false);
     }
@@ -415,7 +426,7 @@ export function IncentiveForm() {
                     render={({ field }) => (
                         <FormItem>
                         <FormLabel>Please Select</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting || bankDetailsMissing}>
                             <FormControl>
                                 <SelectTrigger>
                                 <SelectValue placeholder="Select publication type" />
@@ -707,51 +718,22 @@ export function IncentiveForm() {
                  <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                     <h3 className="font-semibold text-sm -mb-2">PATENT DETAILS</h3>
                     <Separator />
-                    <FormField
-                        control={form.control}
-                        name="patentTitle"
-                        render={({ field }) => (
-                            <FormItem>
-                            <FormLabel>Title of the Patent</FormLabel>
-                            <FormControl>
-                                <Textarea placeholder="Enter the full title of your patent" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                     <FormField
-                        control={form.control}
-                        name="patentStatus"
-                        render={({ field }) => (
-                            <FormItem className="space-y-3">
-                            <FormLabel>Patent Status</FormLabel>
-                            <FormControl>
-                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6" disabled={isSubmitting || bankDetailsMissing}>
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Application Published" /></FormControl><FormLabel className="font-normal">Application Published</FormLabel></FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Granted" /></FormControl><FormLabel className="font-normal">Granted</FormLabel></FormItem>
-                                </RadioGroup>
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                     <FormField
-                        control={form.control}
-                        name="patentApplicantType"
-                        render={({ field }) => (
-                            <FormItem className="space-y-3">
-                            <FormLabel>Applicant Type</FormLabel>
-                            <FormControl>
-                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6" disabled={isSubmitting || bankDetailsMissing}>
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Sole" /></FormControl><FormLabel className="font-normal">Parul University as Sole Applicant</FormLabel></FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Joint" /></FormControl><FormLabel className="font-normal">Parul University as Joint Applicant</FormLabel></FormItem>
-                                </RadioGroup>
-                            </FormControl>
-                            <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                    <FormField name="patentOrcidId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0002-1825-0097" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Patent</FormLabel><FormControl><Textarea placeholder="Enter the full title of your patent" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentSpecificationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Specification Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Full" /></FormControl><FormLabel className="font-normal">Full</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Provisional" /></FormControl><FormLabel className="font-normal">Provisional</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentApplicationNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Ref. No/Application Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentTotalStudents" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Number of Students</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Students</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentFiledInPuName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Was the patent filed in the name of PU as an Applicant?</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentFiledFromIprCell" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Was the patent filed from IPR Cell, PU?</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                    {patentFiledFromIprCell === false && (
+                         <FormField name="patentPermissionTaken" control={form.control} render={({ field }) => ( <FormItem><FormLabel>If No, was permission from PU taken?</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                    )}
+                    <FormField name="patentStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Status of Application</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Filed" /></FormControl><FormLabel className="font-normal">Filed</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Published" /></FormControl><FormLabel className="font-normal">Published</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Granted" /></FormControl><FormLabel className="font-normal">Granted</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentApprovalProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof of Approval (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentForm1" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof (Form 1) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="patentGovtReceipt" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof (Govt. Receipt) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
+                     <FormField control={form.control} name="patentSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /></div></FormItem> )} />
                  </div>
             )}
 

@@ -39,12 +39,16 @@ type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'subm
 function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!claim) return null;
 
-    const renderDetail = (label: string, value?: string | number) => {
-        if (!value) return null;
+    const renderDetail = (label: string, value?: string | number | boolean) => {
+        if (value === undefined || value === null || value === '') return null;
+        let displayValue = value;
+        if (typeof value === 'boolean') {
+            displayValue = value ? 'Yes' : 'No';
+        }
         return (
             <div className="grid grid-cols-3 gap-2 py-1">
                 <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
-                <dd className="col-span-2">{value}</dd>
+                <dd className="col-span-2">{displayValue}</dd>
             </div>
         );
     };
@@ -70,7 +74,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     <DialogTitle>Incentive Claim Details</DialogTitle>
                     <DialogDescription>Full submission details for claimant: {claim.userName}.</DialogDescription>
                 </DialogHeader>
-                <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-2 text-sm">
+                <div className="max-h-[70vh] overflow-y-auto pr-4 space-y-2 text-sm">
                     {renderDetail("Claimant Name", claim.userName)}
                     {renderDetail("Claimant Email", claim.userEmail)}
                     {renderDetail("Claim Type", claim.claimType)}
@@ -99,8 +103,20 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Patent Details</h4>
                             {renderDetail("Patent Title", claim.patentTitle)}
+                            {renderDetail("ORCID ID", claim.patentOrcidId)}
+                            {renderDetail("Specification Type", claim.patentSpecificationType)}
+                            {renderDetail("Application/Ref No.", claim.patentApplicationNumber)}
                             {renderDetail("Patent Status", claim.patentStatus)}
                             {renderDetail("Applicant Type", claim.patentApplicantType === 'Sole' ? 'Parul University as Sole Applicant' : 'Parul University as Joint Applicant')}
+                            {renderDetail("PU as Applicant?", claim.patentFiledInPuName)}
+                            {renderDetail("Filed from IPR Cell?", claim.patentFiledFromIprCell)}
+                            {renderDetail("Permission Taken (if not from IPR Cell)", claim.patentPermissionTaken)}
+                            {renderDetail("Total Students", claim.patentTotalStudents)}
+                            {renderDetail("Student Names", claim.patentStudentNames)}
+                            {renderLinkDetail("Approval Proof", claim.patentApprovalProofUrl)}
+                            {renderLinkDetail("Form 1 Proof", claim.patentForm1Url)}
+                            {renderLinkDetail("Govt. Receipt Proof", claim.patentGovtReceiptUrl)}
+                            {renderDetail("Self Declaration", claim.patentSelfDeclaration)}
                         </>
                     )}
                     

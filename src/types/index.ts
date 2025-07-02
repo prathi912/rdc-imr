@@ -146,8 +146,20 @@ export type IncentiveClaim = {
 
     // Patent Fields
     patentTitle?: string;
-    patentStatus?: 'Application Published' | 'Granted';
+    patentStatus?: 'Filed' | 'Published' | 'Granted';
     patentApplicantType?: 'Sole' | 'Joint';
+    patentOrcidId?: string;
+    patentSpecificationType?: 'Full' | 'Provisional';
+    patentApplicationNumber?: string;
+    patentTotalStudents?: number;
+    patentStudentNames?: string;
+    patentFiledInPuName?: boolean;
+    patentFiledFromIprCell?: boolean;
+    patentPermissionTaken?: boolean;
+    patentApprovalProofUrl?: string;
+    patentForm1Url?: string;
+    patentGovtReceiptUrl?: string;
+    patentSelfDeclaration?: boolean;
 
     // Conference Fields
     conferenceName?: string;
