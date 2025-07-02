@@ -49,10 +49,11 @@ const incentiveSchema = z
     prefilledMonthlyStatusId: z.string().optional(),
     partialEnteredId: z.string().optional(),
     publicationType: z.string().min(1, 'Please select a publication type.'),
-    relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-    indexType: z.enum(['wos', 'scopus', 'both', 'esci', 'ft50'], {
+    indexType: z.enum(['wos', 'scopus', 'both', 'esci'], {
       required_error: 'You need to select an index type.',
     }),
+    relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+    journalClassification: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
     wosType: z.enum(['sci', 'scie', 'ahi']).optional(),
     impactFactor: z.coerce.number().optional(),
     totalAuthors: z.string().min(1, 'Please select the total number of authors.'),
@@ -117,6 +118,7 @@ export function IncentiveForm() {
       journalWebsite: '',
       paperTitle: '',
       publicationPhase: '',
+      journalClassification: undefined,
     },
   });
   
@@ -332,7 +334,6 @@ export function IncentiveForm() {
                             <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scopus" /></FormControl><FormLabel className="font-normal">Scopus</FormLabel></FormItem>
                             <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="both" /></FormControl><FormLabel className="font-normal">Both</FormLabel></FormItem>
                             <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="esci" /></FormControl><FormLabel className="font-normal">ESCI</FormLabel></FormItem>
-                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="ft50" /></FormControl><FormLabel className="font-normal">FT-50</FormLabel></FormItem>
                             </RadioGroup>
                         </FormControl>
                         <FormMessage />
@@ -365,6 +366,31 @@ export function IncentiveForm() {
                         </FormItem>
                     )}
                 />
+                
+                <FormField
+                    control={form.control}
+                    name="journalClassification"
+                    render={({ field }) => (
+                        <FormItem className="space-y-3">
+                        <FormLabel>Journal Classification</FormLabel>
+                        <FormControl>
+                            <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex flex-wrap items-center gap-x-6 gap-y-2"
+                            disabled={isSubmitting || bankDetailsMissing}
+                            >
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q1" /></FormControl><FormLabel className="font-normal">Q1</FormLabel></FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q2" /></FormControl><FormLabel className="font-normal">Q2</FormLabel></FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q3" /></FormControl><FormLabel className="font-normal">Q3</FormLabel></FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q4" /></FormControl><FormLabel className="font-normal">Q4</FormLabel></FormItem>
+                            </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
 
                 {(indexType === 'wos' || indexType === 'both') && (
                     <FormField

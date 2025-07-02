@@ -84,6 +84,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     {renderDetail("Claim Type", claim.claimType)}
                     {renderDetail("Publication Type", claim.publicationType)}
                     {renderDetail("Index Type", claim.indexType.toUpperCase())}
+                    {renderDetail("Journal Classification", claim.journalClassification)}
                     {renderDetail("WoS Type", claim.wosType)}
                     {renderDetail("Impact Factor", claim.impactFactor)}
                     {renderDetail("Publication Phase", claim.publicationPhase)}

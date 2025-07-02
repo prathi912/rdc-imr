@@ -127,7 +127,8 @@ export type IncentiveClaim = {
     prefilledMonthlyStatusId?: string;
     partialEnteredId?: string;
     publicationType: string;
-    indexType: 'wos' | 'scopus' | 'both' | 'esci' | 'ft50';
+    indexType: 'wos' | 'scopus' | 'both' | 'esci';
+    journalClassification?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
     wosType?: 'sci' | 'scie' | 'ahi';
     impactFactor?: number;
     totalAuthors: string;
