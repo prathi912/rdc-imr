@@ -80,6 +80,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     {renderDetail("Paper Title", claim.paperTitle)}
                     {renderLinkDetail("Relevant Link", claim.relevantLink)}
                     {renderDetail("Journal Name", claim.journalName)}
+                    {renderLinkDetail("Journal Website", claim.journalWebsite)}
                     {renderDetail("Claim Type", claim.claimType)}
                     {renderDetail("Publication Type", claim.publicationType)}
                     {renderDetail("Index Type", claim.indexType.toUpperCase())}

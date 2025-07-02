@@ -136,6 +136,7 @@ export type IncentiveClaim = {
     authorType: string;
     benefitMode: string;
     journalName: string;
+    journalWebsite?: string;
     paperTitle: string;
     publicationPhase: string;
     relevantLink?: string;

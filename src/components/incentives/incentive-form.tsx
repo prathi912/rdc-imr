@@ -49,6 +49,7 @@ const incentiveSchema = z
     prefilledMonthlyStatusId: z.string().optional(),
     partialEnteredId: z.string().optional(),
     publicationType: z.string().min(1, 'Please select a publication type.'),
+    relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     indexType: z.enum(['wos', 'scopus', 'both', 'esci', 'ft50'], {
       required_error: 'You need to select an index type.',
     }),
@@ -60,9 +61,9 @@ const incentiveSchema = z
     authorType: z.string().min(1, 'Please select the author type.'),
     benefitMode: z.string().default('incentives'),
     journalName: z.string().min(5, 'Journal name is required.'),
+    journalWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     paperTitle: z.string().min(5, 'Paper title is required.'),
     publicationPhase: z.string().min(1, 'Please select the publication phase.'),
-    relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   })
   .refine(
     (data) => {
@@ -106,15 +107,16 @@ export function IncentiveForm() {
       benefitMode: 'incentives',
       prefilledMonthlyStatusId: '',
       partialEnteredId: '',
+      relevantLink: '',
       impactFactor: '' as any, // Initialize to empty string to make it a controlled component
       totalAuthors: '',
       totalInternalAuthors: '',
       totalInternalCoAuthors: '',
       authorType: '',
       journalName: '',
+      journalWebsite: '',
       paperTitle: '',
       publicationPhase: '',
-      relevantLink: '',
     },
   });
   
@@ -486,6 +488,19 @@ export function IncentiveForm() {
                         <FormLabel>Name of Journal/Proceedings</FormLabel>
                         <FormControl>
                             <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="journalWebsite"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Journal Website Link</FormLabel>
+                        <FormControl>
+                            <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting || bankDetailsMissing} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
