@@ -301,6 +301,32 @@ export function IncentiveForm() {
                     </FormItem>
                   )}
                 />
+                 <FormField
+                    control={form.control}
+                    name="relevantLink"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Relevant Link (e.g., DOI, Scopus URL)</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <FormControl>
+                                <Input placeholder="https://www.scopus.com/record/display.uri?eid=..." {...field} disabled={isSubmitting || bankDetailsMissing} />
+                            </FormControl>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={handleFetchScopusData}
+                                disabled={isSubmitting || bankDetailsMissing || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')}
+                                title="Fetch data from Scopus"
+                            >
+                                {isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                <span className="sr-only">Fetch from Scopus</span>
+                            </Button>
+                        </div>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
                 <FormField
                     control={form.control}
                     name="indexType"
@@ -452,33 +478,6 @@ export function IncentiveForm() {
                 
                 <Separator />
                 
-                <FormField
-                    control={form.control}
-                    name="relevantLink"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Relevant Link (e.g., DOI, Scopus URL)</FormLabel>
-                        <div className="flex items-center gap-2">
-                            <FormControl>
-                                <Input placeholder="https://www.scopus.com/record/display.uri?eid=..." {...field} disabled={isSubmitting || bankDetailsMissing} />
-                            </FormControl>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="icon"
-                                onClick={handleFetchScopusData}
-                                disabled={isSubmitting || bankDetailsMissing || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')}
-                                title="Fetch data from Scopus"
-                            >
-                                {isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                                <span className="sr-only">Fetch from Scopus</span>
-                            </Button>
-                        </div>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
                 <FormField
                     control={form.control}
                     name="journalName"
