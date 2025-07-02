@@ -390,6 +390,47 @@ export function IncentiveForm() {
                         )}
                     />
                 )}
+                <Separator />
+                 <FormField
+                    control={form.control}
+                    name="journalName"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Name of Journal/Proceedings</FormLabel>
+                        <FormControl>
+                            <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="journalWebsite"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Journal Website Link</FormLabel>
+                        <FormControl>
+                            <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                 <FormField
+                    control={form.control}
+                    name="paperTitle"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Title of the Paper published</FormLabel>
+                        <FormControl>
+                            <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
+                        </FormControl>
+                        <FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
                  <FormField
                     control={form.control}
                     name="impactFactor"
@@ -490,48 +531,6 @@ export function IncentiveForm() {
                     )}
                 />
                 
-                <Separator />
-                
-                <FormField
-                    control={form.control}
-                    name="journalName"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Name of Journal/Proceedings</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="journalWebsite"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Journal Website Link</FormLabel>
-                        <FormControl>
-                            <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="paperTitle"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Title of the Paper published</FormLabel>
-                        <FormControl>
-                            <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                        </FormControl>
-                        <FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
                 <FormField
                     control={form.control}
                     name="publicationPhase"
