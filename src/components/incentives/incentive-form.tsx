@@ -40,7 +40,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { fetchScopusDataByUrl, getJournalWebsite } from '@/app/actions';
+import { fetchScopusDataByUrl, getJournalWebsite, uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle, Bot } from 'lucide-react';
 
 const incentiveSchema = z
@@ -65,6 +65,15 @@ const incentiveSchema = z
     patentTitle: z.string().optional(),
     patentStatus: z.enum(['Application Published', 'Granted']).optional(),
     patentApplicantType: z.enum(['Sole', 'Joint']).optional(),
+    // Conference fields
+    conferenceName: z.string().optional(),
+    conferencePaperTitle: z.string().optional(),
+    conferenceType: z.enum(['International', 'National', 'Regional/State']).optional(),
+    conferenceVenue: z.enum(['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American']).optional(),
+    presentationType: z.enum(['Oral', 'Poster']).optional(),
+    govtFundingRequestProof: z.any().optional(),
+    registrationFee: z.coerce.number().optional(),
+    travelExpenses: z.coerce.number().optional(),
   })
   .refine(
     (data) => {
@@ -117,7 +126,33 @@ const incentiveSchema = z
       message: 'For WoS or Both, you must select a WoS Type.',
       path: ['wosType'],
     }
-  );
+  )
+  .refine((data) => {
+      if (data.claimType !== 'Conference Presentations') return true;
+      return !!data.conferenceName && data.conferenceName.length > 2;
+  }, { message: 'Conference name is required.', path: ['conferenceName']})
+  .refine((data) => {
+      if (data.claimType !== 'Conference Presentations') return true;
+      return !!data.conferencePaperTitle && data.conferencePaperTitle.length > 5;
+  }, { message: 'Paper title is required.', path: ['conferencePaperTitle']})
+  .refine((data) => {
+      if (data.claimType !== 'Conference Presentations') return true;
+      return !!data.conferenceType;
+  }, { message: 'Conference type is required.', path: ['conferenceType']})
+  .refine((data) => {
+      if (data.claimType !== 'Conference Presentations') return true;
+      return !!data.conferenceVenue;
+  }, { message: 'Conference venue is required.', path: ['conferenceVenue']})
+  .refine((data) => {
+      if (data.claimType !== 'Conference Presentations') return true;
+      return !!data.presentationType;
+  }, { message: 'Presentation type is required.', path: ['presentationType']})
+  .refine((data) => {
+      if (data.claimType === 'Conference Presentations' && data.conferenceVenue !== 'India') {
+          return !!data.govtFundingRequestProof && data.govtFundingRequestProof.length > 0;
+      }
+      return true;
+  }, { message: 'Proof of government funding request is required for conferences outside India.', path: ['govtFundingRequestProof']});
 
 type IncentiveFormValues = z.infer<typeof incentiveSchema>;
 
@@ -132,6 +167,22 @@ const publicationPhaseOptions = [
     'Published online first with DOI number',
     'Published with vol and page number',
 ];
+
+const conferenceVenueOptions = {
+    'International': ['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American'],
+    'National': ['India'],
+    'Regional/State': ['India'],
+}
+
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
+
 
 export function IncentiveForm() {
   const { toast } = useToast();
@@ -176,6 +227,8 @@ export function IncentiveForm() {
   const indexType = form.watch('indexType');
   const relevantLink = form.watch('relevantLink');
   const journalName = form.watch('journalName');
+  const conferenceType = form.watch('conferenceType');
+  const conferenceVenue = form.watch('conferenceVenue');
   
   const handleFetchScopusData = async () => {
     const link = form.getValues('relevantLink');
@@ -268,8 +321,21 @@ export function IncentiveForm() {
     }
     setIsSubmitting(true);
     try {
+        let govtFundingRequestProofUrl: string | undefined;
+        const proofFile = data.govtFundingRequestProof?.[0];
+        if (proofFile) {
+            const dataUrl = await fileToDataUrl(proofFile);
+            const path = `incentive-proofs/${user.uid}/${new Date().toISOString()}-${proofFile.name}`;
+            const result = await uploadFileToServer(dataUrl, path);
+            if (!result.success || !result.url) {
+                throw new Error(result.error || "Proof document upload failed");
+            }
+            govtFundingRequestProofUrl = result.url;
+        }
+
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
+            govtFundingRequestProofUrl: govtFundingRequestProofUrl,
             uid: user.uid,
             userName: user.name,
             userEmail: user.email,
@@ -327,6 +393,7 @@ export function IncentiveForm() {
                       <SelectContent>
                         <SelectItem value="Research Papers">Research Papers</SelectItem>
                         <SelectItem value="Patents">Patents</SelectItem>
+                        <SelectItem value="Conference Presentations">Conference Presentations</SelectItem>
                         <SelectItem value="Books">Books (Coming Soon)</SelectItem>
                       </SelectContent>
                     </Select>
@@ -687,6 +754,49 @@ export function IncentiveForm() {
                     />
                  </div>
             )}
+
+            {claimType === 'Conference Presentations' && (
+                <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
+                    <h3 className="font-semibold text-sm -mb-2">CONFERENCE PRESENTATION DETAILS</h3>
+                    <Separator />
+                    <FormField name="conferencePaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Paper Title</FormLabel><FormControl><Input placeholder="Title of the paper presented" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="conferenceName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Name</FormLabel><FormControl><Input placeholder="Full name of the conference" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField name="conferenceType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="International">International</SelectItem><SelectItem value="National">National</SelectItem><SelectItem value="Regional/State">Regional/State</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                        <FormField name="presentationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Oral">Oral</SelectItem><SelectItem value="Poster">Poster</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                    </div>
+                     <FormField
+                        control={form.control}
+                        name="conferenceVenue"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Conference Venue/Location</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value} disabled={!conferenceType}>
+                                    <FormControl>
+                                        <SelectTrigger><SelectValue placeholder="Select venue" /></SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {(conferenceVenueOptions[conferenceType as keyof typeof conferenceVenueOptions] || []).map(venue => (
+                                            <SelectItem key={venue} value={venue}>{venue}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    {conferenceVenue && conferenceVenue !== 'India' && (
+                         <FormField name="govtFundingRequestProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Govt. Funding Request</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormDescription>Required for conferences outside India.</FormDescription><FormMessage /></FormItem> )} />
+                    )}
+                    <Separator />
+                    <p className="text-sm font-medium">Expenses</p>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField name="registrationFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Registration Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="travelExpenses" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Expenses (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 20000" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    </div>
+                </div>
+            )}
+
 
           </CardContent>
           <CardFooter>

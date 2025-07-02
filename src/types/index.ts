@@ -148,4 +148,14 @@ export type IncentiveClaim = {
     patentTitle?: string;
     patentStatus?: 'Application Published' | 'Granted';
     patentApplicantType?: 'Sole' | 'Joint';
+
+    // Conference Fields
+    conferenceName?: string;
+    conferencePaperTitle?: string;
+    conferenceType?: 'International' | 'National' | 'Regional/State';
+    conferenceVenue?: 'India' | 'Indian Subcontinent' | 'South Korea, Japan, Australia and Middle East' | 'Europe' | 'African/South American/North American';
+    presentationType?: 'Oral' | 'Poster';
+    govtFundingRequestProofUrl?: string;
+    registrationFee?: number;
+    travelExpenses?: number;
 };

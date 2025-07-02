@@ -103,6 +103,21 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                             {renderDetail("Applicant Type", claim.patentApplicantType === 'Sole' ? 'Parul University as Sole Applicant' : 'Parul University as Joint Applicant')}
                         </>
                     )}
+                    
+                    {claim.claimType === 'Conference Presentations' && (
+                         <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Conference Details</h4>
+                            {renderDetail("Paper Title", claim.conferencePaperTitle)}
+                            {renderDetail("Conference Name", claim.conferenceName)}
+                            {renderDetail("Conference Type", claim.conferenceType)}
+                            {renderDetail("Presentation Type", claim.presentationType)}
+                            {renderDetail("Venue/Location", claim.conferenceVenue)}
+                            {renderDetail("Registration Fee", claim.registrationFee?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Travel Expenses", claim.travelExpenses?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderLinkDetail("Proof of Govt. Funding Request", claim.govtFundingRequestProofUrl)}
+                        </>
+                    )}
 
                     <hr className="my-2" />
                     <h4 className="font-semibold text-base mt-2">Author & Benefit Details</h4>
@@ -208,7 +223,8 @@ export default function ManageIncentiveClaimsPage() {
       filtered = filtered.filter(claim =>
         claim.userName.toLowerCase().includes(lowerCaseSearch) ||
         (claim.paperTitle && claim.paperTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.patentTitle && claim.patentTitle.toLowerCase().includes(lowerCaseSearch))
+        (claim.patentTitle && claim.patentTitle.toLowerCase().includes(lowerCaseSearch)) ||
+        (claim.conferencePaperTitle && claim.conferencePaperTitle.toLowerCase().includes(lowerCaseSearch))
       );
     }
 
@@ -308,7 +324,7 @@ export default function ManageIncentiveClaimsPage() {
         {sortedAndFilteredClaims.map((claim) => (
             <TableRow key={claim.id}>
               <TableCell className="font-medium">{claim.userName}</TableCell>
-              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle}</TableCell>
+              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle}</TableCell>
               <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
               <TableCell>
                 <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
