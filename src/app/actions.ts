@@ -1,9 +1,9 @@
 
 'use server';
 
+import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
 import { summarizeProject, type SummarizeProjectInput } from '@/ai/flows/project-summarization';
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flows/evaluation-prompts';
-import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
 import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal-website-finder';
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
@@ -31,13 +31,13 @@ export async function getEvaluationPrompts(input: EvaluationPromptsInput) {
 }
 
 export async function getResearchDomain(input: ResearchDomainInput) {
-  try {
-    const result = await getResearchDomainSuggestion(input);
-    return { success: true, domain: result.domain };
-  } catch (error) {
-    console.error('Error generating research domain:', error);
-    return { success: false, error: 'Failed to generate research domain.' };
-  }
+    try {
+        const result = await getResearchDomainSuggestion(input);
+        return { success: true, domain: result.domain };
+    } catch (error) {
+        console.error('Error getting research domain:', error);
+        return { success: false, error: 'Failed to get research domain.' };
+    }
 }
 
 export async function getJournalWebsite(input: JournalWebsiteInput) {
@@ -308,7 +308,7 @@ export async function fetchWosDataByUrl(url: string, claimantName: string): Prom
   }
   const doi = doiMatch[1];
 
-  const wosApiUrl = `https://api.clarivate.com/api/wos/?databaseId=WOS&usr_query=DO=${encodeURIComponent(doi)}&count=1&firstRecord=1`;
+  const wosApiUrl = `https://api.clarivate.com/apis/wos-starter/v1/documents?q=DO=${encodeURIComponent(doi)}`;
 
   try {
     const response = await fetch(wosApiUrl, {
@@ -325,16 +325,16 @@ export async function fetchWosDataByUrl(url: string, claimantName: string): Prom
     }
 
     const data = await response.json();
-    const record = data?.Data?.Records?.records?.item?.[0];
+    const record = data?.data?.[0];
 
     if (!record) {
       return { success: false, error: 'No matching record found in Web of Science for the provided DOI.' };
     }
 
-    const title = record.title?.title?.[0]?.value || '';
-    const journalName = record.source?.source_title?.[0]?.value || '';
+    const title = record.title || '';
+    const journalName = record.source?.title || '';
     
-    const authors = record.static_data?.fullrecord_metadata?.authors?.author;
+    const authors = record.authors;
     const authorList = Array.isArray(authors) ? authors : (authors ? [authors] : []);
     const totalAuthors = authorList.length;
 
@@ -342,8 +342,8 @@ export async function fetchWosDataByUrl(url: string, claimantName: string): Prom
     const claimantLastName = nameParts.pop() || '---';
 
     const isClaimantAnAuthor = authorList.some((author: any) => {
-        const wosFullName = (author.full_name || '').toLowerCase();
-        // WoS format is often "Lastname, F." or "Lastname, Firstname"
+        const wosFullName = (author.name || '').toLowerCase();
+        // WoS format is "Lastname, F." or "Lastname, Firstname"
         if (wosFullName.includes(',')) {
             const [wosLastName] = wosFullName.split(',').map((p:string) => p.trim());
             return wosLastName === claimantLastName;
