@@ -169,3 +169,73 @@ export async function checkMisIdExists(misId: string, currentUid: string): Promi
     throw new Error('Failed to verify MIS ID due to a server error. Please try again.');
   }
 }
+
+export async function fetchScopusDataByUrl(url: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number }; error?: string }> {
+  const apiKey = process.env.SCOPUS_API_KEY;
+  if (!apiKey) {
+    console.error('Scopus API key is not configured.');
+    return { success: false, error: 'Scopus integration is not configured on the server.' };
+  }
+
+  let identifier: string | null = null;
+  let type: 'doi' | 'eid' | null = null;
+
+  // Try to extract DOI
+  const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+  if (doiMatch && doiMatch[1]) {
+    identifier = doiMatch[1];
+    type = 'doi';
+  } else {
+    // Try to extract EID from common Scopus URL format
+    const eidMatch = url.match(/eid=([^&]+)/);
+    if (eidMatch && eidMatch[1]) {
+      identifier = eidMatch[1];
+      type = 'eid';
+    }
+  }
+
+  if (!identifier || !type) {
+    return { success: false, error: 'Could not find a valid DOI or Scopus EID in the provided link.' };
+  }
+
+  const scopusApiUrl = `https://api.elsevier.com/content/abstract/${type}/${encodeURIComponent(identifier)}`;
+
+  try {
+    const response = await fetch(scopusApiUrl, {
+      headers: {
+        'X-ELS-APIKey': apiKey,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      const errorMessage = errorData?.['service-error']?.status?.statusText || 'Failed to fetch data from Scopus.';
+      return { success: false, error: `Scopus API Error: ${errorMessage}` };
+    }
+
+    const data = await response.json();
+    const coredata = data?.['abstracts-retrieval-response']?.coredata;
+    const authors = data?.['abstracts-retrieval-response']?.authors?.author;
+
+    if (!coredata) {
+      return { success: false, error: 'Invalid response structure from Scopus API.' };
+    }
+
+    const title = coredata['dc:title'] || '';
+    const journalName = coredata['prism:publicationName'] || '';
+    const totalAuthors = Array.isArray(authors) ? authors.length : 0;
+
+    return {
+      success: true,
+      data: {
+        title,
+        journalName,
+        totalAuthors,
+      },
+    };
+  } catch (error: any) {
+    console.error('Error calling Scopus API:', error);
+    return { success: false, error: error.message || 'An unexpected error occurred while fetching Scopus data.' };
+  }
+}

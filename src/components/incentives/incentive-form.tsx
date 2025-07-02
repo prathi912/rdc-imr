@@ -40,7 +40,8 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { fetchScopusDataByUrl } from '@/app/actions';
+import { Loader2, AlertCircle, Bot } from 'lucide-react';
 
 const incentiveSchema = z
   .object({
@@ -94,6 +95,7 @@ export function IncentiveForm() {
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingScopus, setIsFetchingScopus] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   
   const form = useForm<IncentiveFormValues>({
@@ -128,6 +130,40 @@ export function IncentiveForm() {
   }, []);
 
   const indexType = form.watch('indexType');
+  const relevantLink = form.watch('relevantLink');
+  
+  const handleFetchScopusData = async () => {
+    const link = form.getValues('relevantLink');
+    if (!link) {
+        toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a link to fetch data from.' });
+        return;
+    }
+
+    setIsFetchingScopus(true);
+    toast({ title: 'Fetching Scopus Data', description: 'Please wait...' });
+
+    try {
+        const result = await fetchScopusDataByUrl(link);
+        if (result.success && result.data) {
+            const { title, journalName, totalAuthors } = result.data;
+            form.setValue('paperTitle', title, { shouldValidate: true });
+            form.setValue('journalName', journalName, { shouldValidate: true });
+            
+            const authorsStr = totalAuthors > 10 ? '10+' : totalAuthors.toString();
+            if (authorCountOptions.includes(authorsStr)) {
+                form.setValue('totalAuthors', authorsStr, { shouldValidate: true });
+            }
+            
+            toast({ title: 'Success', description: 'Form fields have been pre-filled.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFetchingScopus(false);
+    }
+  };
 
   async function onSubmit(data: IncentiveFormValues) {
     if (!user || !user.faculty || !user.bankDetails) {
@@ -162,7 +198,7 @@ export function IncentiveForm() {
       <CardHeader>
         <CardTitle>Research Paper Incentive Claim Form</CardTitle>
         <CardDescription>
-          Fill out the details below to apply for the incentive.
+          Fill out the details below to apply for the incentive. For Scopus-indexed papers, you can use the fetch button to auto-fill details.
         </CardDescription>
       </CardHeader>
       <Form {...form}>
@@ -415,6 +451,33 @@ export function IncentiveForm() {
                 />
                 
                 <Separator />
+                
+                <FormField
+                    control={form.control}
+                    name="relevantLink"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Relevant Link (e.g., DOI, Scopus URL)</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <FormControl>
+                                <Input placeholder="https://www.scopus.com/record/display.uri?eid=..." {...field} disabled={isSubmitting || bankDetailsMissing} />
+                            </FormControl>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={handleFetchScopusData}
+                                disabled={isSubmitting || bankDetailsMissing || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')}
+                                title="Fetch data from Scopus"
+                            >
+                                {isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                <span className="sr-only">Fetch from Scopus</span>
+                            </Button>
+                        </div>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
 
                 <FormField
                     control={form.control}
@@ -439,19 +502,6 @@ export function IncentiveForm() {
                             <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
                         </FormControl>
                         <FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                 <FormField
-                    control={form.control}
-                    name="relevantLink"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Relevant Link (e.g., DOI, Article URL)</FormLabel>
-                        <FormControl>
-                            <Input placeholder="https://example.com/your-paper" {...field} disabled={isSubmitting || bankDetailsMissing} />
-                        </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
