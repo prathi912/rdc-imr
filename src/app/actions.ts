@@ -287,7 +287,7 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
         totalInternalAuthors,
         totalInternalCoAuthors,
       },
-      claimantIsAuthor,
+      claimantIsAuthor: isClaimantAnAuthor,
     };
   } catch (error: any) {
     console.error('Error calling Scopus API:', error);
@@ -359,7 +359,7 @@ export async function fetchWosDataByUrl(url: string, claimantName: string): Prom
         journalName,
         totalAuthors
       },
-      claimantIsAuthor,
+      claimantIsAuthor: isClaimantAnAuthor,
     };
   } catch (error: any) {
     console.error('Error calling Web of Science API:', error);
