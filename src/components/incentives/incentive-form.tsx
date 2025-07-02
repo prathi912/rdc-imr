@@ -36,13 +36,25 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { fetchScopusDataByUrl, getJournalWebsite, uploadFileToServer, fetchWosDataByUrl } from '@/app/actions';
 import { Loader2, AlertCircle, Bot } from 'lucide-react';
+
+const SPECIAL_POLICY_FACULTIES = [
+    "Faculty of Applied Sciences",
+    "Faculty of Medicine",
+    "Faculty of Homoeopathy",
+    "Faculty of Ayurveda",
+    "Faculty of Nursing",
+    "Faculty of Pharmacy",
+    "Faculty of Physiotherapy",
+    "Faculty of Public Health",
+    "Faculty of Engineering & Technology"
+];
 
 const incentiveSchema = z
   .object({
@@ -51,7 +63,7 @@ const incentiveSchema = z
     indexType: z.enum(['wos', 'scopus', 'both', 'esci']).optional(),
     relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     journalClassification: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
-    wosType: z.enum(['sci', 'scie', 'ahi']).optional(),
+    wosType: z.enum(['SCIE', 'SSCI', 'A&HCI']).optional(),
     impactFactor: z.coerce.number().optional(),
     totalAuthors: z.string().optional(),
     totalInternalAuthors: z.string().optional(),
@@ -251,6 +263,27 @@ const conferenceVenueOptions = {
     'Regional/State': ['India'],
 }
 
+const wosTypeOptions = [
+    { value: 'SCIE', label: 'SCIE' },
+    { value: 'SSCI', label: 'SSCI' },
+    { value: 'A&HCI', label: 'A&HCI' },
+];
+
+const indexTypeOptions = [
+    { value: 'wos', label: 'WoS' },
+    { value: 'scopus', label: 'Scopus' },
+    { value: 'both', label: 'Both' },
+    { value: 'esci', label: 'ESCI' },
+];
+
+const journalClassificationOptions = [
+    { value: 'Q1', label: 'Q1' },
+    { value: 'Q2', label: 'Q2' },
+    { value: 'Q3', label: 'Q3' },
+    { value: 'Q4', label: 'Q4' },
+];
+
+
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -275,7 +308,7 @@ export function IncentiveForm() {
     defaultValues: {
       claimType: 'Research Papers',
       benefitMode: 'incentives',
-      publicationType: '',
+      publicationType: 'Referred paper in journal listed by WOS/Scopus',
       indexType: undefined,
       relevantLink: '',
       journalClassification: undefined,
@@ -383,6 +416,41 @@ export function IncentiveForm() {
   const bookApplicationType = form.watch('bookApplicationType');
   const isScopusIndexed = form.watch('isScopusIndexed');
   
+  const isSpecialFaculty = useMemo(() => 
+    user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false,
+    [user?.faculty]
+  );
+
+  const availableIndexTypes = useMemo(() =>
+    isSpecialFaculty 
+        ? indexTypeOptions.filter(o => o.value !== 'esci') 
+        : indexTypeOptions,
+    [isSpecialFaculty]
+  );
+
+  const availableClassifications = useMemo(() =>
+    (isSpecialFaculty && (indexType === 'wos' || indexType === 'both'))
+        ? journalClassificationOptions.filter(o => o.value === 'Q1' || o.value === 'Q2')
+        : journalClassificationOptions,
+    [isSpecialFaculty, indexType]
+  );
+  
+  useEffect(() => {
+    // When available classifications change, if the current value is no longer valid, reset it.
+    const currentClassification = form.getValues('journalClassification');
+    if (currentClassification && !availableClassifications.find(o => o.value === currentClassification)) {
+        form.setValue('journalClassification', undefined, { shouldValidate: true });
+    }
+  }, [availableClassifications, form]);
+
+  useEffect(() => {
+    // When available index types change, if the current value is no longer valid, reset it.
+    const currentIndexType = form.getValues('indexType');
+    if (currentIndexType && !availableIndexTypes.find(o => o.value === currentIndexType)) {
+        form.setValue('indexType', undefined, { shouldValidate: true });
+    }
+  }, [availableIndexTypes, form]);
+
   const handleFetchScopusData = async () => {
     const link = form.getValues('relevantLink');
     if (!link) {
@@ -667,10 +735,14 @@ export function IncentiveForm() {
                                 className="flex flex-wrap items-center gap-x-6 gap-y-2"
                                 disabled={isSubmitting || bankDetailsMissing}
                                 >
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="wos" /></FormControl><FormLabel className="font-normal">WoS</FormLabel></FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scopus" /></FormControl><FormLabel className="font-normal">Scopus</FormLabel></FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="both" /></FormControl><FormLabel className="font-normal">Both</FormLabel></FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="esci" /></FormControl><FormLabel className="font-normal">ESCI</FormLabel></FormItem>
+                                {availableIndexTypes.map((option) => (
+                                    <FormItem key={option.value} className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value={option.value} />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">{option.label}</FormLabel>
+                                    </FormItem>
+                                ))}
                                 </RadioGroup>
                             </FormControl>
                             <FormMessage />
@@ -721,17 +793,21 @@ export function IncentiveForm() {
                         render={({ field }) => (
                             <FormItem className="space-y-3">
                             <FormLabel>Journal Classification</FormLabel>
-                            <FormControl>
+                             <FormControl>
                                 <RadioGroup
                                 onValueChange={field.onChange}
                                 value={field.value}
                                 className="flex flex-wrap items-center gap-x-6 gap-y-2"
                                 disabled={isSubmitting || bankDetailsMissing}
                                 >
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q1" /></FormControl><FormLabel className="font-normal">Q1</FormLabel></FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q2" /></FormControl><FormLabel className="font-normal">Q2</FormLabel></FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q3" /></FormControl><FormLabel className="font-normal">Q3</FormLabel></FormItem>
-                                <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Q4" /></FormControl><FormLabel className="font-normal">Q4</FormLabel></FormItem>
+                                {availableClassifications.map((option) => (
+                                    <FormItem key={option.value} className="flex items-center space-x-2 space-y-0">
+                                        <FormControl>
+                                            <RadioGroupItem value={option.value} />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">{option.label}</FormLabel>
+                                    </FormItem>
+                                ))}
                                 </RadioGroup>
                             </FormControl>
                             <FormMessage />
@@ -754,9 +830,14 @@ export function IncentiveForm() {
                                     className="flex items-center space-x-6"
                                     disabled={isSubmitting || bankDetailsMissing}
                                     >
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="sci" /></FormControl><FormLabel className="font-normal">SCI</FormLabel></FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="scie" /></FormControl><FormLabel className="font-normal">SCIE</FormLabel></FormItem>
-                                    <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="ahi" /></FormControl><FormLabel className="font-normal">A&amp;HI</FormLabel></FormItem>
+                                    {wosTypeOptions.map((option) => (
+                                        <FormItem key={option.value} className="flex items-center space-x-2 space-y-0">
+                                            <FormControl>
+                                                <RadioGroupItem value={option.value} />
+                                            </FormControl>
+                                            <FormLabel className="font-normal">{option.label}</FormLabel>
+                                        </FormItem>
+                                    ))}
                                     </RadioGroup>
                                 </FormControl>
                                 <FormMessage />

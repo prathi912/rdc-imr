@@ -137,7 +137,7 @@ export type IncentiveClaim = {
     publicationType?: string;
     indexType?: 'wos' | 'scopus' | 'both' | 'esci';
     journalClassification?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
-    wosType?: 'sci' | 'scie' | 'ahi';
+    wosType?: 'SCIE' | 'SSCI' | 'A&HCI';
     impactFactor?: number;
     journalName?: string;
     journalWebsite?: string;
