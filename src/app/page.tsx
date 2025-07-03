@@ -57,13 +57,13 @@ export default function LandingPage() {
               <div className="flex flex-col justify-center space-y-4 animate-in fade-in slide-in-from-left-8 duration-700">
                 <div className="space-y-2">
                    <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm font-medium text-primary">
-                    IMR Funding Portal
+                    Research & Development Cell
                   </div>
                   <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                    Empowering Research at Parul University
+                    Empowering Research & Recognizing Achievement
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    Our comprehensive portal streamlines the entire Intramural Research (IMR) funding lifecycle. From seamless proposal submission and transparent evaluation to efficient grant management, we provide the tools you need to focus on what matters most: innovative research.
+                    Our comprehensive portal streamlines the entire research lifecycle. From IMR proposal submissions and AI-assisted evaluations to simplified claims for publication incentives, we provide the tools to foster innovation at Parul University.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -101,45 +101,39 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* How It Works Section */}
-        <section id="how-it-works" className="w-full py-12 md:py-24 lg:py-32">
-            <div className="container px-4 md:px-6">
-                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
-                    <div className="space-y-2">
-                        <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">A Simplified Research Journey</h2>
-                        <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                            Our platform guides you through a clear, three-step process for IMR funding.
-                        </p>
-                    </div>
-                </div>
-                <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 py-12 sm:grid-cols-2 md:grid-cols-3">
-                    <div className="flex flex-col items-center text-center">
-                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <FilePlus className="h-8 w-8" />
-                        </div>
-                        <h3 className="text-xl font-bold">1. Submit Proposal</h3>
-                        <p className="text-muted-foreground">Faculty members use our intuitive, step-by-step form to submit their research proposals and all necessary documentation with ease.</p>
-                    </div>
-                    <div className="flex flex-col items-center text-center">
-                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <GanttChartSquare className="h-8 w-8" />
-                        </div>
-                        <h3 className="text-xl font-bold">2. Review & Evaluate</h3>
-                        <p className="text-muted-foreground">Projects are scheduled for IMR meetings where designated evaluators use AI-powered prompts to provide fair and consistent feedback.</p>
-                    </div>
-                    <div className="flex flex-col items-center text-center">
-                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <Award className="h-8 w-8" />
-                        </div>
-                        <h3 className="text-xl font-bold">3. Award & Manage</h3>
-                        <p className="text-muted-foreground">Approved projects are awarded grants. PIs can then manage fund utilization and submit completion reports through the portal.</p>
-                    </div>
-                </div>
+        {/* Features Section */}
+        <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">A Unified Platform for Your Research Journey</h2>
+                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                  One portal to manage everything from initial project funding to celebrating your publication success.
+                </p>
+              </div>
             </div>
+            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 py-12 sm:grid-cols-2 lg:grid-cols-2">
+              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <GanttChartSquare className="h-8 w-8" />
+                </div>
+                <h3 className="text-xl font-bold">IMR Project Funding</h3>
+                <p className="text-muted-foreground mt-2">A guided workflow for submitting intramural research proposals, tracking their evaluation status, and managing awarded grants efficiently.</p>
+              </div>
+              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Award className="h-8 w-8" />
+                </div>
+                <h3 className="text-xl font-bold">Incentive Claims</h3>
+                <p className="text-muted-foreground mt-2">Easily apply for incentives for your published research papers, patents, books, and conference presentations through dedicated, easy-to-use forms.</p>
+              </div>
+            </div>
+          </div>
         </section>
 
+
         {/* Built for you section */}
-        <section id="roles" className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+        <section id="roles" className="w-full py-12 md:py-24">
              <div className="container px-4 md:px-6">
                  <div className="flex flex-col items-center justify-center space-y-4 text-center">
                     <div className="space-y-2">
@@ -160,8 +154,8 @@ export default function LandingPage() {
                         <p className="text-muted-foreground">Submit, track, and manage your research projects and incentive claims from a personalized dashboard.</p>
                         <ul className="grid gap-2 text-sm">
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Simplified Proposal Submission</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Streamlined Incentive Claims</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Real-time Status Tracking</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Fund Utilization Reporting</li>
                         </ul>
                     </div>
                     <div className="grid gap-4">
@@ -178,79 +172,22 @@ export default function LandingPage() {
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Fair and Consistent Scoring</li>
                         </ul>
                     </div>
-                    <div className="flex flex-col items-center text-center">
-                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <FilePlus className="h-8 w-8" />
+                    <div className="grid gap-4">
+                         <div className="flex items-center gap-4">
+                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                               <ShieldCheck className="h-6 w-6" />
+                            </div>
+                            <h3 className="text-xl font-bold">For Admins</h3>
                         </div>
-                        <h3 className="text-xl font-bold">1. Submit Proposal</h3>
-                        <p className="text-muted-foreground">Faculty members use our intuitive, step-by-step form to submit their research proposals and all necessary documentation with ease.</p>
+                        <p className="text-muted-foreground">Oversee the entire process with powerful dashboards, user management tools, and comprehensive analytics.</p>
+                         <ul className="grid gap-2 text-sm">
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Centralized Project Oversight</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Incentive Claim Management</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Data Analytics & Reporting</li>
+                        </ul>
                     </div>
-                    <div className="flex flex-col items-center text-center">
-                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <GanttChartSquare className="h-8 w-8" />
-                        </div>
-                        <h3 className="text-xl font-bold">2. Review & Evaluate</h3>
-                        <p className="text-muted-foreground">Projects are scheduled for IMR meetings where designated evaluators use AI-powered prompts to provide fair and consistent feedback.</p>
-                    </div>
-                    <div className="flex flex-col items-center text-center">
-                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                            <Award className="h-8 w-8" />
-                        </div>
-                        <h3 className="text-xl font-bold">3. Award & Manage</h3>
-                        <p className="text-muted-foreground">Approved projects are awarded grants. PIs can then manage fund utilization and submit completion reports through the portal.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        {/* Key Features Section */}
-        <section id="features" className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <div className="space-y-2">
-                <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm">Key Features</div>
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">A Better Way to Manage Research</h2>
-                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  Our portal provides a centralized platform for managing the entire lifecycle of intramural research projects.
-                </p>
-              </div>
-            </div>
-            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
-              <div className="grid gap-1 text-center animate-in fade-in-0 slide-in-from-bottom-8 duration-700" style={{ animationDelay: '100ms' }}>
-                <div className="flex justify-center items-center mb-4">
-                    <div className="p-4 rounded-full bg-primary/10 text-primary">
-                        <BookCheck className="h-8 w-8" />
-                    </div>
-                </div>
-                <h3 className="text-xl font-bold">Seamless Submissions</h3>
-                <p className="text-muted-foreground">
-                  A guided, multi-step form ensures all necessary project information is captured accurately.
-                </p>
-              </div>
-              <div className="grid gap-1 text-center animate-in fade-in-0 slide-in-from-bottom-8 duration-700" style={{ animationDelay: '200ms' }}>
-                <div className="flex justify-center items-center mb-4">
-                    <div className="p-4 rounded-full bg-primary/10 text-primary">
-                        <Bot className="h-8 w-8" />
-                    </div>
-                </div>
-                <h3 className="text-xl font-bold">AI-Powered Assistance</h3>
-                <p className="text-muted-foreground">
-                  Leverage AI for project summaries and insightful evaluation prompts to ensure fair and consistent reviews.
-                </p>
-              </div>
-              <div className="grid gap-1 text-center animate-in fade-in-0 slide-in-from-bottom-8 duration-700" style={{ animationDelay: '300ms' }}>
-                <div className="flex justify-center items-center mb-4">
-                    <div className="p-4 rounded-full bg-primary/10 text-primary">
-                        <Award className="h-8 w-8" />
-                    </div>
-                </div>
-                <h3 className="text-xl font-bold">Efficient Grant Management</h3>
-                <p className="text-muted-foreground">
-                  Track grant disbursement and fund utilization from a single, unified interface.
-                </p>
-              </div>
-            </div>
-          </div>
+                 </div>
+             </div>
         </section>
 
         {/* CTA Section */}
