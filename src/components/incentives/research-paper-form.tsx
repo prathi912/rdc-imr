@@ -74,7 +74,7 @@ const researchPaperSchema = z
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>;
 
 const authorCountOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
-const authorTypeOptions = [ 'First Author', 'Corresponding Author', 'First & Corresponding Author', 'Co-Author' ];
+const authorTypeOptions = [ 'Author', 'Co-author' ];
 const publicationPhaseOptions = [ 'Published online first with DOI number', 'Published with vol and page number' ];
 const wosTypeOptions = [ { value: 'SCIE', label: 'SCIE' }, { value: 'SSCI', label: 'SSCI' }, { value: 'A&HCI', label: 'A&HCI' } ];
 const indexTypeOptions = [ { value: 'wos', label: 'WoS' }, { value: 'scopus', label: 'Scopus' }, { value: 'both', label: 'Both' }, { value: 'esci', label: 'ESCI' } ];
