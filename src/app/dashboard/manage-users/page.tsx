@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -82,6 +83,7 @@ function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null,
                     <div className="border-t pt-4">
                       <h4 className="font-semibold text-base mb-2">Academic Details</h4>
                       {renderDetail("MIS ID", user.misId)}
+                      {renderDetail("ORCID ID", user.orcidId)}
                       {renderDetail("Faculty", user.faculty)}
                       {renderDetail("Institute", user.institute)}
                       {renderDetail("Department", user.department)}

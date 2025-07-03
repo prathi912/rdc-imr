@@ -44,7 +44,6 @@ import { Loader2, AlertCircle } from 'lucide-react';
 
 const bookSchema = z
   .object({
-    orcidId: z.string().optional(),
     bookApplicationType: z.enum(['Book Chapter', 'Book'], { required_error: 'Please select an application type.' }),
     publicationTitle: z.string().min(3, 'Title is required.'),
     bookAuthors: z.string().min(3, 'Author names are required.'),
@@ -102,7 +101,6 @@ export function BookForm() {
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
     defaultValues: {
-      orcidId: '',
       bookApplicationType: undefined,
       publicationTitle: '',
       bookAuthors: '',
@@ -165,6 +163,7 @@ export function BookForm() {
 
       const claimData: Omit<IncentiveClaim, 'id'> = {
         ...data,
+        orcidId: user.orcidId,
         claimType: 'Books',
         benefitMode: 'incentives',
         bookProofUrl,
@@ -208,7 +207,6 @@ export function BookForm() {
             <div className="rounded-lg border p-4 space-y-6 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">BOOK/BOOK CHAPTER DETAILS</h3>
                 <Separator />
-                <FormField name="orcidId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0002-1825-0097" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="bookApplicationType" control={form.control} render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Type of Application</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Book Chapter" /></FormControl><FormLabel className="font-normal">Book Chapter Publication</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Book" /></FormControl><FormLabel className="font-normal">Book Publication</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publicationTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the {bookApplicationType || 'Publication'}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookTitleForChapter" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Book (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}

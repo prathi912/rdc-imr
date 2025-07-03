@@ -39,7 +39,6 @@ const patentSchema = z
     patentTitle: z.string().min(3, 'Patent title is required.'),
     patentStatus: z.enum(['Filed', 'Published', 'Granted'], { required_error: 'Patent status is required.' }),
     patentApplicantType: z.enum(['Sole', 'Joint']).optional(),
-    orcidId: z.string().optional(),
     patentSpecificationType: z.enum(['Full', 'Provisional'], { required_error: 'Specification type is required.' }),
     patentApplicationNumber: z.string().min(3, 'Application number is required.'),
     patentTotalStudents: z.coerce.number().optional(),
@@ -80,7 +79,6 @@ export function PatentForm() {
       patentTitle: '',
       patentStatus: undefined,
       patentApplicantType: undefined,
-      orcidId: '',
       patentSpecificationType: undefined,
       patentApplicationNumber: '',
       patentTotalStudents: 0,
@@ -132,6 +130,7 @@ export function PatentForm() {
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
+            orcidId: user.orcidId,
             claimType: 'Patents',
             benefitMode: 'incentives',
             patentApprovalProofUrl,
@@ -176,7 +175,6 @@ export function PatentForm() {
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">PATENT DETAILS</h3>
                 <Separator />
-                <FormField name="orcidId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0002-1825-0097" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Patent</FormLabel><FormControl><Textarea placeholder="Enter the full title of your patent" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentSpecificationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Specification Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Full" /></FormControl><FormLabel className="font-normal">Full</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Provisional" /></FormControl><FormLabel className="font-normal">Provisional</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentApplicationNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Ref. No/Application Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />

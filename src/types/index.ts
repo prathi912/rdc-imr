@@ -1,5 +1,4 @@
 
-
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -19,6 +18,7 @@ export type User = {
   institute?: string;
   department?: string;
   misId?: string;
+  orcidId?: string;
   phoneNumber?: string;
   profileComplete?: boolean;
   photoURL?: string;

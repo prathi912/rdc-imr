@@ -28,6 +28,7 @@ const profileSetupSchema = z.object({
   department: z.string().min(2, 'Department name is required.'),
   designation: z.string().min(2, 'Designation is required.'),
   misId: z.string().min(1, 'MIS ID is required.'),
+  orcidId: z.string().optional(),
   phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
 });
 
@@ -81,6 +82,7 @@ export default function ProfileSetupPage() {
       department: '',
       designation: '',
       misId: '',
+      orcidId: '',
       phoneNumber: '',
     },
   });
@@ -104,6 +106,7 @@ export default function ProfileSetupPage() {
             department: appUser.department || '',
             designation: appUser.designation || '',
             misId: appUser.misId || '',
+            orcidId: appUser.orcidId || '',
             phoneNumber: appUser.phoneNumber || '',
           });
         } else {
@@ -166,6 +169,7 @@ export default function ProfileSetupPage() {
         department: data.department,
         designation: data.designation,
         misId: data.misId,
+        orcidId: data.orcidId,
         phoneNumber: data.phoneNumber,
         photoURL: photoURL,
         profileComplete: true,
@@ -246,6 +250,9 @@ export default function ProfileSetupPage() {
                 )} />
                 <FormField control={form.control} name="misId" render={({ field }) => (
                   <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                 <FormField control={form.control} name="orcidId" render={({ field }) => (
+                  <FormItem><FormLabel>ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0001-2345-6789" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="phoneNumber" render={({ field }) => (
                   <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>

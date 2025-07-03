@@ -34,7 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
-const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies'];
+const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
 type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
 
@@ -42,10 +42,13 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
     if (!claim) return null;
 
     const renderDetail = (label: string, value?: string | number | boolean) => {
-        if (value === undefined || value === null || value === '') return null;
+        if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         let displayValue = String(value);
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            displayValue = value.join(', ');
         }
         return (
             <div className="grid grid-cols-3 gap-2 py-1">
@@ -209,6 +212,36 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                         </>
                     )}
 
+                    {claim.claimType === 'Seed Money for APC' && (
+                         <>
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">APC Claim Details</h4>
+                            {renderDetail("Article Type", claim.apcTypeOfArticle === 'Other' ? claim.apcOtherArticleType : claim.apcTypeOfArticle)}
+                            {renderDetail("Paper Title", claim.apcPaperTitle)}
+                            {renderDetail("Authors", claim.apcAuthors)}
+                            {renderDetail("Total Student Authors", claim.apcTotalStudentAuthors)}
+                            {renderDetail("Student Names", claim.apcStudentNames)}
+                            {renderDetail("Journal Details", claim.apcJournalDetails)}
+                            {renderDetail("Journal Q-Rating", claim.apcQRating)}
+                            {renderDetail("Journal Type", claim.apcNationalInternational)}
+                            {renderLinkDetail("Journal Website", claim.apcJournalWebsite)}
+                            {renderDetail("ISSN", claim.apcIssnNo)}
+                            {renderDetail("Indexing Status", claim.apcIndexingStatus)}
+                            {claim.apcIndexingStatus?.includes('Other') && renderDetail("Other Indexing", claim.apcOtherIndexingStatus)}
+                            {renderDetail("SCI Impact Factor", claim.apcSciImpactFactor)}
+                            {renderDetail("APC Waiver Requested?", claim.apcApcWaiverRequested)}
+                            {renderLinkDetail("Waiver Request Proof", claim.apcApcWaiverProofUrl)}
+                            {renderDetail("PU Name in Publication?", claim.apcPuNameInPublication)}
+                            {renderDetail("Total APC Amount", claim.apcTotalAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Amount Claimed", claim.apcAmountClaimed?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Self Declaration", claim.apcSelfDeclaration)}
+                            <hr className="my-2" />
+                            <h4 className="font-semibold text-base mt-2">Uploaded APC Documents</h4>
+                            {renderLinkDetail("Publication Proof", claim.apcPublicationProofUrl)}
+                            {renderLinkDetail("Invoice/Payment Proof", claim.apcInvoiceProofUrl)}
+                        </>
+                    )}
+
                     <hr className="my-2" />
                     <h4 className="font-semibold text-base mt-2">Author & Benefit Details</h4>
                     {renderDetail("Author Type", claim.authorType)}
@@ -321,7 +354,8 @@ export default function ManageIncentiveClaimsPage() {
         (claim.patentTitle && claim.patentTitle.toLowerCase().includes(lowerCaseSearch)) ||
         (claim.conferencePaperTitle && claim.conferencePaperTitle.toLowerCase().includes(lowerCaseSearch)) ||
         (claim.publicationTitle && claim.publicationTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.professionalBodyName && claim.professionalBodyName.toLowerCase().includes(lowerCaseSearch))
+        (claim.professionalBodyName && claim.professionalBodyName.toLowerCase().includes(lowerCaseSearch)) ||
+        (claim.apcPaperTitle && claim.apcPaperTitle.toLowerCase().includes(lowerCaseSearch))
       );
     }
 

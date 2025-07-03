@@ -24,7 +24,6 @@ import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 const apcSchema = z.object({
-  orcidId: z.string().optional(),
   apcTypeOfArticle: z.string({ required_error: 'Please select an article type.' }),
   apcOtherArticleType: z.string().optional(),
   apcPaperTitle: z.string().min(5, 'Paper title is required.'),
@@ -136,6 +135,7 @@ export function ApcForm() {
 
       const claimData: Omit<IncentiveClaim, 'id'> = {
         ...data,
+        orcidId: user.orcidId,
         apcApcWaiverProofUrl,
         apcPublicationProofUrl,
         apcInvoiceProofUrl,
@@ -180,7 +180,6 @@ export function ApcForm() {
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">ARTICLE &amp; JOURNAL DETAILS</h3>
                 <Separator />
-                 <FormField name="orcidId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0002-1825-0097" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField control={form.control} name="apcTypeOfArticle" render={({ field }) => ( <FormItem><FormLabel>Type of Article</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-6">{articleTypes.map(type => (<FormItem key={type} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={type} /></FormControl><FormLabel className="font-normal">{type}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
                 {watchArticleType === 'Other' && <FormField name="apcOtherArticleType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Please specify other article type</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
                 <FormField name="apcPaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Paper</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />

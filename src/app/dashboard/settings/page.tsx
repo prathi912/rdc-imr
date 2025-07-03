@@ -30,6 +30,7 @@ const profileSchema = z.object({
   department: z.string().min(2, 'Department name is required.'),
   designation: z.string().min(2, 'Designation is required.'),
   misId: z.string().min(1, 'MIS ID is required.'),
+  orcidId: z.string().optional(),
   phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
 });
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -108,6 +109,7 @@ export default function SettingsPage() {
       department: '',
       designation: '',
       misId: '',
+      orcidId: '',
       phoneNumber: '',
     },
   });
@@ -150,6 +152,7 @@ export default function SettingsPage() {
             department: appUser.department || '',
             designation: appUser.designation || '',
             misId: appUser.misId || '',
+            orcidId: appUser.orcidId || '',
             phoneNumber: appUser.phoneNumber || '',
           });
           if (appUser.bankDetails) {
@@ -383,10 +386,13 @@ export default function SettingsPage() {
                   <FormField control={profileForm.control} name="misId" render={({ field }) => (
                     <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
-                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+                   <FormField control={profileForm.control} name="orcidId" render={({ field }) => (
+                    <FormItem><FormLabel>ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0001-2345-6789" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                 </div>
+                 <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
+                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
               </CardContent>
               <CardFooter className="border-t px-6 py-4">
                 <Button type="submit" disabled={isSubmittingProfile}>{isSubmittingProfile ? 'Saving...' : 'Save Changes'}</Button>

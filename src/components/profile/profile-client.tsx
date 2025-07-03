@@ -65,6 +65,7 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
                     <CardContent className="space-y-4">
                         <ProfileDetail label="Designation" value={user.designation} />
                         <ProfileDetail label="MIS ID" value={user.misId} />
+                        <ProfileDetail label="ORCID ID" value={user.orcidId} />
                         <ProfileDetail label="Faculty" value={user.faculty} />
                         <ProfileDetail label="Institute" value={user.institute} />
                         <ProfileDetail label="Department" value={user.department} />

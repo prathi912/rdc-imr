@@ -72,7 +72,6 @@ const conferenceSchema = z
     travelReceipts: z.any().optional(),
     flightTickets: z.any().optional(),
     conferenceSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
-    orcidId: z.string().optional(),
     authorType: z.string().optional(),
     totalAuthors: z.string().optional(),
   })
@@ -145,7 +144,6 @@ export function ConferenceForm() {
       travelReceipts: undefined,
       flightTickets: undefined,
       conferenceSelfDeclaration: false,
-      orcidId: '',
     },
   });
 
@@ -184,6 +182,7 @@ export function ConferenceForm() {
 
       const claimData: Omit<IncentiveClaim, 'id'> = {
         ...data,
+        orcidId: user.orcidId,
         claimType: 'Conference Presentations',
         benefitMode: 'reimbursement',
         govtFundingRequestProofUrl: await uploadFileHelper(data.govtFundingRequestProof?.[0], 'conference-funding-proof'),
