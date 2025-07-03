@@ -463,7 +463,7 @@ export default function ManageIncentiveClaimsPage() {
             <TableRow key={claim.id}>
               <TableCell className="font-medium">{claim.userName}</TableCell>
               <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle}</TableCell>
-              <TableCell className="hidden lg:table-cell">{claim.claimType}</TableCell>
+              <TableCell className="hidden lg:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
               <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
               <TableCell>
                 <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>

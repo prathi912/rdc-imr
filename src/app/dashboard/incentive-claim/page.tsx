@@ -25,16 +25,22 @@ function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
             </Card>
         );
     }
+    
+    const getClaimTitle = (claim: IncentiveClaim): string => {
+        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
+    };
+
     return (
         <div className="space-y-4">
             {claims.map(claim => (
                  <Card key={claim.id}>
-                    <CardContent className="p-4 flex justify-between items-start">
-                         <div>
-                            <p className="font-semibold">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle}</p>
+                    <CardContent className="p-4 flex justify-between items-start gap-4">
+                         <div className="flex-1 space-y-1">
+                            <Badge variant="outline">{claim.claimType}</Badge>
+                            <p className="font-semibold">{getClaimTitle(claim)}</p>
                             {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
                             {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
-                            <p className="text-sm text-muted-foreground">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
+                            <p className="text-sm text-muted-foreground pt-1">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
                         </div>
                         <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                     </CardContent>
