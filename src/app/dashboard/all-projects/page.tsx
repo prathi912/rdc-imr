@@ -82,6 +82,8 @@ export default function AllProjectsPage() {
 
         const isAdmin = ['admin', 'Super-admin'].includes(user.role);
         const isCro = user.role === 'CRO';
+        const isPrincipal = user.designation === 'Principal';
+        const isHod = user.designation === 'HOD';
         const isSpecialUser = user.email === 'unnati.joshi22950@paruluniversity.ac.in';
 
         if (isSpecialUser) {
@@ -92,10 +94,22 @@ export default function AllProjectsPage() {
           );
         } else if (isAdmin) {
           q = query(projectsCol, orderBy('submissionDate', 'desc'));
-        } else if (isCro) {
+        } else if (isCro && user.faculty) {
           q = query(
             projectsCol, 
             where('faculty', '==', user.faculty),
+            orderBy('submissionDate', 'desc')
+          );
+        } else if (isPrincipal && user.institute) {
+          q = query(
+            projectsCol,
+            where('institute', '==', user.institute),
+            orderBy('submissionDate', 'desc')
+          );
+        } else if (isHod && user.department) {
+          q = query(
+            projectsCol,
+            where('departmentName', '==', user.department),
             orderBy('submissionDate', 'desc')
           );
         } else {
@@ -121,6 +135,8 @@ export default function AllProjectsPage() {
   
   const isAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
   const isCro = user?.role === 'CRO';
+  const isPrincipal = user?.designation === 'Principal';
+  const isHod = user?.designation === 'HOD';
   const isSpecialUser = user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
   
   let pageTitle = "All Projects";
@@ -132,7 +148,14 @@ export default function AllProjectsPage() {
   } else if (isCro) {
     pageTitle = `Projects from ${user?.faculty}`;
     pageDescription = "Browse all projects submitted from your faculty.";
+  } else if (isPrincipal) {
+    pageTitle = `Projects from ${user?.institute}`;
+    pageDescription = "Browse all projects submitted from your institute.";
+  } else if (isHod) {
+    pageTitle = `Projects from ${user?.department}`;
+    pageDescription = "Browse all projects submitted from your department.";
   }
+
 
   const filteredProjects = useMemo(() => {
     return allProjects
@@ -214,6 +237,10 @@ export default function AllProjectsPage() {
     let fileName = `all_projects_${new Date().toISOString().split('T')[0]}.xlsx`;
     if (isCro && user?.faculty) {
         fileName = `projects_${user.faculty.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    } else if (isPrincipal && user?.institute) {
+        fileName = `projects_${user.institute.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    } else if (isHod && user?.department) {
+        fileName = `projects_${user.department.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
     } else if (isSpecialUser) {
         fileName = `projects_Eng_Tech_${new Date().toISOString().split('T')[0]}.xlsx`;
     }
@@ -227,7 +254,7 @@ export default function AllProjectsPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
-        {(isAdmin || isCro || isSpecialUser) && (
+        {(isAdmin || isCro || isSpecialUser || isPrincipal || isHod) && (
             <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
                 <DialogTrigger asChild>
                     <Button disabled={loading || filteredProjects.length === 0}>

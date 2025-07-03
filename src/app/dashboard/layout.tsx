@@ -64,8 +64,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               appUser.allowedModules = getDefaultModulesForRole(appUser.role);
           }
           
-          // Add special permission for Unnati Joshi
-          if (appUser.email === 'unnati.joshi22950@paruluniversity.ac.in') {
+          const isPrincipal = appUser.designation === 'Principal';
+          const isHod = appUser.designation === 'HOD';
+
+          // Add special permission for Unnati Joshi, Principals, and HODs to see the 'All Projects' page
+          if (appUser.email === 'unnati.joshi22950@paruluniversity.ac.in' || isPrincipal || isHod) {
             if (!appUser.allowedModules.includes('all-projects')) {
               appUser.allowedModules.push('all-projects');
             }
