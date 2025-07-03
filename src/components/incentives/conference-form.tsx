@@ -93,7 +93,6 @@ const authorCountOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
 const authorTypeOptions = [
   'First Author',
   'Corresponding Author',
-  'First & Corresponding Author',
   'Co-Author',
 ];
 
@@ -235,7 +234,7 @@ export function ConferenceForm() {
                     <div className="space-y-4 mt-4">
                         <FormField name="conferencePaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Paper Title</FormLabel><FormControl><Input placeholder="Title of the paper presented" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="conferenceName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference/Event Name</FormLabel><FormControl><Input placeholder="Full name of the conference" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                        <FormField name="organizerName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Organizer Name</FormLabel><FormControl><Input placeholder="e.g., IEEE, Springer" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="organizerName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Organizer Name</FormLabel><FormControl><Input placeholder="Name of Institution/Organisation" {...field} /></FormControl><FormMessage /></FormItem> )} />
                          <FormField name="eventWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Event Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <FormField name="conferenceDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
