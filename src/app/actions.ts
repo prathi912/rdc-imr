@@ -181,7 +181,7 @@ export async function checkMisIdExists(misId: string, currentUid: string): Promi
   }
 }
 
-export async function fetchScopusDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; totalInternalAuthors: number; totalInternalCoAuthors: number; }; error?: string; claimantIsAuthor?: boolean; }> {
+export async function fetchScopusDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; totalPuAuthors: number; }; error?: string; claimantIsAuthor?: boolean; }> {
   const apiKey = process.env.SCOPUS_API_KEY;
   if (!apiKey) {
     console.error('Scopus API key is not configured.');
@@ -237,7 +237,7 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
     const journalName = coredata['prism:publicationName'] || '';
     const totalAuthors = Array.isArray(authors) ? authors.length : 0;
     
-    let totalInternalAuthors = 0;
+    let totalPuAuthors = 0;
     if (Array.isArray(authors)) {
         authors.forEach(author => {
             const affiliations = Array.isArray(author.affiliation) ? author.affiliation : [author.affiliation];
@@ -245,11 +245,10 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
                 affil && affil.affilname && affil.affilname.toLowerCase().includes('parul')
             );
             if (isInternal) {
-                totalInternalAuthors++;
+                totalPuAuthors++;
             }
         });
     }
-    const totalInternalCoAuthors = Math.max(0, totalInternalAuthors - 1);
 
     const nameParts = claimantName.trim().toLowerCase().split(/\s+/);
     const claimantLastName = nameParts.pop() || '---';
@@ -284,8 +283,7 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
         title,
         journalName,
         totalAuthors,
-        totalInternalAuthors,
-        totalInternalCoAuthors,
+        totalPuAuthors,
       },
       claimantIsAuthor: isClaimantAnAuthor,
     };

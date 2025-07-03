@@ -127,8 +127,6 @@ export type IncentiveClaim = {
 
     // Common fields
     totalAuthors?: string;
-    totalInternalAuthors?: string;
-    totalInternalCoAuthors?: string;
     authorType?: string;
     benefitMode: string;
     orcidId?: string;
@@ -201,7 +199,7 @@ export type IncentiveClaim = {
     bookTotalPages?: number;
     bookType?: 'Textbook' | 'Reference Book';
     authorRole?: 'Editor' | 'Author';
-    totalPuAuthors?: number;
+    totalPuAuthors?: string;
     totalPuStudents?: number;
     puStudentNames?: string;
     publisherName?: string;

@@ -49,7 +49,7 @@ const bookSchema = z
     bookAuthors: z.string().min(3, 'Author names are required.'),
     bookTitleForChapter: z.string().optional(),
     bookEditor: z.string().optional(),
-    totalPuAuthors: z.coerce.number().optional(),
+    totalPuAuthors: z.string().optional(),
     totalPuStudents: z.coerce.number().optional(),
     puStudentNames: z.string().optional(),
     bookChapterPages: z.coerce.number().optional(),
@@ -106,7 +106,7 @@ export function BookForm() {
       bookAuthors: '',
       bookTitleForChapter: '',
       bookEditor: '',
-      totalPuAuthors: 0,
+      totalPuAuthors: '',
       totalPuStudents: 0,
       puStudentNames: '',
       bookChapterPages: 0,
@@ -212,7 +212,25 @@ export function BookForm() {
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookTitleForChapter" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Book (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
                 <FormField name="bookAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Author(s)</FormLabel><FormControl><Textarea placeholder="Comma-separated list of authors" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookEditor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the Editor (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField name="totalPuAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Authors from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} /><FormField name="totalPuStudents" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Students from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} /></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="totalPuAuthors"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Total Authors from PU</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger>
+                          </FormControl>
+                          <SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField name="totalPuStudents" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Students from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                </div>
                 <FormField name="puStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Students from PU</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book Chapter' ? (<FormField name="bookChapterPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book chapter</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />) : (<FormField name="bookTotalPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />)}
                 <FormField name="publisherName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the publisher</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />

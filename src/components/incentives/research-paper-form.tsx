@@ -56,8 +56,7 @@ const researchPaperSchema = z
     wosType: z.enum(['SCIE', 'SSCI', 'A&HCI']).optional(),
     impactFactor: z.coerce.number().optional(),
     totalAuthors: z.string().optional(),
-    totalInternalAuthors: z.string().optional(),
-    totalInternalCoAuthors: z.string().optional(),
+    totalPuAuthors: z.string().optional(),
     authorType: z.string().optional(),
     journalName: z.string().min(3, "Journal name is required."),
     journalWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
@@ -100,8 +99,7 @@ export function ResearchPaperForm() {
       wosType: undefined,
       impactFactor: 0,
       totalAuthors: '',
-      totalInternalAuthors: '',
-      totalInternalCoAuthors: '',
+      totalPuAuthors: '',
       authorType: '',
       journalName: '',
       journalWebsite: '',
@@ -166,13 +164,12 @@ export function ResearchPaperForm() {
     try {
         const result = await fetchScopusDataByUrl(link, user.name);
         if (result.success && result.data) {
-            const { title, journalName, totalAuthors, totalInternalAuthors, totalInternalCoAuthors } = result.data;
+            const { title, journalName, totalAuthors, totalPuAuthors } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate: true });
             const formatCount = (count: number) => count >= 10 ? '10+' : count.toString();
             form.setValue('totalAuthors', formatCount(totalAuthors), { shouldValidate: true });
-            form.setValue('totalInternalAuthors', formatCount(totalInternalAuthors), { shouldValidate: true });
-            form.setValue('totalInternalCoAuthors', formatCount(totalInternalCoAuthors), { shouldValidate: true });
+            form.setValue('totalPuAuthors', formatCount(totalPuAuthors), { shouldValidate: true });
             toast({ title: 'Success', description: 'Form fields pre-filled.' });
             if (result.claimantIsAuthor === false) { toast({ variant: 'destructive', title: 'Author Not Found', description: `Could not verify "${user.name}" in the author list.`, duration: 8000 }); }
         } else { toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' }); }
@@ -267,10 +264,13 @@ export function ResearchPaperForm() {
                 <FormField control={form.control} name="journalWebsite" render={({ field }) => ( <FormItem><FormLabel>Journal Website Link</FormLabel><FormControl><Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="paperTitle" render={({ field }) => ( <FormItem><FormLabel>Title of the Paper published</FormLabel><FormControl><Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="impactFactor" render={({ field }) => ( <FormItem><FormLabel>Impact factor</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormMessage /></FormItem> )}/>
+                
                 <FormField control={form.control} name="totalAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Authors</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormDescription className="text-destructive text-xs">* Note:-More than Two First Authors or More than Two Corresponding Authors are Not Allowed. In this case you have to select more Co-Authors only.</FormDescription><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="totalInternalAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Internal Authors</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="totalInternalCoAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Internal Co Authors</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                
+                <FormField control={form.control} name="totalPuAuthors" render={({ field }) => ( <FormItem><FormLabel>No. of Authors from Parul University</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+
                 <FormField control={form.control} name="authorType" render={({ field }) => ( <FormItem><FormLabel>Author Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                
                 <FormField control={form.control} name="publicationPhase" render={({ field }) => ( <FormItem><FormLabel>Publication Phase</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
             </div>
           </CardContent>
