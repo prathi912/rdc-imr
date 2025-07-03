@@ -220,4 +220,28 @@ export type IncentiveClaim = {
     membershipFee?: number;
     membershipProofUrl?: string;
     membershipSelfDeclaration?: boolean;
+
+    // Seed Money for APC Fields
+    apcTypeOfArticle?: string;
+    apcOtherArticleType?: string;
+    apcPaperTitle?: string;
+    apcAuthors?: string;
+    apcTotalStudentAuthors?: number;
+    apcStudentNames?: string;
+    apcJournalDetails?: string;
+    apcQRating?: string;
+    apcNationalInternational?: 'National' | 'International';
+    apcApcWaiverRequested?: boolean;
+    apcApcWaiverProofUrl?: string;
+    apcJournalWebsite?: string;
+    apcIssnNo?: string;
+    apcIndexingStatus?: string[];
+    apcOtherIndexingStatus?: string;
+    apcSciImpactFactor?: number;
+    apcPublicationProofUrl?: string;
+    apcInvoiceProofUrl?: string;
+    apcPuNameInPublication?: boolean;
+    apcAmountClaimed?: number;
+    apcTotalAmount?: number;
+    apcSelfDeclaration?: boolean;
 };

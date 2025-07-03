@@ -12,7 +12,7 @@ import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Book, Award, Presentation, FileText, UserPlus } from 'lucide-react';
+import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
@@ -31,7 +31,7 @@ function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
                  <Card key={claim.id}>
                     <CardContent className="p-4 flex justify-between items-start">
                          <div>
-                            <p className="font-semibold">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName}</p>
+                            <p className="font-semibold">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle}</p>
                             {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
                             {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
                             <p className="text-sm text-muted-foreground">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
@@ -74,6 +74,12 @@ const claimTypes = [
     description: 'Claim 50% of the fee for one membership per year.',
     href: '/dashboard/incentive-claim/membership',
     icon: UserPlus,
+  },
+  {
+    title: 'Seed Money for APC',
+    description: 'Claim reimbursement for Article Processing Charges after publication.',
+    href: '/dashboard/incentive-claim/apc',
+    icon: Banknote,
   },
 ];
 
