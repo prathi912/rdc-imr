@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -177,19 +178,26 @@ export default function LandingPage() {
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Fair and Consistent Scoring</li>
                         </ul>
                     </div>
-                    <div className="grid gap-4">
-                        <div className="flex items-center gap-4">
-                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                               <ShieldCheck className="h-6 w-6" />
-                            </div>
-                            <h3 className="text-xl font-bold">For Administrators</h3>
+                    <div className="flex flex-col items-center text-center">
+                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <FilePlus className="h-8 w-8" />
                         </div>
-                        <p className="text-muted-foreground">Oversee the entire funding process with powerful administrative dashboards, analytics, and user management tools.</p>
-                         <ul className="grid gap-2 text-sm">
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Centralized Project Overview</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Data Analytics & Reporting</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Granular User Permissions</li>
-                        </ul>
+                        <h3 className="text-xl font-bold">1. Submit Proposal</h3>
+                        <p className="text-muted-foreground">Faculty members use our intuitive, step-by-step form to submit their research proposals and all necessary documentation with ease.</p>
+                    </div>
+                    <div className="flex flex-col items-center text-center">
+                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <GanttChartSquare className="h-8 w-8" />
+                        </div>
+                        <h3 className="text-xl font-bold">2. Review & Evaluate</h3>
+                        <p className="text-muted-foreground">Projects are scheduled for IMR meetings where designated evaluators use AI-powered prompts to provide fair and consistent feedback.</p>
+                    </div>
+                    <div className="flex flex-col items-center text-center">
+                        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <Award className="h-8 w-8" />
+                        </div>
+                        <h3 className="text-xl font-bold">3. Award & Manage</h3>
+                        <p className="text-muted-foreground">Approved projects are awarded grants. PIs can then manage fund utilization and submit completion reports through the portal.</p>
                     </div>
                 </div>
             </div>
