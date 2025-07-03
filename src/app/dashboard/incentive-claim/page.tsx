@@ -2,16 +2,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { IncentiveForm } from '@/components/incentives/incentive-form';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import type { User, IncentiveClaim } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
+import { ArrowRight, Book, Award, Presentation, FileText, UserPlus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
     if (claims.length === 0) {
@@ -29,7 +31,7 @@ function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
                  <Card key={claim.id}>
                     <CardContent className="p-4 flex justify-between items-start">
                          <div>
-                            <p className="font-semibold">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle}</p>
+                            <p className="font-semibold">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName}</p>
                             {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
                             {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
                             <p className="text-sm text-muted-foreground">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
@@ -41,6 +43,40 @@ function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
         </div>
     );
 }
+
+const claimTypes = [
+  {
+    title: 'Research Papers',
+    description: 'Claim incentives for papers published in WoS/Scopus indexed journals.',
+    href: '/dashboard/incentive-claim/research-paper',
+    icon: FileText,
+  },
+  {
+    title: 'Patents',
+    description: 'Claim incentives for filed, published, or granted patents.',
+    href: '/dashboard/incentive-claim/patent',
+    icon: Award,
+  },
+  {
+    title: 'Conference Presentations',
+    description: 'Get assistance for presenting papers at events.',
+    href: '/dashboard/incentive-claim/conference',
+    icon: Presentation,
+  },
+  {
+    title: 'Books & Chapters',
+    description: 'Claim incentives for publishing books or book chapters.',
+    href: '/dashboard/incentive-claim/book',
+    icon: Book,
+  },
+  {
+    title: 'Professional Body Memberships',
+    description: 'Claim 50% of the fee for one membership per year.',
+    href: '/dashboard/incentive-claim/membership',
+    icon: UserPlus,
+  },
+];
+
 
 export default function IncentiveClaimPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -83,19 +119,38 @@ export default function IncentiveClaimPage() {
     <div className="container mx-auto max-w-5xl py-10">
       <PageHeader
         title="Incentive Claim Portal"
-        description="Submit your claims for publication incentives and track their status."
+        description="Select a category to apply for an incentive, or view your existing claims below."
         showBackButton={false}
       />
       <div className="mt-8">
         <Tabs defaultValue="apply" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="apply">Apply</TabsTrigger>
+            <TabsTrigger value="apply">Apply for Incentive</TabsTrigger>
             <TabsTrigger value="pending">Pending ({pendingClaims.length})</TabsTrigger>
             <TabsTrigger value="accepted">Accepted ({acceptedClaims.length})</TabsTrigger>
             <TabsTrigger value="rejected">Rejected ({rejectedClaims.length})</TabsTrigger>
           </TabsList>
-          <TabsContent value="apply">
-            <IncentiveForm />
+          <TabsContent value="apply" className="mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {claimTypes.map(claim => (
+                <Link href={claim.href} key={claim.href} className="flex">
+                  <Card className="flex flex-col w-full hover:bg-accent/50 dark:hover:bg-accent/20 transition-colors">
+                    <CardHeader>
+                      <claim.icon className="h-7 w-7 mb-2 text-primary" />
+                      <CardTitle>{claim.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-grow">
+                      <p className="text-sm text-muted-foreground">{claim.description}</p>
+                    </CardContent>
+                    <CardFooter>
+                      <div className="text-sm font-semibold text-primary">
+                        Apply Now <ArrowRight className="inline-block ml-1 h-4 w-4" />
+                      </div>
+                    </CardFooter>
+                  </Card>
+                </Link>
+              ))}
+            </div>
           </TabsContent>
           <TabsContent value="pending">
              {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={pendingClaims} />}
