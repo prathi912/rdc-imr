@@ -168,7 +168,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                             {renderLinkDetail("Participation Certificate", claim.participationCertificateUrl)}
                             {renderLinkDetail("Prize Proof", claim.prizeProofUrl)}
                             {renderLinkDetail("Travel Receipts", claim.travelReceiptsUrl)}
-                            {renderLinkDetail("Flight Tickets", claim.flightTicketsUrl)}
                             {renderLinkDetail("Proof of Govt. Funding Request", claim.govtFundingRequestProofUrl)}
                         </>
                     )}
@@ -247,8 +246,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     {renderDetail("Author Type", claim.authorType)}
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Total Authors", claim.totalAuthors)}
-                    {renderDetail("Total Internal Authors", claim.totalInternalAuthors)}
-                    {renderDetail("Total Internal Co-Authors", claim.totalInternalCoAuthors)}
                     
                     {claim.bankDetails && (
                         <>

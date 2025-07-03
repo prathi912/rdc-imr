@@ -186,7 +186,6 @@ export type IncentiveClaim = {
     travelPlaceVisited?: string;
     travelMode?: 'Bus' | 'Train' | 'Air' | 'Other';
     travelReceiptsUrl?: string;
-    flightTicketsUrl?: string;
     conferenceSelfDeclaration?: boolean;
 
     // Book/Book Chapter Fields
