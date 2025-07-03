@@ -87,7 +87,7 @@ export async function uploadFileToServer(fileDataUrl: string, path: string): Pro
     if (!fileDataUrl) {
       throw new Error('Empty file data URL.');
     }
-    const bucket = adminStorage().bucket();
+    const bucket = adminStorage.bucket();
     const file = bucket.file(path);
 
     // Extract mime type and base64 data from data URL
