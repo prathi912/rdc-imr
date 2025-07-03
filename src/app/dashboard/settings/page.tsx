@@ -15,12 +15,12 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db, auth } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { uploadFileToServer } from '@/app/actions';
+import { uploadFileToServer, fetchOrcidData } from '@/app/actions';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Banknote } from 'lucide-react';
+import { Banknote, Bot, Loader2 } from 'lucide-react';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -98,6 +98,7 @@ export default function SettingsPage() {
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -294,6 +295,28 @@ export default function SettingsPage() {
     }
   };
 
+  const handleFetchOrcid = async () => {
+    const orcidId = profileForm.getValues('orcidId');
+    if (!orcidId) {
+        toast({ variant: 'destructive', title: 'ORCID iD Missing', description: 'Please enter an ORCID iD to fetch data.' });
+        return;
+    }
+    setIsFetchingOrcid(true);
+    try {
+        const result = await fetchOrcidData(orcidId);
+        if (result.success && result.data) {
+            profileForm.setValue('name', result.data.name, { shouldValidate: true });
+            toast({ title: 'Success', description: 'Your name has been pre-filled from your ORCID profile.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Fetch Failed', description: result.error });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFetchingOrcid(false);
+    }
+};
+
 
   if (loading) {
     return (
@@ -383,12 +406,23 @@ export default function SettingsPage() {
                   <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={profileForm.control} name="misId" render={({ field }) => (
-                    <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
-                   <FormField control={profileForm.control} name="orcidId" render={({ field }) => (
-                    <FormItem><FormLabel>ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0001-2345-6789" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
+                    <FormField control={profileForm.control} name="misId" render={({ field }) => (
+                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={profileForm.control} name="orcidId" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>ORCID iD</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormControl>
+                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
+                                </FormControl>
+                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid} title="Fetch data from ORCID">
+                                    {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
                 </div>
                  <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
                     <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>

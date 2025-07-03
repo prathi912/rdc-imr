@@ -14,13 +14,14 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { uploadFileToServer, checkMisIdExists } from '@/app/actions';
+import { uploadFileToServer, checkMisIdExists, fetchOrcidData } from '@/app/actions';
 import type { User } from '@/types';
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Bot, Loader2 } from 'lucide-react';
 
 const profileSetupSchema = z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
@@ -73,6 +74,7 @@ export default function ProfileSetupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
 
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
@@ -190,6 +192,27 @@ export default function ProfileSetupPage() {
     }
   };
   
+  const handleFetchOrcid = async () => {
+    const orcidId = form.getValues('orcidId');
+    if (!orcidId) {
+        toast({ variant: 'destructive', title: 'ORCID iD Missing', description: 'Please enter an ORCID iD to fetch data.' });
+        return;
+    }
+    setIsFetchingOrcid(true);
+    try {
+        const result = await fetchOrcidData(orcidId);
+        if (result.success && result.data) {
+            toast({ title: 'ORCID iD Verified', description: `Successfully verified ORCID iD for ${result.data.name}.` });
+        } else {
+            toast({ variant: 'destructive', title: 'Verification Failed', description: result.error });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFetchingOrcid(false);
+    }
+};
+
   if (loading || !user) {
     return (
         <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -252,7 +275,18 @@ export default function ProfileSetupPage() {
                   <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                  <FormField control={form.control} name="orcidId" render={({ field }) => (
-                  <FormItem><FormLabel>ORCID ID</FormLabel><FormControl><Input placeholder="e.g., 0000-0001-2345-6789" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem>
+                        <FormLabel>ORCID iD</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <FormControl>
+                                <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
+                            </FormControl>
+                            <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid} title="Verify ORCID iD">
+                                {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                        <FormMessage />
+                    </FormItem>
                 )} />
                 <FormField control={form.control} name="phoneNumber" render={({ field }) => (
                   <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>

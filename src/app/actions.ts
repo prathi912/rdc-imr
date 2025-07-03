@@ -427,3 +427,47 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
     return { success: false, count: 0, error: error.message || 'Failed to upload projects.' };
   }
 }
+
+export async function fetchOrcidData(orcidId: string): Promise<{ success: boolean; data?: { name: string; }; error?: string; }> {
+  if (!/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/.test(orcidId)) {
+    return { success: false, error: 'Invalid ORCID iD format.' };
+  }
+
+  const orcidApiUrl = `https://pub.orcid.org/v3.0/${orcidId}`;
+
+  try {
+    const response = await fetch(orcidApiUrl, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+        if (response.status === 404) {
+            return { success: false, error: 'ORCID iD not found.' };
+        }
+      const errorText = await response.text();
+      return { success: false, error: `ORCID API Error: ${response.statusText} - ${errorText}` };
+    }
+
+    const data = await response.json();
+    
+    const givenName = data.person.name['given-names']?.value || '';
+    const familyName = data.person.name['family-name']?.value || '';
+    const fullName = `${givenName} ${familyName}`.trim();
+
+    if (!fullName) {
+      return { success: false, error: 'Could not extract name from ORCID profile.' };
+    }
+    
+    return {
+      success: true,
+      data: {
+        name: fullName,
+      }
+    };
+  } catch (error: any) {
+    console.error('Error calling ORCID API:', error);
+    return { success: false, error: error.message || 'An unexpected error occurred while fetching ORCID data.' };
+  }
+}
