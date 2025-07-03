@@ -199,7 +199,7 @@ export type IncentiveClaim = {
     bookTotalPages?: number;
     bookType?: 'Textbook' | 'Reference Book';
     authorRole?: 'Editor' | 'Author';
-    totalPuAuthors?: string;
+    totalPuAuthors?: number;
     totalPuStudents?: number;
     puStudentNames?: string;
     publisherName?: string;
