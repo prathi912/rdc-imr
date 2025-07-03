@@ -55,7 +55,7 @@ const researchPaperSchema = z
     journalClassification: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
     wosType: z.enum(['SCIE', 'SSCI', 'A&HCI']).optional(),
     impactFactor: z.coerce.number().optional(),
-    authorType: z.string().optional(),
+    authorType: z.string({ required_error: 'Please select your author type.' }),
     journalName: z.string().min(3, "Journal name is required."),
     journalWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     paperTitle: z.string().min(5, "Paper title is required."),
@@ -70,7 +70,7 @@ const researchPaperSchema = z
 
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>;
 
-const authorTypeOptions = [ 'Author', 'Co-author' ];
+const authorTypeOptions = [ 'First Author', 'Corresponding Author', 'First & Corresponding Author', 'Co-Author' ];
 const publicationPhaseOptions = [ 'Published online first with DOI number', 'Published with vol and page number' ];
 const wosTypeOptions = [ { value: 'SCIE', label: 'SCIE' }, { value: 'SSCI', label: 'SSCI' }, { value: 'A&HCI', label: 'A&HCI' } ];
 const indexTypeOptions = [ { value: 'wos', label: 'WoS' }, { value: 'scopus', label: 'Scopus' }, { value: 'both', label: 'Both' }, { value: 'esci', label: 'ESCI' } ];
@@ -258,7 +258,26 @@ export function ResearchPaperForm() {
                 <FormField control={form.control} name="paperTitle" render={({ field }) => ( <FormItem><FormLabel>Title of the Paper published</FormLabel><FormControl><Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="impactFactor" render={({ field }) => ( <FormItem><FormLabel>Impact factor</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormMessage /></FormItem> )}/>
                 
-                <FormField control={form.control} name="authorType" render={({ field }) => ( <FormItem><FormLabel>Author Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                <FormField
+                  control={form.control}
+                  name="authorType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Your Author Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="-- Please Select --" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <FormField control={form.control} name="publicationPhase" render={({ field }) => ( <FormItem><FormLabel>Publication Phase</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
             </div>
