@@ -32,7 +32,7 @@ export async function sendEmail({ to, subject, html }: EmailOptions) {
   }
 
   const mailOptions = {
-    from: `"Parul Research Portal" <${GMAIL_USER}>`,
+    from: `"Research & Development Cell - PU" <${GMAIL_USER}>`,
     to: to,
     subject: subject,
     html: html,
