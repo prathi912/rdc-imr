@@ -18,27 +18,31 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      // Check if user has a profile and an admin-level role
-      return isSignedIn() && getUserData(request.auth.uid).role in ['admin', 'CRO', 'Super-admin'];
+      let userData = getUserData(request.auth.uid);
+      return userData.role in ['admin', 'CRO', 'Super-admin'];
     }
     
     function isEvaluator() {
-      // Check if user has a profile and an evaluator-level role
-      return isSignedIn() && getUserData(request.auth.uid).role in ['Evaluator', 'CRO', 'Super-admin', 'admin'];
+      let userData = getUserData(request.auth.uid);
+      return userData.role in ['Evaluator', 'CRO', 'Super-admin', 'admin'];
     }
 
-    // Users Collection
+    // Collection: users
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if !exists(/databases/$(database)/documents/users/$(userId));
+      allow update: if isOwner(userId) || getUserData(request.auth.uid).role == 'Super-admin';
+    }
+     // Users Collection
     // - Anyone can read individual user profiles (for public profile pages).
     // - Users can create their own profile.
     // - Users can update their own profile, admins can update any profile.
-    // - Admins can delete users.
     match /users/{userId} {
       allow read: if true;
       allow create: if request.auth.uid == userId;
-      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow delete: if isAdmin();
+      allow update: if request.auth != null && (request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin', 'CRO']);
+      allow delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin'];
     }
-
     // Projects Collection
     // - Any authenticated user can read projects.
     // - Users can only create projects for themselves.
@@ -56,8 +60,26 @@ service cloud.firestore {
         allow write: if isEvaluator() && isOwner(evaluatorId);
       }
     }
+    // Collection: projects
+    match /projects/{projectId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.pi_uid);
+
+      // Subcollection: evaluations
+      match /evaluations/{evaluatorId} {
+        allow read: if isSignedIn() && (isAdmin() || isOwner(evaluatorId));
+        allow write: if isSignedIn() && isEvaluator() && isOwner(evaluatorId);
+      }
+    }
+
+    // Collection: notifications
+    match /notifications/{notificationId} {
+      allow read, update: if isSignedIn() && isOwner(get(/databases/$(database)/documents/notifications/$(notificationId)).data.uid);
+      allow create: if isSignedIn();
+    }
     
-    // Notifications Collection
+   // Notifications Collection
     // - A user can read/update their own notifications.
     // - Creation is server-side only (via Admin SDK).
     match /notifications/{notificationId} {
@@ -68,6 +90,12 @@ service cloud.firestore {
     // Incentive Claims Collection
     // - Users can create and read their own claims.
     // - Admins/CROs can read and update all claims.
+    match /incentiveClaims/{claimId} {
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.uid;
+      allow read: if isSignedIn() && (isOwner(resource.data.uid) || isAdmin());
+      allow update: if isSignedIn() && isAdmin();
+    }
+    // Collection: incentiveClaims
     match /incentiveClaims/{claimId} {
       allow create: if isSignedIn() && request.auth.uid == request.resource.data.uid;
       allow read: if isSignedIn() && (isOwner(resource.data.uid) || isAdmin());

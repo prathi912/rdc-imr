@@ -143,16 +143,16 @@ export async function scheduleMeeting(
   meetingDetails: { date: string; time: string; venue: string; }
 ) {
   try {
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
 
     for (const project of projectsToSchedule) {
-      const projectRef = doc(db, 'projects', project.id);
+      const projectRef = adminDb.collection('projects').doc(project.id);
       batch.update(projectRef, { 
         meetingDetails: meetingDetails,
         status: 'Under Review'
       });
 
-      const notificationRef = doc(collection(db, 'notifications'));
+      const notificationRef = adminDb.collection('notifications').doc();
       batch.set(notificationRef, {
          uid: project.pi_uid,
          projectId: project.id,
