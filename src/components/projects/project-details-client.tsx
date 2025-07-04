@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import type { Project, User, GrantDetails, Evaluation, BankDetails } from '@/types';
 import { db } from '@/lib/config';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
-import { uploadFileToServer } from '@/app/actions';
+import { uploadFileToServer, updateProjectStatus } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -149,28 +149,15 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     setIsUpdating(true);
-    try {
-      const projectRef = doc(db, 'projects', project.id);
-      await updateDoc(projectRef, { status: newStatus });
+    const result = await updateProjectStatus(project.id, newStatus);
+    setIsUpdating(false);
 
-      if (project.pi_uid) {
-        await addDoc(collection(db, 'notifications'), {
-          uid: project.pi_uid,
-          title: `Your project "${project.title}" status was updated to: ${newStatus}`,
-          projectId: project.id,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-        });
-      }
-
+    if (result.success) {
       setProject({ ...project, status: newStatus });
       toast({ title: 'Success', description: `Project status updated to ${newStatus}` });
-      router.refresh(); 
-    } catch (error) {
-      console.error('Error updating project status:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to update project status.' });
-    } finally {
-      setIsUpdating(false);
+      router.refresh();
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to update project status.' });
     }
   };
 

@@ -7,7 +7,9 @@ import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flo
 import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal-website-finder';
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
-import { doc, collection, writeBatch, query, where, getDocs } from 'firebase/firestore';
+import { doc, collection, writeBatch, query, where, getDocs, getDoc, addDoc } from 'firebase/firestore';
+import type { Project } from '@/types';
+import { sendEmail } from '@/lib/email';
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -50,14 +52,56 @@ export async function getJournalWebsite(input: JournalWebsiteInput) {
   }
 }
 
+export async function updateProjectStatus(projectId: string, newStatus: Project['status']) {
+  try {
+    const projectRef = doc(db, 'projects', projectId);
+    const projectSnap = await getDoc(projectRef);
+
+    if (!projectSnap.exists()) {
+      return { success: false, error: 'Project not found.' };
+    }
+    const project = projectSnap.data() as Project;
+
+    await adminDb.collection('projects').doc(projectId).update({ status: newStatus });
+
+    const notification = {
+      uid: project.pi_uid,
+      projectId: projectId,
+      title: `Your project "${project.title}" status was updated to: ${newStatus}`,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    };
+    await addDoc(collection(db, 'notifications'), notification);
+
+    if (project.pi_email) {
+      await sendEmail({
+        to: project.pi_email,
+        subject: `Project Status Update: ${project.title}`,
+        html: `
+          <p>Dear ${project.pi},</p>
+          <p>The status of your project, "<strong>${project.title}</strong>", has been updated to <strong>${newStatus}</strong>.</p>
+          <p>You can view your project details on the <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}">Parul Research Portal</a>.</p>
+          <p>Thank you,</p>
+          <p>RDC Team, Parul University</p>
+        `,
+      });
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating project status:', error);
+    return { success: false, error: error.message || 'Failed to update status.' };
+  }
+}
+
 export async function scheduleMeeting(
-  projectsToSchedule: { id: string; pi_uid: string; title: string; }[],
+  projectsToSchedule: { id: string; pi_uid: string; title: string; pi_email?: string; }[],
   meetingDetails: { date: string; time: string; venue: string; }
 ) {
   try {
     const batch = writeBatch(db);
 
-    projectsToSchedule.forEach((project) => {
+    for (const project of projectsToSchedule) {
       const projectRef = doc(db, 'projects', project.id);
       batch.update(projectRef, { 
         meetingDetails: meetingDetails,
@@ -72,7 +116,24 @@ export async function scheduleMeeting(
          createdAt: new Date().toISOString(),
          isRead: false,
       });
-    });
+
+      if (project.pi_email) {
+        await sendEmail({
+          to: project.pi_email,
+          subject: `IMR Meeting Scheduled for Your Project: ${project.title}`,
+          html: `
+            <p>Dear Researcher,</p>
+            <p>An IMR evaluation meeting has been scheduled for your project, "<strong>${project.title}</strong>".</p>
+            <p><strong>Date:</strong> ${new Date(meetingDetails.date).toLocaleDateString()}</p>
+            <p><strong>Time:</strong> ${meetingDetails.time}</p>
+            <p><strong>Venue:</strong> ${meetingDetails.venue}</p>
+            <p>Please prepare for your presentation. You can view more details on the <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${project.id}">Parul Research Portal</a>.</p>
+            <p>Thank you,</p>
+            <p>RDC Team, Parul University</p>
+          `,
+        });
+      }
+    }
 
     await batch.commit();
     return { success: true };
