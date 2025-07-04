@@ -142,7 +142,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   
   const isPI = user?.uid === project.pi_uid;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
-  const canEvaluate = user && ['Evaluator', 'CRO'].includes(user.role);
+  const canEvaluate = user && ['Evaluator', 'CRO', 'admin', 'Super-admin'].includes(user.role);
   const allEvaluationsIn = evaluations.length >= 3; // Require at least 3 evaluations
 
   const showEvaluationForm = canEvaluate && project.status === 'Under Review' && user;
