@@ -14,67 +14,64 @@ service cloud.firestore {
     }
 
     function getUserData(uid) {
-      // It's safer to check if the path exists before accessing .data
-      return exists(/databases/$(database)/documents/users/$(uid)) ? get(/databases/$(database)/documents/users/$(uid)).data : null;
+      return get(/databases/$(database)/documents/users/$(uid)).data;
     }
 
     function isAdmin() {
-      let userData = getUserData(request.auth.uid);
-      return userData != null && userData.role in ['admin', 'CRO', 'Super-admin'];
+      // Check if user has a profile and an admin-level role
+      return isSignedIn() && getUserData(request.auth.uid).role in ['admin', 'CRO', 'Super-admin'];
     }
     
     function isEvaluator() {
-      let userData = getUserData(request.auth.uid);
-      return userData != null && userData.role in ['Evaluator', 'CRO', 'Super-admin', 'admin'];
+      // Check if user has a profile and an evaluator-level role
+      return isSignedIn() && getUserData(request.auth.uid).role in ['Evaluator', 'CRO', 'Super-admin', 'admin'];
     }
 
-    // Collection: users
-    // - Anyone can read public profiles.
-    // - Users can create their own profile document.
-    // - Users can update their own profile. Admins can update any profile.
-    // - Only Super-admins can delete users.
+    // Users Collection
+    // - Anyone can read individual user profiles (for public profile pages).
+    // - Users can create their own profile.
+    // - Users can update their own profile, admins can update any profile.
+    // - Admins can delete users.
     match /users/{userId} {
       allow read: if true;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || getUserData(request.auth.uid).role == 'Super-admin';
-      allow delete: if getUserData(request.auth.uid).role == 'Super-admin';
+      allow create: if request.auth.uid == userId;
+      allow update: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
     }
 
-    // Collection: projects
+    // Projects Collection
     // - Any authenticated user can read projects.
-    // - Users can only create projects for themselves (pi_uid must match auth.uid).
-    // - The project's PI or an admin can update the project.
+    // - Users can only create projects for themselves.
+    // - PIs and admins can update projects.
     match /projects/{projectId} {
       allow read: if isSignedIn();
-      allow create: if isOwner(request.resource.data.pi_uid);
-      allow update: if isSignedIn() && (isOwner(resource.data.pi_uid) || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.pi_uid;
+      allow update: if isSignedIn() && (isAdmin() || request.auth.uid == resource.data.pi_uid);
 
-      // Subcollection: evaluations
-      // - Admins can read any evaluation.
-      // - Evaluators can only read/write their own evaluation.
+      // Evaluations Subcollection
+      // - Admins and the specific evaluator can read evaluations.
+      // - Only the specific evaluator can write their own evaluation.
       match /evaluations/{evaluatorId} {
         allow read: if isSignedIn() && (isAdmin() || isOwner(evaluatorId));
-        allow write: if isSignedIn() && isEvaluator() && isOwner(evaluatorId);
+        allow write: if isEvaluator() && isOwner(evaluatorId);
       }
     }
     
-    // Collection: notifications
-    // - A user can read and update (e.g., mark as read) their own notifications.
-    // - Notifications can only be created by the server (via Admin SDK).
+    // Notifications Collection
+    // - A user can read/update their own notifications.
+    // - Creation is server-side only (via Admin SDK).
     match /notifications/{notificationId} {
       allow read, update: if isSignedIn() && isOwner(resource.data.uid);
-      allow create: if false; // Server-side only
+      allow create: if false; // Only allow server-side creation
     }
-    
-    // Collection: incentiveClaims
-    // - A user can create their own claim.
-    // - A user can read their own claims.
-    // - Admins can read and update any claim.
+
+    // Incentive Claims Collection
+    // - Users can create and read their own claims.
+    // - Admins/CROs can read and update all claims.
     match /incentiveClaims/{claimId} {
-      allow create: if isOwner(request.resource.data.uid);
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.uid;
       allow read: if isSignedIn() && (isOwner(resource.data.uid) || isAdmin());
       allow update: if isSignedIn() && isAdmin();
     }
   }
 }
-    
