@@ -136,9 +136,6 @@ export function ApcForm() {
       const claimData: Omit<IncentiveClaim, 'id'> = {
         ...data,
         orcidId: user.orcidId,
-        apcApcWaiverProofUrl,
-        apcPublicationProofUrl,
-        apcInvoiceProofUrl,
         claimType: 'Seed Money for APC',
         benefitMode: 'reimbursement',
         uid: user.uid,
@@ -149,6 +146,10 @@ export function ApcForm() {
         submissionDate: new Date().toISOString(),
         bankDetails: user.bankDetails,
       };
+
+      if (apcApcWaiverProofUrl) claimData.apcApcWaiverProofUrl = apcApcWaiverProofUrl;
+      if (apcPublicationProofUrl) claimData.apcPublicationProofUrl = apcPublicationProofUrl;
+      if (apcInvoiceProofUrl) claimData.apcInvoiceProofUrl = apcInvoiceProofUrl;
 
       await addDoc(collection(db, 'incentiveClaims'), claimData);
       toast({ title: 'Success', description: 'Your incentive claim for APC has been submitted.' });

@@ -133,9 +133,6 @@ export function PatentForm() {
             orcidId: user.orcidId,
             claimType: 'Patents',
             benefitMode: 'incentives',
-            patentApprovalProofUrl,
-            patentForm1Url,
-            patentGovtReceiptUrl,
             uid: user.uid,
             userName: user.name,
             userEmail: user.email,
@@ -144,6 +141,10 @@ export function PatentForm() {
             submissionDate: new Date().toISOString(),
             bankDetails: user.bankDetails,
         };
+
+        if (patentApprovalProofUrl) claimData.patentApprovalProofUrl = patentApprovalProofUrl;
+        if (patentForm1Url) claimData.patentForm1Url = patentForm1Url;
+        if (patentGovtReceiptUrl) claimData.patentGovtReceiptUrl = patentGovtReceiptUrl;
 
         await addDoc(collection(db, 'incentiveClaims'), claimData);
         toast({ title: 'Success', description: 'Your incentive claim for patent has been submitted.' });

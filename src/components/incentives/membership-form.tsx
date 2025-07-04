@@ -103,7 +103,6 @@ export function MembershipForm() {
         ...data,
         claimType: 'Membership of Professional Bodies',
         benefitMode: 'reimbursement',
-        membershipProofUrl,
         uid: user.uid,
         userName: user.name,
         userEmail: user.email,
@@ -112,6 +111,8 @@ export function MembershipForm() {
         submissionDate: new Date().toISOString(),
         bankDetails: user.bankDetails,
       };
+
+      if (membershipProofUrl) claimData.membershipProofUrl = membershipProofUrl;
 
       await addDoc(collection(db, 'incentiveClaims'), claimData);
       toast({ title: 'Success', description: 'Your incentive claim for membership has been submitted.' });

@@ -166,8 +166,6 @@ export function BookForm() {
         orcidId: user.orcidId,
         claimType: 'Books',
         benefitMode: 'incentives',
-        bookProofUrl,
-        scopusProofUrl,
         uid: user.uid,
         userName: user.name,
         userEmail: user.email,
@@ -176,6 +174,9 @@ export function BookForm() {
         submissionDate: new Date().toISOString(),
         bankDetails: user.bankDetails,
       };
+
+      if (bookProofUrl) claimData.bookProofUrl = bookProofUrl;
+      if (scopusProofUrl) claimData.scopusProofUrl = scopusProofUrl;
 
       await addDoc(collection(db, 'incentiveClaims'), claimData);
       toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });

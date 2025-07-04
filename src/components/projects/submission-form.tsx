@@ -196,10 +196,12 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         timelineAndOutcomes: data.expectedOutcomes,
         status: status,
         submissionDate: project?.submissionDate || new Date().toISOString(),
-        proposalUrl,
-        cvUrl,
-        ethicsUrl,
       };
+
+      // Conditionally add URLs to avoid 'undefined' values
+      if (proposalUrl) projectData.proposalUrl = proposalUrl;
+      if (cvUrl) projectData.cvUrl = cvUrl;
+      if (ethicsUrl) projectData.ethicsUrl = ethicsUrl;
 
       await setDoc(doc(db, 'projects', projectId), projectData, { merge: true });
       setProgress(100);

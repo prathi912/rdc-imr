@@ -181,12 +181,6 @@ export function ConferenceForm() {
         orcidId: user.orcidId,
         claimType: 'Conference Presentations',
         benefitMode: 'reimbursement',
-        govtFundingRequestProofUrl: await uploadFileHelper(data.govtFundingRequestProof?.[0], 'conference-funding-proof'),
-        abstractUrl: await uploadFileHelper(data.abstractUpload?.[0], 'conference-abstract'),
-        registrationFeeProofUrl: await uploadFileHelper(data.registrationFeeProof?.[0], 'conference-reg-proof'),
-        participationCertificateUrl: await uploadFileHelper(data.participationCertificate?.[0], 'conference-cert'),
-        prizeProofUrl: await uploadFileHelper(data.prizeProof?.[0], 'conference-prize-proof'),
-        travelReceiptsUrl: await uploadFileHelper(data.travelReceipts?.[0], 'conference-travel-receipts'),
         uid: user.uid,
         userName: user.name,
         userEmail: user.email,
@@ -195,6 +189,20 @@ export function ConferenceForm() {
         submissionDate: new Date().toISOString(),
         bankDetails: user.bankDetails,
       };
+
+      const govtFundingRequestProofUrl = await uploadFileHelper(data.govtFundingRequestProof?.[0], 'conference-funding-proof');
+      const abstractUrl = await uploadFileHelper(data.abstractUpload?.[0], 'conference-abstract');
+      const registrationFeeProofUrl = await uploadFileHelper(data.registrationFeeProof?.[0], 'conference-reg-proof');
+      const participationCertificateUrl = await uploadFileHelper(data.participationCertificate?.[0], 'conference-cert');
+      const prizeProofUrl = await uploadFileHelper(data.prizeProof?.[0], 'conference-prize-proof');
+      const travelReceiptsUrl = await uploadFileHelper(data.travelReceipts?.[0], 'conference-travel-receipts');
+
+      if (govtFundingRequestProofUrl) claimData.govtFundingRequestProofUrl = govtFundingRequestProofUrl;
+      if (abstractUrl) claimData.abstractUrl = abstractUrl;
+      if (registrationFeeProofUrl) claimData.registrationFeeProofUrl = registrationFeeProofUrl;
+      if (participationCertificateUrl) claimData.participationCertificateUrl = participationCertificateUrl;
+      if (prizeProofUrl) claimData.prizeProofUrl = prizeProofUrl;
+      if (travelReceiptsUrl) claimData.travelReceiptsUrl = travelReceiptsUrl;
 
       await addDoc(collection(db, 'incentiveClaims'), claimData);
       toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
