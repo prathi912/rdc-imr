@@ -54,15 +54,15 @@ export async function getJournalWebsite(input: JournalWebsiteInput) {
 
 export async function updateProjectStatus(projectId: string, newStatus: Project['status']) {
   try {
-    const projectRef = doc(db, 'projects', projectId);
-    const projectSnap = await getDoc(projectRef);
+    const projectRef = adminDb.collection('projects').doc(projectId);
+    const projectSnap = await projectRef.get();
 
-    if (!projectSnap.exists()) {
+    if (!projectSnap.exists) {
       return { success: false, error: 'Project not found.' };
     }
     const project = projectSnap.data() as Project;
 
-    await adminDb.collection('projects').doc(projectId).update({ status: newStatus });
+    await projectRef.update({ status: newStatus });
 
     const notification = {
       uid: project.pi_uid,
@@ -71,7 +71,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
       createdAt: new Date().toISOString(),
       isRead: false,
     };
-    await addDoc(collection(db, 'notifications'), notification);
+    await adminDb.collection('notifications').add(notification);
 
     if (project.pi_email) {
       await sendEmail({
@@ -96,15 +96,15 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
 
 export async function updateIncentiveClaimStatus(claimId: string, newStatus: IncentiveClaim['status']) {
   try {
-    const claimRef = doc(db, 'incentiveClaims', claimId);
-    const claimSnap = await getDoc(claimRef);
+    const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
+    const claimSnap = await claimRef.get();
 
-    if (!claimSnap.exists()) {
+    if (!claimSnap.exists) {
       return { success: false, error: 'Incentive claim not found.' };
     }
     const claim = claimSnap.data() as IncentiveClaim;
 
-    await adminDb.collection('incentiveClaims').doc(claimId).update({ status: newStatus });
+    await claimRef.update({ status: newStatus });
 
     const claimTitle = claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Your Claim';
 
@@ -115,7 +115,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
       createdAt: new Date().toISOString(),
       isRead: false,
     };
-    await addDoc(collection(db, 'notifications'), notification);
+    await adminDb.collection('notifications').add(notification);
 
     if (claim.userEmail) {
       await sendEmail({
@@ -574,3 +574,5 @@ export async function fetchOrcidData(orcidId: string): Promise<{ success: boolea
     return { success: false, error: error.message || 'An unexpected error occurred while fetching ORCID data.' };
   }
 }
+
+    
