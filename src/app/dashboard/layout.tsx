@@ -52,44 +52,65 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { toast } = useToast();
 
   useEffect(() => {
+    let unsubscribeProfile: (() => void) | undefined;
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      // Clean up previous profile listener if auth state changes
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+      }
+
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
-          
-          // Client-side defaulting for users without the field.
-          if (!appUser.allowedModules || appUser.allowedModules.length === 0) {
-              appUser.allowedModules = getDefaultModulesForRole(appUser.role);
-          }
-          
-          const isPrincipal = appUser.designation === 'Principal';
-          const isHod = appUser.designation === 'HOD';
-
-          // Add special permission for Unnati Joshi, Principals, and HODs to see the 'All Projects' page
-          if (appUser.email === 'unnati.joshi22950@paruluniversity.ac.in' || isPrincipal || isHod) {
-            if (!appUser.allowedModules.includes('all-projects')) {
-              appUser.allowedModules.push('all-projects');
+        
+        // Set up a real-time listener for the user's profile
+        unsubscribeProfile = onSnapshot(userDocRef, (userDocSnap) => {
+          if (userDocSnap.exists()) {
+            const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
+            
+            // Client-side defaulting for users without the field.
+            if (!appUser.allowedModules || appUser.allowedModules.length === 0) {
+                appUser.allowedModules = getDefaultModulesForRole(appUser.role);
             }
-          }
+            
+            const isPrincipal = appUser.designation === 'Principal';
+            const isHod = appUser.designation === 'HOD';
 
-          setUser(appUser);
-          localStorage.setItem('user', JSON.stringify(appUser));
-        } else {
-          toast({ variant: 'destructive', title: 'Authentication Error', description: 'User profile not found.' });
-          await signOut(auth);
-          router.replace('/login');
-        }
+            // Add special permission for Unnati Joshi, Principals, and HODs to see the 'All Projects' page
+            if (appUser.email === 'unnati.joshi22950@paruluniversity.ac.in' || isPrincipal || isHod) {
+              if (!appUser.allowedModules.includes('all-projects')) {
+                appUser.allowedModules.push('all-projects');
+              }
+            }
+
+            setUser(appUser);
+            localStorage.setItem('user', JSON.stringify(appUser));
+          } else {
+            toast({ variant: 'destructive', title: 'Authentication Error', description: 'User profile not found.' });
+            signOut(auth); // This will trigger onAuthStateChanged again with null
+          }
+          setLoading(false);
+        }, (error) => {
+          console.error("Firestore user listener error:", error);
+          toast({ variant: "destructive", title: "Network Error", description: "Could not fetch real-time user data." });
+          signOut(auth); // Log out on error
+          setLoading(false);
+        });
+
       } else {
         localStorage.removeItem('user');
         router.replace('/login');
         setUser(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribeAuth();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+      }
+    };
   }, [router, toast]);
 
   useEffect(() => {
