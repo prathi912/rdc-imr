@@ -8,7 +8,7 @@ import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
 import { doc, collection, writeBatch, query, where, getDocs, getDoc, addDoc } from 'firebase/firestore';
-import type { Project } from '@/types';
+import type { Project, IncentiveClaim } from '@/types';
 import { sendEmail } from '@/lib/email';
 
 
@@ -90,6 +90,50 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     return { success: true };
   } catch (error: any) {
     console.error('Error updating project status:', error);
+    return { success: false, error: error.message || 'Failed to update status.' };
+  }
+}
+
+export async function updateIncentiveClaimStatus(claimId: string, newStatus: IncentiveClaim['status']) {
+  try {
+    const claimRef = doc(db, 'incentiveClaims', claimId);
+    const claimSnap = await getDoc(claimRef);
+
+    if (!claimSnap.exists()) {
+      return { success: false, error: 'Incentive claim not found.' };
+    }
+    const claim = claimSnap.data() as IncentiveClaim;
+
+    await adminDb.collection('incentiveClaims').doc(claimId).update({ status: newStatus });
+
+    const claimTitle = claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Your Claim';
+
+    const notification = {
+      uid: claim.uid,
+      projectId: claimId,
+      title: `Your incentive claim for "${claimTitle}" was updated to: ${newStatus}`,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    };
+    await addDoc(collection(db, 'notifications'), notification);
+
+    if (claim.userEmail) {
+      await sendEmail({
+        to: claim.userEmail,
+        subject: `Incentive Claim Status Update: ${newStatus}`,
+        html: `
+          <p>Dear ${claim.userName},</p>
+          <p>The status of your incentive claim for "<strong>${claimTitle}</strong>" has been updated to <strong>${newStatus}</strong>.</p>
+          <p>You can view your claims on the <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim">Parul Research Portal</a>.</p>
+          <p>Thank you,</p>
+          <p>RDC Team, Parul University</p>
+        `,
+      });
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating incentive claim status:', error);
     return { success: false, error: error.message || 'Failed to update status.' };
   }
 }

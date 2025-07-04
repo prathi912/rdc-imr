@@ -16,10 +16,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { db } from '@/lib/config';
-import { collection, getDocs, doc, updateDoc, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, doc, orderBy, query } from 'firebase/firestore';
 import type { IncentiveClaim } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { updateIncentiveClaimStatus } from '@/app/actions';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
 
@@ -49,14 +50,12 @@ export default function ManageIncentiveClaimsPage() {
   }, [fetchClaims]);
 
   const handleStatusChange = useCallback(async (id: string, newStatus: IncentiveClaim['status']) => {
-    try {
-      const claimDoc = doc(db, 'incentiveClaims', id);
-      await updateDoc(claimDoc, { status: newStatus });
-      toast({ title: 'Status Updated', description: "The claim's status has been changed." });
+    const result = await updateIncentiveClaimStatus(id, newStatus);
+    if (result.success) {
+      toast({ title: 'Status Updated', description: "The claim's status has been changed and the user has been notified." });
       fetchClaims(); 
-    } catch (error) {
-       console.error("Error updating status:", error);
-       toast({ variant: 'destructive', title: "Error", description: "Could not update status." });
+    } else {
+       toast({ variant: 'destructive', title: "Error", description: result.error || "Could not update status." });
     }
   }, [fetchClaims, toast]);
   
