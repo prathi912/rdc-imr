@@ -8,7 +8,7 @@ import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
 import { doc, collection, writeBatch, query, where, getDocs, getDoc, addDoc } from 'firebase/firestore';
-import type { Project, IncentiveClaim } from '@/types';
+import type { Project, IncentiveClaim, User } from '@/types';
 import { sendEmail } from '@/lib/email';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
@@ -645,6 +645,16 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
     }
     const claim = claimSnap.data() as IncentiveClaim;
 
+    // Fetch user data for designation and department
+    let user: User | null = null;
+    if (claim.uid) {
+        const userRef = adminDb.collection('users').doc(claim.uid);
+        const userSnap = await userRef.get();
+        if (userSnap.exists()) {
+            user = userSnap.data() as User;
+        }
+    }
+
     const templatePath = path.join(process.cwd(), 'fomat.xlsx');
     if (!fs.existsSync(templatePath)) {
       return { success: false, error: 'Template file "fomat.xlsx" not found in the project root directory.' };
@@ -654,20 +664,30 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
-    // This is a very basic mapping. You'll need to expand this to match all fields in your template.
-    const dataMap: { [key: string]: string | number | boolean | undefined } = {
-      // General
-      A2: claim.userName, B2: claim.userEmail, C2: claim.claimType, D2: claim.status,
-      // Paper
-      A5: claim.paperTitle, B5: claim.journalName, C5: claim.journalWebsite, D5: claim.indexType, E5: claim.wosType, F5: claim.journalClassification,
-      // ... Add all other fields you have in your template
+    const getClaimTitle = (claim: IncentiveClaim): string => {
+        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
+    };
+    
+    const claimTitle = getClaimTitle(claim);
+    const submissionDate = new Date(claim.submissionDate).toLocaleDateString();
+
+    const dataMap: { [key: string]: any } = {
+      'B2': claim.userName,
+      'B3': user?.designation || 'N/A',
+      'B4': user?.department || 'N/A',
+      'B5': claimTitle,
+      'G11': submissionDate,
     };
     
     for (const cellAddress in dataMap) {
         if (Object.prototype.hasOwnProperty.call(dataMap, cellAddress)) {
             const value = dataMap[cellAddress];
             if (value !== undefined && value !== null) {
-                worksheet[cellAddress] = { t: 's', v: String(value) };
+                if (worksheet[cellAddress]) {
+                    worksheet[cellAddress].v = value;
+                } else {
+                    XLSX.utils.sheet_add_aoa(worksheet, [[value]], { origin: cellAddress });
+                }
             }
         }
     }
@@ -682,3 +702,4 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
   }
 }
     
+
