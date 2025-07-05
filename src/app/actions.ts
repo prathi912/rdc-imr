@@ -650,7 +650,7 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
     if (claim.uid) {
         const userRef = adminDb.collection('users').doc(claim.uid);
         const userSnap = await userRef.get();
-        if (userSnap.exists()) {
+        if (userSnap.exists) {
             user = userSnap.data() as User;
         }
     }
@@ -702,4 +702,5 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
   }
 }
     
+
 
