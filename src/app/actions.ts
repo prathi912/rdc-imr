@@ -1,3 +1,4 @@
+
 'use server';
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
@@ -654,9 +655,9 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
         }
     }
 
-    const templatePath = path.join(process.cwd(), 'fomat.xlsx');
+    const templatePath = path.join(process.cwd(), 'format.xlsx');
     if (!fs.existsSync(templatePath)) {
-      return { success: false, error: 'Template file "fomat.xlsx" not found in the project root directory.' };
+      return { success: false, error: 'Template file "format.xlsx" not found in the project root directory.' };
     }
     const templateBuffer = fs.readFileSync(templatePath);
     const workbook = XLSX.read(templateBuffer, { type: 'buffer', cellStyles: true });
@@ -682,6 +683,9 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
         if (Object.prototype.hasOwnProperty.call(dataMap, cellAddress)) {
             const value = dataMap[cellAddress];
             if (value !== undefined && value !== null) {
+                // This logic ensures that if a cell exists (even if empty but styled),
+                // we only update its value, preserving the style.
+                // If it doesn't exist, we create it.
                 if (worksheet[cellAddress]) {
                     worksheet[cellAddress].v = value;
                 } else {
@@ -704,3 +708,6 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
 
 
 
+
+
+    
