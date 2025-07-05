@@ -1,4 +1,3 @@
-
 'use server';
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from '@/ai/flows/research-domain-suggestion';
@@ -660,7 +659,7 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
       return { success: false, error: 'Template file "fomat.xlsx" not found in the project root directory.' };
     }
     const templateBuffer = fs.readFileSync(templatePath);
-    const workbook = XLSX.read(templateBuffer, { type: 'buffer' });
+    const workbook = XLSX.read(templateBuffer, { type: 'buffer', cellStyles: true });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
@@ -702,5 +701,6 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
   }
 }
     
+
 
 
