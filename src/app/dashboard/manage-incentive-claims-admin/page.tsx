@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Download, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { db } from '@/lib/config';
@@ -32,7 +33,7 @@ import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { updateIncentiveClaimStatus } from '@/app/actions';
+import { updateIncentiveClaimStatus, exportClaimToExcel } from '@/app/actions';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
@@ -40,7 +41,44 @@ type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'subm
 
 
 function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+    const { toast } = useToast();
+    const [isPrinting, setIsPrinting] = useState(false);
+
     if (!claim) return null;
+
+    const handlePrint = async () => {
+        if (!claim) return;
+        setIsPrinting(true);
+        try {
+            const result = await exportClaimToExcel(claim.id);
+            if (result.success && result.fileData) {
+                const byteCharacters = atob(result.fileData);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `claim_${claim.userName.replace(/\s/g, '_')}_${claim.id.substring(0,5)}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                toast({ title: "Export Successful", description: "Claim details have been exported." });
+            } else {
+                throw new Error(result.error || "Failed to export data.");
+            }
+        } catch (error: any) {
+            console.error("Print error:", error);
+            toast({ variant: 'destructive', title: "Export Failed", description: error.message });
+        } finally {
+            setIsPrinting(false);
+        }
+    };
 
     const renderDetail = (label: string, value?: string | number | boolean) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
@@ -261,6 +299,12 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                         </>
                     )}
                 </div>
+                <DialogFooter>
+                    <Button onClick={handlePrint} disabled={isPrinting}>
+                        {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                        Print
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

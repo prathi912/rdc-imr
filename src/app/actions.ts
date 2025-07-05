@@ -10,6 +10,9 @@ import { adminDb, adminStorage } from '@/lib/admin';
 import { doc, collection, writeBatch, query, where, getDocs, getDoc, addDoc } from 'firebase/firestore';
 import type { Project, IncentiveClaim } from '@/types';
 import { sendEmail } from '@/lib/email';
+import * as XLSX from 'xlsx';
+import fs from 'fs';
+import path from 'path';
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -78,12 +81,30 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
         to: project.pi_email,
         subject: `Project Status Update: ${project.title}`,
         html: `
-          <p>Dear ${project.pi},</p>
-          <p>The status of your project, "<strong>${project.title}</strong>", has been updated to <strong>${newStatus}</strong>.</p>
-          <p>You can view your project details on the <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}">Parul Research Portal</a>.</p>
-          <p>Thank you,</p>
-          <p>RDC Team, Parul University</p>
-        `,
+        <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;">
+          <div style="text-align:center; margin-bottom:20px;">
+            <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width:300px; height:auto;" />
+          </div>
+      
+          <p style="color:#ffffff;">Dear ${project.pi},</p>
+      
+          <p style="color:#e0e0e0;">
+            The status of your project, "<strong style="color:#ffffff;">${project.title}</strong>" has been updated to 
+            <strong style="color:#00e676;">${newStatus}</strong>.
+          </p>
+      
+          <p style="color:#e0e0e0;">
+            You can view your project details on the 
+            <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}" style="color:#64b5f6; text-decoration:underline;">
+              PU Research Portal
+            </a>.
+          </p>
+      
+          <p style="color:#b0bec5;">Thank you,</p>
+          <p style="color:#b0bec5;">Research & Development Cell Team, </p>
+          <p style="color:#b0bec5;">Parul University</p>
+        </div>
+      `,
       });
     }
 
@@ -122,12 +143,33 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
         to: claim.userEmail,
         subject: `Incentive Claim Status Update: ${newStatus}`,
         html: `
-          <p>Dear ${claim.userName},</p>
-          <p>The status of your incentive claim for "<strong>${claimTitle}</strong>" has been updated to <strong>${newStatus}</strong>.</p>
-          <p>You can view your claims on the <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim">Parul Research Portal</a>.</p>
-          <p>Thank you,</p>
-          <p>RDC Team, Parul University</p>
-        `,
+                  <div style="background:linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:10px;">
+                    <div style="text-align:center; margin-bottom:20px;">
+                      <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC-PU Logo" style="max-width:200px; height:auto;" />
+                    </div>
+                
+                    <p style="color:#ffffff;">Dear ${claim.userName},</p>
+                
+                    <p style="color:#e0e0e0;">
+                      The status of your incentive claim for 
+                      "<strong style="color:#ffffff;">${claimTitle}</strong>" has been updated to 
+                      <strong style="color:${newStatus === 'Accepted' ? '#00e676' : newStatus === 'Rejected' ? '#ff5252' : '#ffca28'};">
+                        ${newStatus}
+                      </strong>.
+                    </p>
+                
+                    <p style="color:#e0e0e0;">
+                      You can view your claims on the 
+                      <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim" style="color:#64b5f6; text-decoration:underline;">
+                        PU Research Portal
+                      </a>.
+                    </p>
+                
+                    <p style="color:#b0bec5;">Thank you,</p>
+                    <p style="color:#b0bec5;">Research & Development Cell Team, </p>
+                    <p style="color:#b0bec5;">Parul University</p>
+                  </div>
+                `,
       });
     }
 
@@ -166,14 +208,33 @@ export async function scheduleMeeting(
           to: project.pi_email,
           subject: `IMR Meeting Scheduled for Your Project: ${project.title}`,
           html: `
-            <p>Dear Researcher,</p>
-            <p>An IMR evaluation meeting has been scheduled for your project, "<strong>${project.title}</strong>".</p>
-            <p><strong>Date:</strong> ${new Date(meetingDetails.date).toLocaleDateString()}</p>
-            <p><strong>Time:</strong> ${meetingDetails.time}</p>
-            <p><strong>Venue:</strong> ${meetingDetails.venue}</p>
-            <p>Please prepare for your presentation. You can view more details on the <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${project.id}">Parul Research Portal</a>.</p>
-            <p>Thank you,</p>
-            <p>RDC Team, Parul University</p>
+            <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width: 300px; height: auto;" />
+              </div>
+
+              <p style="color: #ffffff;">Dear Researcher,</p>
+
+              <p style="color: #e0e0e0;">
+                An <strong style="color: #ffffff;">IMR evaluation meeting</strong> has been scheduled for your project, 
+                "<strong style="color: #ffffff;">${project.title}</strong>".
+              </p>
+
+              <p><strong style="color: #ffffff;">Date:</strong> ${new Date(meetingDetails.date).toLocaleDateString()}</p>
+              <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
+              <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+
+              <p style="color: #cccccc;">
+                Please prepare for your presentation. You can view more details on the 
+                <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${project.id}" style="color: #64b5f6; text-decoration: underline;">
+                  PU Research Portal
+                </a>.
+              </p>
+
+          <p style="color:#b0bec5;">Thank you,</p>
+          <p style="color:#b0bec5;">Research & Development Cell Team, </p>
+          <p style="color:#b0bec5;">Parul University</p>
+            </div>
           `,
         });
       }
@@ -575,4 +636,49 @@ export async function fetchOrcidData(orcidId: string): Promise<{ success: boolea
   }
 }
 
+export async function exportClaimToExcel(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
+  try {
+    const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
+    const claimSnap = await claimRef.get();
+    if (!claimSnap.exists) {
+      return { success: false, error: 'Claim not found.' };
+    }
+    const claim = claimSnap.data() as IncentiveClaim;
+
+    const templatePath = path.join(process.cwd(), 'fomat.xlsx');
+    if (!fs.existsSync(templatePath)) {
+      return { success: false, error: 'Template file "fomat.xlsx" not found in the project root directory.' };
+    }
+    const templateBuffer = fs.readFileSync(templatePath);
+    const workbook = XLSX.read(templateBuffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+
+    // This is a very basic mapping. You'll need to expand this to match all fields in your template.
+    const dataMap: { [key: string]: string | number | boolean | undefined } = {
+      // General
+      A2: claim.userName, B2: claim.userEmail, C2: claim.claimType, D2: claim.status,
+      // Paper
+      A5: claim.paperTitle, B5: claim.journalName, C5: claim.journalWebsite, D5: claim.indexType, E5: claim.wosType, F5: claim.journalClassification,
+      // ... Add all other fields you have in your template
+    };
+    
+    for (const cellAddress in dataMap) {
+        if (Object.prototype.hasOwnProperty.call(dataMap, cellAddress)) {
+            const value = dataMap[cellAddress];
+            if (value !== undefined && value !== null) {
+                worksheet[cellAddress] = { t: 's', v: String(value) };
+            }
+        }
+    }
+
+    const outputBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+
+    return { success: true, fileData: outputBuffer };
+
+  } catch (error: any) {
+    console.error('Error exporting claim to Excel:', error);
+    return { success: false, error: error.message || 'Failed to export data.' };
+  }
+}
     
