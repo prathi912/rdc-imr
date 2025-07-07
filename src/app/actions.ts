@@ -101,8 +101,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
           </p>
       
           <p style="color:#b0bec5;">Thank you,</p>
-          <p style="color:#b0bec5;">Research & Development Cell Team, </p>
-          <p style="color:#b0bec5;">Parul University</p>
+          <p style="color:#b0bec5;">Research & Development Cell - PU</p>
         </div>
       `,
       });
@@ -166,8 +165,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
                     </p>
                 
                     <p style="color:#b0bec5;">Thank you,</p>
-                    <p style="color:#b0bec5;">Research & Development Cell Team, </p>
-                    <p style="color:#b0bec5;">Parul University</p>
+                    <p style="color:#b0bec5;">Research & Development Cell - PU</p>
                   </div>
                 `,
       });
@@ -232,8 +230,7 @@ export async function scheduleMeeting(
               </p>
 
           <p style="color:#b0bec5;">Thank you,</p>
-          <p style="color:#b0bec5;">Research & Development Cell Team, </p>
-          <p style="color:#b0bec5;">Parul University</p>
+          <p style="color:#b0bec5;">Research & Development Cell - PU</p>
             </div>
           `,
         });
@@ -288,21 +285,21 @@ export async function uploadFileToServer(fileDataUrl: string, path: string): Pro
 export async function notifyAdminsOnProjectSubmission(projectId: string, projectTitle: string, piName: string) {
   try {
     const adminRoles = ['admin', 'Super-admin', 'CRO'];
-    const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('role', 'in', adminRoles));
+    const usersRef = adminDb.collection('users');
+    const q = usersRef.where('role', 'in', adminRoles);
 
-    const adminUsersSnapshot = await getDocs(q);
+    const adminUsersSnapshot = await q.get();
     if (adminUsersSnapshot.empty) {
       console.log('No admin users found to notify.');
       return { success: true, message: 'No admins to notify.' };
     }
 
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     const notificationTitle = `New Project Submitted: "${projectTitle}" by ${piName}`;
 
     adminUsersSnapshot.forEach(userDoc => {
       // userDoc.id is the UID of the admin user
-      const notificationRef = doc(collection(db, 'notifications'));
+      const notificationRef = adminDb.collection('notifications').doc();
       batch.set(notificationRef, {
         uid: userDoc.id,
         projectId: projectId,
@@ -660,7 +657,8 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
       return { success: false, error: 'Template file "format.xlsx" not found in the project root directory.' };
     }
     const templateBuffer = fs.readFileSync(templatePath);
-    const workbook = XLSX.read(templateBuffer, { type: 'buffer', cellStyles: true });
+    // Add sheetStubs to create cell objects for empty but styled cells.
+    const workbook = XLSX.read(templateBuffer, { type: 'buffer', cellStyles: true, sheetStubs: true });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
 
@@ -669,7 +667,7 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
     };
     
     const claimTitle = getClaimTitle(claim);
-    const submissionDate = new Date(claim.submissionDate).toLocaleDateString();
+    const submissionDate = claim.submissionDate ? new Date(claim.submissionDate).toLocaleDateString() : 'N/A';
 
     const dataMap: { [key: string]: any } = {
       'B2': claim.userName,
@@ -683,12 +681,13 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
         if (Object.prototype.hasOwnProperty.call(dataMap, cellAddress)) {
             const value = dataMap[cellAddress];
             if (value !== undefined && value !== null) {
-                // This logic ensures that if a cell exists (even if empty but styled),
-                // we only update its value, preserving the style.
-                // If it doesn't exist, we create it.
                 if (worksheet[cellAddress]) {
+                    // Cell exists (even if it was empty and just styled, thanks to sheetStubs).
+                    // Update its value and set type to string.
                     worksheet[cellAddress].v = value;
+                    worksheet[cellAddress].t = 's';
                 } else {
+                    // Fallback for cells that don't exist at all in the template.
                     XLSX.utils.sheet_add_aoa(worksheet, [[value]], { origin: cellAddress });
                 }
             }
