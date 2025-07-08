@@ -8,49 +8,50 @@ The portal is built with a modern tech stack, leveraging the power of Next.js fo
 
 ### 1. Role-Based Access Control (RBAC)
 The portal provides a tailored experience for each user role, ensuring users only see what's relevant to them.
-- **Faculty:** Submit and track research projects, manage their public profile, and file for publication incentives.
-- **Evaluators:** Access a dedicated queue of projects assigned for review, use AI-assisted tools for scoring, and submit structured feedback.
-- **CRO (Chief Research Officer):** View all projects within their faculty, manage user roles, and access faculty-specific analytics.
-- **Admin/Super-admin:** Complete oversight of the entire system, including user management, module access control, system health monitoring, and advanced analytics.
+-   **Faculty:** The primary users of the portal. They can submit and track their own research projects, manage their public profile, and file for various publication incentives.
+-   **Evaluators:** Assigned to review project proposals. They have access to a dedicated queue of projects assigned for review, can use AI-assisted tools for scoring, and submit structured feedback.
+-   **CRO (Chief Research Officer):** Have oversight of all projects within their specific faculty. They can manage user roles, schedule meetings, and access faculty-specific analytics.
+-   **Admin:** Have broad oversight of the entire system, including user management, project and claim status updates, and system monitoring.
+-   **Super-admin:** Has complete control over the entire system, including all admin privileges plus the ability to dynamically manage module access for all other users.
 
 ### 2. Intramural Research (IMR) Project Management
 A complete workflow for managing research project funding from submission to completion.
-- **Guided Proposal Submission:** A multi-step form for submitting detailed project proposals, including team information and file uploads.
-- **Status Tracking:** Real-time tracking of project status (Draft, Submitted, Under Review, Approved, Rejected, Completed).
-- **AI-Assisted Evaluation:** AI-generated prompts to help evaluators assess projects based on criteria like relevance, methodology, and innovation.
-- **Meeting Scheduling:** Admins can schedule IMR evaluation meetings for multiple projects and automatically notify PIs.
-- **Grant Management:** A system for awarding grants, tracking fund utilization, and managing the disbursement process.
+-   **Guided Proposal Submission:** A multi-step form for submitting detailed project proposals, including team information, abstracts, and necessary file uploads (proposal PDF, team CVs, ethics approvals).
+-   **Status Tracking:** Real-time tracking of project status (Draft, Submitted, Under Review, Approved, Rejected, Completed, etc.).
+-   **AI-Assisted Evaluation:** AI-generated prompts to help evaluators assess projects based on key criteria like relevance, methodology, feasibility, and innovation.
+-   **Meeting Scheduling:** Admins and CROs can schedule IMR evaluation meetings for multiple submitted projects at once and automatically notify the Principal Investigators (PIs) via email.
+-   **Grant Management:** A system for awarding grants, tracking fund utilization through transaction logging, and managing the disbursement process.
 
 ### 3. Incentive Claim System
 A streamlined process for faculty to claim incentives for their research output.
-- **Dedicated Forms:** Easy-to-use forms for various claim types, including Research Papers, Patents, Books, Conference Presentations, and more.
-- **Automated Data Fetching:** AI-powered tools to fetch publication details automatically from Scopus, Web of Science, and other sources using a DOI or URL.
-- **Admin Review Dashboard:** A central place for administrators to review, approve, or reject claims and notify claimants.
-- **Excel Export:** Export claim details to a pre-formatted Excel template for streamlined processing and record-keeping.
+-   **Dedicated Forms:** Easy-to-use, specific forms for various claim types, including Research Papers, Patents, Books, Conference Presentations, Professional Body Memberships, and APC reimbursements.
+-   **Automated Data Fetching:** AI-powered tools to fetch publication details automatically from Scopus, Web of Science, and other sources using just a DOI or URL, simplifying the application process.
+-   **Admin Review Dashboard:** A central dashboard for administrators to review, approve, or reject claims and notify claimants of status changes automatically.
+-   **Excel Export:** Export claim details to a pre-formatted Excel template for streamlined processing and record-keeping by the administrative team.
 
 ### 4. AI Integration (Powered by Google Genkit)
-- **Project Summarization:** Instantly generate concise summaries of complex project proposals.
-- **Research Domain Suggestion:** AI analyzes a faculty member's publications to suggest their core research domain for their public profile.
-- **Journal Website Finder:** An AI tool to find the official website of an academic journal.
+-   **Project Summarization:** Instantly generate concise summaries of complex project proposals to aid in quick reviews.
+-   **Research Domain Suggestion:** AI analyzes a faculty member's publication history to suggest their core research domain for their public profile.
+-   **Journal Website Finder:** An AI tool to find the official website of an academic journal based on its name, helping to verify publication sources.
 
 ### 5. User & System Management
-- **User Profiles:** Public-facing profiles for faculty to showcase their research contributions, publications, and projects.
-- **Module Management:** Super-admins can dynamically assign access to different parts of the portal for each user.
-- **System Health Dashboard:** A dedicated page to monitor the connectivity and status of all integrated Firebase services.
-- **Bulk Data Upload:** Admins can upload historical project data from an Excel file.
+-   **User Profiles:** Public-facing profiles for faculty to showcase their research contributions, publications, and projects, enhancing visibility within the university.
+-   **Module Management:** A Super-admin exclusive feature to dynamically assign access to different parts of the portal (e.g., "Manage Users", "Analytics") for each user.
+-   **System Health Dashboard:** A dedicated page to monitor the connectivity and status of all integrated Firebase services (Firestore, Auth, Storage) in real-time.
+-   **Bulk Data Upload:** Admins can upload historical project data from a formatted Excel file to integrate past records into the system.
 
 ## 🛠️ Tech Stack
 
-- **Framework:** [Next.js](https://nextjs.org/) (App Router)
-- **Language:** [TypeScript](https://www.typescriptlang.org/)
-- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
-- **UI Components:** [ShadCN UI](https://ui.shadcn.com/)
-- **AI Toolkit:** [Google Genkit](https://firebase.google.com/docs/genkit)
-- **Database:** [Cloud Firestore](https://firebase.google.com/docs/firestore)
-- **Authentication:** [Firebase Authentication](https://firebase.google.com/docs/auth)
-- **File Storage:** [Cloud Storage for Firebase](https://firebase.google.com/docs/storage)
-- **Deployment:** [Firebase App Hosting](https://firebase.google.com/docs/hosting)
-- **Email Service:** [Nodemailer](https://nodemailer.com/) with Gmail
+-   **Framework:** [Next.js](https://nextjs.org/) (App Router)
+-   **Language:** [TypeScript](https://www.typescriptlang.org/)
+-   **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+-   **UI Components:** [ShadCN UI](https://ui.shadcn.com/)
+-   **AI Toolkit:** [Google Genkit](https://firebase.google.com/docs/genkit)
+-   **Database:** [Cloud Firestore](https://firebase.google.com/docs/firestore)
+-   **Authentication:** [Firebase Authentication](https://firebase.google.com/docs/auth)
+-   **File Storage:** [Cloud Storage for Firebase](https://firebase.google.com/docs/storage)
+-   **Deployment:** [Firebase App Hosting](https://firebase.google.com/docs/hosting)
+-   **Email Service:** [Nodemailer](https://nodemailer.com/) with Gmail
 
 ## 🚀 Getting Started
 
@@ -58,9 +59,9 @@ Follow these instructions to get the project up and running on your local machin
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v20 or later)
-- `npm` (comes with Node.js)
-- A [Firebase](https://firebase.google.com/) project.
+-   [Node.js](https://nodejs.org/) (v20 or later)
+-   `npm` (comes with Node.js)
+-   A [Firebase](https://firebase.google.com/) project.
 
 ### 1. Clone the Repository
 
@@ -148,7 +149,7 @@ The application should now be running at [http://localhost:9002](http://localhos
 -   `public/`: Static assets like images and logos.
 -   `firestore.rules`: Security rules for the Firestore database.
 -   `apphosting.yaml`: Configuration for deployment to Firebase App Hosting.
--   `fomat.xlsx`: Template file for Excel exports.
+-   `format.xlsx`: Template file for Excel exports.
 
 ## ☁️ Deployment
 
