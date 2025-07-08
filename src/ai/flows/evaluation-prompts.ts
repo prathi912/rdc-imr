@@ -17,10 +17,7 @@ const EvaluationPromptsInputSchema = z.object({
 export type EvaluationPromptsInput = z.infer<typeof EvaluationPromptsInputSchema>;
 
 const EvaluationPromptsOutputSchema = z.object({
-  relevance: z.string().describe("A question to prompt evaluation of the project's relevance and significance."),
-  methodology: z.string().describe("A question to prompt evaluation of the project's methodology and research design."),
-  feasibility: z.string().describe("A question to prompt evaluation of the project's feasibility, considering timeline and budget."),
-  innovation: z.string().describe("A question to prompt evaluation of the project's novelty and innovation."),
+  guidance: z.string().describe("A single, insightful question to guide the evaluator's overall assessment and comments about the project."),
 });
 export type EvaluationPromptsOutput = z.infer<typeof EvaluationPromptsOutputSchema>;
 
@@ -32,12 +29,12 @@ const prompt = ai.definePrompt({
   name: 'evaluationPromptsPrompt',
   input: {schema: EvaluationPromptsInputSchema},
   output: {schema: EvaluationPromptsOutputSchema},
-  prompt: `You are an expert research project evaluator. Based on the project title and abstract below, generate a single, insightful question for each of the four evaluation criteria (relevance, methodology, feasibility, innovation). These questions should guide an evaluator to provide a thoughtful assessment.
+  prompt: `You are an expert research project evaluator. Your task is to provide a single, insightful question to guide another evaluator who is reviewing the project below. The question should encourage them to think critically about the project's overall merit, potential impact, and feasibility, helping them write comprehensive comments.
 
   Project Title: {{{title}}}
   Abstract: {{{abstract}}}
 
-  Generate one question for each category.`,
+  Generate one guiding question.`,
 });
 
 const evaluationPromptsFlow = ai.defineFlow(

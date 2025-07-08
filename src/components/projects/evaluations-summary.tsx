@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useMemo } from 'react';
 import type { Project, Evaluation } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { UserCheck, UserX } from 'lucide-react';
+import { UserCheck, UserX, ThumbsUp, ThumbsDown, History } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
@@ -12,21 +13,30 @@ interface EvaluationsSummaryProps {
   evaluations: Evaluation[];
 }
 
-const getOverallScore = (scores: Evaluation['scores']) => {
-    const total = Object.values(scores).reduce((sum, score) => sum + score, 0);
-    return (total / (Object.keys(scores).length * 10)) * 100; // As percentage
+const getRecommendationBadge = (recommendation: Evaluation['recommendation']) => {
+    switch (recommendation) {
+        case 'Recommended':
+            return <Badge variant="default" className="bg-green-600 hover:bg-green-700"><ThumbsUp className="h-4 w-4 mr-1"/> Recommended</Badge>;
+        case 'Not Recommended':
+            return <Badge variant="destructive"><ThumbsDown className="h-4 w-4 mr-1"/> Not Recommended</Badge>;
+        case 'Revision Is Needed':
+            return <Badge variant="secondary" className="bg-yellow-500 text-black hover:bg-yellow-600"><History className="h-4 w-4 mr-1"/> Revision Is Needed</Badge>;
+        default:
+            return <Badge variant="outline">No Recommendation</Badge>;
+    }
 }
 
 export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryProps) {
-    const averageScore = useMemo(() => {
-    if (evaluations.length === 0) {
-      return 0;
-    }
-    const totalPercentage = evaluations.reduce((sum, evaluation) => {
-      return sum + getOverallScore(evaluation.scores);
-    }, 0);
-    return totalPercentage / evaluations.length;
-  }, [evaluations]);
+    const recommendationCounts = useMemo(() => {
+        return evaluations.reduce((acc, evaluation) => {
+            acc[evaluation.recommendation] = (acc[evaluation.recommendation] || 0) + 1;
+            return acc;
+        }, {} as Record<Evaluation['recommendation'], number>);
+    }, [evaluations]);
+
+    const summaryText = Object.entries(recommendationCounts)
+        .map(([key, value]) => `${value} ${key}`)
+        .join(', ');
 
   return (
     <Card className="mt-8">
@@ -37,9 +47,7 @@ export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryP
         </div>
         <CardDescription>
           {evaluations.length} evaluations submitted.
-          {evaluations.length > 0 && (
-            <span className="font-semibold text-primary"> | Final Score: {averageScore.toFixed(0)}%</span>
-          )}
+          {summaryText && <span className="font-semibold text-primary"> | {summaryText}</span>}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -52,27 +60,7 @@ export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryP
                              <p className="font-semibold">{evaluation.evaluatorName}</p>
                              <p className="text-xs text-muted-foreground">{new Date(evaluation.evaluationDate).toLocaleDateString()}</p>
                            </div>
-                           <Badge variant="secondary">Score: {getOverallScore(evaluation.scores).toFixed(0)}%</Badge>
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-center">
-                            <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger><div className="font-semibold text-sm">Relevance<p>{evaluation.scores.relevance}/10</p></div></TooltipTrigger>
-                                    <TooltipContent>Relevance Score</TooltipContent>
-                                </Tooltip>
-                                 <Tooltip>
-                                    <TooltipTrigger><div className="font-semibold text-sm">Methodology<p>{evaluation.scores.methodology}/10</p></div></TooltipTrigger>
-                                    <TooltipContent>Methodology Score</TooltipContent>
-                                </Tooltip>
-                                 <Tooltip>
-                                    <TooltipTrigger><div className="font-semibold text-sm">Feasibility<p>{evaluation.scores.feasibility}/10</p></div></TooltipTrigger>
-                                    <TooltipContent>Feasibility Score</TooltipContent>
-                                </Tooltip>
-                                 <Tooltip>
-                                    <TooltipTrigger><div className="font-semibold text-sm">Innovation<p>{evaluation.scores.innovation}/10</p></div></TooltipTrigger>
-                                    <TooltipContent>Innovation Score</TooltipContent>
-                                </Tooltip>
-                            </TooltipProvider>
+                           {getRecommendationBadge(evaluation.recommendation)}
                         </div>
                         <p className="text-sm mt-4 text-muted-foreground border-t pt-3">
                             <span className="font-semibold text-foreground">Comments:</span> {evaluation.comments}

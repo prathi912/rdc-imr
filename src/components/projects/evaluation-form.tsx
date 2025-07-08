@@ -9,14 +9,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Slider } from '@/components/ui/slider';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import type { Project, User, Evaluation } from '@/types';
 import { getEvaluationPrompts } from '@/app/actions';
-import { Loader2, Wand2 } from 'lucide-react';
+import { Loader2, Wand2, ThumbsUp, ThumbsDown, History } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface EvaluationFormProps {
   project: Project;
@@ -25,19 +26,25 @@ interface EvaluationFormProps {
 }
 
 const evaluationSchema = z.object({
-  relevance: z.number().min(1).max(10),
-  methodology: z.number().min(1).max(10),
-  feasibility: z.number().min(1).max(10),
-  innovation: z.number().min(1).max(10),
+  recommendation: z.enum(['Recommended', 'Not Recommended', 'Revision Is Needed'], {
+    required_error: 'You must select a recommendation.',
+  }),
   comments: z.string().min(20, 'Comments must be at least 20 characters.'),
 });
 
 type EvaluationFormData = z.infer<typeof evaluationSchema>;
 
+const recommendationOptions = [
+  { value: 'Recommended', label: 'Recommended', icon: ThumbsUp },
+  { value: 'Not Recommended', label: 'Not Recommended', icon: ThumbsDown },
+  { value: 'Revision Is Needed', label: 'Revision Is Needed', icon: History },
+] as const;
+
+
 export function EvaluationForm({ project, user, onEvaluationSubmitted }: EvaluationFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [prompts, setPrompts] = useState<any>(null);
+  const [promptGuidance, setPromptGuidance] = useState<string | null>(null);
   const [loadingPrompts, setLoadingPrompts] = useState(true);
   const [existingEvaluation, setExistingEvaluation] = useState<Evaluation | null>(null);
   const [loadingExisting, setLoadingExisting] = useState(true);
@@ -46,10 +53,7 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
   const form = useForm<EvaluationFormData>({
     resolver: zodResolver(evaluationSchema),
     defaultValues: {
-      relevance: 5,
-      methodology: 5,
-      feasibility: 5,
-      innovation: 5,
+      recommendation: undefined,
       comments: '',
     },
   });
@@ -64,10 +68,7 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
                 const data = evalSnap.data() as Evaluation;
                 setExistingEvaluation(data);
                 form.reset({
-                    relevance: data.scores.relevance,
-                    methodology: data.scores.methodology,
-                    feasibility: data.scores.feasibility,
-                    innovation: data.scores.innovation,
+                    recommendation: data.recommendation,
                     comments: data.comments,
                 });
             }
@@ -88,7 +89,7 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
       try {
         const result = await getEvaluationPrompts({ title: project.title, abstract: project.abstract });
         if (result.success) {
-          setPrompts(result.prompts);
+          setPromptGuidance(result.prompts.guidance);
         } else {
           toast({ variant: 'destructive', title: 'AI Error', description: 'Could not load AI evaluation prompts.' });
         }
@@ -111,12 +112,7 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
         evaluatorUid: user.uid,
         evaluatorName: user.name,
         evaluationDate: new Date().toISOString(),
-        scores: {
-          relevance: values.relevance,
-          methodology: values.methodology,
-          feasibility: values.feasibility,
-          innovation: values.innovation,
-        },
+        recommendation: values.recommendation,
         comments: values.comments,
       };
 
@@ -135,33 +131,6 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
       setIsSubmitting(false);
     }
   };
-  
-  const ScoreField = ({ name, label, prompt }: { name: keyof EvaluationFormData, label: string, prompt: string | null }) => (
-    <FormField
-      control={form.control}
-      name={name as any}
-      render={({ field }) => (
-        <FormItem>
-          <div className="flex justify-between items-center">
-            <FormLabel>{label}</FormLabel>
-            <span className="text-sm font-bold text-primary">{field.value} / 10</span>
-          </div>
-          {loadingPrompts ? <Skeleton className="h-5 w-3/4" /> : (prompt && <p className="text-xs text-muted-foreground italic">"{prompt}"</p>)}
-          <FormControl>
-            <Slider
-              min={1}
-              max={10}
-              step={1}
-              value={[field.value as number]}
-              onValueChange={(vals) => field.onChange(vals[0])}
-              disabled={isSubmitting || loadingExisting}
-            />
-          </FormControl>
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
 
   return (
     <Card className="mt-8 border-primary/50">
@@ -170,7 +139,7 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
             <Wand2 className="h-6 w-6" />
             <CardTitle>Submit Your Evaluation</CardTitle>
         </div>
-        <CardDescription>{existingEvaluation ? 'You can update your previous evaluation below.' : 'Please provide your scores and comments for this project.'}</CardDescription>
+        <CardDescription>{existingEvaluation ? 'You can update your previous evaluation below.' : 'Please provide your recommendation and comments for this project.'}</CardDescription>
       </CardHeader>
       <CardContent>
         {loadingExisting ? (
@@ -180,10 +149,35 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
         ) : (
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-            <ScoreField name="relevance" label="Relevance & Significance" prompt={prompts?.relevance} />
-            <ScoreField name="methodology" label="Methodology & Research Design" prompt={prompts?.methodology} />
-            <ScoreField name="feasibility" label="Feasibility (Timeline & Budget)" prompt={prompts?.feasibility} />
-            <ScoreField name="innovation" label="Novelty & Innovation" prompt={prompts?.innovation} />
+            <FormField
+              control={form.control}
+              name="recommendation"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel>Your Recommendation</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                    >
+                      {recommendationOptions.map((option) => (
+                        <FormItem key={option.value}>
+                          <FormControl>
+                            <RadioGroupItem value={option.value} className="sr-only" />
+                          </FormControl>
+                           <FormLabel className={`flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${field.value === option.value ? 'border-primary' : ''}`}>
+                            <option.icon className="mb-3 h-6 w-6" />
+                            {option.label}
+                          </FormLabel>
+                        </FormItem>
+                      ))}
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             
             <FormField
               control={form.control}
@@ -191,6 +185,14 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Overall Comments</FormLabel>
+                  {loadingPrompts ? <Skeleton className="h-5 w-3/4 mb-2" /> : (
+                    promptGuidance && 
+                    <Alert variant="default" className="bg-muted/50">
+                        <Wand2 className="h-4 w-4" />
+                        <AlertTitle>AI Suggestion</AlertTitle>
+                        <AlertDescription>{promptGuidance}</AlertDescription>
+                    </Alert>
+                  )}
                   <FormControl>
                     <Textarea rows={5} {...field} disabled={isSubmitting || loadingExisting} />
                   </FormControl>

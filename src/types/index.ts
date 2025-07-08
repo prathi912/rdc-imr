@@ -60,13 +60,7 @@ export type Evaluation = {
   evaluatorUid: string;
   evaluatorName: string;
   evaluationDate: string; // ISO String
-  scores: {
-    relevance: number;
-    methodology: number;
-
-    feasibility: number;
-    innovation: number;
-  };
+  recommendation: 'Recommended' | 'Not Recommended' | 'Revision Is Needed';
   comments: string;
 };
 
