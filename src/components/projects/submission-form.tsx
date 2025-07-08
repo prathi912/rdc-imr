@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,27 +22,6 @@ import { collection, doc, setDoc } from 'firebase/firestore';
 import { uploadFileToServer, notifyAdminsOnProjectSubmission } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
-
-const formSchema = z.object({
-  // Step 1
-  title: z.string().min(5, 'Title must be at least 5 characters.'),
-  abstract: z.string().min(20, 'Abstract must be at least 20 characters.'),
-  projectType: z.string().min(1, 'Please select a category.'),
-  // Step 2
-  coPiNames: z.string().optional(),
-  studentInfo: z.string().optional(),
-  cvUpload: z.any().optional(),
-  // Step 3
-  proposalUpload: z.any().refine((files) => files?.length > 0, 'Project proposal is required.'),
-  ethicsUpload: z.any().optional(),
-  // Step 4
-  expectedOutcomes: z.string().min(10, 'Please describe the expected outcomes.'),
-  guidelinesAgreement: z.boolean().refine(val => val === true, {
-    message: "You must agree to the guidelines to submit.",
-  }),
-});
-
-type FormData = z.infer<typeof formSchema>;
 
 interface SubmissionFormProps {
   project?: Project;
@@ -71,6 +51,31 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+
+  const formSchema = useMemo(() => z.object({
+    // Step 1
+    title: z.string().min(5, 'Title must be at least 5 characters.'),
+    abstract: z.string().min(20, 'Abstract must be at least 20 characters.'),
+    projectType: z.string().min(1, 'Please select a category.'),
+    // Step 2
+    coPiNames: z.string().optional(),
+    studentInfo: z.string().optional(),
+    cvUpload: z.any().refine((files) => {
+        return !!project?.cvUrl || (files && files.length > 0);
+    }, 'CVs upload is required (single ZIP file).'),
+    // Step 3
+    proposalUpload: z.any().refine((files) => {
+        return !!project?.proposalUrl || (files && files.length > 0);
+    }, 'Project proposal is required.'),
+    ethicsUpload: z.any().optional(),
+    // Step 4
+    expectedOutcomes: z.string().min(10, 'Please describe the expected outcomes.'),
+    guidelinesAgreement: z.boolean().refine(val => val === true, {
+      message: "You must agree to the guidelines to submit.",
+    }),
+  }), [project]);
+
+  type FormData = z.infer<typeof formSchema>;
   
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -119,8 +124,8 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const handleNext = async () => {
     const fieldsToValidate = {
       1: ['title', 'abstract', 'projectType'],
-      2: [], // No required fields in step 2
-      3: project ? [] : ['proposalUpload'], // Proposal only required for new submissions, not for drafts being updated
+      2: [],
+      3: ['proposalUpload', 'cvUpload'],
       4: ['expectedOutcomes', 'guidelinesAgreement'],
     }[currentStep] as (keyof FormData)[];
 
@@ -302,7 +307,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                   control={form.control}
                   render={({ field: { value, onChange, ...fieldProps } }) => (
                     <FormItem>
-                      <FormLabel>Upload CVs (single ZIP file)</FormLabel>
+                      <FormLabel>Upload CVs (single ZIP file)<span className="text-destructive"> *</span></FormLabel>
                       {project?.cvUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.cvUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded CVs</a>. Uploading a new file will replace it.</p>}
                       <FormControl>
                         <Input {...fieldProps} type="file" accept=".zip" onChange={(e) => onChange(e.target.files)} />
@@ -320,7 +325,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                   control={form.control}
                   render={({ field: { value, onChange, ...fieldProps } }) => (
                     <FormItem>
-                      <FormLabel>Project Proposal (PDF)</FormLabel>
+                      <FormLabel>Project Proposal (PDF)<span className="text-destructive"> *</span></FormLabel>
                        {project?.proposalUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.proposalUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded Proposal</a>. Uploading a new file will replace it.</p>}
                       <FormControl>
                         <Input {...fieldProps} type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} />

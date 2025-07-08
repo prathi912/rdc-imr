@@ -24,6 +24,9 @@ export function Guidelines() {
             <h4 className="font-semibold text-foreground mb-2">Key Conditions:</h4>
             <ul className="list-disc pl-6 space-y-2">
             <li>
+                If poroject gets Approved, and a grant is awarded, transactions should be only made through your
+            </li>
+            <li>
                 One IMR project only shall be sanctioned to a faculty member as PI, at any given point of time. However, he/she can become a Co-PI for additional IMR project(s).
             </li>
             <li>
