@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   Upload,
   Users,
+  History,
 } from 'lucide-react';
 
 import {
@@ -239,6 +240,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
                   <ClipboardCheck />
                   Evaluation Queue
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('my-evaluations') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/my-evaluations" tooltip="My Evaluations" isActive={pathname === '/dashboard/my-evaluations'}>
+                  <History />
+                  My Evaluations
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}

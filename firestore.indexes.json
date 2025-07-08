@@ -102,6 +102,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "projects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "evaluatedBy",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "submissionDate",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

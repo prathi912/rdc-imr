@@ -7,6 +7,7 @@ export const ALL_MODULES = [
   { id: 'my-projects', label: 'My Projects' },
   { id: 'incentive-claim', label: 'Incentive Claims' },
   { id: 'evaluator-dashboard', label: 'Evaluation Queue' },
+  { id: 'my-evaluations', label: 'My Evaluations' },
   { id: 'schedule-meeting', label: 'Schedule Meeting' },
   { id: 'pending-reviews', label: 'Pending Reviews' },
   { id: 'completed-reviews', label: 'Completed Reviews' },
@@ -21,7 +22,7 @@ export const ALL_MODULES = [
   { id: 'settings', label: 'Settings' },
 ];
 
-const facultyModules = ['dashboard', 'new-submission', 'my-projects', 'incentive-claim', 'evaluator-dashboard', 'notifications', 'settings'];
+const facultyModules = ['dashboard', 'new-submission', 'my-projects', 'incentive-claim', 'evaluator-dashboard', 'my-evaluations', 'notifications', 'settings'];
 const croModules = [...new Set([...facultyModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'all-projects', 'analytics', 'manage-users', 'manage-incentive-claims'])];
 const adminModules = [...croModules, 'system-health', 'bulk-upload'];
 const superAdminModules = [...adminModules, 'module-management'];
