@@ -24,7 +24,7 @@ export default function RootLayout({
   if (!isFirebaseInitialized) {
     return (
       <html lang="en" suppressHydrationWarning>
-        <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`}>
+        <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`} suppressHydrationWarning>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
@@ -40,7 +40,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`}>
+      <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
