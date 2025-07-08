@@ -101,6 +101,7 @@ export type Project = {
   };
   revisedProposalUrl?: string;
   revisionSubmissionDate?: string;
+  isBulkUploaded?: boolean;
 };
 
 export type Notification = {

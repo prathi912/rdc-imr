@@ -7,7 +7,7 @@ import { generateEvaluationPrompts, type EvaluationPromptsInput } from '@/ai/flo
 import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal-website-finder';
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
-import { doc, collection, writeBatch, query, where, getDocs, getDoc, addDoc } from 'firebase/firestore';
+import { doc, collection, writeBatch, query, where, getDocs, getDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import type { Project, IncentiveClaim, User } from '@/types';
 import { sendEmail } from '@/lib/email';
 import * as XLSX from 'xlsx';
@@ -559,7 +559,8 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
             amount: project.grant_amount || 0,
             status: 'Completed', // Assume old grants are completed
             disbursementDate: project.sanction_date || new Date().toISOString(),
-        }
+        },
+        isBulkUploaded: true,
       };
 
       batch.set(projectRef, newProjectData);
@@ -573,6 +574,19 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
     console.error('Error during bulk upload:', error);
     return { success: false, count: 0, error: error.message || 'Failed to upload projects.' };
   }
+}
+
+export async function deleteBulkProject(projectId: string): Promise<{ success: boolean, error?: string }> {
+    try {
+        if (!projectId) {
+            return { success: false, error: 'Project ID is required.' };
+        }
+        await adminDb.collection('projects').doc(projectId).delete();
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error deleting project:', error);
+        return { success: false, error: error.message || 'Failed to delete the project.' };
+    }
 }
 
 export async function fetchOrcidData(orcidId: string): Promise<{ success: boolean; data?: { name: string; }; error?: string; }> {
@@ -724,6 +738,7 @@ export async function linkHistoricalData(uid: string, email: string): Promise<{ 
 
 
     
+
 
 
 
