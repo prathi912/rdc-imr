@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import type { Project, Evaluation } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCheck, UserX } from 'lucide-react';
@@ -17,6 +18,16 @@ const getOverallScore = (scores: Evaluation['scores']) => {
 }
 
 export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryProps) {
+    const averageScore = useMemo(() => {
+    if (evaluations.length === 0) {
+      return 0;
+    }
+    const totalPercentage = evaluations.reduce((sum, evaluation) => {
+      return sum + getOverallScore(evaluation.scores);
+    }, 0);
+    return totalPercentage / evaluations.length;
+  }, [evaluations]);
+
   return (
     <Card className="mt-8">
       <CardHeader>
@@ -26,6 +37,9 @@ export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryP
         </div>
         <CardDescription>
           {evaluations.length} evaluations submitted.
+          {evaluations.length > 0 && (
+            <span className="font-semibold text-primary"> | Final Score: {averageScore.toFixed(0)}%</span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
