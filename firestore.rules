@@ -4,13 +4,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    function canEvaluate() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             'allowedModules' in userDoc.data &&
-             userDoc.data.allowedModules.hasAny(['evaluator-dashboard']);
-    }
-
+    // ================== HELPER FUNCTIONS ==================
     function isAdmin() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -18,42 +12,71 @@ service cloud.firestore {
              userDoc.data.role in ['admin', 'CRO', 'Super-admin'];
     }
 
+    function isProjectPI() {
+      // Checks if the requesting user is the Principal Investigator of the project.
+      return request.auth.uid == resource.data.pi_uid;
+    }
+
+    function isProjectAssignedEvaluator() {
+      // Checks if the requesting user is in the list of assigned evaluators for the project.
+      // This is safe because it checks for field existence first.
+      return 'meetingDetails' in resource.data &&
+             'assignedEvaluators' in resource.data.meetingDetails &&
+             request.auth.uid in resource.data.meetingDetails.assignedEvaluators;
+    }
+
+    // ================== GLOBAL ADMIN RULE ==================
+    // Admins can read and write anything. This rule is checked first.
     match /{path=**} {
       allow read, write: if isAdmin();
     }
     
+    // ================== COLLECTION RULES (for non-admins) ==================
+    
     match /users/{userId} {
+      // Any signed-in user can read any public profile.
       allow read: if request.auth != null;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
+      // A user can only create or update their own user document.
+      allow create, update: if request.auth.uid == userId;
     }
     
     match /projects/{projectId} {
-      allow read: if request.auth.uid == resource.data.pi_uid 
-                       || (resource.data.meetingDetails != null && 
-                           resource.data.meetingDetails.assignedEvaluators != null && 
-                           request.auth.uid in resource.data.meetingDetails.assignedEvaluators);
+      // A non-admin can read a project IF they are the PI OR an assigned evaluator.
+      // This rule is critical for securing list queries for evaluators.
+      allow read: if isProjectPI() || isProjectAssignedEvaluator();
       
+      // A user can only create a project where they are the PI.
       allow create: if request.auth.uid == request.resource.data.pi_uid;
       
-      allow update: if (request.auth.uid == resource.data.pi_uid) || 
-                       (canEvaluate() && 
-                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
+      // A user can update a project IF:
+      // 1. They are the PI (e.g., submitting completion report).
+      // 2. They are an assigned evaluator AND are ONLY adding their UID to the 'evaluatedBy' array.
+      allow update: if isProjectPI() || 
+                      (isProjectAssignedEvaluator() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
 
+      // Subcollection for evaluations
       match /evaluations/{evaluatorId} {
-        allow read: if canEvaluate();
-        allow write: if canEvaluate() && request.auth.uid == evaluatorId;
+        // Allow reading all evaluations for a project if you are an assigned evaluator for it.
+        // This lets the committee see each other's feedback.
+        allow read: if isProjectAssignedEvaluator();
+        
+        // Allow writing an evaluation only if you are an assigned evaluator AND you are writing to your own document.
+        allow write: if isProjectAssignedEvaluator() && request.auth.uid == evaluatorId;
       }
     }
 
     match /notifications/{notificationId} {
+      // A user can read and update their own notifications.
       allow read, update: if request.auth.uid == resource.data.uid;
+      // Notifications are created by the server, not clients.
       allow create: if false;
     }
     
     match /incentiveClaims/{claimId} {
+      // A user can create and read their own incentive claims.
       allow create: if request.auth.uid == request.resource.data.uid;
       allow read: if request.auth.uid == resource.data.uid;
+      // Status updates are handled by the server.
       allow update: if false;
     }
   }
