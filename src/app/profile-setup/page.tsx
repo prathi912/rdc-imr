@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Bot, Loader2 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 const profileSetupSchema = z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
@@ -261,6 +262,14 @@ export default function ProfileSetupPage() {
                     </FormControl>
                 </div>
                 
+                <div className="space-y-2">
+                    <Label>Full Name</Label>
+                    <Input value={user.name} disabled />
+                    <p className="text-sm text-muted-foreground">
+                        This name was set from your sign-up details. It can be changed in Settings after setup.
+                    </p>
+                </div>
+
                 <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
                 <FormField name="faculty" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>

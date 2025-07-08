@@ -75,6 +75,10 @@ export default function LoginPage() {
 
     if (userDocSnap.exists()) {
       user = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
+      // If the existing name is just the email prefix, and a Google display name is available, update it.
+      if (user.name === user.email.split('@')[0] && firebaseUser.displayName) {
+        user.name = firebaseUser.displayName;
+      }
     } else {
       // Create new user if they don't exist in Firestore (e.g., first Google sign-in)
       const role = determineUserRole(firebaseUser.email!);
