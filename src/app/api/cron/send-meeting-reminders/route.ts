@@ -1,3 +1,4 @@
+
 import { NextResponse, type NextRequest } from 'next/server';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/config';
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
                   </p>
 
                   <p><strong style="color:#ffffff;">Project:</strong> ${project.title}</p>
-                  <p><strong style="color:#ffffff;">Date:</strong> ${format(new Date(project.meetingDetails.date), 'PPP')}</p>
+                  <p><strong style="color:#ffffff;">Date:</strong> ${format(new Date(project.meetingDetails.date), 'MMMM d, yyyy')}</p>
                   <p><strong style="color:#ffffff;">Time:</strong> ${project.meetingDetails.time}</p>
                   <p><strong style="color:#ffffff;">Venue:</strong> ${project.meetingDetails.venue}</p>
 

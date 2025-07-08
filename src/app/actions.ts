@@ -13,6 +13,7 @@ import { sendEmail } from '@/lib/email';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
 import path from 'path';
+import { format } from 'date-fns';
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -184,6 +185,7 @@ export async function scheduleMeeting(
 ) {
   try {
     const batch = adminDb.batch();
+    const formattedDate = format(new Date(meetingDetails.date), 'MMMM d, yyyy');
 
     for (const project of projectsToSchedule) {
       const projectRef = adminDb.collection('projects').doc(project.id);
@@ -223,7 +225,7 @@ export async function scheduleMeeting(
                 "<strong style="color: #ffffff;">${project.title}</strong>".
               </p>
 
-              <p><strong style="color: #ffffff;">Date:</strong> ${new Date(meetingDetails.date).toLocaleDateString()}</p>
+              <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
 
@@ -258,7 +260,7 @@ export async function scheduleMeeting(
           batch.set(evaluatorNotificationRef, {
               uid: evaluator.uid,
               projectId: projectsToSchedule[0].id,
-              title: `You've been assigned to an IMR evaluation on ${new Date(meetingDetails.date).toLocaleDateString()}`,
+              title: `You've been assigned to an IMR evaluation on ${formattedDate}`,
               createdAt: new Date().toISOString(),
               isRead: false,
           });
@@ -276,7 +278,7 @@ export async function scheduleMeeting(
                     <p style="color: #e0e0e0;">
                         You have been assigned to the IMR evaluation committee for a meeting with the following details. You are requested to be present.
                     </p>
-                    <p><strong style="color: #ffffff;">Date:</strong> ${new Date(meetingDetails.date).toLocaleDateString()}</p>
+                    <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
                     <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
                     <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
                     <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
