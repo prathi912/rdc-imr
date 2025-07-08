@@ -64,7 +64,7 @@ export function ScheduleMeetingForm() {
       
       const evaluatorsQuery = query(
         collection(db, 'users'), 
-        where('role', 'in', ['faculty', 'CRO', 'admin'])
+        where('role', 'in', ['faculty', 'CRO', 'admin', 'Super-admin'])
       );
 
       const [projectsSnapshot, evaluatorsSnapshot] = await Promise.all([
@@ -83,8 +83,7 @@ export function ScheduleMeetingForm() {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     fetchRequiredData();
