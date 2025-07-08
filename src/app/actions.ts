@@ -690,6 +690,33 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
     return { success: false, error: error.message || 'Failed to export data.' };
   }
 }
+
+export async function linkHistoricalData(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const projectsRef = adminDb.collection('projects');
+    const q = projectsRef.where('pi_email', '==', email).where('pi_uid', 'in', ['', null]);
+    
+    const projectsSnapshot = await q.get();
+
+    if (projectsSnapshot.empty) {
+      return { success: true, count: 0 };
+    }
+
+    const batch = adminDb.batch();
+    projectsSnapshot.forEach(projectDoc => {
+      batch.update(projectDoc.ref, { pi_uid: uid });
+    });
+    
+    await batch.commit();
+
+    console.log(`Linked ${projectsSnapshot.size} historical projects for user ${email} (UID: ${uid})`);
+    return { success: true, count: projectsSnapshot.size };
+
+  } catch (error: any) {
+    console.error('Error linking historical project data:', error);
+    return { success: false, count: 0, error: error.message || 'Failed to link historical data.' };
+  }
+}
     
 
 
@@ -697,6 +724,7 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
 
 
     
+
 
 
 
