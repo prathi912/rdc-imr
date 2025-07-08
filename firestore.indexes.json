@@ -1,3 +1,4 @@
+
 {
   "indexes": [
     {
@@ -77,6 +78,24 @@
         {
           "fieldPath": "status",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "submissionDate",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "projects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "meetingDetails.assignedEvaluators",
+          "arrayConfig": "CONTAINS"
         },
         {
           "fieldPath": "submissionDate",

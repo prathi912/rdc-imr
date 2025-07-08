@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -7,9 +8,9 @@ service cloud.firestore {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              'allowedModules' in userDoc.data &&
-             'evaluator-dashboard' in userDoc.data.allowedModules;
+             userDoc.data.allowedModules.hasAny(['evaluator-dashboard']);
     }
-    
+
     function isAdmin() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -28,22 +29,20 @@ service cloud.firestore {
     }
     
     match /projects/{projectId} {
-      // A user can read a project if they are the PI, or if they are an assigned evaluator.
-      // This is secure for queries because the client query must specify one of these conditions.
-      // Admins are covered by the global rule.
-      allow read: if request.auth.uid == resource.data.pi_uid || 
-                     (canEvaluate() && resource.data.meetingDetails.assignedEvaluators.hasAny([request.auth.uid]));
+      allow read: if request.auth.uid == resource.data.pi_uid 
+                       || (resource.data.meetingDetails != null && 
+                           resource.data.meetingDetails.assignedEvaluators != null && 
+                           request.auth.uid in resource.data.meetingDetails.assignedEvaluators);
       
       allow create: if request.auth.uid == request.resource.data.pi_uid;
       
-      // A PI can update their own project.
-      // An evaluator can only update the 'evaluatedBy' field to mark their review as complete.
-      allow update: if request.auth.uid == resource.data.pi_uid || 
-                       (canEvaluate() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
+      allow update: if (request.auth.uid == resource.data.pi_uid) || 
+                       (canEvaluate() && 
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
 
       match /evaluations/{evaluatorId} {
         allow read: if canEvaluate();
-        allow write: if request.auth.uid == evaluatorId && canEvaluate();
+        allow write: if canEvaluate() && request.auth.uid == evaluatorId;
       }
     }
 
