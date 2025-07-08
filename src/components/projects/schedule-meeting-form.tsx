@@ -61,9 +61,10 @@ export function ScheduleMeetingForm() {
         where('status', '==', 'Submitted'),
         orderBy('submissionDate', 'desc')
       );
+      // Exclude 'Super-admin' from the list of potential evaluators
       const evaluatorsQuery = query(
         collection(db, 'users'), 
-        where('role', 'in', ['Evaluator', 'CRO', 'admin', 'Super-admin'])
+        where('role', 'in', ['Evaluator', 'CRO', 'admin'])
       );
 
       const [projectsSnapshot, evaluatorsSnapshot] = await Promise.all([
