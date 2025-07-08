@@ -761,7 +761,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         </Card>
       )}
 
-      {isAdmin && project.status === 'Under Review' && <EvaluationsSummary project={project} evaluations={evaluations} />}
+      {isAdmin && evaluations.length > 0 && <EvaluationsSummary project={project} evaluations={evaluations} />}
 
       {showEvaluationForm && (
         <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchData} />
