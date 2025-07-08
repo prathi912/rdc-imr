@@ -38,11 +38,23 @@ service cloud.firestore {
       // A PI can update their own project (e.g., submit completion report).
       allow update: if request.auth.uid == resource.data.pi_uid;
 
+      function hasEvaluatorAccess() {
+        let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+        return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                'role' in userDoc.data &&
+                userDoc.data.role in ['Evaluator', 'admin', 'CRO', 'Super-admin'];
+      }
+
       // Rules for the evaluations subcollection inside a project
       match /evaluations/{evaluatorId} {
-        // An evaluator can only read and write their OWN evaluation.
-        // Admins are already covered by the global rule.
-        allow read, write: if request.auth.uid == evaluatorId;
+        // Any user with evaluator access can read any evaluation within the project.
+        // This promotes transparency among the evaluation committee.
+        allow read: if hasEvaluatorAccess();
+        
+        // An evaluator can only create or update their OWN evaluation record.
+        // Admins are covered by the global rule above, so this rule specifically
+        // empowers the 'Evaluator' role to write their own feedback.
+        allow write: if request.auth.uid == evaluatorId;
       }
     }
 
@@ -62,5 +74,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
