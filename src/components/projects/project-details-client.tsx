@@ -1,10 +1,11 @@
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, startOfToday } from 'date-fns';
+import { format, startOfToday, isToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 import type { Project, User, GrantDetails, Evaluation, BankDetails } from '@/types';
@@ -144,7 +145,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
   const isPrivilegedViewer = isAdmin || (user?.designation === 'Principal') || (user?.designation === 'HOD');
   const canViewDocuments = isPI || isPrivilegedViewer;
-  const showEvaluationForm = user && project.status === 'Under Review' && project.meetingDetails?.assignedEvaluators?.includes(user.uid);
+  
+  const isMeetingToday = project.meetingDetails?.date ? isToday(new Date(project.meetingDetails.date)) : false;
+  const showEvaluationForm = user && project.status === 'Under Review' && project.meetingDetails?.assignedEvaluators?.includes(user.uid) && isMeetingToday;
+
   const allEvaluationsIn = (project.meetingDetails?.assignedEvaluators?.length ?? 0) > 0 && evaluations.length >= (project.meetingDetails?.assignedEvaluators?.length ?? 0);
 
   const assignedEvaluatorNames = useMemo(() => {
@@ -799,3 +803,5 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
     </>
   );
 }
+
+    
