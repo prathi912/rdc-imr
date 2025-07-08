@@ -23,6 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { parseISO } from 'date-fns';
 
 interface ProjectListProps {
   projects: Project[];
@@ -54,8 +55,8 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
         const key = sortConfig.key;
 
         if (key === 'meetingDate') {
-            aValue = a.meetingDetails?.date ? new Date(a.meetingDetails.date).getTime() : 0;
-            bValue = b.meetingDetails?.date ? new Date(b.meetingDetails.date).getTime() : 0;
+            aValue = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
+            bValue = b.meetingDetails?.date ? parseISO(b.meetingDetails.date).getTime() : 0;
         } else {
             aValue = a[key as keyof Project] || '';
             bValue = b[key as keyof Project] || '';
@@ -120,7 +121,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
           </TableHeader>
           <TableBody>
             {sortedProjects.map((project) => {
-              const meetingDate = project.meetingDetails?.date ? new Date(project.meetingDetails.date) : null;
+              const meetingDate = project.meetingDetails?.date ? parseISO(project.meetingDetails.date) : null;
              
               let actionButton;
               if (project.status === 'Draft') {

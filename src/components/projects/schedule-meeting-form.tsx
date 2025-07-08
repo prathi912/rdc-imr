@@ -112,7 +112,7 @@ export function ScheduleMeetingForm() {
     }
 
     const meetingDetails = {
-      date: data.date.toISOString(),
+      date: format(data.date, 'yyyy-MM-dd'),
       time: data.time,
       venue: "RDC Committee Room, PIMSR",
       evaluatorUids: data.evaluatorUids,

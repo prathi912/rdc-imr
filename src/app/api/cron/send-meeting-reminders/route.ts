@@ -4,7 +4,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/config';
 import { sendEmail } from '@/lib/email';
 import type { Project } from '@/types';
-import { format, addDays, startOfDay, endOfDay } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 export async function GET(request: NextRequest) {
   // Secure the endpoint
@@ -17,15 +17,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const tomorrow = addDays(new Date(), 1);
-    const startOfTomorrow = startOfDay(tomorrow).toISOString();
-    const endOfTomorrow = endOfDay(tomorrow).toISOString();
+    const tomorrowDateString = format(tomorrow, 'yyyy-MM-dd');
 
     const projectsRef = collection(db, 'projects');
     const q = query(
       projectsRef,
       where('status', '==', 'Under Review'),
-      where('meetingDetails.date', '>=', startOfTomorrow),
-      where('meetingDetails.date', '<=', endOfTomorrow)
+      where('meetingDetails.date', '==', tomorrowDateString)
     );
 
     const querySnapshot = await getDocs(q);
@@ -37,6 +35,7 @@ export async function GET(request: NextRequest) {
     const reminderPromises = querySnapshot.docs.map(doc => {
       const project = { id: doc.id, ...doc.data() } as Project;
       if (project.pi_email && project.meetingDetails) {
+        const projectDate = new Date(project.meetingDetails.date.replace(/-/g, '/'));
         return sendEmail({
           to: project.pi_email,
           subject: `REMINDER: IMR Meeting Tomorrow for Project "${project.title}"`,
@@ -53,7 +52,7 @@ export async function GET(request: NextRequest) {
                   </p>
 
                   <p><strong style="color:#ffffff;">Project:</strong> ${project.title}</p>
-                  <p><strong style="color:#ffffff;">Date:</strong> ${format(new Date(project.meetingDetails.date), 'MMMM d, yyyy')}</p>
+                  <p><strong style="color:#ffffff;">Date:</strong> ${format(projectDate, 'MMMM d, yyyy')}</p>
                   <p><strong style="color:#ffffff;">Time:</strong> ${project.meetingDetails.time}</p>
                   <p><strong style="color:#ffffff;">Venue:</strong> ${project.meetingDetails.venue}</p>
 

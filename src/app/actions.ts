@@ -185,7 +185,10 @@ export async function scheduleMeeting(
 ) {
   try {
     const batch = adminDb.batch();
-    const formattedDate = format(new Date(meetingDetails.date), 'MMMM d, yyyy');
+    // The date is now 'yyyy-MM-dd', parse it safely.
+    // Using replace is a safe way to ensure it's parsed as local time, avoiding timezone-off-by-one errors.
+    const dateForFormatting = new Date(meetingDetails.date.replace(/-/g, '/'));
+    const formattedDate = format(dateForFormatting, 'MMMM d, yyyy');
 
     for (const project of projectsToSchedule) {
       const projectRef = adminDb.collection('projects').doc(project.id);
@@ -888,3 +891,4 @@ export async function updateProjectEvaluators(projectId: string, evaluatorUids: 
 
 
     
+

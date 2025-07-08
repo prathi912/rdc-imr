@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { format, startOfToday, isToday } from 'date-fns';
+import { format, startOfToday, isToday, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
 import type { Project, User, GrantDetails, Evaluation, BankDetails, GrantPhase } from '@/types';
@@ -122,7 +122,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
   useEffect(() => {
     if (project.meetingDetails) {
         scheduleForm.reset({
-            date: new Date(project.meetingDetails.date),
+            date: project.meetingDetails.date ? parseISO(project.meetingDetails.date) : undefined,
             time: project.meetingDetails.time,
             venue: project.meetingDetails.venue,
         });
@@ -180,7 +180,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid);
   const canViewDocuments = isPI || isAdmin || isAssignedEvaluator;
   
-  const isMeetingToday = project.meetingDetails?.date ? isToday(new Date(project.meetingDetails.date)) : false;
+  const isMeetingToday = project.meetingDetails?.date ? isToday(parseISO(project.meetingDetails.date)) : false;
   const showEvaluationForm = user && project.status === 'Under Review' && isAssignedEvaluator && isMeetingToday;
 
   const allEvaluationsIn = (project.meetingDetails?.assignedEvaluators?.length ?? 0) > 0 && evaluations.length >= (project.meetingDetails?.assignedEvaluators?.length ?? 0);
@@ -214,7 +214,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
     try {
         const projectRef = doc(db, 'projects', project.id);
         const newMeetingDetails = {
-            date: data.date.toISOString(),
+            date: format(data.date, 'yyyy-MM-dd'),
             time: data.time,
             venue: data.venue,
         };
@@ -436,15 +436,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
       setIsUpdating(false);
   };
 
-  const formatDate = (isoString: string) => {
-      if (!isoString) return 'N/A';
-      try {
-        return new Date(isoString).toLocaleDateString('en-US', {
-            year: 'numeric', month: 'long', day: 'numeric'
-        });
-      } catch (e) {
-        return 'Invalid Date';
-      }
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    try {
+      return format(parseISO(dateString), 'PPP'); // PPP is like "Jan 1, 2024"
+    } catch (e) {
+      console.error("Date formatting error:", e);
+      return 'Invalid Date';
+    }
   }
 
   const handleProjectUpdate = (updatedProject: Project) => {
@@ -707,7 +706,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                     <div className="space-y-2">
                         <h3 className="font-semibold text-lg">Revised Proposal</h3>
                         <p className="text-sm text-muted-foreground">
-                            The following revised proposal was submitted on {formatDate(project.revisionSubmissionDate!)}.
+                            The following revised proposal was submitted on {formatDate(project.revisionSubmissionDate)}.
                         </p>
                         <ul className="list-disc list-inside text-sm space-y-1">
                           <li>
@@ -725,7 +724,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                     <div className="space-y-2">
                         <h3 className="font-semibold text-lg">Completion Documents</h3>
                         <p className="text-sm text-muted-foreground">
-                            The following documents were submitted on {formatDate(project.completionSubmissionDate!)}.
+                            The following documents were submitted on {formatDate(project.completionSubmissionDate)}.
                         </p>
                         <ul className="list-disc list-inside text-sm space-y-1">
                           <li>
