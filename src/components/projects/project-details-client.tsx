@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -37,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 interface ProjectDetailsClientProps {
   project: Project;
+  allUsers: User[];
 }
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -67,7 +67,7 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
-export function ProjectDetailsClient({ project: initialProject }: ProjectDetailsClientProps) {
+export function ProjectDetailsClient({ project: initialProject, allUsers }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -146,6 +146,16 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const canViewDocuments = isPI || isPrivilegedViewer;
   const showEvaluationForm = user && project.status === 'Under Review' && project.meetingDetails?.assignedEvaluators?.includes(user.uid);
   const allEvaluationsIn = (project.meetingDetails?.assignedEvaluators?.length ?? 0) > 0 && evaluations.length >= (project.meetingDetails?.assignedEvaluators?.length ?? 0);
+
+  const assignedEvaluatorNames = useMemo(() => {
+    if (!project.meetingDetails?.assignedEvaluators || !allUsers.length) {
+      return [];
+    }
+    return project.meetingDetails.assignedEvaluators.map(uid => {
+      const evaluator = allUsers.find(u => u.uid === uid);
+      return evaluator ? evaluator.name : 'Unknown Evaluator';
+    });
+  }, [project.meetingDetails, allUsers]);
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     setIsUpdating(true);
@@ -623,6 +633,16 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                   <p><strong>Time:</strong> {project.meetingDetails.time}</p>
                   <p><strong>Venue:</strong> {project.meetingDetails.venue}</p>
                 </div>
+                {isAdmin && assignedEvaluatorNames.length > 0 && (
+                  <div className="pt-2">
+                    <p className="font-semibold text-sm">Assigned Evaluators:</p>
+                    <ul className="list-disc list-inside text-sm pl-4">
+                      {assignedEvaluatorNames.map((name, index) => (
+                        <li key={index}>{name}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
               <Separator />
             </>

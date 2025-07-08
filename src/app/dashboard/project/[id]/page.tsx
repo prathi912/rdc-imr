@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/config';
-import type { Project } from '@/types';
+import type { Project, User } from '@/types';
 import { PageHeader } from '@/components/page-header';
 import { ProjectDetailsClient } from '@/components/projects/project-details-client';
 import { ProjectSummary } from '@/components/projects/project-summary';
@@ -15,17 +15,23 @@ export default function ProjectDetailsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     if (!projectId) return;
     
-    async function getProject(id: string) {
+    async function getProjectAndUsers(id: string) {
       setLoading(true);
       try {
           const projectRef = doc(db, 'projects', id);
-          const projectSnap = await getDoc(projectRef);
+          const usersRef = collection(db, 'users');
+
+          const [projectSnap, usersSnap] = await Promise.all([
+            getDoc(projectRef),
+            getDocs(usersRef),
+          ]);
 
           if (!projectSnap.exists()) {
               setNotFound(true);
@@ -38,14 +44,18 @@ export default function ProjectDetailsPage() {
               ...data,
               submissionDate: data.submissionDate || new Date().toISOString()
           } as Project);
+
+          const userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+          setAllUsers(userList);
+
       } catch (error) {
-          console.error("Error fetching project:", error);
+          console.error("Error fetching project data:", error);
           setNotFound(true); // Or handle error differently
       } finally {
         setLoading(false);
       }
     }
-    getProject(projectId);
+    getProjectAndUsers(projectId);
   }, [projectId]);
 
 
@@ -91,7 +101,7 @@ export default function ProjectDetailsPage() {
         <ProjectSummary project={project} />
       </PageHeader>
       <div className="mt-8">
-        <ProjectDetailsClient project={project} />
+        <ProjectDetailsClient project={project} allUsers={allUsers} />
       </div>
     </div>
   );
