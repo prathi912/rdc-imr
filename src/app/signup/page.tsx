@@ -101,11 +101,15 @@ export default function SignupPage() {
       uid: firebaseUser.uid,
       name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
-      photoURL: firebaseUser.photoURL || undefined,
       role: role,
       profileComplete: role !== 'faculty',
       allowedModules: getDefaultModulesForRole(role),
     };
+
+    if (firebaseUser.photoURL) {
+      user.photoURL = firebaseUser.photoURL;
+    }
+    
     await setDoc(userDocRef, user);
 
     // Back-fill pi_uid for migrated projects using a server action
