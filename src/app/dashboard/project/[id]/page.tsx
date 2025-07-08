@@ -74,17 +74,14 @@ export default function ProjectDetailsPage() {
         const usersRef = collection(db, 'users');
         let userList: User[] = [];
 
+        // Only admins need the full user list for UI components like re-assigning evaluators.
+        // Other roles like Principal or HOD don't have permission to list all users, so we skip this for them.
         if (isAdmin) {
           const usersSnap = await getDocs(usersRef);
           userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
-        } else {
-          const evaluatorIds = projectData.meetingDetails?.assignedEvaluators;
-          if (evaluatorIds && evaluatorIds.length > 0) {
-              const q = query(usersRef, where(documentId(), 'in', evaluatorIds));
-              const evaluatorsSnap = await getDocs(q);
-              userList = evaluatorsSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
-          }
         }
+        // For all other roles, userList will remain an empty array.
+        // The client component is designed to handle this gracefully.
         setAllUsers(userList);
 
     } catch (error) {
