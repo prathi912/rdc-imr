@@ -4,72 +4,55 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if a user is one of the admin types
+    function hasEvaluatorAccess() {
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             'role' in userDoc.data &&
+             userDoc.data.role in ['Evaluator', 'admin', 'CRO', 'Super-admin'];
+    }
+    
     function isAdmin() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      // Ensure the user document exists and has a role that's in the admin list
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              'role' in userDoc.data &&
              userDoc.data.role in ['admin', 'CRO', 'Super-admin'];
     }
 
-    // This is a "god-mode" rule. If a user is an admin, they can do anything.
-    // This rule is checked first. If it's true, access is granted.
     match /{path=**} {
       allow read, write: if isAdmin();
     }
     
-    // The following rules apply to non-admin users.
-    
     match /users/{userId} {
-      // Any signed-in user can read a public profile.
       allow read: if request.auth != null;
-      // A user can create their own document.
       allow create: if request.auth.uid == userId;
-      // A user can only update their own document. Admins are covered by the global rule above.
       allow update: if request.auth.uid == userId;
     }
     
     match /projects/{projectId} {
-      // Any signed-in user can read project details.
       allow read: if request.auth != null;
-      // A user can only create a project where they are the PI.
       allow create: if request.auth.uid == request.resource.data.pi_uid;
-      // A PI can update their own project (e.g., submit completion report).
       allow update: if request.auth.uid == resource.data.pi_uid;
 
-      function hasEvaluatorAccess() {
-        let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-        return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-                'role' in userDoc.data &&
-                userDoc.data.role in ['Evaluator', 'admin', 'CRO', 'Super-admin'];
+      // This rule grants read (get and list) access to the entire evaluations 
+      // subcollection for any user with evaluator privileges.
+      match /evaluations/{document=**} {
+        allow read: if hasEvaluatorAccess();
       }
 
-      // Rules for the evaluations subcollection inside a project
+      // This more specific rule restricts write access to a user's own evaluation document.
       match /evaluations/{evaluatorId} {
-        // Any user with evaluator access can read any evaluation within the project.
-        // This promotes transparency among the evaluation committee.
-        allow read: if hasEvaluatorAccess();
-        
-        // An evaluator can only create or update their OWN evaluation record.
-        // Admins are covered by the global rule above, so this rule specifically
-        // empowers the 'Evaluator' role to write their own feedback.
-        allow write: if request.auth.uid == evaluatorId;
+         allow write: if request.auth.uid == evaluatorId;
       }
     }
 
     match /notifications/{notificationId} {
-      // A user can read and update (e.g., mark as read) their own notifications.
       allow read, update: if request.auth.uid == resource.data.uid;
-      // All notifications are created by the server using the Admin SDK, so client creation is denied.
       allow create: if false;
     }
     
     match /incentiveClaims/{claimId} {
-      // A user can create and read their own incentive claims.
       allow create: if request.auth.uid == request.resource.data.uid;
       allow read: if request.auth.uid == resource.data.uid;
-      // All status updates are handled by the server (Admin SDK), so client updates are denied.
       allow update: if false;
     }
   }
