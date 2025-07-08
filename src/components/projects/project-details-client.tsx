@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import type { Project, User, GrantDetails, Evaluation, BankDetails, GrantPhase } from '@/types';
 import { db } from '@/lib/config';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
-import { uploadFileToServer, updateProjectStatus, updateProjectDuration, updateProjectEvaluators } from '@/app/actions';
+import { uploadFileToServer, updateProjectStatus, updateProjectWithRevision, updateProjectDuration, updateProjectEvaluators } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +45,7 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
   'Approved': 'default',
   'In Progress': 'default',
   'Under Review': 'secondary',
+  'Revision Needed': 'secondary',
   'Pending Completion Approval': 'secondary',
   'Rejected': 'destructive',
   'Completed': 'outline'
@@ -380,31 +381,27 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
     }
     setIsSubmittingRevision(true);
     try {
-        const projectRef = doc(db, 'projects', project.id);
-
         const dataUrl = await fileToDataUrl(revisedProposalFile);
         const path = `revisions/${project.id}/${revisedProposalFile.name}`;
-        const result = await uploadFileToServer(dataUrl, path);
+        const uploadResult = await uploadFileToServer(dataUrl, path);
         
-        if (!result.success || !result.url) {
-            throw new Error(result.error || "Revision upload failed");
+        if (!uploadResult.success || !uploadResult.url) {
+            throw new Error(uploadResult.error || "Revision upload failed");
         }
-        const revisedProposalUrl = result.url;
+        
+        const revisionResult = await updateProjectWithRevision(project.id, uploadResult.url);
 
-        const updateData = {
-          revisedProposalUrl: revisedProposalUrl,
-          revisionSubmissionDate: new Date().toISOString(),
-        };
+        if (!revisionResult.success) {
+            throw new Error(revisionResult.error || "Failed to update project with revision.");
+        }
 
-        await updateDoc(projectRef, updateData);
-        setProject({ ...project, ...updateData });
-
-        toast({ title: 'Revision Submitted', description: 'Your revised proposal has been submitted.' });
+        toast({ title: 'Revision Submitted', description: 'Your revised proposal has been submitted for re-evaluation.' });
         setIsRevisionDialogOpen(false);
         setRevisedProposalFile(null);
-    } catch (error) {
+        refetchData();
+    } catch (error: any) {
         console.error('Error submitting revision:', error);
-        toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not submit your revision.' });
+        toast({ variant: 'destructive', title: 'Submission Failed', description: error.message || 'Could not submit your revision.' });
     } finally {
         setIsSubmittingRevision(false);
     }
@@ -472,32 +469,42 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
               <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                   <Badge variant={statusVariant[project.status] || 'secondary'} className="text-sm px-3 py-1">
                       {project.status === 'Under Review' && <Clock className="mr-2 h-4 w-4" />}
+                      {project.status === 'Revision Needed' && <Edit className="mr-2 h-4 w-4" />}
                       {project.status === 'Pending Completion Approval' && <Clock className="mr-2 h-4 w-4" />}
                       {(project.status === 'Approved' || project.status === 'Completed') && <Check className="mr-2 h-4 w-4" />}
                       {project.status === 'Rejected' && <X className="mr-2 h-4 w-4" />}
                       {project.status}
                   </Badge>
                   {isAdmin && project.status === 'Under Review' && (
-                     <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={() => handleApprovalClick('Approved')}><Check className="mr-2 h-4 w-4"/>Approve</Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleApprovalClick('Rejected')}><X className="mr-2 h-4 w-4"/>Reject</Button>
-                     </div>
-                  )}
-                  {isSuperAdmin && (
-                      <DropdownMenu>
+                     <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                               <Button variant="outline" disabled={isUpdating}>
-                                  Change Status <ChevronDown className="ml-2 h-4 w-4" />
+                                  Update Status <ChevronDown className="ml-2 h-4 w-4" />
                               </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                              {availableStatuses.map(status => (
-                                <DropdownMenuItem key={status} onClick={() => handleStatusUpdate(status)} disabled={project.status === status}>
-                                    {status}
-                                </DropdownMenuItem>
-                              ))}
+                              <DropdownMenuItem onClick={() => handleApprovalClick('Approved')}>
+                                  <Check className="mr-2 h-4 w-4" /> Approve
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleApprovalClick('Rejected')}>
+                                  <X className="mr-2 h-4 w-4 text-destructive" /> <span className="text-destructive">Reject</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleStatusUpdate('Revision Needed')}>
+                                  <Edit className="mr-2 h-4 w-4" /> Request Revision
+                              </DropdownMenuItem>
                           </DropdownMenuContent>
                       </DropdownMenu>
+                  )}
+                  {isPI && project.status === 'Revision Needed' && (
+                    <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
+                      <DialogTrigger asChild><Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Submit Revision</Button></DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader><DialogTitle>Submit Revised Proposal</DialogTitle><DialogDescription>Upload your revised proposal based on the feedback from the IMR evaluation meeting.</DialogDescription></DialogHeader>
+                        <div className="grid gap-4 py-4"><div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="revised-proposal" className="text-right">Proposal (PDF)</Label><Input id="revised-proposal" type="file" accept=".pdf" onChange={(e) => setRevisedProposalFile(e.target.files ? e.target.files[0] : null)} className="col-span-3" /></div></div>
+                        <DialogFooter><Button type="button" onClick={handleRevisionSubmit} disabled={isSubmittingRevision || !revisedProposalFile}>{isSubmittingRevision ? 'Submitting...' : 'Submit Revised Proposal'}</Button></DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   )}
                   {isSuperAdmin && project.status === 'Approved' && (
                     <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
@@ -547,16 +554,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                       </DialogContent>
                     </Dialog>
                   )}
-                  {isPI && project.status === 'Under Review' && (
-                    <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
-                      <DialogTrigger asChild><Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Submit Revision</Button></DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader><DialogTitle>Submit Revised Proposal</DialogTitle><DialogDescription>Upload your revised proposal based on the feedback from the IMR evaluation meeting.</DialogDescription></DialogHeader>
-                        <div className="grid gap-4 py-4"><div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="revised-proposal" className="text-right">Proposal (PDF)</Label><Input id="revised-proposal" type="file" accept=".pdf" onChange={(e) => setRevisedProposalFile(e.target.files ? e.target.files[0] : null)} className="col-span-3" /></div></div>
-                        <DialogFooter><Button type="button" onClick={handleRevisionSubmit} disabled={isSubmittingRevision || !revisedProposalFile}>{isSubmittingRevision ? 'Submitting...' : 'Submit Revised Proposal'}</Button></DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  )}
+                  
                   {isPI && (project.status === 'Approved' || project.status === 'In Progress') && (
                     <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
                       <DialogTrigger asChild><Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Request Project Closure</Button></DialogTrigger>

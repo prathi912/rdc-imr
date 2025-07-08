@@ -837,6 +837,55 @@ export async function linkHistoricalData(uid: string, email: string): Promise<{ 
   }
 }
     
+export async function updateProjectWithRevision(projectId: string, revisedProposalUrl: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!projectId || !revisedProposalUrl) {
+            return { success: false, error: 'Project ID and revised proposal URL are required.' };
+        }
+        const projectRef = adminDb.collection('projects').doc(projectId);
+        
+        await projectRef.update({
+            revisedProposalUrl: revisedProposalUrl,
+            revisionSubmissionDate: new Date().toISOString(),
+            status: 'Under Review',
+        });
+
+        const projectSnap = await projectRef.get();
+        if (!projectSnap.exists) {
+            return { success: false, error: 'Project not found after update.' };
+        }
+        const project = projectSnap.data() as Project;
+
+        // Notify admins
+        const adminRoles = ['admin', 'Super-admin', 'CRO'];
+        const usersRef = adminDb.collection('users');
+        const q = usersRef.where('role', 'in', adminRoles);
+
+        const adminUsersSnapshot = await q.get();
+        if (!adminUsersSnapshot.empty) {
+            const batch = adminDb.batch();
+            const notificationTitle = `Revision Submitted for "${project.title}" by ${project.pi}`;
+
+            adminUsersSnapshot.forEach(userDoc => {
+                const notificationRef = adminDb.collection('notifications').doc();
+                batch.set(notificationRef, {
+                    uid: userDoc.id,
+                    projectId: projectId,
+                    title: notificationTitle,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
+                });
+            });
+
+            await batch.commit();
+        }
+        
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error submitting project revision:', error);
+        return { success: false, error: error.message || 'Failed to submit revision.' };
+    }
+}
 
 export async function updateProjectDuration(projectId: string, startDate: string, endDate: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -891,4 +940,5 @@ export async function updateProjectEvaluators(projectId: string, evaluatorUids: 
 
 
     
+
 
