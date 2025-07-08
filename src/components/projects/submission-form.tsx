@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -27,7 +26,7 @@ const formSchema = z.object({
   // Step 1
   title: z.string().min(5, 'Title must be at least 5 characters.'),
   abstract: z.string().min(20, 'Abstract must be at least 20 characters.'),
-  projectType: z.string().min(1, 'Please select a project type.'),
+  projectType: z.string().min(1, 'Please select a category.'),
   // Step 2
   coPiNames: z.string().optional(),
   studentInfo: z.string().optional(),
@@ -276,7 +275,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                   <FormItem><FormLabel>Abstract</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField name="projectType" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Project Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Research">Research</SelectItem><SelectItem value="Development">Development</SelectItem><SelectItem value="Clinical Trial">Clinical Trial</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Multi-Disciplinary">Multi-Disciplinary</SelectItem><SelectItem value="Inter-Disciplinary">Inter-Disciplinary</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                 )} />
                  <div className="p-4 border rounded-lg bg-muted/50 text-sm text-muted-foreground">
                     <p><span className="font-semibold text-foreground">Faculty:</span> {user?.faculty || 'Not set'}</p>

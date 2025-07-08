@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -29,7 +28,7 @@ const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Approved', 
 const EXPORT_COLUMNS = [
   { id: 'id', label: 'Project ID' },
   { id: 'title', label: 'Project Title' },
-  { id: 'type', label: 'Project Type' },
+  { id: 'type', label: 'Category' },
   { id: 'submissionDate', label: 'Submission Date' },
   { id: 'abstract', label: 'Abstract' },
   { id: 'pi', label: 'Principal Investigator' },

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -660,7 +659,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
             <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Project Details</h3>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <dt className="font-medium text-muted-foreground">Project Type</dt>
+                    <dt className="font-medium text-muted-foreground">Category</dt>
                     <dd>{project.type}</dd>
                 </dl>
             </div>
@@ -803,5 +802,3 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
     </>
   );
 }
-
-    

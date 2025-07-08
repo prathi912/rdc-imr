@@ -14,7 +14,7 @@ import {z} from 'genkit';
 const SummarizeProjectInputSchema = z.object({
   title: z.string().describe('The title of the project.'),
   abstract: z.string().describe('The abstract of the project.'),
-  type: z.string().describe('The type of the project.'),
+  type: z.string().describe('The category of the project.'),
   faculty: z.string().describe('The faculty associated with the project.'),
   institute: z.string().describe('The institute associated with the project.'),
   departmentName: z.string().describe('The specific department name.'),
@@ -42,7 +42,7 @@ const summarizeProjectPrompt = ai.definePrompt({
 
   Project Title: {{{title}}}
   Abstract: {{{abstract}}}
-  Project Type: {{{type}}}
+  Category: {{{type}}}
   Faculty: {{{faculty}}}
   Institute: {{{institute}}}
   Department: {{{departmentName}}}
