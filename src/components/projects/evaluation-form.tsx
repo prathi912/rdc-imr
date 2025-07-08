@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import type { Project, User, Evaluation } from '@/types';
-import { getEvaluationPrompts } from '@/app/actions';
+import { getEvaluationPrompts, notifySuperAdminsOnEvaluation } from '@/app/actions';
 import { Loader2, Wand2, ThumbsUp, ThumbsDown, History } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -121,6 +121,8 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
       await updateDoc(projectRef, {
         evaluatedBy: arrayUnion(user.uid)
       });
+      
+      await notifySuperAdminsOnEvaluation(project.id, project.title, user.name);
 
       onEvaluationSubmitted();
       toast({ title: 'Success', description: 'Your evaluation has been submitted.' });

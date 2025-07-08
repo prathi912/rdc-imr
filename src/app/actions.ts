@@ -381,6 +381,37 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
   }
 }
 
+export async function notifySuperAdminsOnEvaluation(projectId: string, projectName: string, evaluatorName: string) {
+  try {
+    const superAdminUsersSnapshot = await adminDb.collection('users').where('role', '==', 'Super-admin').get();
+    if (superAdminUsersSnapshot.empty) {
+      console.log('No Super-admin users found to notify.');
+      return { success: true, message: 'No Super-admins to notify.' };
+    }
+
+    const batch = adminDb.batch();
+    const notificationTitle = `Evaluation submitted for "${projectName}" by ${evaluatorName}`;
+
+    superAdminUsersSnapshot.forEach(userDoc => {
+      const notificationRef = adminDb.collection('notifications').doc();
+      batch.set(notificationRef, {
+        uid: userDoc.id,
+        projectId: projectId,
+        title: notificationTitle,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      });
+    });
+
+    await batch.commit();
+    return { success: true };
+
+  } catch (error: any) {
+    console.error('Error notifying Super-admins:', error);
+    return { success: false, error: error.message || 'Failed to notify Super-admins.' };
+  }
+}
+
 export async function checkMisIdExists(misId: string, currentUid: string): Promise<{exists: boolean}> {
   try {
     const usersRef = adminDb.collection('users');
