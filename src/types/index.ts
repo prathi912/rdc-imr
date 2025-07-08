@@ -1,4 +1,5 @@
 
+
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -39,7 +40,8 @@ export type BankDetails = {
 };
 
 export type Transaction = {
-  id: string;
+  id: string; // Can be a timestamp + random string
+  phaseId: string; // Link transaction to a phase
   dateOfTransaction: string; // ISO String
   amount: number;
   vendorName: string;
@@ -49,14 +51,22 @@ export type Transaction = {
   description: string;
 };
 
+export type GrantPhase = {
+  id: string; // Can be a timestamp + random string
+  name: string;
+  amount: number;
+  status: 'Pending Disbursement' | 'Disbursed' | 'Utilization Submitted' | 'Completed';
+  disbursementDate?: string;
+  transactions?: Transaction[];
+  utilizationSubmissionDate?: string;
+};
+
 export type GrantDetails = {
-    amount: number;
+    totalAmount: number;
     sanctionNumber?: string;
-    status: 'Pending Bank Details' | 'Bank Details Submitted' | 'Disbursed' | 'Utilization Submitted' | 'Completed';
-    disbursementDate?: string; // ISO String
+    status: 'Awarded' | 'In Progress' | 'Completed';
     bankDetails?: BankDetails;
-    transactions?: Transaction[];
-    utilizationSubmissionDate?: string; // ISO String
+    phases: GrantPhase[];
 };
 
 export type Evaluation = {

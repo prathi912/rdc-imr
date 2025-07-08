@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -8,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { format, startOfToday, isToday } from 'date-fns';
 import { useRouter } from 'next/navigation';
 
-import type { Project, User, GrantDetails, Evaluation, BankDetails } from '@/types';
+import type { Project, User, GrantDetails, Evaluation, BankDetails, GrantPhase } from '@/types';
 import { db } from '@/lib/config';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
 import { uploadFileToServer, updateProjectStatus } from '@/app/actions';
@@ -75,8 +76,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const [grantAmount, setGrantAmount] = useState<number | ''>('');
   const [sanctionNumber, setSanctionNumber] = useState('');
+  const [phaseName, setPhaseName] = useState('Phase 1');
+  const [phaseAmount, setPhaseAmount] = useState<number | ''>('');
   const [isAwarding, setIsAwarding] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
@@ -210,8 +212,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
 
 
   const handleAwardGrant = async () => {
-    if (!grantAmount || grantAmount <= 0) {
-      toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid grant amount.' });
+    if (!phaseAmount || phaseAmount <= 0) {
+      toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid amount for the first phase.' });
       return;
     }
     if (!sanctionNumber || sanctionNumber.trim() === '') {
@@ -221,19 +223,15 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
     setIsAwarding(true);
     try {
       const projectRef = doc(db, 'projects', project.id);
-
-      // Fetch PI's user data to get bank details
       const userRef = doc(db, 'users', project.pi_uid);
       const userSnap = await getDoc(userRef);
       
-      let newGrant: GrantDetails;
+      let initialBankDetails: BankDetails | undefined = undefined;
       
       if (userSnap.exists()) {
         const piUser = userSnap.data() as User;
-        
         if (piUser.bankDetails) {
-          // Bank details exist, copy them over
-          const grantBankDetails: BankDetails = {
+          initialBankDetails = {
               accountHolderName: piUser.bankDetails.beneficiaryName,
               accountNumber: piUser.bankDetails.accountNumber,
               bankName: piUser.bankDetails.bankName,
@@ -241,31 +239,28 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
               branchName: piUser.bankDetails.branchName,
               city: piUser.bankDetails.city,
           };
-          
-          newGrant = {
-            amount: grantAmount,
-            sanctionNumber: sanctionNumber.trim(),
-            status: 'Bank Details Submitted',
-            bankDetails: grantBankDetails
-          };
         } else {
-          // Bank details don't exist
-          newGrant = {
-            amount: grantAmount,
-            sanctionNumber: sanctionNumber.trim(),
-            status: 'Pending Bank Details',
-          };
+          toast({ variant: 'destructive', title: 'Warning', description: "PI's bank details are missing. Grant will be pending until details are added." });
         }
       } else {
-        // PI user document not found, proceed without bank details
-        newGrant = {
-          amount: grantAmount,
-          sanctionNumber: sanctionNumber.trim(),
-          status: 'Pending Bank Details',
-        };
         toast({ variant: 'destructive', title: 'Warning', description: "Could not find PI's user profile to fetch bank details." });
       }
 
+      const newPhase: GrantPhase = {
+        id: new Date().toISOString(),
+        name: phaseName.trim(),
+        amount: phaseAmount,
+        status: 'Pending Disbursement',
+        transactions: [],
+      };
+
+      const newGrant: GrantDetails = {
+        totalAmount: phaseAmount,
+        sanctionNumber: sanctionNumber.trim(),
+        status: 'Awarded',
+        phases: [newPhase],
+        bankDetails: initialBankDetails,
+      };
 
       await updateDoc(projectRef, { grant: newGrant });
 
@@ -278,9 +273,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
       });
 
       setProject({ ...project, grant: newGrant });
-      toast({ title: 'Grant Awarded!', description: `A grant of ₹${grantAmount.toLocaleString('en-IN')} has been awarded.` });
+      toast({ title: 'Grant Awarded!', description: `Phase 1 of the grant for ₹${phaseAmount.toLocaleString('en-IN')} has been created.` });
       setIsDialogOpen(false);
-      setGrantAmount('');
+      setPhaseName('Phase 1');
+      setPhaseAmount('');
       setSanctionNumber('');
     } catch (error) {
       console.error('Error awarding grant:', error);
@@ -454,21 +450,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Award Grant</DialogTitle>
-                          <DialogDescription>Enter the grant amount and sanction number for "{project.title}".</DialogDescription>
+                          <DialogTitle>Award Multi-Phase Grant</DialogTitle>
+                          <DialogDescription>Set the sanction number and details for the first phase of the grant for "{project.title}".</DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="grant-amount" className="text-right">Amount (₹)</Label>
-                            <Input
-                              id="grant-amount"
-                              type="number"
-                              value={grantAmount}
-                              onChange={(e) => setGrantAmount(Number(e.target.value))}
-                              className="col-span-3"
-                              placeholder="e.g., 400000"
-                            />
-                          </div>
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="sanction-number" className="text-right">Sanction No.</Label>
                             <Input
@@ -477,6 +462,27 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                               onChange={(e) => setSanctionNumber(e.target.value)}
                               className="col-span-3"
                               placeholder="e.g., RDC/IMSL/122"
+                            />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="phase-name" className="text-right">Phase Name</Label>
+                            <Input
+                              id="phase-name"
+                              value={phaseName}
+                              onChange={(e) => setPhaseName(e.target.value)}
+                              className="col-span-3"
+                              placeholder="e.g., Phase 1 - Equipment"
+                            />
+                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="phase-amount" className="text-right">Amount (₹)</Label>
+                            <Input
+                              id="phase-amount"
+                              type="number"
+                              value={phaseAmount}
+                              onChange={(e) => setPhaseAmount(Number(e.target.value))}
+                              className="col-span-3"
+                              placeholder="e.g., 200000"
                             />
                           </div>
                         </div>
