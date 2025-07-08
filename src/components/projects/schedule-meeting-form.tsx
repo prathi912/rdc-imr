@@ -20,8 +20,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Skeleton } from '../ui/skeleton';
-import { Input } from '../ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { scheduleMeeting } from '@/app/actions';
 import {
   DropdownMenu,
@@ -61,10 +61,10 @@ export function ScheduleMeetingForm() {
         where('status', '==', 'Submitted'),
         orderBy('submissionDate', 'desc')
       );
-      // Exclude 'Super-admin' from the list of potential evaluators
+      
       const evaluatorsQuery = query(
         collection(db, 'users'), 
-        where('role', 'in', ['Evaluator', 'CRO', 'admin'])
+        where('role', 'in', ['faculty', 'CRO', 'admin'])
       );
 
       const [projectsSnapshot, evaluatorsSnapshot] = await Promise.all([
@@ -264,7 +264,7 @@ export function ScheduleMeetingForm() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                          <DropdownMenuLabel>Available Evaluators</DropdownMenuLabel>
+                          <DropdownMenuLabel>Available Staff</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           {evaluators.map((evaluator) => (
                             <DropdownMenuCheckboxItem

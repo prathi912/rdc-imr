@@ -19,6 +19,9 @@ export type User = {
   department?: string;
   misId?: string;
   orcidId?: string;
+  scopusId?: string;
+  vidwanId?: string;
+  googleScholarId?: string;
   phoneNumber?: string;
   profileComplete?: boolean;
   photoURL?: string;

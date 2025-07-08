@@ -30,6 +30,9 @@ const profileSetupSchema = z.object({
   designation: z.string().min(2, 'Designation is required.'),
   misId: z.string().min(1, 'MIS ID is required.'),
   orcidId: z.string().optional(),
+  scopusId: z.string().optional(),
+  vidwanId: z.string().optional(),
+  googleScholarId: z.string().optional(),
   phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
 });
 
@@ -85,6 +88,9 @@ export default function ProfileSetupPage() {
       designation: '',
       misId: '',
       orcidId: '',
+      scopusId: '',
+      vidwanId: '',
+      googleScholarId: '',
       phoneNumber: '',
     },
   });
@@ -109,6 +115,9 @@ export default function ProfileSetupPage() {
             designation: appUser.designation || '',
             misId: appUser.misId || '',
             orcidId: appUser.orcidId || '',
+            scopusId: appUser.scopusId || '',
+            vidwanId: appUser.vidwanId || '',
+            googleScholarId: appUser.googleScholarId || '',
             phoneNumber: appUser.phoneNumber || '',
           });
         } else {
@@ -166,13 +175,7 @@ export default function ProfileSetupPage() {
       }
       
       const updateData = {
-        faculty: data.faculty,
-        institute: data.institute,
-        department: data.department,
-        designation: data.designation,
-        misId: data.misId,
-        orcidId: data.orcidId,
-        phoneNumber: data.phoneNumber,
+        ...data,
         photoURL: photoURL,
         profileComplete: true,
       };
@@ -271,6 +274,13 @@ export default function ProfileSetupPage() {
                 <FormField control={form.control} name="designation" render={({ field }) => (
                   <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+                <FormField control={form.control} name="phoneNumber" render={({ field }) => (
+                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                
+                <Separator />
+                <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
+                
                 <FormField control={form.control} name="misId" render={({ field }) => (
                   <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
@@ -288,8 +298,14 @@ export default function ProfileSetupPage() {
                         <FormMessage />
                     </FormItem>
                 )} />
-                <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormField control={form.control} name="scopusId" render={({ field }) => (
+                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="vidwanId" render={({ field }) => (
+                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="googleScholarId" render={({ field }) => (
+                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 
                 <Button type="submit" className="w-full !mt-8" disabled={isSubmitting}>

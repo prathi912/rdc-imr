@@ -13,13 +13,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { GanttChartSquare, Microscope, Users, FileText, Loader2 } from 'lucide-react';
+import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/config';
 import { collection, doc, setDoc } from 'firebase/firestore';
 import { uploadFileToServer, notifyAdminsOnProjectSubmission } from '@/app/actions';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import Link from 'next/link';
 
 const formSchema = z.object({
   // Step 1
@@ -67,6 +69,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
   
@@ -86,7 +89,11 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        if (!parsedUser.bankDetails) {
+            setBankDetailsMissing(true);
+        }
     }
   }, []);
 
@@ -140,6 +147,14 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         description: 'Please complete your profile in Settings before submitting.',
       });
       return;
+    }
+    if (status === 'Submitted' && !user.bankDetails) {
+        toast({
+            variant: 'destructive',
+            title: 'Bank Details Missing',
+            description: 'You must add your bank details in Settings to submit a project.',
+        });
+        return;
     }
 
     setIsSaving(true);
@@ -242,6 +257,16 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       <FormProvider {...form}>
         <form onSubmit={form.handleSubmit(onFinalSubmit)}>
           <CardContent className="space-y-8">
+            {bankDetailsMissing && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Bank Details Required</AlertTitle>
+                    <AlertDescription>
+                        You must add your salary bank account details in your profile before you can submit a project.
+                        <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
+                    </AlertDescription>
+                </Alert>
+            )}
             {currentStep === 1 && (
               <div className="space-y-4 animate-in fade-in-0">
                 <FormField name="title" control={form.control} render={({ field }) => (
@@ -370,7 +395,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                   {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : 'Save as Draft'}
                 </Button>
                 {currentStep < 4 && <Button type="button" onClick={handleNext} disabled={isSaving}>Next</Button>}
-                {currentStep === 4 && <Button type="submit" disabled={isSaving || !form.watch('guidelinesAgreement')}>{isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Submitting...</> : "Submit Project"}</Button>}
+                {currentStep === 4 && <Button type="submit" disabled={isSaving || !form.watch('guidelinesAgreement') || bankDetailsMissing}>{isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Submitting...</> : "Submit Project"}</Button>}
               </div>
             </div>
           </CardFooter>

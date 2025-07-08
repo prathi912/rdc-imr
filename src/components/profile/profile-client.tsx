@@ -66,6 +66,9 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
                         <ProfileDetail label="Designation" value={user.designation} />
                         <ProfileDetail label="MIS ID" value={user.misId} />
                         <ProfileDetail label="ORCID ID" value={user.orcidId} />
+                        <ProfileDetail label="Scopus ID" value={user.scopusId} />
+                        <ProfileDetail label="Vidwan ID" value={user.vidwanId} />
+                        <ProfileDetail label="Google Scholar ID" value={user.googleScholarId} />
                         <ProfileDetail label="Faculty" value={user.faculty} />
                         <ProfileDetail label="Institute" value={user.institute} />
                         <ProfileDetail label="Department" value={user.department} />
@@ -135,4 +138,3 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
         </div>
     );
 }
-

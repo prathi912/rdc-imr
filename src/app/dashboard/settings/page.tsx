@@ -31,6 +31,9 @@ const profileSchema = z.object({
   designation: z.string().min(2, 'Designation is required.'),
   misId: z.string().min(1, 'MIS ID is required.'),
   orcidId: z.string().optional(),
+  scopusId: z.string().optional(),
+  vidwanId: z.string().optional(),
+  googleScholarId: z.string().optional(),
   phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
 });
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -111,6 +114,9 @@ export default function SettingsPage() {
       designation: '',
       misId: '',
       orcidId: '',
+      scopusId: '',
+      vidwanId: '',
+      googleScholarId: '',
       phoneNumber: '',
     },
   });
@@ -154,6 +160,9 @@ export default function SettingsPage() {
             designation: appUser.designation || '',
             misId: appUser.misId || '',
             orcidId: appUser.orcidId || '',
+            scopusId: appUser.scopusId || '',
+            vidwanId: appUser.vidwanId || '',
+            googleScholarId: appUser.googleScholarId || '',
             phoneNumber: appUser.phoneNumber || '',
           });
           if (appUser.bankDetails) {
@@ -405,6 +414,10 @@ export default function SettingsPage() {
                 <FormField control={profileForm.control} name="designation" render={({ field }) => (
                   <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
+                
+                <Separator />
+                <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={profileForm.control} name="misId" render={({ field }) => (
                         <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
@@ -424,6 +437,17 @@ export default function SettingsPage() {
                         </FormItem>
                     )} />
                 </div>
+                <FormField control={profileForm.control} name="scopusId" render={({ field }) => (
+                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={profileForm.control} name="vidwanId" render={({ field }) => (
+                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={profileForm.control} name="googleScholarId" render={({ field }) => (
+                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+
+                 <Separator />
                  <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
                     <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
