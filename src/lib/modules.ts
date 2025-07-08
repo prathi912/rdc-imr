@@ -22,22 +22,35 @@ export const ALL_MODULES = [
   { id: 'settings', label: 'Settings' },
 ];
 
-const facultyModules = ['dashboard', 'new-submission', 'my-projects', 'incentive-claim', 'evaluator-dashboard', 'my-evaluations', 'notifications', 'settings'];
-const croModules = [...new Set([...facultyModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'all-projects', 'analytics', 'manage-users', 'manage-incentive-claims'])];
-const adminModules = [...croModules, 'system-health', 'bulk-upload'];
-const superAdminModules = [...adminModules, 'module-management'];
+// Define module sets for clarity and to avoid unintended inheritance issues.
+const coreModules = ['dashboard', 'notifications', 'settings'];
+
+const basicFacultyModules = [...coreModules, 'new-submission', 'my-projects'];
+const fullFacultyModules = [...basicFacultyModules, 'incentive-claim', 'evaluator-dashboard', 'my-evaluations'];
+
+const croAdminModules = ['schedule-meeting', 'pending-reviews', 'completed-reviews', 'all-projects', 'analytics', 'manage-users', 'manage-incentive-claims'];
+const generalAdminModules = ['system-health', 'bulk-upload'];
+const superAdminOnlyModules = ['module-management'];
+
+
+// Define default permissions for each role.
+// New sign-ups get the basic 'faculty' set. Admins/CROs get a comprehensive set.
+const facultyDefaults = basicFacultyModules;
+const croDefaults = [...new Set([...fullFacultyModules, ...croAdminModules])];
+const adminDefaults = [...new Set([...croDefaults, ...generalAdminModules])];
+const superAdminDefaults = [...new Set([...adminDefaults, ...superAdminOnlyModules])];
 
 export function getDefaultModulesForRole(role: User['role']): string[] {
   switch (role) {
     case 'faculty':
-      return facultyModules;
+      return facultyDefaults;
     case 'CRO':
-      return croModules;
+      return croDefaults;
     case 'admin':
-      return adminModules;
+      return adminDefaults;
     case 'Super-admin':
-      return superAdminModules;
+      return superAdminDefaults;
     default:
-      return ['dashboard', 'notifications', 'settings'];
+      return coreModules;
   }
 }
