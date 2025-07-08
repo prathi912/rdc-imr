@@ -10,12 +10,14 @@ import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/hooks/use-toast';
 
 export default function EvaluatorDashboardPage() {
   const [projectsToReview, setProjectsToReview] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const { toast } = useToast();
 
   useEffect(() => {
      const storedUser = localStorage.getItem('user');
@@ -31,9 +33,12 @@ export default function EvaluatorDashboardPage() {
       setLoading(true);
       try {
         const projectsCol = collection(db, 'projects');
+        // This query now filters by the evaluator's UID on the backend.
+        // This is more efficient and necessary for Firestore security rules.
         const q = query(
           projectsCol,
           where('status', '==', 'Under Review'),
+          where('meetingDetails.assignedEvaluators', 'array-contains', user.uid),
           orderBy('submissionDate', 'desc')
         );
         const projectSnapshot = await getDocs(q);
@@ -42,20 +47,27 @@ export default function EvaluatorDashboardPage() {
           id: doc.id,
         } as Project));
 
-        // Filter out projects the evaluator has already reviewed
+        // Now we only need to filter out projects the user has already reviewed, client-side.
         const pendingForCurrentUser = projectList.filter(p => 
             !p.evaluatedBy?.includes(user.uid)
         );
 
         setProjectsToReview(pendingForCurrentUser);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error fetching projects for evaluation: ", error);
+        toast({
+            variant: 'destructive',
+            title: 'Error Fetching Projects',
+            description: error.message.includes('permission-denied') 
+                ? 'You do not have permission to view these projects.' 
+                : 'Could not refresh project data. Please try again.',
+        });
       } finally {
         setLoading(false);
       }
     }
     getProjects();
-  }, [user]);
+  }, [user, toast]);
 
   const filteredProjects = useMemo(() => {
     if (!searchTerm) return projectsToReview;
