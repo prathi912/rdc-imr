@@ -516,7 +516,7 @@ export async function fetchWosDataByUrl(url: string, claimantName: string): Prom
 
 export async function bulkUploadProjects(projectsData: any[]): Promise<{ success: boolean; count: number; error?: string }> {
   try {
-    const batch = writeBatch(db);
+    const batch = adminDb.batch();
     const usersRef = adminDb.collection('users');
     let projectCount = 0;
 
@@ -538,7 +538,7 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         pi_name = userDoc.data().name || pi_name;
       }
 
-      const projectRef = doc(collection(db, 'projects'));
+      const projectRef = adminDb.collection('projects').doc();
       
       const newProjectData = {
         title: project.project_title,
@@ -697,5 +697,6 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
 
 
     
+
 
 
