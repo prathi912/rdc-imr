@@ -92,6 +92,7 @@ export type Project = {
     date: string;
     time: string;
     venue: string;
+    assignedEvaluators?: string[];
   };
   revisedProposalUrl?: string;
   revisionSubmissionDate?: string;

@@ -1,10 +1,9 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // ===== HELPER FUNCTIONS =====
+    // Helper function to check if a user is one of the admin types
     function isAdmin() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       // Ensure the user document exists and has a role that's in the admin list
@@ -13,22 +12,13 @@ service cloud.firestore {
              userDoc.data.role in ['admin', 'CRO', 'Super-admin'];
     }
 
-    function canEvaluate() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      // Checks if the user has the specific module assigned to them, regardless of role.
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             'allowedModules' in userDoc.data &&
-             'evaluator-dashboard' in userDoc.data.allowedModules;
-    }
-
-    // ===== GLOBAL ADMIN RULE =====
-    // If a user is an admin, they can do anything.
+    // This is a "god-mode" rule. If a user is an admin, they can do anything.
     // This rule is checked first. If it's true, access is granted.
     match /{path=**} {
       allow read, write: if isAdmin();
     }
     
-    // ===== NON-ADMIN RULES =====
+    // The following rules apply to non-admin users.
     
     match /users/{userId} {
       // Any signed-in user can read a public profile.
@@ -45,22 +35,26 @@ service cloud.firestore {
       // A user can only create a project where they are the PI.
       allow create: if request.auth.uid == request.resource.data.pi_uid;
       
-      // A PI can update their own project.
-      // An evaluator can update ONLY the 'evaluatedBy' field to add themselves.
-      allow update: if (request.auth.uid == resource.data.pi_uid) ||
-                   (
-                      canEvaluate() &&
-                      request.resource.data.diff(resource.data)
-                        .affectedKeys().hasOnly(['evaluatedBy']) &&
-                      (request.auth.uid in request.resource.data.evaluatedBy)
-                   );
+      // Allow PI to update their own project (e.g. for completion report)
+      // Allow an assigned evaluator to update the project (only to add their UID to the evaluatedBy array)
+      function isAssignedEvaluator(pId) {
+        let projectData = get(/databases/$(database)/documents/projects/$(pId)).data;
+        return 'meetingDetails' in projectData &&
+              'assignedEvaluators' in projectData.meetingDetails &&
+              request.auth.uid in projectData.meetingDetails.assignedEvaluators;
+      }
+      
+      allow update: if request.auth.uid == resource.data.pi_uid ||
+                      (isAssignedEvaluator(projectId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
 
       // Rules for the evaluations subcollection inside a project
       match /evaluations/{evaluatorId} {
-        // A user with evaluator permissions can read any evaluation.
-        allow read: if canEvaluate();
-        // A user with evaluator permissions can only write their own evaluation.
-        allow write: if canEvaluate() && request.auth.uid == evaluatorId;
+        // Allow reading all evaluations for a project if you are an assigned evaluator for it.
+        // This lets the committee see each other's feedback.
+        allow read: if isAssignedEvaluator(projectId);
+        
+        // Allow writing an evaluation only if you are an assigned evaluator AND you are writing to your own document.
+        allow write: if isAssignedEvaluator(projectId) && request.auth.uid == evaluatorId;
       }
     }
 

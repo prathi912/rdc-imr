@@ -180,7 +180,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
 
 export async function scheduleMeeting(
   projectsToSchedule: { id: string; pi_uid: string; title: string; pi_email?: string; }[],
-  meetingDetails: { date: string; time: string; venue: string; }
+  meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[]; }
 ) {
   try {
     const batch = adminDb.batch();
@@ -188,7 +188,12 @@ export async function scheduleMeeting(
     for (const project of projectsToSchedule) {
       const projectRef = adminDb.collection('projects').doc(project.id);
       batch.update(projectRef, { 
-        meetingDetails: meetingDetails,
+        meetingDetails: {
+          date: meetingDetails.date,
+          time: meetingDetails.time,
+          venue: meetingDetails.venue,
+          assignedEvaluators: meetingDetails.evaluatorUids,
+        },
         status: 'Under Review'
       });
 
@@ -744,6 +749,7 @@ export async function linkHistoricalData(uid: string, email: string): Promise<{ 
 
 
     
+
 
 
 

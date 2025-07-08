@@ -56,7 +56,7 @@ const scheduleSchema = z.object({
 });
 type ScheduleFormData = z.infer<typeof scheduleSchema>;
 
-const venues = ["RDC Committee Room, PIMSR", "Micro-Nano R&D Center Colab Space, D-Block"];
+const venues = ["RDC Committee Room, PIMSR"];
 
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -144,10 +144,8 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
   const isPrivilegedViewer = isAdmin || (user?.designation === 'Principal') || (user?.designation === 'HOD');
   const canViewDocuments = isPI || isPrivilegedViewer;
-  const canEvaluate = user && ['Evaluator', 'CRO', 'admin', 'Super-admin'].includes(user.role);
-  const allEvaluationsIn = evaluations.length >= 3; // Require at least 3 evaluations
-
-  const showEvaluationForm = canEvaluate && project.status === 'Under Review' && user;
+  const showEvaluationForm = user && project.status === 'Under Review' && project.meetingDetails?.assignedEvaluators?.includes(user.uid);
+  const allEvaluationsIn = (project.meetingDetails?.assignedEvaluators?.length ?? 0) > 0 && evaluations.length >= (project.meetingDetails?.assignedEvaluators?.length ?? 0);
 
   const handleStatusUpdate = async (newStatus: Project['status']) => {
     setIsUpdating(true);
@@ -173,7 +171,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
             venue: data.venue,
         };
 
-        await updateDoc(projectRef, { meetingDetails: newMeetingDetails });
+        await updateDoc(projectRef, { 'meetingDetails.date': newMeetingDetails.date, 'meetingDetails.time': newMeetingDetails.time, 'meetingDetails.venue': newMeetingDetails.venue });
         
         await addDoc(collection(db, 'notifications'), {
             uid: project.pi_uid,
@@ -183,7 +181,7 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
             isRead: false,
         });
 
-        setProject({ ...project, meetingDetails: newMeetingDetails });
+        setProject({ ...project, meetingDetails: { ...project.meetingDetails, ...newMeetingDetails } as Project['meetingDetails'] });
         toast({ title: 'Success', description: `Meeting schedule has been updated.` });
         setIsScheduleDialogOpen(false);
         
@@ -769,8 +767,8 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
                 <AlertDialogHeader>
                     <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This project cannot be approved or rejected until all required evaluations have been submitted. 
-                        There are currently {evaluations.length || 0} of 3 required evaluations complete.
+                        This project cannot be approved or rejected until all assigned evaluations have been submitted. 
+                        There are currently {evaluations.length || 0} of {project.meetingDetails?.assignedEvaluators?.length || 0} required evaluations complete.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

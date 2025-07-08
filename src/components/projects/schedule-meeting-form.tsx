@@ -7,10 +7,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { format, startOfToday } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, ChevronDown } from 'lucide-react';
 
 import { db } from '@/lib/config';
-import type { Project } from '@/types';
+import type { Project, User } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,54 +21,72 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '../ui/input';
 import { scheduleMeeting } from '@/app/actions';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
   time: z.string().min(1, 'Meeting time is required.'),
-  venue: z.string().min(1, 'Meeting venue is required.'),
+  evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
 });
-
-const venues = ["RDC Committee Room, PIMSR", "Micro-Nano R&D Center Colab Space, D-Block"];
 
 export function ScheduleMeetingForm() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [evaluators, setEvaluators] = useState<User[]>([]);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof scheduleSchema>>({
     resolver: zodResolver(scheduleSchema),
     defaultValues: {
       time: '',
-      venue: '',
+      evaluatorUids: [],
     },
   });
 
-  const fetchProjects = useCallback(async () => {
+  const fetchRequiredData = useCallback(async () => {
     setLoading(true);
     try {
-      const q = query(
+      const projectsQuery = query(
         collection(db, 'projects'),
         where('status', '==', 'Submitted'),
         orderBy('submissionDate', 'desc')
       );
-      const querySnapshot = await getDocs(q);
-      const projectList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      const evaluatorsQuery = query(
+        collection(db, 'users'), 
+        where('role', 'in', ['Evaluator', 'CRO', 'admin', 'Super-admin'])
+      );
+
+      const [projectsSnapshot, evaluatorsSnapshot] = await Promise.all([
+        getDocs(projectsQuery),
+        getDocs(evaluatorsQuery),
+      ]);
+
+      const projectList = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      const evaluatorList = evaluatorsSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+      
       setProjects(projectList);
+      setEvaluators(evaluatorList);
     } catch (error) {
-      console.error("Error fetching submitted projects:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch projects.' });
+      console.error("Error fetching data:", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch projects or evaluators.' });
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    fetchRequiredData();
+  }, [fetchRequiredData]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -93,8 +111,10 @@ export function ScheduleMeetingForm() {
     }
 
     const meetingDetails = {
-      ...data,
       date: data.date.toISOString(),
+      time: data.time,
+      venue: "RDC Committee Room, PIMSR",
+      evaluatorUids: data.evaluatorUids,
     };
     
     const projectsToSchedule = projects
@@ -112,7 +132,7 @@ export function ScheduleMeetingForm() {
       toast({ title: 'Meeting Scheduled!', description: 'The meeting has been scheduled and PIs have been notified.' });
       setSelectedProjects([]);
       form.reset();
-      await fetchProjects();
+      await fetchRequiredData();
     } else {
       toast({ variant: 'destructive', title: 'Scheduling Failed', description: result.error || 'An unknown error occurred.' });
     }
@@ -185,7 +205,7 @@ export function ScheduleMeetingForm() {
       <Card>
         <CardHeader>
           <CardTitle>Schedule Details</CardTitle>
-          <CardDescription>Set the time and place for the selected projects.</CardDescription>
+          <CardDescription>Set the time and assign evaluators for the selected projects.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -229,28 +249,41 @@ export function ScheduleMeetingForm() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="venue"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Venue</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a venue" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {venues.map(venue => (
-                          <SelectItem key={venue} value={venue}>{venue}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+               <FormField
+                  control={form.control}
+                  name="evaluatorUids"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Assign Evaluators</FormLabel>
+                       <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                          <DropdownMenuLabel>Available Evaluators</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {evaluators.map((evaluator) => (
+                            <DropdownMenuCheckboxItem
+                              key={evaluator.uid}
+                              checked={field.value?.includes(evaluator.uid)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...(field.value || []), evaluator.uid])
+                                  : field.onChange(field.value?.filter((id) => id !== evaluator.uid));
+                              }}
+                            >
+                              {evaluator.name}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               <Button type="submit" className="w-full" disabled={form.formState.isSubmitting || selectedProjects.length === 0}>
                 {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Schedule for {selectedProjects.length} Project(s)
