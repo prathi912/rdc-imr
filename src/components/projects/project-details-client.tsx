@@ -145,9 +145,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
   
   const isPI = user?.uid === project.pi_uid;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
-  const isPrivilegedViewer = isAdmin || (user?.designation === 'Principal') || (user?.designation === 'HOD');
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid);
-  const canViewDocuments = isPI || isPrivilegedViewer || isAssignedEvaluator;
+  const canViewDocuments = isPI || isAdmin || isAssignedEvaluator;
   
   const isMeetingToday = project.meetingDetails?.date ? isToday(new Date(project.meetingDetails.date)) : false;
   const showEvaluationForm = user && project.status === 'Under Review' && isAssignedEvaluator && isMeetingToday;
