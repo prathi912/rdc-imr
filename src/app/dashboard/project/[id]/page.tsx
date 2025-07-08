@@ -1,8 +1,9 @@
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, query, where, documentId } from 'firebase/firestore';
 import { db } from '@/lib/config';
 import type { Project, User } from '@/types';
 import { PageHeader } from '@/components/page-header';
@@ -18,45 +19,86 @@ export default function ProjectDetailsPage() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [sessionUser, setSessionUser] = useState<User | null>(null);
 
   useEffect(() => {
-    if (!projectId) return;
-    
-    async function getProjectAndUsers(id: string) {
-      setLoading(true);
-      try {
-          const projectRef = doc(db, 'projects', id);
-          const usersRef = collection(db, 'users');
-
-          const [projectSnap, usersSnap] = await Promise.all([
-            getDoc(projectRef),
-            getDocs(usersRef),
-          ]);
-
-          if (!projectSnap.exists()) {
-              setNotFound(true);
-              return;
-          }
-          
-          const data = projectSnap.data();
-          setProject({ 
-              id: projectSnap.id,
-              ...data,
-              submissionDate: data.submissionDate || new Date().toISOString()
-          } as Project);
-
-          const userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
-          setAllUsers(userList);
-
-      } catch (error) {
-          console.error("Error fetching project data:", error);
-          setNotFound(true); // Or handle error differently
-      } finally {
-        setLoading(false);
-      }
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+        setSessionUser(JSON.parse(storedUser));
     }
-    getProjectAndUsers(projectId);
-  }, [projectId]);
+  }, []);
+
+  const getProjectAndUsers = useCallback(async (id: string) => {
+    if (!sessionUser) return;
+    setLoading(true);
+    try {
+        const projectRef = doc(db, 'projects', id);
+        const projectSnap = await getDoc(projectRef);
+
+        if (!projectSnap.exists()) {
+            setNotFound(true);
+            setLoading(false);
+            return;
+        }
+        
+        const projectData = { 
+            id: projectSnap.id,
+            ...projectSnap.data(),
+            submissionDate: projectSnap.data().submissionDate || new Date().toISOString()
+        } as Project;
+
+        // Perform a client-side permission check as a safeguard.
+        // This ensures that even if Firestore rules are permissive, the client enforces access.
+        const isPI = sessionUser.uid === projectData.pi_uid;
+        const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
+        const isPrincipal = sessionUser.designation === 'Principal' && sessionUser.institute === projectData.institute;
+        const isHod = sessionUser.designation === 'HOD' && sessionUser.department === projectData.departmentName;
+        const isAssignedEvaluator = projectData.meetingDetails?.assignedEvaluators?.includes(sessionUser.uid);
+        
+        if (!isPI && !isAdmin && !isPrincipal && !isHod && !isAssignedEvaluator) {
+             setNotFound(true); // Effectively a permission denied
+             setLoading(false);
+             return;
+        }
+
+        setProject(projectData);
+
+        // Now fetch users. Admins get all, others get a limited list to avoid permission errors.
+        const usersRef = collection(db, 'users');
+        let userList: User[] = [];
+
+        if (isAdmin) {
+          // Admins have permission to list all users for management tasks.
+          const usersSnap = await getDocs(usersRef);
+          userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+        } else {
+          // Non-admins should only fetch specific users they need to see, like assigned evaluators.
+          const evaluatorIds = projectData.meetingDetails?.assignedEvaluators;
+          if (evaluatorIds && evaluatorIds.length > 0) {
+              const q = query(usersRef, where(documentId(), 'in', evaluatorIds));
+              const evaluatorsSnap = await getDocs(q);
+              userList = evaluatorsSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+          }
+        }
+        setAllUsers(userList);
+
+    } catch (error) {
+        console.error("Error fetching project data:", error);
+        // This catch block will handle Firestore permission errors if getDoc fails
+        setNotFound(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionUser]);
+
+  useEffect(() => {
+    if (projectId && sessionUser) {
+        getProjectAndUsers(projectId);
+    } else if (!sessionUser) {
+        // If there's no session user after the initial check, stop loading.
+        setLoading(false);
+    }
+  }, [projectId, sessionUser, getProjectAndUsers]);
 
 
   if (loading) {
@@ -82,7 +124,7 @@ export default function ProjectDetailsPage() {
       <div className="container mx-auto py-10 text-center">
         <PageHeader 
           title="Project Not Found"
-          description="The project you are looking for does not exist."
+          description="The project you are looking for does not exist or you do not have permission to view it."
           backButtonHref="/dashboard/all-projects"
           backButtonText="Back to Projects"
         />
