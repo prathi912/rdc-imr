@@ -242,6 +242,64 @@ export async function scheduleMeeting(
       }
     }
 
+    // Notify evaluators
+    if (meetingDetails.evaluatorUids && meetingDetails.evaluatorUids.length > 0) {
+      const evaluatorDocs = await Promise.all(
+          meetingDetails.evaluatorUids.map(uid => adminDb.collection('users').doc(uid).get())
+      );
+
+      const projectTitles = projectsToSchedule.map(p => `<li style="color: #cccccc;">${p.title}</li>`).join('');
+
+      for (const evaluatorDoc of evaluatorDocs) {
+        if (evaluatorDoc.exists()) {
+          const evaluator = evaluatorDoc.data() as User;
+          
+          const evaluatorNotificationRef = adminDb.collection('notifications').doc();
+          batch.set(evaluatorNotificationRef, {
+              uid: evaluator.uid,
+              projectId: projectsToSchedule[0].id,
+              title: `You've been assigned to an IMR evaluation on ${new Date(meetingDetails.date).toLocaleDateString()}`,
+              createdAt: new Date().toISOString(),
+              isRead: false,
+          });
+
+          if (evaluator.email) {
+            await sendEmail({
+              to: evaluator.email,
+              subject: 'IMR Evaluation Committee Assignment',
+              html: `
+                <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width: 300px; height: auto;" />
+                    </div>
+                    <p style="color: #ffffff;">Dear Evaluator,</p>
+                    <p style="color: #e0e0e0;">
+                        You have been assigned to the IMR evaluation committee for a meeting with the following details. You are requested to be present.
+                    </p>
+                    <p><strong style="color: #ffffff;">Date:</strong> ${new Date(meetingDetails.date).toLocaleDateString()}</p>
+                    <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
+                    <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+                    <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
+                    <ul style="list-style-type: none; padding-left: 0;">
+                        ${projectTitles}
+                    </ul>
+                    <p style="color: #cccccc;">
+                        You can access your evaluation queue on the
+                        <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="color: #64b5f6; text-decoration: underline;">
+                        PU Research Portal
+                        </a>.
+                    </p>
+                    <p style="color:#b0bec5;">Thank you,</p>
+                    <p style="color:#b0bec5;">Research & Development Cell - PU</p>
+                </div>
+              `,
+            });
+          }
+        }
+      }
+    }
+
+
     await batch.commit();
     return { success: true };
   } catch (error: any) {
@@ -756,3 +814,6 @@ export async function linkHistoricalData(uid: string, email: string): Promise<{ 
 
 
 
+
+
+    
