@@ -529,13 +529,20 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
 
       let pi_uid = '';
       let pi_name = project.pi_email.split('@')[0]; // Default name
+      let faculty = "Unknown";
+      let institute = "Unknown";
+      let departmentName = "Unknown";
 
-      // Find user by email to get UID
+      // Find user by email to get UID and profile data
       const userQuery = await usersRef.where('email', '==', project.pi_email).limit(1).get();
       if (!userQuery.empty) {
         const userDoc = userQuery.docs[0];
+        const userData = userDoc.data();
         pi_uid = userDoc.id;
-        pi_name = userDoc.data().name || pi_name;
+        pi_name = userData.name || pi_name;
+        faculty = userData.faculty || "Unknown";
+        institute = userData.institute || "Unknown";
+        departmentName = userData.department || "Unknown";
       }
 
       const projectRef = adminDb.collection('projects').doc();
@@ -546,12 +553,11 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         status: project.status,
         pi_uid: pi_uid, // Will be empty if user not found yet
         pi: pi_name,
-        // Add default values for other required fields
         abstract: "Historical data migrated from bulk upload.",
         type: "Research", // Default type
-        faculty: "Unknown", // Default
-        institute: "Unknown",
-        departmentName: "Unknown",
+        faculty: faculty,
+        institute: institute,
+        departmentName: departmentName,
         teamInfo: "Historical data, team info not available.",
         timelineAndOutcomes: "Historical data, outcomes not available.",
         submissionDate: project.sanction_date || new Date().toISOString(),
@@ -738,6 +744,7 @@ export async function linkHistoricalData(uid: string, email: string): Promise<{ 
 
 
     
+
 
 
 
