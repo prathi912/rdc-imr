@@ -21,9 +21,8 @@ export const ALL_MODULES = [
   { id: 'settings', label: 'Settings' },
 ];
 
-const facultyModules = ['dashboard', 'new-submission', 'my-projects', 'incentive-claim', 'notifications', 'settings'];
-const evaluatorModules = ['dashboard', 'evaluator-dashboard', 'notifications', 'settings'];
-const croModules = [...new Set([...evaluatorModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'all-projects', 'analytics', 'manage-users', 'manage-incentive-claims'])];
+const facultyModules = ['dashboard', 'new-submission', 'my-projects', 'incentive-claim', 'evaluator-dashboard', 'notifications', 'settings'];
+const croModules = [...new Set([...facultyModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'all-projects', 'analytics', 'manage-users', 'manage-incentive-claims'])];
 const adminModules = [...croModules, 'system-health', 'bulk-upload'];
 const superAdminModules = [...adminModules, 'module-management'];
 
@@ -31,8 +30,6 @@ export function getDefaultModulesForRole(role: User['role']): string[] {
   switch (role) {
     case 'faculty':
       return facultyModules;
-    case 'Evaluator':
-      return evaluatorModules;
     case 'CRO':
       return croModules;
     case 'admin':

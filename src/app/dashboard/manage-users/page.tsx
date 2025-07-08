@@ -46,7 +46,7 @@ import { getDefaultModulesForRole } from '@/lib/modules';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const ROLES: User['role'][] = ['faculty', 'Evaluator', 'CRO', 'admin', 'Super-admin'];
+const ROLES: User['role'][] = ['faculty', 'CRO', 'admin', 'Super-admin'];
 const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
 type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role'> | 'claimsCount';
 
