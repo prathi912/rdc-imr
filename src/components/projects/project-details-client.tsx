@@ -27,8 +27,9 @@ import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon, Edit, UserCog } from 'lucide-react';
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon, Edit, UserCog, Banknote, AlertCircle } from 'lucide-react';
 
 import { GrantManagement } from './grant-management';
 import { EvaluationForm } from './evaluation-form';
@@ -38,6 +39,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 interface ProjectDetailsClientProps {
   project: Project;
   allUsers: User[];
+  piUser: User | null;
 }
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -84,7 +86,7 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
-export function ProjectDetailsClient({ project: initialProject, allUsers }: ProjectDetailsClientProps) {
+export function ProjectDetailsClient({ project: initialProject, allUsers, piUser }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [user, setUser] = useState<User | null>(null);
@@ -255,29 +257,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
     setIsAwarding(true);
     try {
       const projectRef = doc(db, 'projects', project.id);
-      const userRef = doc(db, 'users', project.pi_uid);
-      const userSnap = await getDoc(userRef);
       
-      let initialBankDetails: BankDetails | undefined = undefined;
-      
-      if (userSnap.exists()) {
-        const piUser = userSnap.data() as User;
-        if (piUser.bankDetails) {
-          initialBankDetails = {
-              accountHolderName: piUser.bankDetails.beneficiaryName,
-              accountNumber: piUser.bankDetails.accountNumber,
-              bankName: piUser.bankDetails.bankName,
-              ifscCode: piUser.bankDetails.ifscCode,
-              branchName: piUser.bankDetails.branchName,
-              city: piUser.bankDetails.city,
-          };
-        } else {
-          toast({ variant: 'destructive', title: 'Warning', description: "PI's bank details are missing. Grant will be pending until details are added." });
-        }
-      } else {
-        toast({ variant: 'destructive', title: 'Warning', description: "Could not find PI's user profile to fetch bank details." });
-      }
-
       const newPhase: GrantPhase = {
         id: new Date().toISOString(),
         name: phaseName.trim(),
@@ -291,7 +271,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
         sanctionNumber: sanctionNumber.trim(),
         status: 'Awarded',
         phases: [newPhase],
-        bankDetails: initialBankDetails,
+        bankDetails: piUser?.bankDetails,
       };
 
       await updateDoc(projectRef, { grant: newGrant });
@@ -746,6 +726,41 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
         </CardContent>
       </Card>
       
+      {isAdmin && ['Approved', 'In Progress', 'Completed', 'Pending Completion Approval'].includes(project.status) && (
+        <Card className="mt-8">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Banknote className="h-6 w-6" />
+              <CardTitle>PI Bank Details (for Grant Disbursement)</CardTitle>
+            </div>
+            <CardDescription>
+              These are the bank details provided by the Principal Investigator for grant payment.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {piUser?.bankDetails ? (
+              <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                <div><dt className="font-medium text-muted-foreground">Beneficiary Name</dt><dd>{piUser.bankDetails.beneficiaryName}</dd></div>
+                <div><dt className="font-medium text-muted-foreground">Bank Name</dt><dd>{piUser.bankDetails.bankName}</dd></div>
+                <div><dt className="font-medium text-muted-foreground">Account Number</dt><dd>{piUser.bankDetails.accountNumber}</dd></div>
+                <div><dt className="font-medium text-muted-foreground">IFSC Code</dt><dd>{piUser.bankDetails.ifscCode}</dd></div>
+                <div><dt className="font-medium text-muted-foreground">Branch</dt><dd>{piUser.bankDetails.branchName}</dd></div>
+                <div><dt className="font-medium text-muted-foreground">City</dt><dd>{piUser.bankDetails.city}</dd></div>
+              </dl>
+            ) : (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Bank Details Missing</AlertTitle>
+                <AlertDescription>
+                  The Principal Investigator has not provided their bank details in their profile settings.
+                  Please ask them to update it to proceed with grant disbursement.
+                </AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {isAdmin && project.status === 'Under Review' && <EvaluationsSummary project={project} evaluations={evaluations} />}
 
       {showEvaluationForm && (
@@ -755,6 +770,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
       {project.grant && user && (
         <GrantManagement project={project} user={user} onUpdate={handleProjectUpdate} />
       )}
+
        <AlertDialog open={showApprovalAlert} onOpenChange={setShowApprovalAlert}>
             <AlertDialogContent>
                 <AlertDialogHeader>

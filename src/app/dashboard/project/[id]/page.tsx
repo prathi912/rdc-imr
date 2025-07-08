@@ -16,6 +16,7 @@ export default function ProjectDetailsPage() {
   const params = useParams();
   const projectId = params.id as string;
   const [project, setProject] = useState<Project | null>(null);
+  const [piUser, setPiUser] = useState<User | null>(null);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -47,8 +48,6 @@ export default function ProjectDetailsPage() {
             submissionDate: projectSnap.data().submissionDate || new Date().toISOString()
         } as Project;
 
-        // Perform a client-side permission check as a safeguard.
-        // This ensures that even if Firestore rules are permissive, the client enforces access.
         const isPI = sessionUser.uid === projectData.pi_uid;
         const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
         const isPrincipal = sessionUser.designation === 'Principal' && sessionUser.institute === projectData.institute;
@@ -56,23 +55,28 @@ export default function ProjectDetailsPage() {
         const isAssignedEvaluator = projectData.meetingDetails?.assignedEvaluators?.includes(sessionUser.uid);
         
         if (!isPI && !isAdmin && !isPrincipal && !isHod && !isAssignedEvaluator) {
-             setNotFound(true); // Effectively a permission denied
+             setNotFound(true); 
              setLoading(false);
              return;
         }
 
         setProject(projectData);
 
-        // Now fetch users. Admins get all, others get a limited list to avoid permission errors.
+        // Fetch PI's user data
+        const piUserRef = doc(db, 'users', projectData.pi_uid);
+        const piUserSnap = await getDoc(piUserRef);
+        if (piUserSnap.exists()) {
+            setPiUser({ uid: piUserSnap.id, ...piUserSnap.data() } as User);
+        }
+
+        // Now fetch other users needed for the page
         const usersRef = collection(db, 'users');
         let userList: User[] = [];
 
         if (isAdmin) {
-          // Admins have permission to list all users for management tasks.
           const usersSnap = await getDocs(usersRef);
           userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
         } else {
-          // Non-admins should only fetch specific users they need to see, like assigned evaluators.
           const evaluatorIds = projectData.meetingDetails?.assignedEvaluators;
           if (evaluatorIds && evaluatorIds.length > 0) {
               const q = query(usersRef, where(documentId(), 'in', evaluatorIds));
@@ -84,7 +88,6 @@ export default function ProjectDetailsPage() {
 
     } catch (error) {
         console.error("Error fetching project data:", error);
-        // This catch block will handle Firestore permission errors if getDoc fails
         setNotFound(true);
     } finally {
       setLoading(false);
@@ -95,7 +98,6 @@ export default function ProjectDetailsPage() {
     if (projectId && sessionUser) {
         getProjectAndUsers(projectId);
     } else if (!sessionUser) {
-        // If there's no session user after the initial check, stop loading.
         setLoading(false);
     }
   }, [projectId, sessionUser, getProjectAndUsers]);
@@ -143,7 +145,7 @@ export default function ProjectDetailsPage() {
         <ProjectSummary project={project} />
       </PageHeader>
       <div className="mt-8">
-        <ProjectDetailsClient project={project} allUsers={allUsers} />
+        <ProjectDetailsClient project={project} allUsers={allUsers} piUser={piUser} />
       </div>
     </div>
   );
