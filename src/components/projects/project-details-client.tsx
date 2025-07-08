@@ -142,6 +142,8 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
   
   const isPI = user?.uid === project.pi_uid;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
+  const isPrivilegedViewer = isAdmin || (user?.designation === 'Principal') || (user?.designation === 'HOD');
+  const canViewDocuments = isPI || isPrivilegedViewer;
   const canEvaluate = user && ['Evaluator', 'CRO', 'admin', 'Super-admin'].includes(user.role);
   const allEvaluationsIn = evaluations.length >= 3; // Require at least 3 evaluations
 
@@ -672,79 +674,83 @@ export function ProjectDetailsClient({ project: initialProject }: ProjectDetails
             <h3 className="font-semibold text-lg">Timeline and Outcomes</h3>
             <p className="text-muted-foreground whitespace-pre-wrap">{project.timelineAndOutcomes}</p>
           </div>
-          {(project.proposalUrl || project.cvUrl || project.ethicsUrl) && (
+          {canViewDocuments && (
             <>
-              <Separator />
-              <div className="space-y-2">
-                <h3 className="font-semibold text-lg">Submitted Documents</h3>
-                <ul className="list-disc list-inside text-sm space-y-1">
-                  {project.proposalUrl && (
-                    <li>
-                      <Button variant="link" asChild className="p-0 h-auto">
-                        <a href={project.proposalUrl} target="_blank" rel="noopener noreferrer">View Project Proposal</a>
-                      </Button>
-                    </li>
-                  )}
-                  {project.cvUrl && (
-                    <li>
-                      <Button variant="link" asChild className="p-0 h-auto">
-                        <a href={project.cvUrl} target="_blank" rel="noopener noreferrer">View Team CVs</a>
-                      </Button>
-                    </li>
-                  )}
-                  {project.ethicsUrl && (
-                    <li>
-                      <Button variant="link" asChild className="p-0 h-auto">
-                        <a href={project.ethicsUrl} target="_blank" rel="noopener noreferrer">View Ethics Approval</a>
-                      </Button>
-                    </li>
-                  )}
-                </ul>
-              </div>
-            </>
-          )}
-          {project.revisedProposalUrl && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                    <h3 className="font-semibold text-lg">Revised Proposal</h3>
-                    <p className="text-sm text-muted-foreground">
-                        The following revised proposal was submitted on {formatDate(project.revisionSubmissionDate!)}.
-                    </p>
+              {(project.proposalUrl || project.cvUrl || project.ethicsUrl) && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-lg">Submitted Documents</h3>
                     <ul className="list-disc list-inside text-sm space-y-1">
-                      <li>
-                        <Button variant="link" asChild className="p-0 h-auto">
-                            <a href={project.revisedProposalUrl} target="_blank" rel="noopener noreferrer">View Revised Proposal</a>
-                        </Button>
-                      </li>
-                    </ul>
-                </div>
-              </>
-          )}
-          {project.completionReportUrl && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                    <h3 className="font-semibold text-lg">Completion Documents</h3>
-                    <p className="text-sm text-muted-foreground">
-                        The following documents were submitted on {formatDate(project.completionSubmissionDate!)}.
-                    </p>
-                    <ul className="list-disc list-inside text-sm space-y-1">
-                      <li>
-                        <Button variant="link" asChild className="p-0 h-auto">
-                            <a href={project.completionReportUrl} target="_blank" rel="noopener noreferrer">Project outcome-cum-completion report</a>
-                        </Button>
-                      </li>
-                      {project.utilizationCertificateUrl && (
+                      {project.proposalUrl && (
                         <li>
                           <Button variant="link" asChild className="p-0 h-auto">
-                              <a href={project.utilizationCertificateUrl} target="_blank" rel="noopener noreferrer">Utilization Certificate</a>
+                            <a href={project.proposalUrl} target="_blank" rel="noopener noreferrer">View Project Proposal</a>
+                          </Button>
+                        </li>
+                      )}
+                      {project.cvUrl && (
+                        <li>
+                          <Button variant="link" asChild className="p-0 h-auto">
+                            <a href={project.cvUrl} target="_blank" rel="noopener noreferrer">View Team CVs</a>
+                          </Button>
+                        </li>
+                      )}
+                      {project.ethicsUrl && (
+                        <li>
+                          <Button variant="link" asChild className="p-0 h-auto">
+                            <a href={project.ethicsUrl} target="_blank" rel="noopener noreferrer">View Ethics Approval</a>
                           </Button>
                         </li>
                       )}
                     </ul>
-                </div>
-              </>
+                  </div>
+                </>
+              )}
+              {project.revisedProposalUrl && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                        <h3 className="font-semibold text-lg">Revised Proposal</h3>
+                        <p className="text-sm text-muted-foreground">
+                            The following revised proposal was submitted on {formatDate(project.revisionSubmissionDate!)}.
+                        </p>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                          <li>
+                            <Button variant="link" asChild className="p-0 h-auto">
+                                <a href={project.revisedProposalUrl} target="_blank" rel="noopener noreferrer">View Revised Proposal</a>
+                            </Button>
+                          </li>
+                        </ul>
+                    </div>
+                  </>
+              )}
+              {project.completionReportUrl && (
+                  <>
+                    <Separator />
+                    <div className="space-y-2">
+                        <h3 className="font-semibold text-lg">Completion Documents</h3>
+                        <p className="text-sm text-muted-foreground">
+                            The following documents were submitted on {formatDate(project.completionSubmissionDate!)}.
+                        </p>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                          <li>
+                            <Button variant="link" asChild className="p-0 h-auto">
+                                <a href={project.completionReportUrl} target="_blank" rel="noopener noreferrer">Project outcome-cum-completion report</a>
+                            </Button>
+                          </li>
+                          {project.utilizationCertificateUrl && (
+                            <li>
+                              <Button variant="link" asChild className="p-0 h-auto">
+                                  <a href={project.utilizationCertificateUrl} target="_blank" rel="noopener noreferrer">Utilization Certificate</a>
+                              </Button>
+                            </li>
+                          )}
+                        </ul>
+                    </div>
+                  </>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
