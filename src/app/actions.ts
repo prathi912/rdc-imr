@@ -833,6 +833,44 @@ export async function linkHistoricalData(uid: string, email: string): Promise<{ 
 }
     
 
+export async function updateProjectDuration(projectId: string, startDate: string, endDate: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!projectId || !startDate || !endDate) {
+      return { success: false, error: 'Project ID, start date, and end date are required.' };
+    }
+    const projectRef = adminDb.collection('projects').doc(projectId);
+    await projectRef.update({
+      projectStartDate: startDate,
+      projectEndDate: endDate,
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating project duration:', error);
+    return { success: false, error: error.message || 'Failed to update project duration.' };
+  }
+}
+
+export async function updateProjectEvaluators(projectId: string, evaluatorUids: string[]): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!projectId || !evaluatorUids) {
+      return { success: false, error: 'Project ID and evaluator UIDs are required.' };
+    }
+    const projectRef = adminDb.collection('projects').doc(projectId);
+    const projectSnap = await projectRef.get();
+    if (!projectSnap.exists() || !projectSnap.data()?.meetingDetails) {
+        return { success: false, error: 'Project or its meeting details not found.' };
+    }
+    await projectRef.update({
+      'meetingDetails.assignedEvaluators': evaluatorUids,
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating project evaluators:', error);
+    return { success: false, error: 'Failed to update project evaluators.' };
+  }
+}
+
+
 
 
 

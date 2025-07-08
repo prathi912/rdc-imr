@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -12,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import type { Project, User, GrantDetails, Evaluation, BankDetails, GrantPhase } from '@/types';
 import { db } from '@/lib/config';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
-import { uploadFileToServer, updateProjectStatus } from '@/app/actions';
+import { uploadFileToServer, updateProjectStatus, updateProjectDuration, updateProjectEvaluators } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
@@ -29,7 +28,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon } from 'lucide-react';
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon, Edit, UserCog } from 'lucide-react';
 
 import { GrantManagement } from './grant-management';
 import { EvaluationForm } from './evaluation-form';
@@ -57,6 +56,21 @@ const scheduleSchema = z.object({
   venue: z.string().min(1, 'Meeting venue is required.'),
 });
 type ScheduleFormData = z.infer<typeof scheduleSchema>;
+
+const durationSchema = z.object({
+  startDate: z.date({ required_error: 'A start date is required.' }),
+  endDate: z.date({ required_error: 'An end date is required.' }),
+}).refine((data) => data.endDate > data.startDate, {
+  message: "End date must be after start date.",
+  path: ["endDate"],
+});
+type DurationFormData = z.infer<typeof durationSchema>;
+
+const evaluatorSchema = z.object({
+  evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
+});
+type EvaluatorFormData = z.infer<typeof evaluatorSchema>;
+
 
 const venues = ["RDC Committee Room, PIMSR"];
 
@@ -90,20 +104,37 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
   const [revisedProposalFile, setRevisedProposalFile] = useState<File | null>(null);
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false);
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [isDurationDialogOpen, setIsDurationDialogOpen] = useState(false);
+  const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false);
 
   const scheduleForm = useForm<ScheduleFormData>({
     resolver: zodResolver(scheduleSchema),
   });
+  
+  const durationForm = useForm<DurationFormData>({
+    resolver: zodResolver(durationSchema),
+  });
 
+  const evaluatorForm = useForm<EvaluatorFormData>({
+    resolver: zodResolver(evaluatorSchema),
+  });
+  
   useEffect(() => {
-    if (initialProject.meetingDetails) {
+    if (project.meetingDetails) {
         scheduleForm.reset({
-            date: new Date(initialProject.meetingDetails.date),
-            time: initialProject.meetingDetails.time,
-            venue: initialProject.meetingDetails.venue,
+            date: new Date(project.meetingDetails.date),
+            time: project.meetingDetails.time,
+            venue: project.meetingDetails.venue,
         });
     }
-  }, [initialProject.meetingDetails, scheduleForm]);
+    durationForm.reset({
+        startDate: project.projectStartDate ? new Date(project.projectStartDate) : undefined,
+        endDate: project.projectEndDate ? new Date(project.projectEndDate) : undefined,
+    });
+    evaluatorForm.reset({
+        evaluatorUids: project.meetingDetails?.assignedEvaluators || [],
+    });
+  }, [project, scheduleForm, durationForm, evaluatorForm]);
 
   const refetchData = useCallback(async () => {
     try {
@@ -145,6 +176,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
   
   const isPI = user?.uid === project.pi_uid;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
+  const isSuperAdmin = user?.role === 'Super-admin';
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid);
   const canViewDocuments = isPI || isAdmin || isAssignedEvaluator;
   
@@ -378,6 +410,32 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
     }
   };
 
+  const handleDurationSubmit = async (data: DurationFormData) => {
+    setIsUpdating(true);
+    const result = await updateProjectDuration(project.id, data.startDate.toISOString(), data.endDate.toISOString());
+    if (result.success) {
+        toast({ title: "Success", description: "Project duration has been updated." });
+        setProject(prev => ({ ...prev, projectStartDate: data.startDate.toISOString(), projectEndDate: data.endDate.toISOString() }));
+        setIsDurationDialogOpen(false);
+    } else {
+        toast({ variant: "destructive", title: "Error", description: result.error });
+    }
+    setIsUpdating(false);
+  };
+
+  const handleEvaluatorSubmit = async (data: EvaluatorFormData) => {
+      setIsUpdating(true);
+      const result = await updateProjectEvaluators(project.id, data.evaluatorUids);
+      if (result.success) {
+          toast({ title: "Success", description: "Assigned evaluators have been updated." });
+          setProject(prev => ({ ...prev, meetingDetails: { ...prev.meetingDetails!, assignedEvaluators: data.evaluatorUids } }));
+          setIsEvaluatorDialogOpen(false);
+      } else {
+          toast({ variant: "destructive", title: "Error", description: result.error });
+      }
+      setIsUpdating(false);
+  };
+
   const formatDate = (isoString: string) => {
       if (!isoString) return 'N/A';
       try {
@@ -426,7 +484,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                         <Button size="sm" variant="destructive" onClick={() => handleApprovalClick('Rejected')}><X className="mr-2 h-4 w-4"/>Reject</Button>
                      </div>
                   )}
-                  {isAdmin && (
+                  {isSuperAdmin && (
                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                               <Button variant="outline" disabled={isUpdating}>
@@ -442,6 +500,26 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                           </DropdownMenuContent>
                       </DropdownMenu>
                   )}
+                  {isSuperAdmin && project.status === 'Approved' && (
+                    <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline"><CalendarIcon className="mr-2 h-4 w-4" />{project.projectStartDate ? 'Update Duration' : 'Set Duration'}</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Set Project Duration</DialogTitle>
+                                <DialogDescription>Define the start and end dates for this project.</DialogDescription>
+                            </DialogHeader>
+                            <Form {...durationForm}>
+                                <form id="duration-form" onSubmit={durationForm.handleSubmit(handleDurationSubmit)} className="space-y-4 py-4">
+                                <FormField name="startDate" control={durationForm.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Start Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                                <FormField name="endDate" control={durationForm.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>End Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < (durationForm.getValues("startDate") || new Date())} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )}/>
+                                </form>
+                            </Form>
+                            <DialogFooter><Button type="submit" form="duration-form" disabled={isUpdating}>{isUpdating ? "Saving..." : "Save Duration"}</Button></DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                  )}
                   {isAdmin && project.status === 'Approved' && !project.grant && (
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                       <DialogTrigger asChild>
@@ -455,93 +533,41 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                         <div className="grid gap-4 py-4">
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="sanction-number" className="text-right">Sanction No.</Label>
-                            <Input
-                              id="sanction-number"
-                              value={sanctionNumber}
-                              onChange={(e) => setSanctionNumber(e.target.value)}
-                              className="col-span-3"
-                              placeholder="e.g., RDC/IMSL/122"
-                            />
+                            <Input id="sanction-number" value={sanctionNumber} onChange={(e) => setSanctionNumber(e.target.value)} className="col-span-3" placeholder="e.g., RDC/IMSL/122"/>
                           </div>
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="phase-name" className="text-right">Phase Name</Label>
-                            <Input
-                              id="phase-name"
-                              value={phaseName}
-                              onChange={(e) => setPhaseName(e.target.value)}
-                              className="col-span-3"
-                              placeholder="e.g., Phase 1 - Equipment"
-                            />
+                            <Input id="phase-name" value={phaseName} onChange={(e) => setPhaseName(e.target.value)} className="col-span-3" placeholder="e.g., Phase 1 - Equipment"/>
                           </div>
                           <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="phase-amount" className="text-right">Amount (₹)</Label>
-                            <Input
-                              id="phase-amount"
-                              type="number"
-                              value={phaseAmount}
-                              onChange={(e) => setPhaseAmount(Number(e.target.value))}
-                              className="col-span-3"
-                              placeholder="e.g., 200000"
-                            />
+                            <Input id="phase-amount" type="number" value={phaseAmount} onChange={(e) => setPhaseAmount(Number(e.target.value))} className="col-span-3" placeholder="e.g., 200000"/>
                           </div>
                         </div>
-                        <DialogFooter>
-                          <Button type="button" onClick={handleAwardGrant} disabled={isAwarding}>
-                              {isAwarding ? 'Awarding...' : 'Confirm & Award'}
-                          </Button>
-                        </DialogFooter>
+                        <DialogFooter><Button type="button" onClick={handleAwardGrant} disabled={isAwarding}>{isAwarding ? 'Awarding...' : 'Confirm & Award'}</Button></DialogFooter>
                       </DialogContent>
                     </Dialog>
                   )}
                   {isPI && project.status === 'Under Review' && (
                     <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Submit Revision</Button>
-                      </DialogTrigger>
+                      <DialogTrigger asChild><Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Submit Revision</Button></DialogTrigger>
                       <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Submit Revised Proposal</DialogTitle>
-                          <DialogDescription>Upload your revised proposal based on the feedback from the IMR evaluation meeting.</DialogDescription>
-                        </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="revised-proposal" className="text-right">Proposal (PDF)</Label>
-                            <Input id="revised-proposal" type="file" accept=".pdf" onChange={(e) => setRevisedProposalFile(e.target.files ? e.target.files[0] : null)} className="col-span-3" />
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button type="button" onClick={handleRevisionSubmit} disabled={isSubmittingRevision || !revisedProposalFile}>
-                            {isSubmittingRevision ? 'Submitting...' : 'Submit Revised Proposal'}
-                          </Button>
-                        </DialogFooter>
+                        <DialogHeader><DialogTitle>Submit Revised Proposal</DialogTitle><DialogDescription>Upload your revised proposal based on the feedback from the IMR evaluation meeting.</DialogDescription></DialogHeader>
+                        <div className="grid gap-4 py-4"><div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="revised-proposal" className="text-right">Proposal (PDF)</Label><Input id="revised-proposal" type="file" accept=".pdf" onChange={(e) => setRevisedProposalFile(e.target.files ? e.target.files[0] : null)} className="col-span-3" /></div></div>
+                        <DialogFooter><Button type="button" onClick={handleRevisionSubmit} disabled={isSubmittingRevision || !revisedProposalFile}>{isSubmittingRevision ? 'Submitting...' : 'Submit Revised Proposal'}</Button></DialogFooter>
                       </DialogContent>
                     </Dialog>
                   )}
                   {isPI && (project.status === 'Approved' || project.status === 'In Progress') && (
                     <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Request Project Closure</Button>
-                      </DialogTrigger>
+                      <DialogTrigger asChild><Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Request Project Closure</Button></DialogTrigger>
                       <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Submit Completion Documents</DialogTitle>
-                          <DialogDescription>To request project closure, please upload the final 'Project outcome-cum-completion report' and the 'Utilization Certificate'.</DialogDescription>
-                        </DialogHeader>
+                        <DialogHeader><DialogTitle>Submit Completion Documents</DialogTitle><DialogDescription>To request project closure, please upload the final 'Project outcome-cum-completion report' and the 'Utilization Certificate'.</DialogDescription></DialogHeader>
                         <div className="grid gap-4 py-4">
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="completion-report" className="text-right">Completion Report (PDF)</Label>
-                            <Input id="completion-report" type="file" accept=".pdf" onChange={handleCompletionFileChange} className="col-span-3" />
-                          </div>
-                          <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="utilization-certificate" className="text-right">Utilization Certificate (PDF)</Label>
-                            <Input id="utilization-certificate" type="file" accept=".pdf" onChange={handleCertificateFileChange} className="col-span-3" />
-                          </div>
+                          <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="completion-report" className="text-right">Completion Report (PDF)</Label><Input id="completion-report" type="file" accept=".pdf" onChange={handleCompletionFileChange} className="col-span-3" /></div>
+                          <div className="grid grid-cols-4 items-center gap-4"><Label htmlFor="utilization-certificate" className="text-right">Utilization Certificate (PDF)</Label><Input id="utilization-certificate" type="file" accept=".pdf" onChange={handleCertificateFileChange} className="col-span-3" /></div>
                         </div>
-                        <DialogFooter>
-                          <Button type="button" onClick={handleCompletionSubmit} disabled={isSubmittingCompletion || !completionReportFile || !utilizationCertificateFile}>
-                            {isSubmittingCompletion ? 'Submitting...' : 'Submit for Review'}
-                          </Button>
-                        </DialogFooter>
+                        <DialogFooter><Button type="button" onClick={handleCompletionSubmit} disabled={isSubmittingCompletion || !completionReportFile || !utilizationCertificateFile}>{isSubmittingCompletion ? 'Submitting...' : 'Submit for Review'}</Button></DialogFooter>
                       </DialogContent>
                     </Dialog>
                   )}
@@ -552,91 +578,25 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
           {project.meetingDetails && (
             <>
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-start flex-wrap gap-2">
                     <h3 className="font-semibold text-lg">IMR Evaluation Meeting Details</h3>
-                    {isAdmin && (
-                        <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" size="sm">Edit Schedule</Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Edit Meeting Schedule</DialogTitle>
-                                    <DialogDescription>Update the date, time, or venue for this meeting.</DialogDescription>
-                                </DialogHeader>
-                                <Form {...scheduleForm}>
-                                    <form id="schedule-edit-form" onSubmit={scheduleForm.handleSubmit(handleScheduleUpdate)} className="space-y-4 py-4">
-                                        <FormField
-                                            control={scheduleForm.control}
-                                            name="date"
-                                            render={({ field }) => (
-                                                <FormItem className="flex flex-col">
-                                                <FormLabel>New Meeting Date</FormLabel>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                    <FormControl>
-                                                        <Button
-                                                        variant={"outline"}
-                                                        className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                                        >
-                                                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                                        </Button>
-                                                    </FormControl>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0" align="start">
-                                                    <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus />
-                                                    </PopoverContent>
-                                                </Popover>
-                                                <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={scheduleForm.control}
-                                            name="time"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                <FormLabel>New Meeting Time</FormLabel>
-                                                <FormControl>
-                                                    <Input type="time" {...field} />
-                                                </FormControl>
-                                                <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={scheduleForm.control}
-                                            name="venue"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                <FormLabel>New Venue</FormLabel>
-                                                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                                  <FormControl>
-                                                    <SelectTrigger>
-                                                      <SelectValue placeholder="Select a venue" />
-                                                    </SelectTrigger>
-                                                  </FormControl>
-                                                  <SelectContent>
-                                                    {venues.map(venue => (
-                                                      <SelectItem key={venue} value={venue}>{venue}</SelectItem>
-                                                    ))}
-                                                  </SelectContent>
-                                                </Select>
-                                                <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </form>
-                                </Form>
-                                <DialogFooter>
-                                    <Button type="submit" form="schedule-edit-form" disabled={isUpdating}>
-                                        {isUpdating ? 'Saving...' : 'Save Changes'}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {isSuperAdmin && (
+                            <Dialog open={isEvaluatorDialogOpen} onOpenChange={setIsEvaluatorDialogOpen}>
+                                <DialogTrigger asChild><Button variant="outline" size="sm"><UserCog className="mr-2 h-4 w-4" />Update Evaluators</Button></DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader><DialogTitle>Update Assigned Evaluators</DialogTitle><DialogDescription>Modify the evaluation committee for this project.</DialogDescription></DialogHeader>
+                                    <Form {...evaluatorForm}>
+                                        <form id="evaluator-form" onSubmit={evaluatorForm.handleSubmit(handleEvaluatorSubmit)} className="space-y-4 py-4">
+                                            <FormField control={evaluatorForm.control} name="evaluatorUids" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Assigned Evaluators</FormLabel><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="w-full justify-between">{field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}<ChevronDown className="h-4 w-4 opacity-50" /></Button></DropdownMenuTrigger><DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">{allUsers.filter(u => ['faculty', 'CRO', 'admin'].includes(u.role)).map((evaluator) => (<DropdownMenuCheckboxItem key={evaluator.uid} checked={field.value?.includes(evaluator.uid)} onCheckedChange={(checked) => {return checked ? field.onChange([...(field.value || []), evaluator.uid]) : field.onChange(field.value?.filter((id) => id !== evaluator.uid));}}>{evaluator.name}</DropdownMenuCheckboxItem>))}</DropdownMenuContent></DropdownMenu><FormMessage /></FormItem> )}/>
+                                        </form>
+                                    </Form>
+                                    <DialogFooter><Button type="submit" form="evaluator-form" disabled={isUpdating}>{isUpdating ? "Saving..." : "Save Evaluators"}</Button></DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
+                        {isAdmin && (<Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}><DialogTrigger asChild><Button variant="outline" size="sm"><Edit className="mr-2 h-4 w-4"/>Edit Schedule</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Edit Meeting Schedule</DialogTitle><DialogDescription>Update the date, time, or venue for this meeting.</DialogDescription></DialogHeader><Form {...scheduleForm}><form id="schedule-edit-form" onSubmit={scheduleForm.handleSubmit(handleScheduleUpdate)} className="space-y-4 py-4"><FormField control={scheduleForm.control} name="date" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>New Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Pick a date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )}/><FormField control={scheduleForm.control} name="time" render={({ field }) => ( <FormItem><FormLabel>New Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )}/><FormField control={scheduleForm.control} name="venue" render={({ field }) => ( <FormItem><FormLabel>New Venue</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a venue" /></SelectTrigger></FormControl><SelectContent>{venues.map(venue => (<SelectItem key={venue} value={venue}>{venue}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )}/></form></Form><DialogFooter><Button type="submit" form="schedule-edit-form" disabled={isUpdating}>{isUpdating ? 'Saving...' : 'Save Changes'}</Button></DialogFooter></DialogContent></Dialog>)}
+                    </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                   <p><strong>Date:</strong> {formatDate(project.meetingDetails.date)}</p>
@@ -668,6 +628,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers }: Proj
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                     <dt className="font-medium text-muted-foreground">Category</dt>
                     <dd>{project.type}</dd>
+                    {project.projectStartDate && project.projectEndDate && (
+                      <>
+                        <dt className="font-medium text-muted-foreground">Project Duration</dt>
+                        <dd>{format(new Date(project.projectStartDate), "PPP")} - {format(new Date(project.projectEndDate), "PPP")}</dd>
+                      </>
+                    )}
                 </dl>
             </div>
              <div className="space-y-4">
