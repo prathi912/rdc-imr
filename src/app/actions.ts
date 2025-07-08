@@ -660,7 +660,7 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
       'B3': user?.designation || 'N/A',
       'B4': user?.department || 'N/A',
       'B5': claimTitle,
-      'G11': submissionDate,
+      'D11': submissionDate,
     };
     
     for (const cellAddress in dataMap) {
@@ -697,4 +697,5 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
 
 
     
+
 
