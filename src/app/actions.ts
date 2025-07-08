@@ -251,7 +251,7 @@ export async function scheduleMeeting(
       const projectTitles = projectsToSchedule.map(p => `<li style="color: #cccccc;">${p.title}</li>`).join('');
 
       for (const evaluatorDoc of evaluatorDocs) {
-        if (evaluatorDoc.exists()) {
+        if (evaluatorDoc.exists) {
           const evaluator = evaluatorDoc.data() as User;
           
           const evaluatorNotificationRef = adminDb.collection('notifications').doc();
