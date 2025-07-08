@@ -344,7 +344,7 @@ export async function checkMisIdExists(misId: string, currentUid: string): Promi
   }
 }
 
-export async function fetchScopusDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; totalPuAuthors: number; }; error?: string; claimantIsAuthor?: boolean; }> {
+export async function fetchScopusDataByUrl(url: string, claimantName: string): Promise<{ success: boolean; data?: { title: string; journalName: string; totalAuthors: number; }; error?: string; claimantIsAuthor?: boolean; }> {
   const apiKey = process.env.SCOPUS_API_KEY;
   if (!apiKey) {
     console.error('Scopus API key is not configured.');
@@ -400,19 +400,6 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
     const journalName = coredata['prism:publicationName'] || '';
     const totalAuthors = Array.isArray(authors) ? authors.length : 0;
     
-    let totalPuAuthors = 0;
-    if (Array.isArray(authors)) {
-        authors.forEach(author => {
-            const affiliations = Array.isArray(author.affiliation) ? author.affiliation : [author.affiliation];
-            const isInternal = affiliations.some(affil => 
-                affil && affil.affilname && affil.affilname.toLowerCase().includes('parul')
-            );
-            if (isInternal) {
-                totalPuAuthors++;
-            }
-        });
-    }
-
     const nameParts = claimantName.trim().toLowerCase().split(/\s+/);
     const claimantLastName = nameParts.pop() || '---';
     const claimantFirstName = nameParts[0] || '---';
@@ -445,8 +432,7 @@ export async function fetchScopusDataByUrl(url: string, claimantName: string): P
       data: {
         title,
         journalName,
-        totalAuthors,
-        totalPuAuthors,
+        totalAuthors
       },
       claimantIsAuthor: isClaimantAnAuthor,
     };
@@ -694,7 +680,8 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
         }
     }
 
-    const outputBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+    // Explicitly tell the writer to use cell styles from the workbook object
+    const outputBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64', cellStyles: true });
 
     return { success: true, fileData: outputBuffer };
 
@@ -710,3 +697,4 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
 
 
     
+
