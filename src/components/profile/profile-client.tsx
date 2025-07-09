@@ -107,7 +107,14 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
                             {projects.length > 0 ? projects.map(project => (
                                 <Card key={project.id}>
                                     <CardContent className="p-4">
-                                        <p className="font-semibold">{project.title}</p>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <p className="font-semibold">{project.title}</p>
+                                            {project.pi_uid === user.uid ? (
+                                                <Badge variant="secondary">PI</Badge>
+                                            ) : (
+                                                <Badge variant="outline">Co-PI</Badge>
+                                            )}
+                                        </div>
                                         <p className="text-sm text-muted-foreground">Submitted: {new Date(project.submissionDate).toLocaleDateString()}</p>
                                         <Badge variant="outline" className="mt-2">{project.status}</Badge>
                                     </CardContent>
