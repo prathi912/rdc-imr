@@ -13,15 +13,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle } from 'lucide-react';
+import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/config';
 import { collection, doc, setDoc } from 'firebase/firestore';
-import { uploadFileToServer, notifyAdminsOnProjectSubmission } from '@/app/actions';
+import { uploadFileToServer, notifyAdminsOnProjectSubmission, findUserByMisId } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SubmissionFormProps {
   project?: Project;
@@ -33,6 +41,27 @@ const steps = [
   { id: 3, title: 'File Uploads', icon: FileText },
   { id: 4, title: 'Timeline & Outcomes', icon: GanttChartSquare },
 ];
+
+const sdgGoalsList = [
+  "Goal 1: No Poverty",
+  "Goal 2: Zero Hunger",
+  "Goal 3: Good Health and Well-being",
+  "Goal 4: Quality Education",
+  "Goal 5: Gender Equality",
+  "Goal 6: Clean Water and Sanitation",
+  "Goal 7: Affordable and Clean Energy",
+  "Goal 8: Decent Work and Economic Growth",
+  "Goal 9: Industry, Innovation and Infrastructure",
+  "Goal 10: Reduced Inequality",
+  "Goal 11: Sustainable Cities and Communities",
+  "Goal 12: Responsible Consumption and Production",
+  "Goal 13: Climate Action",
+  "Goal 14: Life Below Water",
+  "Goal 15: Life on Land",
+  "Goal 16: Peace and Justice Strong Institutions",
+  "Goal 17: Partnerships for the Goals",
+];
+
 
 const fileToDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -51,14 +80,18 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+  const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+  const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null);
+  const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
   const formSchema = useMemo(() => z.object({
     // Step 1
     title: z.string().min(5, 'Title must be at least 5 characters.'),
     abstract: z.string().min(20, 'Abstract must be at least 20 characters.'),
     projectType: z.string().min(1, 'Please select a category.'),
+    sdgGoals: z.array(z.string()).optional(),
     // Step 2
-    coPiNames: z.string().optional(),
     studentInfo: z.string().optional(),
     cvUpload: z.any().refine((files) => {
         return !!project?.cvUrl || (files && files.length > 0);
@@ -83,10 +116,10 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       title: '',
       abstract: '',
       projectType: '',
-      coPiNames: '',
       studentInfo: '',
       expectedOutcomes: '',
       guidelinesAgreement: false,
+      sdgGoals: [],
     },
   });
 
@@ -104,19 +137,17 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   useEffect(() => {
     if (project) {
         const teamInfo = project.teamInfo || '';
-        const coPiRegex = /Co-PIs: (.*?)(; Students:|$)/;
         const studentRegex = /Students: (.*)/;
-        const coPiMatch = teamInfo.match(coPiRegex);
         const studentMatch = teamInfo.match(studentRegex);
 
         form.reset({
             title: project.title,
             abstract: project.abstract,
             projectType: project.type,
-            coPiNames: coPiMatch ? coPiMatch[1].trim() : '',
             studentInfo: studentMatch ? studentMatch[1].trim() : '',
             expectedOutcomes: project.timelineAndOutcomes,
             guidelinesAgreement: project.status !== 'Draft',
+            sdgGoals: project.sdgGoals || [],
         });
     }
   }, [project, form]);
@@ -142,6 +173,41 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       setCurrentStep(currentStep - 1);
     }
   };
+  
+  const handleSearchCoPi = async () => {
+    if (!coPiSearchTerm) return;
+    setIsSearching(true);
+    setFoundCoPi(null);
+    try {
+        const result = await findUserByMisId(coPiSearchTerm);
+        if (result.success && result.user) {
+            setFoundCoPi(result.user);
+        } else {
+            toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+        }
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+    } finally {
+        setIsSearching(false);
+    }
+  };
+
+  const handleAddCoPi = () => {
+    if (foundCoPi && !coPiList.some(coPi => coPi.uid === foundCoPi.uid)) {
+        if (user && foundCoPi.uid === user.uid) {
+            toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
+            return;
+        }
+        setCoPiList([...coPiList, foundCoPi]);
+    }
+    setFoundCoPi(null);
+    setCoPiSearchTerm('');
+  };
+
+  const handleRemoveCoPi = (uidToRemove: string) => {
+    setCoPiList(coPiList.filter(coPi => coPi.uid !== uidToRemove));
+  };
+
 
   const handleSave = async (status: 'Draft' | 'Submitted') => {
     if (!user || !user.faculty || !user.institute || !user.department) {
@@ -196,9 +262,10 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       }
       
       const teamInfoParts = [];
-      if (data.coPiNames && data.coPiNames.trim() !== '') teamInfoParts.push(`Co-PIs: ${data.coPiNames}`);
       if (data.studentInfo && data.studentInfo.trim() !== '') teamInfoParts.push(`Students: ${data.studentInfo}`);
       const teamInfo = teamInfoParts.join('; ');
+      
+      const coPiUids = coPiList.map(coPi => coPi.uid);
 
       const projectData: Omit<Project, 'id'> = {
         title: data.title,
@@ -211,10 +278,12 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         pi_uid: user.uid,
         pi_email: user.email,
         pi_phoneNumber: user.phoneNumber,
+        coPiUids: coPiUids,
         teamInfo,
         timelineAndOutcomes: data.expectedOutcomes,
         status: status,
         submissionDate: project?.submissionDate || new Date().toISOString(),
+        sdgGoals: data.sdgGoals,
       };
 
       // Conditionally add URLs to avoid 'undefined' values
@@ -282,6 +351,41 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                 <FormField name="projectType" control={form.control} render={({ field }) => (
                     <FormItem><FormLabel>Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Multi-Disciplinary">Multi-Disciplinary</SelectItem><SelectItem value="Inter-Disciplinary">Inter-Disciplinary</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                 )} />
+                <FormField
+                  control={form.control}
+                  name="sdgGoals"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>UN Sustainable Development Goals (SDGs)</FormLabel>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                           <Button variant="outline" className="w-full justify-between">
+                             {field.value?.length > 0 ? `${field.value.length} selected` : "Select relevant goals"}
+                             <ChevronDown className="h-4 w-4 opacity-50" />
+                           </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-60 overflow-y-auto">
+                            <DropdownMenuLabel>Select all that apply</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {sdgGoalsList.map((goal) => (
+                               <DropdownMenuCheckboxItem
+                                 key={goal}
+                                 checked={field.value?.includes(goal)}
+                                 onCheckedChange={(checked) => {
+                                   return checked
+                                     ? field.onChange([...(field.value || []), goal])
+                                     : field.onChange(field.value?.filter((value) => value !== goal));
+                                 }}
+                               >
+                                 {goal}
+                               </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
                  <div className="p-4 border rounded-lg bg-muted/50 text-sm text-muted-foreground">
                     <p><span className="font-semibold text-foreground">Faculty:</span> {user?.faculty || 'Not set'}</p>
                     <p><span className="font-semibold text-foreground">Institute:</span> {user?.institute || 'Not set'}</p>
@@ -296,9 +400,33 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                   <FormLabel>Principal Investigator (PI)</FormLabel>
                   <Input disabled value={user?.name || 'Loading...'} />
                 </FormItem>
-                <FormField name="coPiNames" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Co-PIs (comma-separated)</FormLabel><FormControl><Input {...field} placeholder="Dr. Jane Smith, Dr. John Doe" /></FormControl><FormMessage /></FormItem>
-                )} />
+                 <div className="space-y-2">
+                    <FormLabel>Co-PIs</FormLabel>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Search by Co-PI's MIS ID"
+                        value={coPiSearchTerm}
+                        onChange={(e) => setCoPiSearchTerm(e.target.value)}
+                      />
+                      <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
+                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+                      </Button>
+                    </div>
+                    {foundCoPi && (
+                      <div className="flex items-center justify-between p-2 border rounded-md">
+                        <p>{foundCoPi.name}</p>
+                        <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
+                      </div>
+                    )}
+                    <div className="space-y-2 pt-2">
+                      {coPiList.map(coPi => (
+                        <div key={coPi.uid} className="flex items-center justify-between p-2 bg-secondary rounded-md">
+                           <p className="text-sm font-medium">{coPi.name}</p>
+                           <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>Remove</Button>
+                        </div>
+                      ))}
+                    </div>
+                </div>
                 <FormField name="studentInfo" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Student Members</FormLabel><FormControl><Textarea {...field} placeholder="List student names and roles..." /></FormControl><FormMessage /></FormItem>
                 )} />

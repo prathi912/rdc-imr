@@ -626,6 +626,16 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       </>
                     )}
                 </dl>
+                 {project.sdgGoals && project.sdgGoals.length > 0 && (
+                    <div className="space-y-2 pt-2">
+                        <p className="font-medium text-muted-foreground">UN Sustainable Development Goals</p>
+                        <div className="flex flex-wrap gap-1">
+                            {project.sdgGoals.map(goal => (
+                                <Badge key={goal} variant="secondary">{goal}</Badge>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
              <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Submitter Information</h3>

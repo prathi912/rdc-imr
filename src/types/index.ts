@@ -112,6 +112,7 @@ export type Project = {
   isBulkUploaded?: boolean;
   projectStartDate?: string;
   projectEndDate?: string;
+  sdgGoals?: string[];
 };
 
 export type Notification = {

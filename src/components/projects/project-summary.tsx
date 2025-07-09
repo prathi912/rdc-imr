@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -41,6 +42,7 @@ export function ProjectSummary({ project }: ProjectSummaryProps) {
       departmentName: project.departmentName,
       teamInfo: project.teamInfo,
       timelineAndOutcomes: project.timelineAndOutcomes,
+      sdgGoals: project.sdgGoals,
     };
 
     const result = await getProjectSummary(input);

@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -20,6 +21,7 @@ const SummarizeProjectInputSchema = z.object({
   departmentName: z.string().describe('The specific department name.'),
   teamInfo: z.string().describe('Information about the project team (PI, Co-PIs, students).'),
   timelineAndOutcomes: z.string().describe('Timeline and expected outcomes of the project.'),
+  sdgGoals: z.array(z.string()).optional().describe('A list of UN Sustainable Development Goals the project aligns with.'),
 });
 export type SummarizeProjectInput = z.infer<typeof SummarizeProjectInputSchema>;
 
@@ -48,6 +50,12 @@ const summarizeProjectPrompt = ai.definePrompt({
   Department: {{{departmentName}}}
   Team Information: {{{teamInfo}}}
   Timeline and Expected Outcomes: {{{timelineAndOutcomes}}}
+  {{#if sdgGoals}}
+  Aligned UN SDG Goals:
+  {{#each sdgGoals}}
+  - {{{this}}}
+  {{/each}}
+  {{/if}}
   `,
 });
 
