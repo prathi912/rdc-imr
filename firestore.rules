@@ -1,91 +1,120 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper function to check if a user has an admin-level role
+    
+    // Helper function to check if a user is one of the admin types
     function isAdmin() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin', 'CRO'];
+      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      // Ensure the user document exists and has a role that's in the admin list
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             'role' in userDoc.data &&
+             userDoc.data.role in ['admin', 'CRO', 'Super-admin'];
     }
 
     // Helper function to check if user is a Principal for the given project
     function isPrincipalForProject(projectData) {
-      let userProfile = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return userProfile.designation == 'Principal' && userProfile.institute == projectData.institute;
+      // Check if user document and necessary fields exist before accessing them
+      let userProfileDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             'designation' in userProfileDoc.data &&
+             'institute' in userProfileDoc.data &&
+             projectData.keys().hasAny(['institute']) &&
+             userProfileDoc.data.designation == 'Principal' && 
+             userProfileDoc.data.institute == projectData.institute;
     }
     
     // Helper function to check if user is an HOD for the given project
     function isHodForProject(projectData) {
-      let userProfile = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return userProfile.designation == 'HOD' && userProfile.department == projectData.departmentName;
+      // Check if user document and necessary fields exist before accessing them
+      let userProfileDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             'designation' in userProfileDoc.data &&
+             'department' in userProfileDoc.data &&
+             projectData.keys().hasAny(['departmentName']) &&
+             userProfileDoc.data.designation == 'HOD' && 
+             userProfileDoc.data.department == projectData.departmentName;
     }
     
-    // Helper function for the special case user
-    function isSpecialUser(projectData) {
-      let userProfile = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return userProfile.email == 'unnati.joshi22950@paruluniversity.ac.in' && projectData.faculty == 'Faculty of Engineering & Technology';
+    // Helper function to check if the requesting user is an assigned evaluator for THIS project.
+    function isAssignedEvaluator(projectData) {
+      return 'meetingDetails' in projectData &&
+             projectData.meetingDetails != null &&
+             'assignedEvaluators' in projectData.meetingDetails &&
+             projectData.meetingDetails.assignedEvaluators != null &&
+             request.auth.uid in projectData.meetingDetails.assignedEvaluators;
     }
 
-    // Users Collection Rules
+    // This is a "god-mode" rule. If a user is an admin, they can do anything.
+    // This rule is checked first. If it's true, access is granted.
+    match /{path=**} {
+      allow read, write: if isAdmin();
+    }
+    
+    // The following rules apply to non-admin users.
+    
     match /users/{userId} {
-      // Any authenticated user can read/write their own profile.
-      allow read, write: if request.auth.uid == userId;
-      // Admins can list and write to any user profile (for role changes, etc.)
-      allow list, write: if isAdmin();
+      // Any signed-in user can read a public profile.
+      allow read: if request.auth != null;
+      // A user can create their own document.
+      allow create: if request.auth.uid == userId;
+      // A user can only update their own document. Admins are covered by the global rule above.
+      allow update: if request.auth.uid == userId;
+      allow delete: if request.auth.uid == userId;
     }
     
-    // Projects Collection Rules
     match /projects/{projectId} {
-      // An authenticated user can create a project (initial draft).
-      allow create: if request.auth != null;
+      // A user can get a specific project document if they are the PI, an assigned evaluator, a Principal, or an HOD.
+      // This rule is what allows the document to be read on the project details page.
+      allow get: if request.auth.uid == resource.data.pi_uid ||
+                   isAssignedEvaluator(resource.data) ||
+                   isPrincipalForProject(resource.data) ||
+                   isHodForProject(resource.data);
       
-      // The PI or an admin can update a project.
-      allow update: if request.auth.uid == resource.data.pi_uid || isAdmin();
-      
-      // Read access is granted based on multiple conditions.
-      allow read: if request.auth != null && (
-        request.auth.uid == resource.data.pi_uid ||
-        isAdmin() ||
-        isPrincipalForProject(resource.data) ||
-        isHodForProject(resource.data) ||
-        isSpecialUser(resource.data) ||
-        ('meetingDetails' in resource.data && 
-         'assignedEvaluators' in resource.data.meetingDetails &&
-         request.auth.uid in resource.data.meetingDetails.assignedEvaluators)
-      );
-      
-      // Listing projects is complex and should be secured via queries.
-      // This rule allows admins to perform list queries. Other roles rely on more specific queries.
-      allow list: if isAdmin();
-      
-      // Only admins can delete projects (e.g., bulk-uploaded ones).
-      allow delete: if isAdmin();
+      // Any authenticated user can perform list queries (like for the 'All Projects' page).
+      // The results of the query are then filtered by the 'get' rule above on the client side,
+      // so a user will only receive documents they are permitted to 'get'.
+      allow list: if request.auth != null;
 
-      // Evaluations Subcollection Rules
+      // A user can only create a project where they are the PI.
+      allow create: if request.auth.uid == request.resource.data.pi_uid;
+      
+      // A PI can update their own project (e.g., submit completion report).
+      // An assigned evaluator can update the project ONLY to add their UID to the evaluatedBy array.
+      allow update: if request.auth.uid == resource.data.pi_uid ||
+                      (isAssignedEvaluator(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
+
+      // Rules for the evaluations subcollection inside a project
       match /evaluations/{evaluatorId} {
-        // The assigned evaluator can create/update their own evaluation.
-        allow write: if request.auth.uid == evaluatorId;
-        // The evaluator, admins, and the PI can read an evaluation.
-        allow read: if request.auth.uid == evaluatorId || isAdmin() || request.auth.uid == get(/databases/$(database)/documents/projects/$(projectId)).data.pi_uid;
+        // We use the parent document's `isAssignedEvaluator` logic here by calling get().
+        // The 'get' rule on the project allows this call to succeed for assigned evaluators.
+        function canAccessEvaluation() {
+            let projectDoc = get(/databases/$(database)/documents/projects/$(projectId));
+            return isAssignedEvaluator(projectDoc.data);
+        }
+
+        // Allow reading all evaluations for a project if you are an assigned evaluator for it.
+        allow read: if canAccessEvaluation();
+        
+        // Allow writing an evaluation only if you are an assigned evaluator AND you are writing to your own document.
+        allow write: if canAccessEvaluation() && request.auth.uid == evaluatorId;
       }
     }
-    
-    // Incentive Claims Collection Rules
-    match /incentiveClaims/{claimId} {
-      allow create: if request.auth != null;
-      // User can read/update their own claims.
+
+    match /notifications/{notificationId} {
+      // A user can read and update (e.g., mark as read) their own notifications.
       allow read, update: if request.auth.uid == resource.data.uid;
-      // Admins can list and update any claim.
-      allow list, update: if isAdmin();
+      // All notifications are created by the server using the Admin SDK, so client creation is denied.
+      allow create: if false;
     }
     
-    // Notifications Collection Rules
-    match /notifications/{notificationId} {
-      // Users can read and update (e.g., mark as read) their own notifications.
-      allow read, update: if request.auth.uid == resource.data.uid;
-      // Server-side actions create notifications, so writes are allowed.
-      // In a more secure setup, this would be restricted to a service account role.
-      allow create: if request.auth != null; 
+    match /incentiveClaims/{claimId} {
+      // A user can create and read their own incentive claims.
+      allow create: if request.auth.uid == request.resource.data.uid;
+      allow read: if request.auth.uid == resource.data.uid;
+      // All status updates are handled by the server (Admin SDK), so client updates are denied.
+      allow update: if false;
     }
   }
 }
