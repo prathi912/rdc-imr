@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/config';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
 import { uploadFileToServer, notifyAdminsOnProjectSubmission, findUserByMisId } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
@@ -149,8 +149,25 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
             guidelinesAgreement: project.status !== 'Draft',
             sdgGoals: project.sdgGoals || [],
         });
+        
+        const fetchCoPiUsers = async () => {
+            if (project.coPiUids && project.coPiUids.length > 0) {
+                try {
+                    const usersRef = collection(db, 'users');
+                    const q = query(usersRef, where('__name__', 'in', project.coPiUids));
+                    const querySnapshot = await getDocs(q);
+                    const fetchedUsers = querySnapshot.docs.map(d => ({ uid: d.id, name: d.data().name as string }));
+                    setCoPiList(fetchedUsers);
+                } catch (error) {
+                    console.error("Error fetching Co-PIs:", error);
+                    toast({ variant: 'destructive', title: 'Error', description: "Could not load existing Co-PIs." });
+                }
+            }
+        };
+
+        fetchCoPiUsers();
     }
-  }, [project, form]);
+  }, [project, form, toast]);
 
   const handleNext = async () => {
     const fieldsToValidate = {
