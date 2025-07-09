@@ -1,119 +1,137 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Helper function to check if a user is one of the admin types
+    // =================================
+    // Helper Functions
+    // =================================
+    
+    function isAuth() {
+      return request.auth != null;
+    }
+    
+    // Checks if the requesting user is an admin-level role.
     function isAdmin() {
       let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      // Ensure the user document exists and has a role that's in the admin list
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              'role' in userDoc.data &&
              userDoc.data.role in ['admin', 'CRO', 'Super-admin'];
     }
 
-    // Helper function to check if user is a Principal for the given project
+    // Checks if the user is a Principal of the same institute as the project.
     function isPrincipalForProject(projectData) {
-      // Check if user document and necessary fields exist before accessing them
       let userProfileDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             'designation' in userProfileDoc.data &&
-             'institute' in userProfileDoc.data &&
-             projectData.keys().hasAny(['institute']) &&
-             userProfileDoc.data.designation == 'Principal' && 
+             'designation' in userProfileDoc.data && userProfileDoc.data.designation == 'Principal' &&
+             'institute' in userProfileDoc.data && 'institute' in projectData &&
              userProfileDoc.data.institute == projectData.institute;
     }
     
-    // Helper function to check if user is an HOD for the given project
+    // Checks if the user is an HOD of the same department as the project.
     function isHodForProject(projectData) {
-      // Check if user document and necessary fields exist before accessing them
       let userProfileDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
       return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             'designation' in userProfileDoc.data &&
-             'department' in userProfileDoc.data &&
-             projectData.keys().hasAny(['departmentName']) &&
-             userProfileDoc.data.designation == 'HOD' && 
+             'designation' in userProfileDoc.data && userProfileDoc.data.designation == 'HOD' &&
+             'department' in userProfileDoc.data && 'departmentName' in projectData &&
              userProfileDoc.data.department == projectData.departmentName;
     }
     
-    // Helper function to check if the requesting user is an assigned evaluator for THIS project.
+    // Checks if the user is an assigned evaluator for the project.
     function isAssignedEvaluator(projectData) {
-      return 'meetingDetails' in projectData &&
-             projectData.meetingDetails != null &&
-             'assignedEvaluators' in projectData.meetingDetails &&
-             projectData.meetingDetails.assignedEvaluators != null &&
+      return 'meetingDetails' in projectData && projectData.meetingDetails != null &&
+             'assignedEvaluators' in projectData.meetingDetails && projectData.meetingDetails.assignedEvaluators != null &&
              request.auth.uid in projectData.meetingDetails.assignedEvaluators;
     }
 
-    // This is a "god-mode" rule. If a user is an admin, they can do anything.
-    // This rule is checked first. If it's true, access is granted.
+    // =================================
+    // Admin God-Mode Rule
+    // =================================
+    // This rule gives admins full read/write access everywhere.
+    // It's checked first. If it's true, access is granted.
     match /{path=**} {
       allow read, write: if isAdmin();
     }
     
-    // The following rules apply to non-admin users.
+    // =================================
+    // Non-Admin Rules
+    // =================================
     
     match /users/{userId} {
-      // Any signed-in user can read a public profile.
-      allow read: if request.auth != null;
-      // A user can create their own document.
+      allow read: if isAuth();
       allow create: if request.auth.uid == userId;
-      // A user can only update their own document. Admins are covered by the global rule above.
       allow update: if request.auth.uid == userId;
       allow delete: if request.auth.uid == userId;
     }
     
     match /projects/{projectId} {
-      // A user can get a specific project document if they are the PI, an assigned evaluator, a Principal, or an HOD.
-      // This rule is what allows the document to be read on the project details page.
-      allow get: if request.auth.uid == resource.data.pi_uid ||
-                   isAssignedEvaluator(resource.data) ||
-                   isPrincipalForProject(resource.data) ||
-                   isHodForProject(resource.data);
+      // Allow GET if user is PI, assigned evaluator, Principal, or HOD for the project.
+      allow get: if isAuth() && (
+                    request.auth.uid == resource.data.pi_uid ||
+                    isAssignedEvaluator(resource.data) ||
+                    isPrincipalForProject(resource.data) ||
+                    isHodForProject(resource.data)
+                  );
       
-      // Any authenticated user can perform list queries (like for the 'All Projects' page).
-      // The results of the query are then filtered by the 'get' rule above on the client side,
-      // so a user will only receive documents they are permitted to 'get'.
-      allow list: if request.auth != null;
+      // Allow LIST for any authenticated user. Client-side queries + 'get' rule will filter results.
+      allow list: if isAuth();
 
-      // A user can only create a project where they are the PI.
-      allow create: if request.auth.uid == request.resource.data.pi_uid;
+      // Allow CREATE if user is the PI, the status is valid, and no admin fields are being set.
+      allow create: if isAuth() && 
+                      request.auth.uid == request.resource.data.pi_uid &&
+                      request.resource.data.status in ['Draft', 'Submitted'] &&
+                      !('grant' in request.resource.data) &&
+                      !('meetingDetails' in request.resource.data);
       
-      // A PI can update their own project (e.g., submit completion report).
-      // An assigned evaluator can update the project ONLY to add their UID to the evaluatedBy array.
-      allow update: if request.auth.uid == resource.data.pi_uid ||
-                      (isAssignedEvaluator(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
+      // Allow UPDATE for the PI on specific fields, or for an evaluator to add their review.
+      allow update: if isAuth() && (
+                      ( // PI Update Logic
+                        request.auth.uid == resource.data.pi_uid &&
+                        // PI cannot change their own UID
+                        request.resource.data.pi_uid == resource.data.pi_uid &&
+                        // PI can only change these specific fields
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                          'title', 'abstract', 'type', 'sdgGoals', 'teamInfo', 'coPiUids',
+                          'timelineAndOutcomes', 'proposalUrl', 'cvUrl', 'ethicsUrl',
+                          'status', // Status change is further restricted below
+                          'completionReportUrl', 'utilizationCertificateUrl', 'completionSubmissionDate',
+                          'revisedProposalUrl', 'revisionSubmissionDate'
+                        ]) &&
+                        // When a PI updates status, it can only be to these specific values
+                        (
+                          !("status" in request.resource.data.diff(resource.data).affectedKeys()) ||
+                          request.resource.data.status in ['Draft', 'Pending Completion Approval', 'Under Review']
+                        )
+                      ) ||
+                      ( // Evaluator Update Logic
+                        isAssignedEvaluator(resource.data) &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy'])
+                      )
+                    );
 
-      // Rules for the evaluations subcollection inside a project
+      // Subcollection: evaluations
       match /evaluations/{evaluatorId} {
-        // We use the parent document's `isAssignedEvaluator` logic here by calling get().
-        // The 'get' rule on the project allows this call to succeed for assigned evaluators.
+        // You can access an evaluation if you are an assigned evaluator for the parent project.
         function canAccessEvaluation() {
             let projectDoc = get(/databases/$(database)/documents/projects/$(projectId));
             return isAssignedEvaluator(projectDoc.data);
         }
 
-        // Allow reading all evaluations for a project if you are an assigned evaluator for it.
-        allow read: if canAccessEvaluation();
-        
-        // Allow writing an evaluation only if you are an assigned evaluator AND you are writing to your own document.
-        allow write: if canAccessEvaluation() && request.auth.uid == evaluatorId;
+        allow read: if isAuth() && canAccessEvaluation();
+        allow write: if isAuth() && canAccessEvaluation() && request.auth.uid == evaluatorId;
       }
     }
 
     match /notifications/{notificationId} {
-      // A user can read and update (e.g., mark as read) their own notifications.
-      allow read, update: if request.auth.uid == resource.data.uid;
-      // All notifications are created by the server using the Admin SDK, so client creation is denied.
+      allow read, update: if isAuth() && request.auth.uid == resource.data.uid;
+      // Deny client creation; server only.
       allow create: if false;
     }
     
     match /incentiveClaims/{claimId} {
-      // A user can create and read their own incentive claims.
-      allow create: if request.auth.uid == request.resource.data.uid;
-      allow read: if request.auth.uid == resource.data.uid;
-      // All status updates are handled by the server (Admin SDK), so client updates are denied.
+      allow create: if isAuth() && request.auth.uid == request.resource.data.uid;
+      allow read: if isAuth() && request.auth.uid == resource.data.uid;
+      // Deny client updates; server only.
       allow update: if false;
     }
   }
