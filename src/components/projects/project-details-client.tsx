@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 
 import type { Project, User, GrantDetails, Evaluation, BankDetails, GrantPhase } from '@/types';
 import { db } from '@/lib/config';
-import { doc, updateDoc, addDoc, collection, getDoc, getDocs } from 'firebase/firestore';
+import { doc, updateDoc, addDoc, collection, getDoc, getDocs, where, query } from 'firebase/firestore';
 import { uploadFileToServer, updateProjectStatus, updateProjectWithRevision, updateProjectDuration, updateProjectEvaluators } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -29,7 +29,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon, Edit, UserCog, Banknote, AlertCircle } from 'lucide-react';
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users } from 'lucide-react';
 
 import { GrantManagement } from './grant-management';
 import { EvaluationForm } from './evaluation-form';
@@ -90,6 +90,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [project, setProject] = useState(initialProject);
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [coPiUsers, setCoPiUsers] = useState<User[]>([]);
   const [isUpdating, setIsUpdating] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -176,6 +177,19 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       setUser(JSON.parse(storedUser));
     }
   }, []);
+
+  useEffect(() => {
+    const fetchCoPiUsers = async () => {
+      if (project.coPiUids && project.coPiUids.length > 0) {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('__name__', 'in', project.coPiUids));
+        const querySnapshot = await getDocs(q);
+        const fetchedUsers = querySnapshot.docs.map(d => ({ uid: d.id, ...d.data() } as User));
+        setCoPiUsers(fetchedUsers);
+      }
+    };
+    fetchCoPiUsers();
+  }, [project.coPiUids]);
   
   const isPI = user?.uid === project.pi_uid;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
@@ -632,11 +646,25 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             </div>
           </div>
           <Separator />
-           {project.teamInfo && (
+           {(project.teamInfo || (coPiUsers && coPiUsers.length > 0)) && (
                 <>
-                <div className="space-y-2">
-                  <h3 className="font-semibold text-lg">Team Information</h3>
-                  <p className="text-muted-foreground whitespace-pre-wrap">{project.teamInfo}</p>
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2"><Users className="h-5 w-5"/>Team Information</h3>
+                  {coPiUsers && coPiUsers.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="font-medium">Co-PI(s):</p>
+                      <ul className="list-disc list-inside pl-4 text-muted-foreground">
+                        {coPiUsers.map(copi => (
+                          <li key={copi.uid}>
+                            <Link href={`/profile/${copi.misId}`} className="hover:underline text-primary">
+                              {copi.name}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {project.teamInfo && <p className="text-muted-foreground whitespace-pre-wrap">{project.teamInfo.split(';').find(part => part.trim().startsWith('Students:'))}</p>}
                 </div>
                 <Separator />
                 </>

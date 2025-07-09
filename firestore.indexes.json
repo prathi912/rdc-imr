@@ -116,6 +116,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "projects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "coPiUids",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "submissionDate",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

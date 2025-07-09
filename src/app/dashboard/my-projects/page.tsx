@@ -29,13 +29,40 @@ export default function MyProjectsPage() {
         setLoading(true);
         try {
           const projectsRef = collection(db, 'projects');
-          const q = query(
+          
+          const piQuery = query(
             projectsRef,
-            where('pi_uid', '==', parsedUser.uid),
-            orderBy('submissionDate', 'desc')
+            where('pi_uid', '==', parsedUser.uid)
           );
-          const querySnapshot = await getDocs(q);
-          const userProjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+          const coPiQuery = query(
+            projectsRef,
+            where('coPiUids', 'array-contains', parsedUser.uid)
+          );
+
+          const [piSnapshot, coPiSnapshot] = await Promise.all([
+            getDocs(piQuery),
+            getDocs(coPiQuery),
+          ]);
+          
+          const userProjects: Project[] = [];
+          const projectIds = new Set<string>();
+
+          piSnapshot.forEach(doc => {
+            if (!projectIds.has(doc.id)) {
+                userProjects.push({ id: doc.id, ...doc.data() } as Project);
+                projectIds.add(doc.id);
+            }
+          });
+
+          coPiSnapshot.forEach(doc => {
+              if (!projectIds.has(doc.id)) {
+                  userProjects.push({ id: doc.id, ...doc.data() } as Project);
+                  projectIds.add(doc.id);
+              }
+          });
+
+          userProjects.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
+
           setMyProjects(userProjects);
         } catch (error) {
           console.error("Error fetching user's projects:", error);
@@ -78,7 +105,7 @@ export default function MyProjectsPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title="My Projects" description="A list of all projects you have submitted or saved as drafts." />
+      <PageHeader title="My Projects" description="A list of all projects you are associated with as a PI or Co-PI." />
       <div className="flex items-center py-4">
         <Input
             placeholder="Filter by title..."

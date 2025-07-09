@@ -900,7 +900,7 @@ export async function updateProjectDuration(projectId: string, startDate: string
     return { success: true };
   } catch (error: any) {
     console.error('Error updating project duration:', error);
-    return { success: false, error: error.message || 'Failed to update project duration.' };
+    return { success: false, error: 'Failed to update project duration.' };
   }
 }
 
@@ -924,21 +924,30 @@ export async function updateProjectEvaluators(projectId: string, evaluatorUids: 
   }
 }
 
+export async function findUserByMisId(misId: string): Promise<{ success: boolean; user?: { uid: string; name: string; }; error?: string; }> {
+  try {
+    if (!misId || misId.trim() === '') {
+      return { success: false, error: 'MIS ID is required.' };
+    }
+    const usersRef = adminDb.collection('users');
+    const q = usersRef.where('misId', '==', misId).limit(1);
+    const querySnapshot = await q.get();
 
+    if (querySnapshot.empty) {
+      return { success: false, error: 'No user found with this MIS ID.' };
+    }
 
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
 
+    // Prevent adding admins as Co-PIs
+    if (userData.role === 'admin' || userData.role === 'Super-admin') {
+      return { success: false, error: 'Administrative users cannot be added as Co-PIs.' };
+    }
 
-
-    
-
-
-
-
-
-
-
-
-
-    
-
-
+    return { success: true, user: { uid: userDoc.id, name: userData.name } };
+  } catch (error: any) {
+    console.error('Error finding user by MIS ID:', error);
+    return { success: false, error: error.message || 'Failed to search for user.' };
+  }
+}

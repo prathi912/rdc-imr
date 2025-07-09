@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -80,14 +81,38 @@ export default function ProfilePage() {
         const fetchedClaims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
         setClaims(fetchedClaims);
 
-        // Fetch user's projects
+        // Fetch user's projects (as PI or Co-PI)
         const projectsRef = collection(db, 'projects');
-        const projectsQuery = query(projectsRef, where('pi_uid', '==', fetchedUser.uid), orderBy('submissionDate', 'desc'));
-        const projectsSnapshot = await getDocs(projectsQuery);
-        const fetchedProjects = projectsSnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as Project))
-            .filter(p => p.status !== 'Draft');
-        setProjects(fetchedProjects);
+        const piProjectsQuery = query(projectsRef, where('pi_uid', '==', fetchedUser.uid));
+        const coPiProjectsQuery = query(projectsRef, where('coPiUids', 'array-contains', fetchedUser.uid));
+
+        const [piProjectsSnapshot, coPiProjectsSnapshot] = await Promise.all([
+          getDocs(piProjectsQuery),
+          getDocs(coPiProjectsQuery)
+        ]);
+        
+        const allProjects: Project[] = [];
+        const projectIds = new Set<string>();
+
+        piProjectsSnapshot.forEach(doc => {
+            if (!projectIds.has(doc.id)) {
+                allProjects.push({ id: doc.id, ...doc.data() } as Project);
+                projectIds.add(doc.id);
+            }
+        });
+
+        coPiProjectsSnapshot.forEach(doc => {
+            if (!projectIds.has(doc.id)) {
+                allProjects.push({ id: doc.id, ...doc.data() } as Project);
+                projectIds.add(doc.id);
+            }
+        });
+
+        const sortedProjects = allProjects
+            .filter(p => p.status !== 'Draft')
+            .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
+        
+        setProjects(sortedProjects);
 
       } catch (err: any) {
         if (err.code === 'permission-denied') {
