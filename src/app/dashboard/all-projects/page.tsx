@@ -23,6 +23,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { PRINCIPAL_EMAILS } from '@/lib/constants';
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommeded', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
@@ -56,6 +57,8 @@ export default function AllProjectsPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(EXPORT_COLUMNS.map(c => c.id));
+  
+  const isPrincipal = user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false;
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -82,7 +85,7 @@ export default function AllProjectsPage() {
 
         const isAdmin = ['admin', 'Super-admin'].includes(user.role);
         const isCro = user.role === 'CRO';
-        const isPrincipal = user.designation === 'Principal';
+        
         const isHod = user.designation === 'HOD';
         const isSpecialUser = user.email === 'unnati.joshi22950@paruluniversity.ac.in';
 
@@ -152,11 +155,10 @@ export default function AllProjectsPage() {
       }
     }
     getProjectsAndUsers();
-  }, [user, toast]);
+  }, [user, toast, isPrincipal]);
   
   const isAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
   const isCro = user?.role === 'CRO';
-  const isPrincipal = user?.designation === 'Principal';
   const isHod = user?.designation === 'HOD';
   const isSpecialUser = user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
   

@@ -11,6 +11,7 @@ import { ProjectDetailsClient } from '@/components/projects/project-details-clie
 import { ProjectSummary } from '@/components/projects/project-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
+import { PRINCIPAL_EMAILS } from '@/lib/constants';
 
 export default function ProjectDetailsPage() {
   const params = useParams();
@@ -49,7 +50,7 @@ export default function ProjectDetailsPage() {
         } as Project;
 
         const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
-        const isPrincipal = sessionUser.designation === 'Principal' && sessionUser.institute === projectData.institute;
+        const isPrincipal = sessionUser.email ? PRINCIPAL_EMAILS.includes(sessionUser.email) : false;
         const isHod = sessionUser.designation === 'HOD' && sessionUser.department === projectData.departmentName;
         const isPI = sessionUser.uid === projectData.pi_uid;
         const isCoPI = projectData.coPiUids?.includes(sessionUser.uid);
