@@ -82,7 +82,10 @@ export default function BulkUploadPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty'];
+        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date'];
+        const optionalColumns = ['Name_of_staff', 'Faculty'];
+        const allPossibleColumns = [...requiredColumns, ...optionalColumns];
+
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
             toast({
@@ -166,14 +169,13 @@ export default function BulkUploadPage() {
               <FileWarning className="h-4 w-4" />
               <AlertTitle>Important: File Format</AlertTitle>
               <AlertDescription>
-                Your Excel file must contain the following columns in the first sheet: 
+                Your Excel file must contain the following columns: 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">pi_email</code>, 
-                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code>,
-                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>,
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">project_title</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">status</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">grant_amount</code>, and 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_date</code>.
+                The columns <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code> and <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code> are optional.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
