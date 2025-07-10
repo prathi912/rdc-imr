@@ -33,6 +33,7 @@ import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { linkHistoricalData } from '@/app/actions';
+import { PRINCIPAL_EMAILS } from '@/lib/constants';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -78,6 +79,9 @@ export default function SignupPage() {
     if (email === 'rathipranav07@gmail.com') {
       return 'Super-admin';
     }
+    if (PRINCIPAL_EMAILS.includes(email)) {
+      return 'CRO'; // Treat Principals as CROs for permissions
+    }
     // New users are faculty by default. Super-admin can change roles.
     return 'faculty';
   }
@@ -102,9 +106,15 @@ export default function SignupPage() {
       name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
       role: role,
-      profileComplete: role !== 'faculty',
+      profileComplete: role !== 'faculty', // Principals (CRO) and Admins don't need profile setup
       allowedModules: getDefaultModulesForRole(role),
     };
+
+    if (role === 'CRO') { // If it's a Principal
+        user.designation = 'Principal';
+        user.institute = 'Assigned Institute'; // You can add more specific logic to map email to institute if needed
+        user.faculty = 'Assigned Faculty';
+    }
 
     if (firebaseUser.photoURL) {
       user.photoURL = firebaseUser.photoURL;

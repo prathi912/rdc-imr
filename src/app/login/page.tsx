@@ -33,6 +33,7 @@ import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { linkHistoricalData } from '@/app/actions';
+import { PRINCIPAL_EMAILS } from '@/lib/constants';
 
 const loginSchema = z.object({
   email: z
@@ -64,6 +65,9 @@ export default function LoginPage() {
     if (email === 'rathipranav07@gmail.com') {
       return 'Super-admin';
     }
+    if (PRINCIPAL_EMAILS.includes(email)) {
+      return 'CRO'; // Treat Principals as CROs for permissions
+    }
     // New users are faculty by default, admins can change roles.
     return 'faculty';
   }
@@ -90,6 +94,11 @@ export default function LoginPage() {
         profileComplete: false,
         allowedModules: getDefaultModulesForRole(role),
       };
+      if (role === 'CRO') {
+        user.designation = 'Principal';
+        user.institute = 'Assigned Institute'; // Default, can be refined
+        user.faculty = 'Assigned Faculty'; // Default, can be refined
+      }
     }
     
     // Always update/set the photoURL from provider on sign-in
