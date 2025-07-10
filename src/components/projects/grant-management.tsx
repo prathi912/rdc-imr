@@ -1,11 +1,10 @@
 
-
 'use client';
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import type { Project, User, GrantPhase, Transaction } from '@/types';
+import type { Project, User, GrantPhase, Transaction, GrantDetails } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -16,7 +15,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { uploadFileToServer } from '@/app/actions';
 import { useState } from 'react';
 import { DollarSign, Banknote, FileText, CheckCircle, PlusCircle, AlertCircle, BadgeCent, ChevronDown } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import {
   Dialog,
   DialogContent,
@@ -189,7 +188,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
         const projectRef = doc(db, 'projects', project.id);
         const updatedPhases = grant.phases.map(p => {
             if (p.id === phaseId) {
-                const updatedPhase = { ...p, status: newStatus };
+                const updatedPhase: GrantPhase = { ...p, status: newStatus };
                 if (newStatus === 'Disbursed' && !p.disbursementDate) {
                     updatedPhase.disbursementDate = new Date().toISOString();
                 }
@@ -241,7 +240,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             )}
         </div>
         <CardDescription className='mt-2'>
-            Total grant amount: <span className='font-bold text-foreground'>₹{grant.totalAmount.toLocaleString('en-IN')}</span> | Sanction No: <span className='font-bold text-foreground'>{grant.sanctionNumber || 'N/A'}</span>
+            Total grant amount: <span className='font-bold text-foreground'>₹{(grant.totalAmount || 0).toLocaleString('en-IN')}</span> | Sanction No: <span className='font-bold text-foreground'>{grant.sanctionNumber || 'N/A'}</span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
