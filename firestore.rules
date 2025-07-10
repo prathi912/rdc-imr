@@ -1,23 +1,23 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Helper function to get the requesting user's data from the users collection
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
     // Helper function to check if a user is one of the admin types
     function isAdmin() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      // Ensure the user document exists and has a role that's in the admin list
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             'role' in userDoc.data &&
-             userDoc.data.role in ['admin', 'CRO', 'Super-admin'];
+      let userRole = getUserData().role;
+      return userRole in ['admin', 'CRO', 'Super-admin'];
     }
 
-    // Helper function to check if user is a Principal (by email)
-    function isPrincipal() {
-      let userDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+    // Helper function to check if a user is a Principal by their email
+    function isPrincipalByEmail() {
       // This list must be kept in sync with src/lib/constants.ts
-      let principal_emails = [
+      let principalEmails = [
         'ahmc@paruluniversity.ac.in', 'apc@paruluniversity.ac.in', 'agriculture@paruluniversity.ac.in',
         'dphs@paruluniversity.ac.in', 'fls@paruluniversity.ac.in', 'ips@paruluniversity.ac.in',
         'jnhmc@paruluniversity.ac.in', 'pcpr@paruluniversity.ac.in', 'fasahm@paruluniversity.ac.in',
@@ -34,122 +34,79 @@ service cloud.firestore {
         'pupublichealth@paruluniversity.ac.in', 'psh@paruluniversity.ac.in', 'rhmc@paruluniversity.ac.in',
         'rdc@paruluniversity.ac.in', 'sop@paruluniversity.ac.in'
       ];
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             userDoc.data.email in principal_emails;
+      return request.auth.token.email in principalEmails;
     }
 
     // Helper function to check if user is an HOD
     function isHod() {
-      let userProfileDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             'designation' in userProfileDoc.data &&
-             userProfileDoc.data.designation == 'HOD';
-    }
-    
-    // Helper function to check if the requesting user is an assigned evaluator for THIS project.
-    function isAssignedEvaluator(projectData) {
-      return 'meetingDetails' in projectData &&
-             projectData.meetingDetails != null &&
-             'assignedEvaluators' in projectData.meetingDetails &&
-             projectData.meetingDetails.assignedEvaluators != null &&
-             request.auth.uid in projectData.meetingDetails.assignedEvaluators;
+      return getUserData().designation == 'HOD';
     }
 
-    // This is a "god-mode" rule. If a user is an admin, they can do anything.
-    // This rule is checked first. If it's true, access is granted.
+    // This is a "god-mode" rule for admins.
     match /{path=**} {
       allow read, write: if isAdmin();
     }
     
-    // The following rules apply to non-admin users.
-    
     match /users/{userId} {
-      // Any signed-in user can read a public profile.
       allow read: if request.auth != null;
-      // A user can create their own document.
       allow create: if request.auth.uid == userId;
-      // A user can only update their own document. Admins are covered by the global rule above.
-      allow update: if request.auth.uid == userId;
-      allow delete: if request.auth.uid == userId;
+      allow update, delete: if request.auth.uid == userId;
     }
     
     match /projects/{projectId} {
-      // A user can GET a specific project document if they are the PI, a Co-PI, or an authorized viewer.
-      function isProjectOwner() {
-        return request.auth.uid == resource.data.pi_uid ||
-               request.auth.uid in resource.data.coPiUids;
-      }
-      function isAuthorizedViewer() {
-          let userProfileDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
-          let projectData = resource.data;
+      // GET: Allow reading a single document
+      allow get: if request.auth.uid == resource.data.pi_uid ||
+                   request.auth.uid in resource.data.coPiUids ||
+                   (resource.data.meetingDetails != null && request.auth.uid in resource.data.meetingDetails.assignedEvaluators) ||
+                   (isPrincipalByEmail() && getUserData().institute == resource.data.institute) ||
+                   (isHod() && getUserData().department == resource.data.departmentName);
 
-          let isPrincipalOfProject = isPrincipal() &&
-             'institute' in userProfileDoc.data &&
-             projectData.keys().hasAny(['institute']) &&
-             userProfileDoc.data.institute == projectData.institute;
-             
-          let isHodOfProject = isHod() &&
-             'department' in userProfileDoc.data &&
-             projectData.keys().hasAny(['departmentName']) &&
-             userProfileDoc.data.department == projectData.departmentName;
-
-          return isAssignedEvaluator(projectData) || isPrincipalOfProject || isHodOfProject;
-      }
-      allow get: if isProjectOwner() || isAuthorizedViewer();
-      
-      // A user can LIST projects if the query is for their own projects, or if they are an authorized role querying by a specific field.
+      // LIST: Allow querying multiple documents
       allow list: if request.auth != null && (
-                    (request.query.keys().hasAll(['where', 'orderBy']) && request.query.where[0][0] == 'pi_uid') ||
-                    (request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'coPiUids') || // Co-PI check
-                    (request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'pi_email') || // Historical check
-                    (request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'evaluatedBy') ||
-                    (request.query.keys().hasAll(['where', 'orderBy']) && request.query.where[0][0] == 'meetingDetails.assignedEvaluators') ||
-                    (isPrincipal() && request.query.keys().hasAll(['where', 'orderBy']) && request.query.where[0][0] == 'institute') ||
-                    (isHod() && request.query.keys().hasAll(['where', 'orderBy']) && request.query.where[0][0] == 'departmentName')
+                    // Query for user's own projects as PI
+                    (request.query.where[0] == ['pi_uid', '==', request.auth.uid]) ||
+                    // Query for user's own projects as Co-PI
+                    (request.query.where[0] == ['coPiUids', 'array-contains', request.auth.uid]) ||
+                    // Query for user's evaluation assignments
+                    (request.query.where[0] == ['meetingDetails.assignedEvaluators', 'array-contains', request.auth.uid]) ||
+                    // Corrected rule for querying historical data by email
+                    (request.query.size() == 2 && request.query.where[0] == ['pi_email', '==', request.auth.token.email] && request.query.where[1] == ['pi_uid', 'in', ['', null]]) ||
+                    // Queries for Principals by institute
+                    (isPrincipalByEmail() && request.query.where[0] == ['institute', '==', getUserData().institute]) ||
+                    // Queries for HODs by department
+                    (isHod() && request.query.where[0] == ['departmentName', '==', getUserData().department])
                    );
 
-      // A user can only create a project where they are the PI.
-      // They cannot set the status to anything other than Draft/Submitted.
+      // CREATE: Allow a user to create a project only for themselves
       allow create: if request.auth.uid == request.resource.data.pi_uid &&
                       request.resource.data.status in ['Draft', 'Submitted'] &&
                       !('grant' in request.resource.data) &&
                       !('meetingDetails' in request.resource.data);
       
-      // A PI can update their own project (e.g., submit completion report), but cannot change status or grant details.
-      // An assigned evaluator can update the project ONLY to add their UID to the evaluatedBy array.
+      // UPDATE: Allow a PI to update their own project, or an evaluator to submit an evaluation
       allow update: if (request.auth.uid == resource.data.pi_uid && !('status' in request.resource.data.diff(resource.data).affectedKeys()) && !('grant' in request.resource.data.diff(resource.data).affectedKeys())) ||
-                      (isAssignedEvaluator(resource.data) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
+                      (get(/databases/$(database)/documents/projects/$(projectId)).data.meetingDetails != null && request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.meetingDetails.assignedEvaluators && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['evaluatedBy']));
 
-      // Rules for the evaluations subcollection inside a project
+      // Evaluations Subcollection
       match /evaluations/{evaluatorId} {
-        // We use the parent document's `isAssignedEvaluator` logic here by calling get().
-        // The 'get' rule on the project allows this call to succeed for assigned evaluators.
-        function canAccessEvaluation() {
+        function isAssignedToThisProject() {
             let projectDoc = get(/databases/$(database)/documents/projects/$(projectId));
-            return isAssignedEvaluator(projectDoc.data);
+            return projectDoc.data.meetingDetails != null && request.auth.uid in projectDoc.data.meetingDetails.assignedEvaluators;
         }
-
-        // Allow reading all evaluations for a project if you are an assigned evaluator for it.
-        allow read: if canAccessEvaluation();
-        
-        // Allow writing an evaluation only if you are an assigned evaluator AND you are writing to your own document.
-        allow write: if canAccessEvaluation() && request.auth.uid == evaluatorId;
+        allow read: if isAssignedToThisProject();
+        allow write: if isAssignedToThisProject() && request.auth.uid == evaluatorId;
       }
     }
 
     match /notifications/{notificationId} {
-      // A user can read and update (e.g., mark as read) their own notifications.
       allow read, update: if request.auth.uid == resource.data.uid;
-      // All notifications are created by the server using the Admin SDK, so client creation is denied.
-      allow create: if false;
+      allow create: if false; // Server-only
     }
     
     match /incentiveClaims/{claimId} {
-      // A user can create and read their own incentive claims.
       allow create: if request.auth.uid == request.resource.data.uid;
       allow read: if request.auth.uid == resource.data.uid;
-      // All status updates are handled by the server (Admin SDK), so client updates are denied.
-      allow update: if false;
+      allow update: if false; // Server-only
     }
   }
 }
