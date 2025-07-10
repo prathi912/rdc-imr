@@ -48,13 +48,15 @@ export default function ProjectDetailsPage() {
             submissionDate: projectSnap.data().submissionDate || new Date().toISOString()
         } as Project;
 
-        const isPI = sessionUser.uid === projectData.pi_uid;
         const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
         const isPrincipal = sessionUser.designation === 'Principal' && sessionUser.institute === projectData.institute;
         const isHod = sessionUser.designation === 'HOD' && sessionUser.department === projectData.departmentName;
+        const isPI = sessionUser.uid === projectData.pi_uid;
+        const isCoPI = projectData.coPiUids?.includes(sessionUser.uid);
         const isAssignedEvaluator = projectData.meetingDetails?.assignedEvaluators?.includes(sessionUser.uid);
+        const isSpecialUser = sessionUser.email === 'unnati.joshi22950@paruluniversity.ac.in' && projectData.faculty === 'Faculty of Engineering & Technology';
 
-        if (!isPI && !isAdmin && !isPrincipal && !isHod && !isAssignedEvaluator && !isSpecialUser) {
+        if (!isPI && !isCoPI && !isAdmin && !isPrincipal && !isHod && !isAssignedEvaluator && !isSpecialUser) {
              setNotFound(true); 
              setLoading(false);
              return;
@@ -62,11 +64,13 @@ export default function ProjectDetailsPage() {
 
         setProject(projectData);
 
-        // Fetch PI's user data
-        const piUserRef = doc(db, 'users', projectData.pi_uid);
-        const piUserSnap = await getDoc(piUserRef);
-        if (piUserSnap.exists()) {
-            setPiUser({ uid: piUserSnap.id, ...piUserSnap.data() } as User);
+        // Fetch PI's user data only if pi_uid exists
+        if (projectData.pi_uid) {
+            const piUserRef = doc(db, 'users', projectData.pi_uid);
+            const piUserSnap = await getDoc(piUserRef);
+            if (piUserSnap.exists()) {
+                setPiUser({ uid: piUserSnap.id, ...piUserSnap.data() } as User);
+            }
         }
 
         // Now fetch other users needed for the page
