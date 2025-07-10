@@ -645,6 +645,9 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
       }
 
       const projectRef = adminDb.collection('projects').doc();
+      const submissionDate = project.sanction_date && !isNaN(new Date(project.sanction_date).getTime()) 
+        ? new Date(project.sanction_date).toISOString() 
+        : new Date().toISOString();
       
       const newProjectData: any = {
         title: project.project_title,
@@ -659,7 +662,7 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         departmentName: departmentName,
         teamInfo: "Historical data, team info not available.",
         timelineAndOutcomes: "Historical data, outcomes not available.",
-        submissionDate: project.sanction_date && !isNaN(new Date(project.sanction_date).getTime()) ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
+        submissionDate: submissionDate,
         isBulkUploaded: true,
       };
 
@@ -668,7 +671,8 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
           id: new Date().toISOString(),
           name: 'Phase 1',
           amount: project.grant_amount,
-          status: 'Pending Disbursement',
+          status: 'Disbursed',
+          disbursementDate: submissionDate,
           transactions: [],
         };
         const grant: GrantDetails = {
@@ -974,5 +978,5 @@ export async function findUserByMisId(misId: string): Promise<{ success: boolean
     return { success: false, error: error.message || 'Failed to search for user.' };
   }
 }
-
     
+
