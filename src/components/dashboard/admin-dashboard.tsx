@@ -35,7 +35,7 @@ export function AdminDashboard() {
     completedProjects: 0,
   });
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
-  const [facultyData, setFacultyData] = useState<{ faculty: string, projects: number }[]>([]);
+  const [departmentData, setDepartmentData] = useState<{ department: string, projects: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
@@ -46,7 +46,7 @@ export function AdminDashboard() {
     }
   }, []);
 
-  const facultyConfig = {
+  const departmentConfig = {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },
   } satisfies ChartConfig;
 
@@ -59,14 +59,21 @@ export function AdminDashboard() {
             const projectsRef = collection(db, "projects");
             const usersRef = collection(db, "users");
 
-            const isPrincipal = PRINCIPAL_EMAILS.includes(user.email || '');
+            const isPrincipal = user.designation === 'Principal';
+            const isHod = user.designation === 'HOD';
+            const isCro = user.role === 'CRO';
+            
             let projectQuery;
 
             if (isPrincipal && user.institute) {
-                // Principals only see projects from their institute
                 projectQuery = query(projectsRef, where('institute', '==', user.institute));
-            } else {
-                // Admins/CROs see all projects
+            } else if (isHod && user.department) {
+                projectQuery = query(projectsRef, where('departmentName', '==', user.department));
+            } else if (isCro && user.faculty) {
+                projectQuery = query(projectsRef, where('faculty', '==', user.faculty));
+            }
+            else {
+                // Admins/Super-admins see all projects
                 projectQuery = query(projectsRef);
             }
 
@@ -91,17 +98,17 @@ export function AdminDashboard() {
             setStats({ totalProjects, pendingReviews, approvedProjects, totalUsers, rejectedProjects, completedProjects });
             setRecentProjects(sortedProjects);
 
-            const facultyCounts = Object.entries(
+            const departmentCounts = Object.entries(
                 allProjects.reduce((acc, project) => {
-                if (project.faculty) {
-                    acc[project.faculty] = (acc[project.faculty] || 0) + 1;
+                if (project.departmentName) {
+                    acc[project.departmentName] = (acc[project.departmentName] || 0) + 1;
                 }
                 return acc;
                 }, {} as Record<string, number>)
-            ).map(([faculty, count]) => ({ faculty, projects: count }))
+            ).map(([department, count]) => ({ department, projects: count }))
             .sort((a, b) => b.projects - a.projects)
             .slice(0, 7);
-            setFacultyData(facultyCounts);
+            setDepartmentData(departmentCounts);
 
         } catch (error) {
             console.error("Error fetching admin dashboard data: ", error);
@@ -112,7 +119,14 @@ export function AdminDashboard() {
     getDashboardData();
   }, [user]);
   
-  const isPrincipal = user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false;
+  const isPrincipal = user?.designation === 'Principal';
+  const isHod = user?.designation === 'HOD';
+
+  const getDashboardTitle = () => {
+      if (isPrincipal && user?.institute) return `${user.institute} Dashboard`;
+      if (isHod && user?.department) return `${user.department} Dashboard`;
+      return "Admin Dashboard";
+  };
 
   const statCards = [
     { title: 'Total Projects', value: stats.totalProjects.toString(), icon: Book, loading: loading },
@@ -120,14 +134,13 @@ export function AdminDashboard() {
     { title: 'Recommended', value: stats.approvedProjects.toString(), icon: CheckCircle, loading: loading },
     { title: 'Not Recommended', value: stats.rejectedProjects.toString(), icon: XCircle, loading: loading },
     { title: 'Completed', value: stats.completedProjects.toString(), icon: FileCheck2, loading: loading },
-    // Only show Total Users to non-principals (i.e., true admins/CROs)
-    ...(isPrincipal ? [] : [{ title: 'Total Users', value: stats.totalUsers.toString(), icon: Users, loading: loading }]),
+    ...(isPrincipal || isHod ? [] : [{ title: 'Total Users', value: stats.totalUsers.toString(), icon: Users, loading: loading }]),
   ];
 
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-3xl font-bold tracking-tight">
-        {isPrincipal && user?.institute ? `${user.institute} Dashboard` : "Admin Dashboard"}
+        {getDashboardTitle()}
       </h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {statCards.map((card, index) => (
@@ -161,7 +174,7 @@ export function AdminDashboard() {
         </div>
         <div className="lg:col-span-2 animate-in fade-in-0 slide-in-from-bottom-4" style={{ animationFillMode: 'backwards', animationDelay: '700ms' }}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-2xl font-bold tracking-tight">Projects by Faculty</h3>
+              <h3 className="text-2xl font-bold tracking-tight">Projects by Department</h3>
               <Link href="/dashboard/analytics" passHref>
                   <Button variant="ghost">
                     Analytics
@@ -172,22 +185,22 @@ export function AdminDashboard() {
             {loading ? <Skeleton className="h-[400px] w-full" /> : (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Top Faculty Submissions</CardTitle>
+                    <CardTitle className="text-lg">Top Department Submissions</CardTitle>
                     <CardDescription>
-                      Distribution of projects across the top 7 faculties.
+                      Distribution of projects across the top 7 departments.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pl-0">
-                    <ChartContainer config={facultyConfig} className="h-[320px] w-full">
+                    <ChartContainer config={departmentConfig} className="h-[320px] w-full">
                       <BarChart
                         accessibilityLayer
-                        data={facultyData}
+                        data={departmentData}
                         layout="vertical"
                         margin={{ left: 5, right: 5 }}
                       >
                         <CartesianGrid horizontal={false} />
                         <YAxis
-                          dataKey="faculty"
+                          dataKey="department"
                           type="category"
                           tickLine={false}
                           tickMargin={10}
