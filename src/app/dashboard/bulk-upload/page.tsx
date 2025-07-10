@@ -34,8 +34,8 @@ type ProjectData = {
   status: string;
   grant_amount: number;
   sanction_date: string;
-  Name_of_staff?: string;
-  Faculty?: string;
+  Name_of_staff: string;
+  Faculty: string;
 };
 
 export default function BulkUploadPage() {
@@ -82,10 +82,8 @@ export default function BulkUploadPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date'];
-        const optionalColumns = ['Name_of_staff', 'Faculty'];
-        const allPossibleColumns = [...requiredColumns, ...optionalColumns];
-
+        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty'];
+        
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
             toast({
@@ -173,9 +171,10 @@ export default function BulkUploadPage() {
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">pi_email</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">project_title</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">status</code>, 
-                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">grant_amount</code>, and 
-                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_date</code>.
-                The columns <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code> and <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code> are optional.
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">grant_amount</code>,
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_date</code>,
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code>, and 
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
@@ -202,8 +201,8 @@ export default function BulkUploadPage() {
                     <Table>
                         <TableHeader>
                         <TableRow>
-                            <TableHead>PI Email</TableHead>
                             <TableHead>PI Name</TableHead>
+                            <TableHead>PI Email</TableHead>
                             <TableHead>Project Title</TableHead>
                             <TableHead>Faculty</TableHead>
                             <TableHead>Status</TableHead>
@@ -213,8 +212,8 @@ export default function BulkUploadPage() {
                         <TableBody>
                         {data.map((row, index) => (
                             <TableRow key={index}>
-                            <TableCell>{row.pi_email}</TableCell>
                             <TableCell>{row.Name_of_staff}</TableCell>
+                            <TableCell>{row.pi_email}</TableCell>
                             <TableCell className="font-medium">{row.project_title}</TableCell>
                             <TableCell>{row.Faculty}</TableCell>
                             <TableCell>{row.status}</TableCell>

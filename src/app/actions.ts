@@ -621,14 +621,14 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
 
     for (const project of projectsData) {
       // Basic validation
-      if (!project.pi_email || !project.project_title || !project.status) {
+      if (!project.pi_email || !project.project_title || !project.status || !project.Name_of_staff || !project.Faculty) {
         console.warn('Skipping incomplete project record:', project);
         continue;
       }
 
       let pi_uid = '';
-      let pi_name = project.Name_of_staff || project.pi_email.split('@')[0]; // Use name from sheet, fallback to email prefix
-      let faculty = project.Faculty || "Unknown";
+      let pi_name = project.Name_of_staff;
+      let faculty = project.Faculty;
       let institute = "Unknown";
       let departmentName = "Unknown";
 
@@ -638,9 +638,9 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         const userDoc = userQuery.docs[0];
         const userData = userDoc.data();
         pi_uid = userDoc.id;
-        // Only override name/faculty if they weren't in the sheet
-        pi_name = project.Name_of_staff || userData.name || pi_name;
-        faculty = project.Faculty || userData.faculty || faculty;
+        // User profile data is a fallback if the column was somehow empty despite being required.
+        pi_name = project.Name_of_staff || userData.name || project.pi_email.split('@')[0];
+        faculty = project.Faculty || userData.faculty || "Unknown";
         institute = userData.institute || "Unknown";
         departmentName = userData.department || "Unknown";
       }
