@@ -36,6 +36,7 @@ type ProjectData = {
   sanction_date: string;
   Name_of_staff: string;
   Faculty: string;
+  sanction_number?: string;
 };
 
 export default function BulkUploadPage() {
@@ -105,6 +106,7 @@ export default function BulkUploadPage() {
           sanction_date: row.sanction_date instanceof Date ? row.sanction_date.toISOString() : new Date().toISOString(),
           Name_of_staff: String(row.Name_of_staff || ''),
           Faculty: String(row.Faculty || ''),
+          sanction_number: String(row.sanction_number || ''),
         }));
         setData(formattedData);
       } catch (error) {
@@ -173,8 +175,9 @@ export default function BulkUploadPage() {
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">status</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">grant_amount</code>,
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_date</code>,
-                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code>, and 
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>.
+                The <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_number</code> column is optional.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
@@ -299,3 +302,4 @@ export default function BulkUploadPage() {
     </div>
   );
 }
+

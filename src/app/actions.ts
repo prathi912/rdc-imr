@@ -621,14 +621,14 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
 
     for (const project of projectsData) {
       // Basic validation
-      if (!project.pi_email || !project.project_title || !project.status || !project.Name_of_staff || !project.Faculty) {
+      if (!project.pi_email || !project.project_title || !project.status) {
         console.warn('Skipping incomplete project record:', project);
         continue;
       }
 
       let pi_uid = '';
-      let pi_name = project.Name_of_staff;
-      let faculty = project.Faculty;
+      let pi_name = project.Name_of_staff || project.pi_email.split('@')[0];
+      let faculty = project.Faculty || 'Unknown';
       let institute = "Unknown";
       let departmentName = "Unknown";
 
@@ -638,8 +638,8 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         const userDoc = userQuery.docs[0];
         const userData = userDoc.data();
         pi_uid = userDoc.id;
-        pi_name = project.Name_of_staff || userData.name || project.pi_email.split('@')[0];
-        faculty = project.Faculty || userData.faculty || "Unknown";
+        pi_name = userData.name || pi_name;
+        faculty = userData.faculty || faculty;
         institute = userData.institute || "Unknown";
         departmentName = userData.department || "Unknown";
       }
@@ -678,7 +678,7 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         const grant: GrantDetails = {
           totalAmount: project.grant_amount,
           status: 'Awarded',
-          sanctionNumber: '',
+          sanctionNumber: project.sanction_number || '',
           phases: [firstPhase],
         };
         newProjectData.grant = grant;
@@ -979,4 +979,5 @@ export async function findUserByMisId(misId: string): Promise<{ success: boolean
   }
 }
     
+
 
