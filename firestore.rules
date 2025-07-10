@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -52,7 +51,7 @@ service cloud.firestore {
              projectData.meetingDetails.assignedEvaluators != null &&
              request.auth.uid in projectData.meetingDetails.assignedEvaluators;
     }
-    
+
     // This is a "god-mode" rule. If a user is an admin, they can do anything.
     // This rule is checked first. If it's true, access is granted.
     match /{path=**} {
@@ -62,11 +61,10 @@ service cloud.firestore {
     // The following rules apply to non-admin users.
     
     match /users/{userId} {
-      // Any signed-in user can read their own profile, or query for profiles by misId.
-      // This is required for the profile page to resolve an MIS ID to a user profile.
+      // Any signed-in user can query for public profiles, but can only see their own full data
+      allow list: if request.auth != null;
+      // A user can read their own profile. Admins can read any profile via the global rule.
       allow get: if request.auth.uid == userId;
-      allow list: if request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'misId';
-      
       // A user can create their own document.
       allow create: if request.auth.uid == userId;
       // A user can only update their own document. Admins are covered by the global rule above.
@@ -75,22 +73,38 @@ service cloud.firestore {
     }
     
     match /projects/{projectId} {
-      // A user can GET a specific project document if they are the PI, a Co-PI, an evaluator, or an authorized admin role.
-      // The complex logic for Principals/HODs is handled on the client after this initial check passes.
-      allow get: if request.auth.uid == resource.data.pi_uid ||
-                   request.auth.uid in resource.data.coPiUids ||
-                   isAssignedEvaluator(resource.data) ||
-                   isAdmin(); // Redundant with global rule but safe.
+      // A user can GET a specific project document if they are the PI, a Co-PI, or an authorized viewer.
+      function isProjectOwner() {
+        return request.auth.uid == resource.data.pi_uid ||
+               request.auth.uid in resource.data.coPiUids;
+      }
+      function isAuthorizedViewer() {
+          let userProfileDoc = get(/databases/$(database)/documents/users/$(request.auth.uid));
+          let projectData = resource.data;
+
+          let isPrincipalOfProject = isPrincipal() &&
+             'institute' in userProfileDoc.data &&
+             projectData.keys().hasAny(['institute']) &&
+             userProfileDoc.data.institute == projectData.institute;
+             
+          let isHodOfProject = isHod() &&
+             'department' in userProfileDoc.data &&
+             projectData.keys().hasAny(['departmentName']) &&
+             userProfileDoc.data.department == projectData.departmentName;
+
+          return isAssignedEvaluator(projectData) || isPrincipalOfProject || isHodOfProject;
+      }
+      allow get: if isProjectOwner() || isAuthorizedViewer();
       
       // A user can LIST projects if the query is for their own projects, or if they are an authorized role querying by a specific field.
       allow list: if request.auth != null && (
-                    (request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'pi_uid' && request.query.where[0][2] == request.auth.uid) || 
-                    (request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'coPiUids' && request.query.where[0][2] == request.auth.uid) || 
-                    (request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'pi_email' && request.query.where[0][2] == request.auth.token.email) || 
-                    (request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'evaluatedBy' && request.query.where[0][2] == request.auth.uid) ||
-                    (request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'meetingDetails.assignedEvaluators' && request.query.where[0][2] == request.auth.uid) ||
-                    (isPrincipal() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'institute') ||
-                    (isHod() && request.query.keys().hasAny(['where']) && request.query.where[0][0] == 'departmentName')
+                    (request.query.where[0][0] == 'pi_uid' && request.query.where[0][2] == request.auth.uid) || // Own projects as PI
+                    (request.query.where[0][0] == 'coPiUids' && request.query.where[0][2] == request.auth.uid) || // Own projects as Co-PI
+                    (request.query.where[0][0] == 'pi_email' && request.query.where[0][2] == request.auth.token.email) || // Own historical projects
+                    (request.query.where[0][0] == 'evaluatedBy' && request.query.where[0][2] == request.auth.uid) || // Own evaluated projects
+                    (request.query.where[0][0] == 'meetingDetails.assignedEvaluators' && request.query.where[0][2] == request.auth.uid) || // Assigned evaluations
+                    (isPrincipal() && request.query.where[0][0] == 'institute') ||
+                    (isHod() && request.query.where[0][0] == 'departmentName')
                    );
 
       // A user can only create a project where they are the PI.
