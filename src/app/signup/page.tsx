@@ -75,15 +75,15 @@ export default function SignupPage() {
     },
   });
   
-  const determineUserRoleAndDesignation = (email: string): { role: User['role'], designation?: User['designation'] } => {
+  const determineUserRoleAndDesignation = (email: string): { role: User['role'], designation: User['designation'] } => {
     if (email === 'rathipranav07@gmail.com') {
-      return { role: 'Super-admin' };
+      return { role: 'Super-admin', designation: 'Super-admin' };
     }
     if (PRINCIPAL_EMAILS.includes(email)) {
       return { role: 'faculty', designation: 'Principal' };
     }
     // New users are faculty by default. Super-admin can change roles.
-    return { role: 'faculty' };
+    return { role: 'faculty', designation: 'faculty' };
   }
 
   const processNewUser = async (firebaseUser: FirebaseUser, name?: string) => {

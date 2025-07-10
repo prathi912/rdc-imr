@@ -13,7 +13,7 @@ export type User = {
   name: string;
   email: string;
   role: 'admin' | 'faculty' | 'CRO' | 'Super-admin';
-  designation?: string;
+  designation?: 'Principal' | 'HOD' | 'Super-admin' | 'faculty' | string;
   faculty?: string;
   institute?: string;
   department?: string;
