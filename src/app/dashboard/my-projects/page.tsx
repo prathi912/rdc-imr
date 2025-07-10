@@ -30,40 +30,49 @@ export default function MyProjectsPage() {
         try {
           const projectsRef = collection(db, 'projects');
           
+          // Query 1: Projects where user is the PI (UID match)
           const piQuery = query(
             projectsRef,
             where('pi_uid', '==', parsedUser.uid)
           );
+          
+          // Query 2: Projects where user is a Co-PI (UID match)
           const coPiQuery = query(
             projectsRef,
             where('coPiUids', 'array-contains', parsedUser.uid)
           );
 
-          const [piSnapshot, coPiSnapshot] = await Promise.all([
+          // Query 3: Historical projects where UID is not yet linked but email matches
+          const historicalPiQuery = query(
+            projectsRef,
+            where('pi_email', '==', parsedUser.email),
+            where('pi_uid', 'in', ['', null])
+          );
+
+          const [piSnapshot, coPiSnapshot, historicalPiSnapshot] = await Promise.all([
             getDocs(piQuery),
             getDocs(coPiQuery),
+            getDocs(historicalPiQuery),
           ]);
           
-          const userProjects: Project[] = [];
-          const projectIds = new Set<string>();
+          const userProjectsMap = new Map<string, Project>();
 
-          piSnapshot.forEach(doc => {
-            if (!projectIds.has(doc.id)) {
-                userProjects.push({ id: doc.id, ...doc.data() } as Project);
-                projectIds.add(doc.id);
-            }
-          });
-
-          coPiSnapshot.forEach(doc => {
-              if (!projectIds.has(doc.id)) {
-                  userProjects.push({ id: doc.id, ...doc.data() } as Project);
-                  projectIds.add(doc.id);
+          const processSnapshot = (snapshot: any) => {
+            snapshot.forEach((doc: any) => {
+              if (!userProjectsMap.has(doc.id)) {
+                userProjectsMap.set(doc.id, { id: doc.id, ...doc.data() } as Project);
               }
-          });
+            });
+          };
 
-          userProjects.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
+          processSnapshot(piSnapshot);
+          processSnapshot(coPiSnapshot);
+          processSnapshot(historicalPiSnapshot);
 
-          setMyProjects(userProjects);
+          const allUserProjects = Array.from(userProjectsMap.values());
+          allUserProjects.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
+
+          setMyProjects(allUserProjects);
         } catch (error) {
           console.error("Error fetching user's projects:", error);
           toast({ variant: 'destructive', title: 'Error', description: "Could not fetch your projects." });
