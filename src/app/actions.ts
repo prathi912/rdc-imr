@@ -638,7 +638,6 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         const userDoc = userQuery.docs[0];
         const userData = userDoc.data();
         pi_uid = userDoc.id;
-        // User profile data is a fallback if the column was somehow empty despite being required.
         pi_name = project.Name_of_staff || userData.name || project.pi_email.split('@')[0];
         faculty = project.Faculty || userData.faculty || "Unknown";
         institute = userData.institute || "Unknown";
@@ -660,11 +659,11 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         departmentName: departmentName,
         teamInfo: "Historical data, team info not available.",
         timelineAndOutcomes: "Historical data, outcomes not available.",
-        submissionDate: project.sanction_date || new Date().toISOString(),
+        submissionDate: project.sanction_date ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
         grant: {
             amount: project.grant_amount || 0,
             status: 'Completed', // Assume old grants are completed
-            disbursementDate: project.sanction_date || new Date().toISOString(),
+            disbursementDate: project.sanction_date ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
         },
         isBulkUploaded: true,
       };
@@ -952,3 +951,5 @@ export async function findUserByMisId(misId: string): Promise<{ success: boolean
     return { success: false, error: error.message || 'Failed to search for user.' };
   }
 }
+
+    
