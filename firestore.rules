@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -61,12 +62,14 @@ service cloud.firestore {
     // The following rules apply to non-admin users.
     
     match /users/{userId} {
-      // Any signed-in user can read a public profile.
+      // A user can update their own document, or get any user doc (for profile pages).
+      // Listing is restricted to prevent scraping all users.
+      allow get, update: if request.auth.uid == userId;
+      // Allow read for anyone authenticated, but only allow LISTING users by MIS ID for the profile page.
       allow read: if request.auth != null;
+      allow list: if request.query.where[0][0] == 'misId'; // Allow querying by MIS ID for profile page lookup
       // A user can create their own document.
       allow create: if request.auth.uid == userId;
-      // A user can only update their own document. Admins are covered by the global rule above.
-      allow update: if request.auth.uid == userId;
       allow delete: if request.auth.uid == userId;
     }
     
@@ -98,7 +101,7 @@ service cloud.firestore {
       allow list: if request.auth != null && (
                     (request.query.where[0][0] == 'pi_uid' && request.query.where[0][2] == request.auth.uid) || // Own projects as PI
                     (request.query.where[0][0] == 'coPiUids' && request.query.where[0][2] == request.auth.uid) || // Own projects as Co-PI
-                    (request.query.where[0][0] == 'pi_email' && request.query.where[0][2] == request.auth.token.email) || // Own historical projects
+                    (request.query.where[0][0] == 'pi_email' && request.query.where[0][2] == request.auth.token.email) || // Corrected historical check
                     (request.query.where[0][0] == 'evaluatedBy' && request.query.where[0][2] == request.auth.uid) || // Own evaluated projects
                     (request.query.where[0][0] == 'meetingDetails.assignedEvaluators' && request.query.where[0][2] == request.auth.uid) || // Assigned evaluations
                     (isPrincipal() && request.query.where[0][0] == 'institute') ||

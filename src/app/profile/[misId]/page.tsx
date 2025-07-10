@@ -27,7 +27,6 @@ export default function ProfilePage() {
     if (storedUser) {
         setSessionUser(JSON.parse(storedUser));
     } else {
-        // If there's no user, we can't fetch anything. Let rules handle it or show error early.
         setLoading(false);
         setError("You must be logged in to view profiles.");
     }
@@ -35,17 +34,13 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!misId || !sessionUser) {
-      return; // Wait for session user to be loaded
+      return; 
     }
 
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        let fetchedUser: User | null = null;
-        const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
-
-        // Always fetch the target profile by MIS ID first to get their UID
         const usersRef = collection(db, 'users');
         const userQuery = query(usersRef, where('misId', '==', misId), limit(1));
         const userSnapshot = await getDocs(userQuery);
@@ -55,19 +50,19 @@ export default function ProfilePage() {
         }
 
         const targetUserDoc = userSnapshot.docs[0];
-        fetchedUser = { uid: targetUserDoc.id, ...targetUserDoc.data() } as User;
-
-        // Now, verify if the session user has permission to view this profile.
-        // They are either an admin, or they are the owner of the profile.
+        const fetchedUser = { uid: targetUserDoc.id, ...targetUserDoc.data() } as User;
+        
+        const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
         const isOwner = sessionUser.uid === fetchedUser.uid;
-
+        
+        // This is the main permission check. If not an admin and not the owner, deny access.
         if (!isAdmin && !isOwner) {
             throw new Error("Access Denied: You do not have permission to view this profile.");
         }
         
         setProfileUser(fetchedUser);
 
-        // Fetch user's incentive claims (assuming admins can read all claims, and users their own)
+        // Fetch user's incentive claims
         const claimsRef = collection(db, 'incentiveClaims');
         const claimsQuery = query(claimsRef, where('uid', '==', fetchedUser.uid), orderBy('submissionDate', 'desc'));
         const claimsSnapshot = await getDocs(claimsQuery);
