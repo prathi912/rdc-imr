@@ -99,11 +99,11 @@ export default function ProjectDetailsPage() {
   useEffect(() => {
     if (projectId && sessionUser) {
         getProjectAndUsers(projectId);
-    } else if (!sessionUser && !loading) {
-        // If there's no session user and we aren't already loading, it's likely they're logged out.
+    } else if (!sessionUser) {
         setNotFound(true);
+        setLoading(false);
     }
-  }, [projectId, sessionUser, getProjectAndUsers, loading]);
+  }, [projectId, sessionUser, getProjectAndUsers]);
 
 
   if (loading) {
