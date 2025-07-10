@@ -109,6 +109,7 @@ export type Project = {
   };
   revisedProposalUrl?: string;
   revisionSubmissionDate?: string;
+  revisionComments?: string;
   isBulkUploaded?: boolean;
   projectStartDate?: string;
   projectEndDate?: string;

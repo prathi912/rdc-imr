@@ -36,6 +36,7 @@ import { GrantManagement } from './grant-management';
 import { EvaluationForm } from './evaluation-form';
 import { EvaluationsSummary } from './evaluations-summary';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Textarea } from '../ui/textarea';
 
 interface ProjectDetailsClientProps {
   project: Project;
@@ -75,6 +76,11 @@ const evaluatorSchema = z.object({
 });
 type EvaluatorFormData = z.infer<typeof evaluatorSchema>;
 
+const revisionCommentSchema = z.object({
+    comments: z.string().min(10, "Please provide detailed comments for the revision."),
+});
+type RevisionCommentFormData = z.infer<typeof revisionCommentSchema>;
+
 
 const venues = ["RDC Committee Room, PIMSR"];
 
@@ -111,6 +117,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const [isDurationDialogOpen, setIsDurationDialogOpen] = useState(false);
   const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false);
+  const [isRevisionCommentDialogOpen, setIsRevisionCommentDialogOpen] = useState(false);
 
   const scheduleForm = useForm<ScheduleFormData>({
     resolver: zodResolver(scheduleSchema),
@@ -122,6 +129,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const evaluatorForm = useForm<EvaluatorFormData>({
     resolver: zodResolver(evaluatorSchema),
+  });
+
+  const revisionCommentForm = useForm<RevisionCommentFormData>({
+    resolver: zodResolver(revisionCommentSchema),
+    defaultValues: { comments: '' },
   });
   
   useEffect(() => {
@@ -213,15 +225,19 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     });
   }, [project.meetingDetails, allUsers]);
 
-  const handleStatusUpdate = async (newStatus: Project['status']) => {
+  const handleStatusUpdate = async (newStatus: Project['status'], comments?: string) => {
     setIsUpdating(true);
-    const result = await updateProjectStatus(project.id, newStatus);
+    const result = await updateProjectStatus(project.id, newStatus, comments);
     setIsUpdating(false);
 
     if (result.success) {
       setProject({ ...project, status: newStatus });
       toast({ title: 'Success', description: `Project status updated to ${newStatus}` });
       router.refresh();
+      if (newStatus === 'Revision Needed') {
+        setIsRevisionCommentDialogOpen(false);
+        revisionCommentForm.reset();
+      }
     } else {
       toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to update project status.' });
     }
@@ -449,6 +465,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       }
       handleStatusUpdate(status);
   }
+  
+  const handleRevisionCommentSubmit = (data: RevisionCommentFormData) => {
+    handleStatusUpdate('Revision Needed', data.comments);
+  };
 
   const availableStatuses: Project['status'][] = ['Submitted', 'Under Review', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
@@ -485,8 +505,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                                   <X className="mr-2 h-4 w-4 text-destructive" /> <span className="text-destructive">Not Recommend</span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleStatusUpdate('Revision Needed')}>
-                                  <Edit className="mr-2 h-4 w-4" /> Request Revision
+                              <DropdownMenuItem onSelect={() => setIsRevisionCommentDialogOpen(true)}>
+                                <Edit className="mr-2 h-4 w-4" /> Request Revision
                               </DropdownMenuItem>
                           </DropdownMenuContent>
                       </DropdownMenu>
@@ -607,6 +627,19 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 )}
               </div>
               <Separator />
+            </>
+          )}
+           {project.status === 'Revision Needed' && project.revisionComments && (
+            <>
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Revision Requested</AlertTitle>
+                    <AlertDescription>
+                        <p className="font-semibold mt-2">Evaluator's Comments:</p>
+                        <p className="whitespace-pre-wrap">{project.revisionComments}</p>
+                    </AlertDescription>
+                </Alert>
+                <Separator />
             </>
           )}
           <div className="space-y-2">
@@ -824,6 +857,41 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={isRevisionCommentDialogOpen} onOpenChange={setIsRevisionCommentDialogOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Revision Comments</DialogTitle>
+                    <DialogDescription>
+                        Please provide comments for the PI to understand what needs to be revised. This will be included in the email notification.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...revisionCommentForm}>
+                    <form id="revision-comment-form" onSubmit={revisionCommentForm.handleSubmit(handleRevisionCommentSubmit)} className="py-4">
+                        <FormField
+                            control={revisionCommentForm.control}
+                            name="comments"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Comments</FormLabel>
+                                    <FormControl>
+                                        <Textarea rows={5} {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </form>
+                </Form>
+                 <DialogFooter>
+                    <Button variant="ghost" onClick={() => setIsRevisionCommentDialogOpen(false)}>Cancel</Button>
+                    <Button type="submit" form="revision-comment-form" disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Submit and Request Revision
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </>
   );
 }

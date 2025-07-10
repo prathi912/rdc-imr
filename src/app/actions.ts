@@ -56,7 +56,7 @@ export async function getJournalWebsite(input: JournalWebsiteInput) {
   }
 }
 
-export async function updateProjectStatus(projectId: string, newStatus: Project['status']) {
+export async function updateProjectStatus(projectId: string, newStatus: Project['status'], comments?: string) {
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
     const projectSnap = await projectRef.get();
@@ -65,8 +65,13 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
       return { success: false, error: 'Project not found.' };
     }
     const project = projectSnap.data() as Project;
+    
+    const updateData: { status: Project['status']; revisionComments?: string } = { status: newStatus };
+    if (newStatus === 'Revision Needed' && comments) {
+        updateData.revisionComments = comments;
+    }
 
-    await projectRef.update({ status: newStatus });
+    await projectRef.update(updateData);
 
     const notification = {
       uid: project.pi_uid,
@@ -76,35 +81,48 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
       isRead: false,
     };
     await adminDb.collection('notifications').add(notification);
+    
+    let emailHtml = `
+      <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;">
+        <div style="text-align:center; margin-bottom:20px;">
+          <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width:300px; height:auto;" />
+        </div>
+        <p style="color:#ffffff;">Dear ${project.pi},</p>
+        <p style="color:#e0e0e0;">
+          The status of your project, "<strong style="color:#ffffff;">${project.title}</strong>" has been updated to 
+          <strong style="color:#ffca28;">${newStatus}</strong>.
+        </p>
+    `;
+
+    if (newStatus === 'Revision Needed' && comments) {
+        emailHtml += `
+          <div style="margin-top:20px; padding:15px; border:1px solid #4f5b62; border-radius:6px; background-color:#2c3e50;">
+            <h4 style="color:#ffffff; margin-top:0;">Evaluator's Comments for Revision:</h4>
+            <p style="color:#e0e0e0; white-space: pre-wrap;">${comments}</p>
+          </div>
+          <p style="color:#e0e0e0; margin-top:20px;">
+            Please submit the revised proposal from your project details page on the portal.
+          </p>
+        `;
+    }
+
+    emailHtml += `
+      <p style="color:#e0e0e0;">
+        You can view your project details on the 
+        <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}" style="color:#64b5f6; text-decoration:underline;">
+          PU Research Portal
+        </a>.
+      </p>
+      <p style="color:#b0bec5;">Thank you,</p>
+      <p style="color:#b0bec5;">Research & Development Cell - PU</p>
+    </div>`;
+
 
     if (project.pi_email) {
       await sendEmail({
         to: project.pi_email,
         subject: `Project Status Update: ${project.title}`,
-        html: `
-        <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;">
-          <div style="text-align:center; margin-bottom:20px;">
-            <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width:300px; height:auto;" />
-          </div>
-      
-          <p style="color:#ffffff;">Dear ${project.pi},</p>
-      
-          <p style="color:#e0e0e0;">
-            The status of your project, "<strong style="color:#ffffff;">${project.title}</strong>" has been updated to 
-            <strong style="color:#00e676;">${newStatus}</strong>.
-          </p>
-      
-          <p style="color:#e0e0e0;">
-            You can view your project details on the 
-            <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}" style="color:#64b5f6; text-decoration:underline;">
-              PU Research Portal
-            </a>.
-          </p>
-      
-          <p style="color:#b0bec5;">Thank you,</p>
-          <p style="color:#b0bec5;">Research & Development Cell - PU</p>
-        </div>
-      `,
+        html: emailHtml,
       });
     }
 
@@ -979,6 +997,7 @@ export async function findUserByMisId(misId: string): Promise<{ success: boolean
   }
 }
     
+
 
 
 
