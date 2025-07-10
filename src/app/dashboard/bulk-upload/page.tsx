@@ -205,8 +205,8 @@ export default function BulkUploadPage() {
                         <TableHeader>
                         <TableRow>
                             <TableHead>PI Name</TableHead>
-                            <TableHead>PI Email</TableHead>
                             <TableHead>Project Title</TableHead>
+                            <TableHead>Sanction No.</TableHead>
                             <TableHead>Faculty</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
@@ -216,8 +216,8 @@ export default function BulkUploadPage() {
                         {data.map((row, index) => (
                             <TableRow key={index}>
                             <TableCell>{row.Name_of_staff}</TableCell>
-                            <TableCell>{row.pi_email}</TableCell>
                             <TableCell className="font-medium">{row.project_title}</TableCell>
+                            <TableCell>{row.sanction_number}</TableCell>
                             <TableCell>{row.Faculty}</TableCell>
                             <TableCell>{row.status}</TableCell>
                             <TableCell className="text-right">{row.grant_amount.toLocaleString()}</TableCell>
@@ -302,3 +302,5 @@ export default function BulkUploadPage() {
     </div>
   );
 }
+
+    
