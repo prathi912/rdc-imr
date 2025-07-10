@@ -45,31 +45,24 @@ export default function ProfilePage() {
         let fetchedUser: User | null = null;
         const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
 
-        if (isAdmin) {
-          // Admins can query by misId, this is allowed by `list` security rule
-          const usersRef = collection(db, 'users');
-          const userQuery = query(usersRef, where('misId', '==', misId), limit(1));
-          const userSnapshot = await getDocs(userQuery);
-          if (!userSnapshot.empty) {
-            fetchedUser = { uid: userSnapshot.docs[0].id, ...userSnapshot.docs[0].data() } as User;
-          }
-        } else {
-          // Non-admins can only view their own profile.
-          if (sessionUser.misId === misId) {
-            // Fetch directly by UID, this is allowed by `get` security rule
-            const userRef = doc(db, 'users', sessionUser.uid);
-            const userSnapshot = await getDoc(userRef);
-            if (userSnapshot.exists()) {
-              fetchedUser = { uid: userSnapshot.id, ...userSnapshot.data() } as User;
-            }
-          } else {
-            // Trying to view someone else's profile
-            throw new Error("Access Denied: You do not have permission to view this profile.");
-          }
+        // Always fetch the target profile by MIS ID first to get their UID
+        const usersRef = collection(db, 'users');
+        const userQuery = query(usersRef, where('misId', '==', misId), limit(1));
+        const userSnapshot = await getDocs(userQuery);
+        
+        if (userSnapshot.empty) {
+            throw new Error('User not found.');
         }
 
-        if (!fetchedUser) {
-          throw new Error('User not found.');
+        const targetUserDoc = userSnapshot.docs[0];
+        fetchedUser = { uid: targetUserDoc.id, ...targetUserDoc.data() } as User;
+
+        // Now, verify if the session user has permission to view this profile.
+        // They are either an admin, or they are the owner of the profile.
+        const isOwner = sessionUser.uid === fetchedUser.uid;
+
+        if (!isAdmin && !isOwner) {
+            throw new Error("Access Denied: You do not have permission to view this profile.");
         }
         
         setProfileUser(fetchedUser);
