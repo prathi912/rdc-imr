@@ -24,7 +24,7 @@ export function Guidelines() {
             <h4 className="font-semibold text-foreground mb-2">Key Conditions:</h4>
             <ul className="list-disc pl-6 space-y-2">
             <li>
-                If project gets Approved, and a grant is awarded, transactions should be only made through your Salary Account. Tranasactions from other accounts would not be considered valid.
+                If project gets Recommended, and a grant is awarded, transactions should be only made through your Salary Account. Tranasactions from other accounts would not be considered valid.
             </li>
             <li>
                 One IMR project only shall be sanctioned to a faculty member as PI, at any given point of time. However, he/she can become a Co-PI for additional IMR project(s).

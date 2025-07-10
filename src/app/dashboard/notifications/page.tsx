@@ -70,8 +70,8 @@ export default function NotificationsPage() {
   };
 
   const getIcon = (title: string) => {
-    if (title.includes('Approved') || title.includes('Completed')) return FileCheck2;
-    if (title.includes('Review') || title.includes('Rejected')) return GanttChartSquare;
+    if (title.includes('Recommended') || title.includes('Completed')) return FileCheck2;
+    if (title.includes('Review') || title.includes('Not Recommended')) return GanttChartSquare;
     return Bell;
   }
 

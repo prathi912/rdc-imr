@@ -24,7 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
-const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Approved', 'Rejected', 'In Progress', 'Completed', 'Pending Completion Approval'];
+const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommeded', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
 const EXPORT_COLUMNS = [
   { id: 'id', label: 'Project ID' },

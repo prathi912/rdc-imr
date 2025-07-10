@@ -89,7 +89,7 @@ export type Project = {
   pi_email?: string;
   pi_phoneNumber?: string;
   coPiUids?: string[];
-  status: 'Draft' | 'Submitted' | 'Under Review' | 'Revision Needed' | 'Approved' | 'Rejected' | 'In Progress' | 'Completed' | 'Pending Completion Approval';
+  status: 'Draft' | 'Submitted' | 'Under Review' | 'Revision Needed' | 'Recommended' | 'Not Recommended' | 'In Progress' | 'Completed' | 'Pending Completion Approval';
   teamInfo: string;
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string

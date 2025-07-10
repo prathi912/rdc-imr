@@ -34,6 +34,8 @@ type ProjectData = {
   status: string;
   grant_amount: number;
   sanction_date: string;
+  Name_of_staff?: string;
+  Faculty?: string;
 };
 
 export default function BulkUploadPage() {
@@ -80,13 +82,14 @@ export default function BulkUploadPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date'];
+        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty'];
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
             toast({
                 variant: 'destructive',
                 title: 'Invalid File Format',
                 description: `The uploaded file must contain the following columns: ${requiredColumns.join(', ')}.`,
+                duration: 8000
             });
             setData([]);
             setFileName('');
@@ -99,6 +102,8 @@ export default function BulkUploadPage() {
           status: String(row.status || ''),
           grant_amount: Number(row.grant_amount || 0),
           sanction_date: row.sanction_date instanceof Date ? row.sanction_date.toISOString() : new Date().toISOString(),
+          Name_of_staff: String(row.Name_of_staff || ''),
+          Faculty: String(row.Faculty || ''),
         }));
         setData(formattedData);
       } catch (error) {
@@ -163,6 +168,8 @@ export default function BulkUploadPage() {
               <AlertDescription>
                 Your Excel file must contain the following columns in the first sheet: 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">pi_email</code>, 
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code>,
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>,
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">project_title</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">status</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">grant_amount</code>, and 
@@ -194,7 +201,9 @@ export default function BulkUploadPage() {
                         <TableHeader>
                         <TableRow>
                             <TableHead>PI Email</TableHead>
+                            <TableHead>PI Name</TableHead>
                             <TableHead>Project Title</TableHead>
+                            <TableHead>Faculty</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
                         </TableRow>
@@ -203,7 +212,9 @@ export default function BulkUploadPage() {
                         {data.map((row, index) => (
                             <TableRow key={index}>
                             <TableCell>{row.pi_email}</TableCell>
+                            <TableCell>{row.Name_of_staff}</TableCell>
                             <TableCell className="font-medium">{row.project_title}</TableCell>
+                            <TableCell>{row.Faculty}</TableCell>
                             <TableCell>{row.status}</TableCell>
                             <TableCell className="text-right">{row.grant_amount.toLocaleString()}</TableCell>
                             </TableRow>

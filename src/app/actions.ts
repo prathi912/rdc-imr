@@ -627,8 +627,8 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
       }
 
       let pi_uid = '';
-      let pi_name = project.pi_email.split('@')[0]; // Default name
-      let faculty = "Unknown";
+      let pi_name = project.Name_of_staff || project.pi_email.split('@')[0]; // Use name from sheet, fallback to email prefix
+      let faculty = project.Faculty || "Unknown";
       let institute = "Unknown";
       let departmentName = "Unknown";
 
@@ -638,8 +638,9 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         const userDoc = userQuery.docs[0];
         const userData = userDoc.data();
         pi_uid = userDoc.id;
-        pi_name = userData.name || pi_name;
-        faculty = userData.faculty || "Unknown";
+        // Only override name/faculty if they weren't in the sheet
+        pi_name = project.Name_of_staff || userData.name || pi_name;
+        faculty = project.Faculty || userData.faculty || faculty;
         institute = userData.institute || "Unknown";
         departmentName = userData.department || "Unknown";
       }

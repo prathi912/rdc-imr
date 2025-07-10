@@ -22,7 +22,7 @@ export default function CompletedReviewsPage() {
         const projectsCol = collection(db, 'projects');
         const q = query(
           projectsCol, 
-          where('status', 'in', ['Approved', 'Rejected', 'Completed']),
+          where('status', 'in', ['Recommended', 'Not Recommended', 'Completed']),
           orderBy('submissionDate', 'desc')
         );
         const projectSnapshot = await getDocs(q);

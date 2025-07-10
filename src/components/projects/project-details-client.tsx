@@ -45,12 +45,12 @@ interface ProjectDetailsClientProps {
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
   'Submitted': 'secondary',
-  'Approved': 'default',
+  'Recommended': 'default',
   'In Progress': 'default',
   'Under Review': 'secondary',
   'Revision Needed': 'secondary',
   'Pending Completion Approval': 'secondary',
-  'Rejected': 'destructive',
+  'Not Recommended': 'destructive',
   'Completed': 'outline'
 };
 
@@ -442,7 +442,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setProject(updatedProject);
   };
   
-  const handleApprovalClick = (status: 'Approved' | 'Rejected') => {
+  const handleApprovalClick = (status: 'Recommended' | 'Not Recommended') => {
       if (!allEvaluationsIn) {
           setShowApprovalAlert(true);
           return;
@@ -466,8 +466,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       {project.status === 'Under Review' && <Clock className="mr-2 h-4 w-4" />}
                       {project.status === 'Revision Needed' && <Edit className="mr-2 h-4 w-4" />}
                       {project.status === 'Pending Completion Approval' && <Clock className="mr-2 h-4 w-4" />}
-                      {(project.status === 'Approved' || project.status === 'Completed') && <Check className="mr-2 h-4 w-4" />}
-                      {project.status === 'Rejected' && <X className="mr-2 h-4 w-4" />}
+                      {(project.status === 'Recommended' || project.status === 'Completed') && <Check className="mr-2 h-4 w-4" />}
+                      {project.status === 'Not Recommended' && <X className="mr-2 h-4 w-4" />}
                       {project.status}
                   </Badge>
                   {isAdmin && project.status === 'Under Review' && (
@@ -478,11 +478,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                               </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleApprovalClick('Approved')}>
-                                  <Check className="mr-2 h-4 w-4" /> Approve
+                              <DropdownMenuItem onClick={() => handleApprovalClick('Recommended')}>
+                                  <Check className="mr-2 h-4 w-4" /> Recommend
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleApprovalClick('Rejected')}>
-                                  <X className="mr-2 h-4 w-4 text-destructive" /> <span className="text-destructive">Reject</span>
+                              <DropdownMenuItem onClick={() => handleApprovalClick('Not Recommended')}>
+                                  <X className="mr-2 h-4 w-4 text-destructive" /> <span className="text-destructive">Not Recommend</span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => handleStatusUpdate('Revision Needed')}>
@@ -501,7 +501,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       </DialogContent>
                     </Dialog>
                   )}
-                  {isSuperAdmin && project.status === 'Approved' && (
+                  {isSuperAdmin && project.status === 'Recommended' && (
                     <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
                         <DialogTrigger asChild>
                             <Button variant="outline"><CalendarIcon className="mr-2 h-4 w-4" />{project.projectStartDate ? 'Update Duration' : 'Set Duration'}</Button>
@@ -521,7 +521,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         </DialogContent>
                     </Dialog>
                   )}
-                  {isAdmin && project.status === 'Approved' && !project.grant && (
+                  {isAdmin && project.status === 'Recommended' && !project.grant && (
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                       <DialogTrigger asChild>
                         <Button><DollarSign className="mr-2 h-4 w-4" /> Award Grant</Button>
@@ -550,7 +550,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </Dialog>
                   )}
                   
-                  {isPI && (project.status === 'Approved' || project.status === 'In Progress') && (
+                  {isPI && (project.status === 'Recommended' || project.status === 'In Progress') && (
                     <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
                       <DialogTrigger asChild><Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Request Project Closure</Button></DialogTrigger>
                       <DialogContent>
@@ -765,7 +765,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         </CardContent>
       </Card>
       
-      {isAdmin && ['Approved', 'In Progress', 'Completed', 'Pending Completion Approval'].includes(project.status) && (
+      {isAdmin && ['Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'].includes(project.status) && (
         <Card className="mt-8">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -815,7 +815,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 <AlertDialogHeader>
                     <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This project cannot be approved or rejected until all assigned evaluations have been submitted. 
+                        This project cannot be Recommended or Not Recommended until all assigned evaluations have been submitted. 
                         There are currently {evaluations.length || 0} of {project.meetingDetails?.assignedEvaluators?.length || 0} required evaluations complete.
                     </AlertDialogDescription>
                 </AlertDialogHeader>

@@ -54,8 +54,8 @@ export function AdminDashboard() {
         
         const totalProjects = allProjects.length;
         const pendingReviews = allProjects.filter(p => p.status === 'Under Review').length;
-        const approvedProjects = allProjects.filter(p => p.status === 'Approved').length;
-        const rejectedProjects = allProjects.filter(p => p.status === 'Rejected').length;
+        const approvedProjects = allProjects.filter(p => p.status === 'Recommended').length;
+        const rejectedProjects = allProjects.filter(p => p.status === 'Not Recommended').length;
         const completedProjects = allProjects.filter(p => p.status === 'Completed').length;
         const totalUsers = usersSnapshot.size;
 
@@ -90,8 +90,8 @@ export function AdminDashboard() {
   const statCards = [
     { title: 'Total Projects', value: stats.totalProjects.toString(), icon: Book, loading: loading },
     { title: 'Pending Reviews', value: stats.pendingReviews.toString(), icon: Clock, loading: loading },
-    { title: 'Approved', value: stats.approvedProjects.toString(), icon: CheckCircle, loading: loading },
-    { title: 'Rejected', value: stats.rejectedProjects.toString(), icon: XCircle, loading: loading },
+    { title: 'Recommended', value: stats.approvedProjects.toString(), icon: CheckCircle, loading: loading },
+    { title: 'Not Recommended', value: stats.rejectedProjects.toString(), icon: XCircle, loading: loading },
     { title: 'Completed', value: stats.completedProjects.toString(), icon: FileCheck2, loading: loading },
     { title: 'Total Users', value: stats.totalUsers.toString(), icon: Users, loading: loading },
   ];

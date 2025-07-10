@@ -40,15 +40,17 @@ const profileSetupSchema = z.object({
 type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
 
 const faculties = [
-    "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
+    "RDC","Parul Sevashram Hospital","Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
     "Faculty of Computer Applications", "Faculty of Agriculture", "Faculty of Architecture & Planning",
     "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
     "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
-    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health",
+    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health","RDC",
 ];
 
 const institutes = [
+    "RDC",
+    "Parul Sevashram Hospital",
     "Parul Institute of Engineering & Technology",
     "Parul Institute of Technology",
     "Parul Institute of Engineering & Technology (Diploma Studies)",

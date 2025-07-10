@@ -53,7 +53,6 @@ export default function ProjectDetailsPage() {
         const isPrincipal = sessionUser.designation === 'Principal' && sessionUser.institute === projectData.institute;
         const isHod = sessionUser.designation === 'HOD' && sessionUser.department === projectData.departmentName;
         const isAssignedEvaluator = projectData.meetingDetails?.assignedEvaluators?.includes(sessionUser.uid);
-        const isSpecialUser = sessionUser.email === 'unnati.joshi22950@paruluniversity.ac.in' && projectData.faculty === 'Faculty of Engineering & Technology';
 
         if (!isPI && !isAdmin && !isPrincipal && !isHod && !isAssignedEvaluator && !isSpecialUser) {
              setNotFound(true); 

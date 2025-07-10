@@ -17,7 +17,7 @@ The portal provides a tailored experience for each user role, ensuring users onl
 ### 2. Intramural Research (IMR) Project Management
 A complete workflow for managing research project funding from submission to completion.
 -   **Guided Proposal Submission:** A multi-step form for submitting detailed project proposals, including team information, abstracts, and necessary file uploads (proposal PDF, team CVs, ethics approvals).
--   **Status Tracking:** Real-time tracking of project status (Draft, Submitted, Under Review, Approved, Rejected, Completed, etc.).
+-   **Status Tracking:** Real-time tracking of project status (Draft, Submitted, Under Review, Recommended, Not Recommended, Completed, etc.).
 -   **AI-Assisted Evaluation:** AI-generated prompts to help evaluators assess projects based on key criteria like relevance, methodology, feasibility, and innovation.
 -   **Meeting Scheduling:** Admins and CROs can schedule IMR evaluation meetings for multiple submitted projects at once and automatically notify the Principal Investigators (PIs) via email.
 -   **Grant Management:** A system for awarding grants, tracking fund utilization through transaction logging, and managing the disbursement process.

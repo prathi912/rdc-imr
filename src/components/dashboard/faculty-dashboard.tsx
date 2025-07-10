@@ -35,10 +35,10 @@ export function FacultyDashboard({ user }: { user: User }) {
     fetchProjects();
   }, [user]);
 
-  const activeProjects = projects.filter(p => p.status === 'Approved' || p.status === 'In Progress').length;
+  const activeProjects = projects.filter(p => p.status === 'Recommended' || p.status === 'In Progress').length;
   const pendingApproval = projects.filter(p => p.status === 'Under Review').length;
   const completedProjects = projects.filter(p => p.status === 'Completed').length;
-  const upcomingMeetings = projects.filter(p => p.meetingDetails && p.status !== 'Completed' && p.status !== 'Rejected');
+  const upcomingMeetings = projects.filter(p => p.meetingDetails && p.status !== 'Completed' && p.status !== 'Not Recommended');
 
 
   const statCards = [
