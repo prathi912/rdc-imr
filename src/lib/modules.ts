@@ -26,7 +26,7 @@ const coreModules = ['dashboard', 'notifications', 'settings'];
 const facultyCoreModules = ['new-submission', 'my-projects'];
 const hierarchyCoreModules = [...facultyCoreModules, 'all-projects'];
 
-const facultyDefaults = [...coreModules, ...facultyCoreModules, 'incentive-claim', 'evaluator-dashboard', 'my-evaluations'];
+const facultyDefaults = [...coreModules, ...facultyCoreModules, 'evaluator-dashboard', 'my-evaluations'];
 const croDefaults = [...coreModules, ...hierarchyCoreModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'manage-incentive-claims'];
 const adminDefaults = [...croDefaults, 'system-health', 'bulk-upload'];
 const superAdminDefaults = [...adminDefaults, 'module-management'];
