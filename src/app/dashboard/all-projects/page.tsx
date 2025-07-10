@@ -101,11 +101,31 @@ export default function AllProjectsPage() {
             orderBy('submissionDate', 'desc')
           );
         } else if (isPrincipal && user.institute) {
-          q = query(
-            projectsCol,
-            where('institute', '==', user.institute),
-            orderBy('submissionDate', 'desc')
-          );
+          const instituteUsersQuery = query(usersCol, where('institute', '==', user.institute));
+          const instituteUsersSnapshot = await getDocs(instituteUsersQuery);
+          const instituteUserIds = instituteUsersSnapshot.docs.map(doc => doc.id);
+
+          if (instituteUserIds.length > 0) {
+            // Firestore 'in' queries are limited to 30 items per query.
+            // For a larger number of users, we'd need to batch this.
+            // Assuming an institute won't have more than a few thousand users and this will be fine in chunks.
+            const projectPromises = [];
+            for (let i = 0; i < instituteUserIds.length; i += 30) {
+              const chunk = instituteUserIds.slice(i, i + 30);
+              const chunkQuery = query(projectsCol, where('pi_uid', 'in', chunk));
+              projectPromises.push(getDocs(chunkQuery));
+            }
+            const projectSnapshots = await Promise.all(projectPromises);
+            const projectList = projectSnapshots.flatMap(snapshot => snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project)));
+            projectList.sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
+            setAllProjects(projectList);
+            setLoading(false);
+            return;
+          } else {
+            setAllProjects([]);
+            setLoading(false);
+            return;
+          }
         } else if (isHod && user.department) {
           q = query(
             projectsCol,
@@ -126,12 +146,13 @@ export default function AllProjectsPage() {
         setAllProjects(projectList);
       } catch (error) {
         console.error("Error fetching data: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data. Check permissions or network.' });
       } finally {
         setLoading(false);
       }
     }
     getProjectsAndUsers();
-  }, [user]);
+  }, [user, toast]);
   
   const isAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
   const isCro = user?.role === 'CRO';
