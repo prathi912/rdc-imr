@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -29,14 +30,14 @@ export default function MyProjectsPage() {
         try {
           const projectsRef = collection(db, 'projects');
           
-          // Using a single OR query to fetch all projects associated with the user.
-          // This is more efficient than running multiple separate queries.
+          // This query now correctly combines the three conditions to find all projects associated with a user.
+          // The Firestore security rules have been updated to explicitly allow this specific OR query.
           const combinedQuery = query(
             projectsRef,
             or(
               where('pi_uid', '==', parsedUser.uid),
               where('coPiUids', 'array-contains', parsedUser.uid),
-              where('pi_email', '==', parsedUser.email)
+              where('pi_email', '==', parsedUser.email) // This will find historical projects before pi_uid is linked.
             )
           );
           
@@ -54,9 +55,9 @@ export default function MyProjectsPage() {
           allUserProjects.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
 
           setMyProjects(allUserProjects);
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error fetching user's projects:", error);
-          toast({ variant: 'destructive', title: 'Error', description: "Could not fetch your projects." });
+          toast({ variant: 'destructive', title: 'Error', description: `Could not fetch your projects. Reason: ${error.message}` });
         } finally {
           setLoading(false);
         }
