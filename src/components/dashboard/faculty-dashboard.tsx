@@ -9,7 +9,7 @@ import { ProjectList } from '@/components/projects/project-list';
 import { FilePlus2, CheckCircle, Clock, ArrowRight, BookOpenCheck } from 'lucide-react';
 import type { User, Project } from '@/types';
 import { db } from '@/lib/config';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, or } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 
 export function FacultyDashboard({ user }: { user: User }) {
@@ -22,9 +22,24 @@ export function FacultyDashboard({ user }: { user: User }) {
       setLoading(true);
       try {
         const projectsRef = collection(db, 'projects');
-        const q = query(projectsRef, where('pi_uid', '==', user.uid));
+        const q = query(
+          projectsRef,
+          or(
+            where('pi_uid', '==', user.uid),
+            where('pi_email', '==', user.email)
+          )
+        );
         const querySnapshot = await getDocs(q);
-        const userProjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        
+        const projectIds = new Set<string>();
+        const userProjects = querySnapshot.docs.reduce((acc, doc) => {
+            if (!projectIds.has(doc.id)) {
+                projectIds.add(doc.id);
+                acc.push({ id: doc.id, ...doc.data() } as Project);
+            }
+            return acc;
+        }, [] as Project[]);
+
         setProjects(userProjects);
       } catch (error) {
         console.error("Failed to fetch faculty projects", error);
@@ -36,7 +51,7 @@ export function FacultyDashboard({ user }: { user: User }) {
     fetchProjects();
   }, [user]);
 
-  const activeProjects = projects.filter(p => ['Recommended', 'In Progress', 'Pending Completion Approval'].includes(p.status)).length;
+  const activeProjects = projects.filter(p => ['Recommended', 'In Progress', 'Pending Completion Approval', 'Sanctioned'].includes(p.status)).length;
   const pendingApproval = projects.filter(p => p.status === 'Under Review').length;
   const completedProjects = projects.filter(p => p.status === 'Completed').length;
   const upcomingMeetings = projects.filter(p => p.meetingDetails && p.status !== 'Completed' && p.status !== 'Not Recommended');

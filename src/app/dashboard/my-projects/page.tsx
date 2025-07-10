@@ -1,83 +1,138 @@
+"use client"
 
-'use client';
-
-import { useState, useEffect, useMemo } from 'react';
-import { PageHeader } from '@/components/page-header';
-import { ProjectList } from '@/components/projects/project-list';
-import { type Project, type User } from '@/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
-import { db } from '@/lib/config';
-import { collection, getDocs, query, where, orderBy, or } from 'firebase/firestore';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect, useMemo } from "react"
+import { PageHeader } from "@/components/page-header"
+import { ProjectList } from "@/components/projects/project-list"
+import type { Project, User } from "@/types"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Card, CardContent } from "@/components/ui/card"
+import { db } from "@/lib/config"
+import { collection, getDocs, query, where, or } from "firebase/firestore"
+import { useToast } from "@/hooks/use-toast"
+import { Input } from "@/components/ui/input"
 
 export default function MyProjectsPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [myProjects, setMyProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [user, setUser] = useState<User | null>(null)
+  const [myProjects, setMyProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+  const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = localStorage.getItem("user")
     if (storedUser) {
-      const parsedUser = JSON.parse(storedUser) as User;
-      setUser(parsedUser);
+      const parsedUser = JSON.parse(storedUser) as User
+      setUser(parsedUser)
 
       const fetchProjects = async () => {
-        setLoading(true);
+        setLoading(true)
         try {
-          const projectsRef = collection(db, 'projects');
-          
-          // This query now correctly combines the three conditions to find all projects associated with a user.
-          // The Firestore security rules have been updated to explicitly allow this specific OR query.
-          const combinedQuery = query(
-            projectsRef,
-            or(
-              where('pi_uid', '==', parsedUser.uid),
-              where('coPiUids', 'array-contains', parsedUser.uid),
-              where('pi_email', '==', parsedUser.email) // This will find historical projects before pi_uid is linked.
+          const projectsRef = collection(db, "projects")
+
+          const allUserProjects: Project[] = []
+          const projectIds = new Set<string>()
+
+          // Strategy 1: Try the combined OR query first
+          try {
+            const combinedQuery = query(
+              projectsRef,
+              or(
+                where("pi_uid", "==", parsedUser.uid),
+                where("coPiUids", "array-contains", parsedUser.uid),
+                where("pi_email", "==", parsedUser.email),
+              ),
             )
-          );
-          
-          const querySnapshot = await getDocs(combinedQuery);
-          
-          const userProjectsMap = new Map<string, Project>();
 
-          querySnapshot.forEach((doc) => {
-            if (!userProjectsMap.has(doc.id)) {
-              userProjectsMap.set(doc.id, { id: doc.id, ...doc.data() } as Project);
+            const querySnapshot = await getDocs(combinedQuery)
+
+            querySnapshot.forEach((doc) => {
+              if (!projectIds.has(doc.id)) {
+                allUserProjects.push({ id: doc.id, ...doc.data() } as Project)
+                projectIds.add(doc.id)
+              }
+            })
+          } catch (combinedQueryError) {
+            console.warn("Combined OR query failed, trying individual queries:", combinedQueryError)
+
+            // Strategy 2: Fallback to individual queries
+            try {
+              // Query 1: Projects where user is PI
+              const piQuery = query(projectsRef, where("pi_uid", "==", parsedUser.uid))
+              const piSnapshot = await getDocs(piQuery)
+
+              piSnapshot.forEach((doc) => {
+                if (!projectIds.has(doc.id)) {
+                  allUserProjects.push({ id: doc.id, ...doc.data() } as Project)
+                  projectIds.add(doc.id)
+                }
+              })
+
+              // Query 2: Projects where user is Co-PI
+              try {
+                const coPiQuery = query(projectsRef, where("coPiUids", "array-contains", parsedUser.uid))
+                const coPiSnapshot = await getDocs(coPiQuery)
+
+                coPiSnapshot.forEach((doc) => {
+                  if (!projectIds.has(doc.id)) {
+                    allUserProjects.push({ id: doc.id, ...doc.data() } as Project)
+                    projectIds.add(doc.id)
+                  }
+                })
+              } catch (coPiError) {
+                console.warn("Co-PI query failed:", coPiError)
+              }
+
+              // Query 3: Historical projects by email
+              if (parsedUser.email) {
+                try {
+                  const emailQuery = query(projectsRef, where("pi_email", "==", parsedUser.email))
+                  const emailSnapshot = await getDocs(emailQuery)
+
+                  emailSnapshot.forEach((doc) => {
+                    if (!projectIds.has(doc.id)) {
+                      allUserProjects.push({ id: doc.id, ...doc.data() } as Project)
+                      projectIds.add(doc.id)
+                    }
+                  })
+                } catch (emailError) {
+                  console.warn("Email query failed:", emailError)
+                }
+              }
+            } catch (individualQueriesError) {
+              console.error("All individual queries failed:", individualQueriesError)
+              throw individualQueriesError
             }
-          });
+          }
 
-          const allUserProjects = Array.from(userProjectsMap.values());
-          allUserProjects.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
+          // Sort projects by submission date
+          allUserProjects.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
 
-          setMyProjects(allUserProjects);
+          setMyProjects(allUserProjects)
         } catch (error: any) {
-          console.error("Error fetching user's projects:", error);
-          toast({ variant: 'destructive', title: 'Error', description: `Could not fetch your projects. Reason: ${error.message}` });
+          console.error("Error fetching user's projects:", error)
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: `Could not fetch your projects. ${error.message || "Please try again later."}`,
+          })
         } finally {
-          setLoading(false);
+          setLoading(false)
         }
-      };
-      fetchProjects();
+      }
+      fetchProjects()
     } else {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [toast]);
+  }, [toast])
 
   const filteredProjects = useMemo(() => {
-    if (!searchTerm) return myProjects;
-    return myProjects.filter(p => 
-      p.title.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [myProjects, searchTerm]);
+    if (!searchTerm) return myProjects
+    return myProjects.filter((p) => p.title.toLowerCase().includes(searchTerm.toLowerCase()))
+  }, [myProjects, searchTerm])
 
   if (loading) {
     return (
-       <div className="container mx-auto py-10">
+      <div className="container mx-auto py-10">
         <PageHeader title="My Projects" description="A list of all projects you have submitted or saved as drafts." />
         <div className="mt-8">
           <Card>
@@ -99,10 +154,10 @@ export default function MyProjectsPage() {
       <PageHeader title="My Projects" description="A list of all projects you are associated with as a PI or Co-PI." />
       <div className="flex items-center py-4">
         <Input
-            placeholder="Filter by title..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            className="max-w-sm"
+          placeholder="Filter by title..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="max-w-sm"
         />
       </div>
       <div className="mt-4">
@@ -117,5 +172,5 @@ export default function MyProjectsPage() {
         )}
       </div>
     </div>
-  );
+  )
 }
