@@ -45,8 +45,8 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
   const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(userRole);
   const isEvaluator = userRole === 'Evaluator';
 
-  type SortableKeys = keyof Pick<Project, 'title' | 'faculty' | 'pi' | 'status'> | 'meetingDate';
-  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'title', direction: 'ascending' });
+  type SortableKeys = keyof Pick<Project, 'title' | 'faculty' | 'pi' | 'status' | 'submissionDate'> | 'meetingDate';
+  const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
 
   const sortedProjects = useMemo(() => {
     let sortableItems = [...projects];
@@ -57,6 +57,9 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
         if (key === 'meetingDate') {
             aValue = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
             bValue = b.meetingDetails?.date ? parseISO(b.meetingDetails.date).getTime() : 0;
+        } else if (key === 'submissionDate') {
+            aValue = a.submissionDate ? parseISO(a.submissionDate).getTime() : 0;
+            bValue = b.submissionDate ? parseISO(b.submissionDate).getTime() : 0;
         } else {
             aValue = a[key as keyof Project] || '';
             bValue = b[key as keyof Project] || '';
@@ -93,22 +96,14 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
                     Title <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
               </TableHead>
-               {isEvaluator ? (
-                <TableHead className="hidden md:table-cell">
-                  <Button variant="ghost" onClick={() => requestSort('meetingDate')}>
-                      Meeting Date <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-              ) : (
-                <TableHead className="hidden md:table-cell">
-                  <Button variant="ghost" onClick={() => requestSort('faculty')}>
-                      Faculty <ArrowUpDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </TableHead>
-              )}
               <TableHead className="hidden sm:table-cell">
                 <Button variant="ghost" onClick={() => requestSort('pi')}>
                     PI <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead className="hidden md:table-cell">
+                <Button variant="ghost" onClick={() => requestSort('submissionDate')}>
+                    Date <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
               </TableHead>
               <TableHead className="hidden md:table-cell">
@@ -146,14 +141,8 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
               return (
                 <TableRow key={project.id}>
                   <TableCell className="font-medium">{project.title}</TableCell>
-                   {isEvaluator ? (
-                    <TableCell className="hidden md:table-cell">
-                      {meetingDate ? meetingDate.toLocaleDateString() : 'Not Scheduled'}
-                    </TableCell>
-                  ) : (
-                    <TableCell className="hidden md:table-cell">{project.faculty}</TableCell>
-                  )}
                   <TableCell className="hidden sm:table-cell">{project.pi}</TableCell>
+                  <TableCell className="hidden md:table-cell">{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
                   <TableCell className="hidden md:table-cell">
                     <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
                   </TableCell>
