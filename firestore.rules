@@ -2,141 +2,79 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    function isProjectOwner(userId, projectData) {
-      return userId == projectData.pi_uid;
-    }
-
-    function isProjectMember(userId, projectData) {
-      return isProjectOwner(userId, projectData) || (userId in projectData.coPiUids);
-    }
-
-    function isAssignedEvaluator(userId, projectData) {
-      return projectData.meetingDetails != null && userId in projectData.meetingDetails.assignedEvaluators;
-    }
-
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-
-    function isSuperAdmin(userId) {
-      return getUserData(userId).role == 'Super-admin';
-    }
-
-    function isAdmin(userId) {
-      let userRole = getUserData(userId).role;
-      return userRole in ['admin', 'Super-admin'];
-    }
-
-    function isCRO(userId) {
-      return getUserData(userId).role == 'CRO';
-    }
-
-    function isHod(userId) {
-      return getUserData(userId).designation == 'HOD';
-    }
     
-    function isPrincipal(userId) {
-       // This list must be kept in sync with the one in src/lib/constants.ts
-      let principalEmails = [
-        'ahmc@paruluniversity.ac.in', 'apc@paruluniversity.ac.in', 'agriculture@paruluniversity.ac.in',
-        'dphs@paruluniversity.ac.in', 'fls@paruluniversity.ac.in', 'ips@paruluniversity.ac.in',
-        'jnhmc@paruluniversity.ac.in', 'pcpr@paruluniversity.ac.in', 'fasahm@paruluniversity.ac.in',
-        'fasvdr@paruluniversity.ac.in', 'piar@paruluniversity.ac.in', 'piarts@paruluniversity.ac.in',
-        'pia@paruluniversity.ac.in', 'piaresearch@paruluniversity.ac.in', 'piba@paruluniversity.ac.in',
-        'pic@paruluniversity.ac.in', 'pica@paruluniversity.ac.in', 'pid@paruluniversity.ac.in',
-        'piet@paruluniversity.ac.in', 'pietds1@paruluniversity.ac.in', 'ffa@paruluniversity.ac.in',
-        'pihr@paruluniversity.ac.in', 'pihmct@paruluniversity.ac.in', 'pil@paruluniversity.ac.in',
-        'pim@paruluniversity.ac.in', 'pimr@paruluniversity.ac.in', 'pimsr@paruluniversity.ac.in',
-        'pin@paruluniversity.ac.in', 'pipa@paruluniversity.ac.in', 'piper@paruluniversity.ac.in',
-        'piph@paruluniversity.ac.in', 'pipr@paruluniversity.ac.in', 'pipt@paruluniversity.ac.in',
-        'piptr@paruluniversity.ac.in', 'pisw@paruluniversity.ac.in', 'pit@paruluniversity.ac.in',
-        'fve@paruluniversity.ac.in', 'medical@paruluniversity.ac.in', 'ppi1@paruluniversity.ac.in',
-        'pupublichealth@paruluniversity.ac.in', 'psh@paruluniversity.ac.in', 'rhmc@paruluniversity.ac.in',
-        'rdc@paruluniversity.ac.in', 'sop@paruluniversity.ac.in'
-      ];
-      return getUserData(userId).email in principalEmails;
-    }
-
+    // Users can only read their own profile, admins can read any.
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId || isSuperAdmin(request.auth.uid);
-      allow list: if isAdmin(request.auth.uid) || isCRO(request.auth.uid);
+      allow read: if request.auth.uid == userId 
+                    || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin', 'CRO'];
+      allow write: if request.auth.uid == userId;
     }
     
     match /projects/{projectId} {
-      // READ: Who can see a single project?
-      // - Admins/Super-admins can see everything.
-      // - The PI or a Co-PI of the project.
-      // - An assigned evaluator.
-      // - A CRO, if the project is from their faculty.
-      // - A Principal, if the project is from their institute.
-      // - An HOD, if the project is from their department.
+      // Allow read access if the user is the PI, a Co-PI, an admin, a relevant CRO/Principal/HOD, or an assigned evaluator.
       allow get: if request.auth != null && (
-        isAdmin(request.auth.uid) ||
-        isProjectMember(request.auth.uid, resource.data) ||
-        isAssignedEvaluator(request.auth.uid, resource.data) ||
-        (isCRO(request.auth.uid) && getUserData(request.auth.uid).faculty == resource.data.faculty) ||
-        (isPrincipal(request.auth.uid) && getUserData(request.auth.uid).institute == resource.data.institute) ||
-        (isHod(request.auth.uid) && getUserData(request.auth.uid).department == resource.data.departmentName)
+        // PI or Co-PI
+        resource.data.pi_uid == request.auth.uid || (request.auth.uid in resource.data.coPiUids)
+        // Admin roles
+        || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin', 'CRO']
+        // Principal of the Institute
+        || (request.auth.token.email in get(/databases/$(database)/documents/constants/principalEmails).data.emails && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.institute == resource.data.institute)
+        // HOD of the Department
+        || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.designation == 'HOD' && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department == resource.data.departmentName)
+        // Assigned evaluator
+        || (request.auth.uid in resource.data.meetingDetails.assignedEvaluators)
       );
 
-      // LIST: Who can query for a list of projects?
-      // - The user must be logged in.
-      // - Admins can list all projects without restriction.
-      // - CROs can list projects matching their faculty.
-      // - Principals can list projects matching their institute.
-      // - HODs can list projects matching their department.
-      // - Any user can list projects where they are the PI or a Co-PI.
-      // - Any user can list projects where they are an assigned evaluator.
+      // Allow listing projects based on role
       allow list: if request.auth != null && (
-        isAdmin(request.auth.uid) ||
-        (isCRO(request.auth.uid) && request.query.where.get('faculty') == getUserData(request.auth.uid).faculty) ||
-        (isPrincipal(request.auth.uid) && request.query.where.get('institute') == getUserData(request.auth.uid).institute) ||
-        (isHod(request.auth.uid) && request.query.where.get('departmentName') == getUserData(request.auth.uid).department) ||
-        request.query.where.get('pi_uid') == request.auth.uid ||
-        request.query.where.get('coPiUids') == request.auth.uid || // 'array-contains'
-        request.query.where.get('evaluatedBy') == request.auth.uid || // 'array-contains'
-        (request.query.where.get('meetingDetails.assignedEvaluators') == request.auth.uid) // 'array-contains'
-      );
-      
-      // CREATE: Who can create a new project?
-      // - Any authenticated user (faculty) can create a project where they are the PI.
-      // - Super-admins can create projects (for bulk upload).
-      allow create: if request.auth != null && (
-        isProjectOwner(request.auth.uid, request.resource.data) ||
-        isSuperAdmin(request.auth.uid)
+        // CRO can list projects in their faculty
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'CRO' && request.query.where.to_list()[0].value == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.faculty)
+        // Principal can list projects in their institute
+        || (request.auth.token.email in get(/databases/$(database)/documents/constants/principalEmails).data.emails && request.query.where.to_list()[0].value == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.institute)
+         // HOD can list projects in their department
+        || (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.designation == 'HOD' && request.query.where.to_list()[0].value == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department)
+        // Admin and Super-admin can list all projects
+        || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin']
       );
 
-      // UPDATE: Who can modify a project?
-      // - The PI can update their own project if it's a Draft or needs revision.
-      // - Admins can update any project.
-      allow update: if request.auth != null && (
-        (isProjectOwner(request.auth.uid, resource.data) && (resource.data.status == 'Draft' || resource.data.status == 'Revision Needed')) ||
-        isAdmin(request.auth.uid)
-      );
+      // Allow write access only to the PI
+      allow write: if request.auth != null && resource.data.pi_uid == request.auth.uid;
       
-      // DELETE: Who can delete a project?
-      // Only a Super-admin can delete a project.
-      allow delete: if request.auth != null && isSuperAdmin(request.auth.uid);
+      // Allow creation for any authenticated user
+      allow create: if request.auth != null;
 
+      // Allow admins to delete bulk-uploaded projects.
+      allow delete: if request.auth != null 
+                    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin']
+                    && resource.data.isBulkUploaded == true;
+
+      // Rules for subcollections
       match /evaluations/{evaluatorId} {
-        allow read: if request.auth != null && (isAdmin(request.auth.uid) || isAssignedEvaluator(request.auth.uid, get(/databases/$(database)/documents/projects/$(projectId)).data));
-        allow create, update: if request.auth != null && request.auth.uid == evaluatorId;
+        // Allow evaluators to create/update their own evaluation.
+        allow write: if request.auth.uid == evaluatorId;
+        // Only admins or the PI can read evaluations.
+        allow read: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin', 'CRO']
+                     || get(/databases/$(database)/documents/projects/$(projectId)).data.pi_uid == request.auth.uid;
       }
     }
-    
-    match /incentiveClaims/{claimId} {
-        allow read: if request.auth != null && (isAdmin(request.auth.uid) || request.auth.uid == resource.data.uid);
-        allow list: if request.auth != null; // Query logic is handled by rules on fields
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
-        allow update: if request.auth != null && isAdmin(request.auth.uid);
-    }
-    
+
     match /notifications/{notificationId} {
-      allow read, update: if request.auth != null && request.auth.uid == resource.data.uid;
-      allow list: if request.auth != null; // Filtered by UID in client
-      allow create: if request.auth != null; // Created by server actions
+      // Users can read/write their own notifications.
+      allow read, write: if request.auth != null && request.resource.data.uid == request.auth.uid;
+    }
+
+    match /incentiveClaims/{claimId} {
+      // Users can read/write their own claims.
+      allow read, write: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      // Admins and CROs can read all claims.
+      allow list: if request.auth != null 
+                  && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'Super-admin', 'CRO'];
+    }
+
+    // A collection to store constants like principal emails.
+    // This allows rules to access this list without hardcoding it.
+    match /constants/{docId} {
+      allow get: if true; // Allow anyone to read constants
     }
   }
 }
