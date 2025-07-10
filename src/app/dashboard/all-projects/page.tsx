@@ -105,6 +105,7 @@ export default function AllProjectsPage() {
           // 2. Fetch projects for those linked users.
           if (instituteUserIds.length > 0) {
               const projectPromises = [];
+              // Firestore 'in' queries are limited to 30 values per query.
               for (let i = 0; i < instituteUserIds.length; i += 30) {
                 const chunk = instituteUserIds.slice(i, i + 30);
                 const chunkQuery = query(projectsCol, where('pi_uid', 'in', chunk));
@@ -114,21 +115,18 @@ export default function AllProjectsPage() {
               projectList = projectSnapshots.flatMap(snapshot => snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project)));
           }
           
-          // 3. Additionally, fetch historical projects by Faculty for cases where the PI hasn't logged in yet.
-          // This ensures bulk-uploaded data is visible. The faculty field on user and project must match.
-          if (user.faculty) {
-              const historicalProjectsQuery = query(projectsCol, where('faculty', '==', user.faculty), where('isBulkUploaded', '==', true));
-              const historicalSnapshot = await getDocs(historicalProjectsQuery);
-              const historicalProjects = historicalSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));
-              
-              const combinedProjectIds = new Set(projectList.map(p => p.id));
-              historicalProjects.forEach(p => {
-                  if (!combinedProjectIds.has(p.id)) {
-                      projectList.push(p);
-                      combinedProjectIds.add(p.id);
-                  }
-              });
-          }
+          // 3. Additionally, fetch historical projects by institute for cases where the PI hasn't logged in yet.
+          const historicalProjectsQuery = query(projectsCol, where('institute', '==', user.institute), where('isBulkUploaded', '==', true));
+          const historicalSnapshot = await getDocs(historicalProjectsQuery);
+          const historicalProjects = historicalSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));
+          
+          const combinedProjectIds = new Set(projectList.map(p => p.id));
+          historicalProjects.forEach(p => {
+              if (!combinedProjectIds.has(p.id)) {
+                  projectList.push(p);
+                  combinedProjectIds.add(p.id);
+              }
+          });
 
         } else if (isHod && user.department) {
           q = query(projectsCol, where('departmentName', '==', user.department));
@@ -163,14 +161,14 @@ export default function AllProjectsPage() {
   if (isSpecialUser) {
     pageTitle = "Projects from Faculty of Engineering & Technology";
     pageDescription = "Browse all projects submitted from the Faculty of Engineering & Technology.";
-  } else if (isCro) {
-    pageTitle = `Projects from ${user?.faculty}`;
+  } else if (isCro && user?.faculty) {
+    pageTitle = `Projects from ${user.faculty}`;
     pageDescription = "Browse all projects submitted from your faculty.";
-  } else if (isPrincipal) {
-    pageTitle = `Projects from ${user?.institute}`;
+  } else if (isPrincipal && user?.institute) {
+    pageTitle = `Projects from ${user.institute}`;
     pageDescription = "Browse all projects submitted from your institute.";
-  } else if (isHod) {
-    pageTitle = `Projects from ${user?.department}`;
+  } else if (isHod && user?.department) {
+    pageTitle = `Projects from ${user.department}`;
     pageDescription = "Browse all projects submitted from your department.";
   }
 
