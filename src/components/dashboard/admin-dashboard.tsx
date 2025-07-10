@@ -9,19 +9,20 @@ import Link from 'next/link';
 import { Button } from '../ui/button';
 import { ArrowRight } from 'lucide-react';
 import { db } from '@/lib/config';
-import { collection, getDocs } from 'firebase/firestore';
-import type { Project } from '@/types';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import type { Project, User } from '@/types';
 import { Skeleton } from '../ui/skeleton';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { PRINCIPAL_EMAILS } from '@/lib/constants';
 
 interface DashboardStats {
   totalProjects: number;
   pendingReviews: number;
   approvedProjects: number;
-  totalUsers: number;
   rejectedProjects: number;
   completedProjects: number;
+  totalUsers: number;
 }
 
 export function AdminDashboard() {
@@ -36,6 +37,14 @@ export function AdminDashboard() {
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [facultyData, setFacultyData] = useState<{ faculty: string, projects: number }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+        setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   const facultyConfig = {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },
@@ -43,62 +52,83 @@ export function AdminDashboard() {
 
   useEffect(() => {
     async function getDashboardData() {
-      try {
-        const projectsRef = collection(db, "projects");
-        const usersRef = collection(db, "users");
+        if (!user) return;
+        setLoading(true);
 
-        const projectsSnapshot = await getDocs(projectsRef);
-        const usersSnapshot = await getDocs(usersRef);
+        try {
+            const projectsRef = collection(db, "projects");
+            const usersRef = collection(db, "users");
 
-        const allProjects = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-        
-        const totalProjects = allProjects.length;
-        const pendingReviews = allProjects.filter(p => p.status === 'Under Review').length;
-        const approvedProjects = allProjects.filter(p => p.status === 'Recommended').length;
-        const rejectedProjects = allProjects.filter(p => p.status === 'Not Recommended').length;
-        const completedProjects = allProjects.filter(p => p.status === 'Completed').length;
-        const totalUsers = usersSnapshot.size;
+            const isPrincipal = PRINCIPAL_EMAILS.includes(user.email || '');
+            let projectQuery;
 
-        const sortedProjects = allProjects
-            .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
-            .slice(0, 5);
-        
-        setStats({ totalProjects, pendingReviews, approvedProjects, totalUsers, rejectedProjects, completedProjects });
-        setRecentProjects(sortedProjects);
+            if (isPrincipal && user.institute) {
+                // Principals only see projects from their institute
+                projectQuery = query(projectsRef, where('institute', '==', user.institute));
+            } else {
+                // Admins/CROs see all projects
+                projectQuery = query(projectsRef);
+            }
 
-        const facultyCounts = Object.entries(
-            allProjects.reduce((acc, project) => {
-              if (project.faculty) {
-                acc[project.faculty] = (acc[project.faculty] || 0) + 1;
-              }
-              return acc;
-            }, {} as Record<string, number>)
-        ).map(([faculty, count]) => ({ faculty, projects: count }))
-        .sort((a, b) => b.projects - a.projects)
-        .slice(0, 7);
-        setFacultyData(facultyCounts);
+            const [projectsSnapshot, usersSnapshot] = await Promise.all([
+                getDocs(projectQuery),
+                getDocs(usersRef)
+            ]);
+            
+            const allProjects = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            
+            const totalProjects = allProjects.length;
+            const pendingReviews = allProjects.filter(p => p.status === 'Under Review').length;
+            const approvedProjects = allProjects.filter(p => p.status === 'Recommended').length;
+            const rejectedProjects = allProjects.filter(p => p.status === 'Not Recommended').length;
+            const completedProjects = allProjects.filter(p => p.status === 'Completed').length;
+            const totalUsers = usersSnapshot.size;
 
-      } catch (error) {
-        console.error("Error fetching admin dashboard data: ", error);
-      } finally {
-        setLoading(false);
-      }
+            const sortedProjects = allProjects
+                .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
+                .slice(0, 5);
+            
+            setStats({ totalProjects, pendingReviews, approvedProjects, totalUsers, rejectedProjects, completedProjects });
+            setRecentProjects(sortedProjects);
+
+            const facultyCounts = Object.entries(
+                allProjects.reduce((acc, project) => {
+                if (project.faculty) {
+                    acc[project.faculty] = (acc[project.faculty] || 0) + 1;
+                }
+                return acc;
+                }, {} as Record<string, number>)
+            ).map(([faculty, count]) => ({ faculty, projects: count }))
+            .sort((a, b) => b.projects - a.projects)
+            .slice(0, 7);
+            setFacultyData(facultyCounts);
+
+        } catch (error) {
+            console.error("Error fetching admin dashboard data: ", error);
+        } finally {
+            setLoading(false);
+        }
     }
     getDashboardData();
-  }, []);
+  }, [user]);
   
+  const isPrincipal = user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false;
+
   const statCards = [
     { title: 'Total Projects', value: stats.totalProjects.toString(), icon: Book, loading: loading },
     { title: 'Pending Reviews', value: stats.pendingReviews.toString(), icon: Clock, loading: loading },
     { title: 'Recommended', value: stats.approvedProjects.toString(), icon: CheckCircle, loading: loading },
     { title: 'Not Recommended', value: stats.rejectedProjects.toString(), icon: XCircle, loading: loading },
     { title: 'Completed', value: stats.completedProjects.toString(), icon: FileCheck2, loading: loading },
-    { title: 'Total Users', value: stats.totalUsers.toString(), icon: Users, loading: loading },
+    // Only show Total Users to non-principals (i.e., true admins/CROs)
+    ...(isPrincipal ? [] : [{ title: 'Total Users', value: stats.totalUsers.toString(), icon: Users, loading: loading }]),
   ];
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-3xl font-bold tracking-tight">Admin Dashboard</h2>
+      <h2 className="text-3xl font-bold tracking-tight">
+        {isPrincipal && user?.institute ? `${user.institute} Dashboard` : "Admin Dashboard"}
+      </h2>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {statCards.map((card, index) => (
           <Card 

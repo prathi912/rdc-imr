@@ -58,8 +58,6 @@ export default function AllProjectsPage() {
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(EXPORT_COLUMNS.map(c => c.id));
   
-  const isPrincipal = user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false;
-
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -68,6 +66,8 @@ export default function AllProjectsPage() {
       setLoading(false);
     }
   }, []);
+
+  const isPrincipal = user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false;
 
   useEffect(() => {
     if (!user) return;
@@ -87,7 +87,8 @@ export default function AllProjectsPage() {
         const isAdmin = ['admin', 'Super-admin'].includes(user.role);
         const isCro = user.role === 'CRO';
         const isHod = user.designation === 'HOD';
-        const isPrincipalView = isPrincipal && !isCro; // A principal is not a CRO unless their role is explicitly CRO.
+        // A principal's view is determined by their email, not their role.
+        const isPrincipalView = isPrincipal && user.role !== 'admin' && user.role !== 'Super-admin';
         const isSpecialUser = user.email === 'unnati.joshi22950@paruluniversity.ac.in';
         
         if (isSpecialUser) {
@@ -118,12 +119,12 @@ export default function AllProjectsPage() {
       }
     }
     getProjectsAndUsers();
-  }, [user, toast]);
+  }, [user, toast, isPrincipal]);
   
   const isAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
   const isCro = user?.role === 'CRO';
   const isHod = user?.designation === 'HOD';
-  const isPrincipalView = isPrincipal && !isCro;
+  const isPrincipalView = isPrincipal && user?.role !== 'admin' && user?.role !== 'Super-admin';
   const isSpecialUser = user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
   
   let pageTitle = "All Projects";
@@ -132,7 +133,7 @@ export default function AllProjectsPage() {
   if (isSpecialUser) {
     pageTitle = "Projects from Faculty of Engineering & Technology";
     pageDescription = "Browse all projects submitted from the Faculty of Engineering & Technology.";
-  } else if (isCro && user?.faculty) {
+  } else if (isCro && user?.faculty && !isPrincipalView) {
     pageTitle = `Projects from ${user.faculty}`;
     pageDescription = "Browse all projects submitted from your faculty.";
   } else if (isPrincipalView && user?.institute) {
@@ -222,7 +223,7 @@ export default function AllProjectsPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Projects");
     
     let fileName = `all_projects_${new Date().toISOString().split('T')[0]}.xlsx`;
-    if (isCro && user?.faculty) {
+    if (isCro && user?.faculty && !isPrincipalView) {
         fileName = `projects_${user.faculty.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
     } else if (isPrincipalView && user?.institute) {
         fileName = `projects_${user.institute.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -356,5 +357,3 @@ export default function AllProjectsPage() {
     </div>
   );
 }
-
-    
