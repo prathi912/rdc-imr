@@ -621,14 +621,14 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
 
     for (const project of projectsData) {
       // Basic validation
-      if (!project.pi_email || !project.project_title || !project.status) {
+      if (!project.pi_email || !project.project_title || !project.status || !project.sanction_number || !project.Name_of_staff || !project.Faculty) {
         console.warn('Skipping incomplete project record:', project);
         continue;
       }
 
       let pi_uid = '';
-      let pi_name = project.Name_of_staff || project.pi_email.split('@')[0];
-      let faculty = project.Faculty || 'Unknown';
+      let pi_name = project.Name_of_staff;
+      let faculty = project.Faculty;
       let institute = "Unknown";
       let departmentName = "Unknown";
 
@@ -979,5 +979,6 @@ export async function findUserByMisId(misId: string): Promise<{ success: boolean
   }
 }
     
+
 
 

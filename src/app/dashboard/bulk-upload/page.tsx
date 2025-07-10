@@ -36,7 +36,7 @@ type ProjectData = {
   sanction_date: string;
   Name_of_staff: string;
   Faculty: string;
-  sanction_number?: string;
+  sanction_number: string;
 };
 
 export default function BulkUploadPage() {
@@ -83,7 +83,7 @@ export default function BulkUploadPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty'];
+        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty', 'sanction_number'];
         
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
@@ -176,8 +176,8 @@ export default function BulkUploadPage() {
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">grant_amount</code>,
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_date</code>,
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code>, 
-                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>.
-                The <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_number</code> column is optional.
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>, and
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_number</code>.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
@@ -302,4 +302,3 @@ export default function BulkUploadPage() {
     </div>
   );
 }
-
