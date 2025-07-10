@@ -49,15 +49,19 @@ export default function ProjectDetailsPage() {
             submissionDate: projectSnap.data().submissionDate || new Date().toISOString()
         } as Project;
 
+        // Perform comprehensive client-side authorization check
         const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(sessionUser.role);
         const isPrincipal = sessionUser.email ? PRINCIPAL_EMAILS.includes(sessionUser.email) : false;
+        const isPrincipalForProject = isPrincipal && sessionUser.institute === projectData.institute;
         const isHod = sessionUser.designation === 'HOD' && sessionUser.department === projectData.departmentName;
         const isPI = sessionUser.uid === projectData.pi_uid;
         const isCoPI = projectData.coPiUids?.includes(sessionUser.uid);
         const isAssignedEvaluator = projectData.meetingDetails?.assignedEvaluators?.includes(sessionUser.uid);
         const isSpecialUser = sessionUser.email === 'unnati.joshi22950@paruluniversity.ac.in' && projectData.faculty === 'Faculty of Engineering & Technology';
 
-        if (!isPI && !isCoPI && !isAdmin && !isPrincipal && !isHod && !isAssignedEvaluator && !isSpecialUser) {
+        const hasPermission = isPI || isCoPI || isAdmin || isPrincipalForProject || isHod || isAssignedEvaluator || isSpecialUser;
+
+        if (!hasPermission) {
              setNotFound(true); 
              setLoading(false);
              return;
@@ -74,18 +78,14 @@ export default function ProjectDetailsPage() {
             }
         }
 
-        // Now fetch other users needed for the page
         const usersRef = collection(db, 'users');
         let userList: User[] = [];
 
         // Only admins need the full user list for UI components like re-assigning evaluators.
-        // Other roles like Principal or HOD don't have permission to list all users, so we skip this for them.
         if (isAdmin) {
           const usersSnap = await getDocs(usersRef);
           userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
         }
-        // For all other roles, userList will remain an empty array.
-        // The client component is designed to handle this gracefully.
         setAllUsers(userList);
 
     } catch (error) {
@@ -99,10 +99,11 @@ export default function ProjectDetailsPage() {
   useEffect(() => {
     if (projectId && sessionUser) {
         getProjectAndUsers(projectId);
-    } else if (!sessionUser) {
-        setLoading(false);
+    } else if (!sessionUser && !loading) {
+        // If there's no session user and we aren't already loading, it's likely they're logged out.
+        setNotFound(true);
     }
-  }, [projectId, sessionUser, getProjectAndUsers]);
+  }, [projectId, sessionUser, getProjectAndUsers, loading]);
 
 
   if (loading) {
