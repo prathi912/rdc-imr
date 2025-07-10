@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -8,7 +7,7 @@ import { type Project, type User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, or } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 
@@ -30,44 +29,26 @@ export default function MyProjectsPage() {
         try {
           const projectsRef = collection(db, 'projects');
           
-          // Query 1: Projects where user is the PI (UID match)
-          const piQuery = query(
+          // Using a single OR query to fetch all projects associated with the user.
+          // This is more efficient than running multiple separate queries.
+          const combinedQuery = query(
             projectsRef,
-            where('pi_uid', '==', parsedUser.uid)
+            or(
+              where('pi_uid', '==', parsedUser.uid),
+              where('coPiUids', 'array-contains', parsedUser.uid),
+              where('pi_email', '==', parsedUser.email)
+            )
           );
           
-          // Query 2: Projects where user is a Co-PI (UID match)
-          const coPiQuery = query(
-            projectsRef,
-            where('coPiUids', 'array-contains', parsedUser.uid)
-          );
-
-          // Query 3: Historical projects where UID is not yet linked but email matches
-          const historicalPiQuery = query(
-            projectsRef,
-            where('pi_email', '==', parsedUser.email),
-            where('pi_uid', 'in', ['', null])
-          );
-
-          const [piSnapshot, coPiSnapshot, historicalPiSnapshot] = await Promise.all([
-            getDocs(piQuery),
-            getDocs(coPiQuery),
-            getDocs(historicalPiQuery),
-          ]);
+          const querySnapshot = await getDocs(combinedQuery);
           
           const userProjectsMap = new Map<string, Project>();
 
-          const processSnapshot = (snapshot: any) => {
-            snapshot.forEach((doc: any) => {
-              if (!userProjectsMap.has(doc.id)) {
-                userProjectsMap.set(doc.id, { id: doc.id, ...doc.data() } as Project);
-              }
-            });
-          };
-
-          processSnapshot(piSnapshot);
-          processSnapshot(coPiSnapshot);
-          processSnapshot(historicalPiSnapshot);
+          querySnapshot.forEach((doc) => {
+            if (!userProjectsMap.has(doc.id)) {
+              userProjectsMap.set(doc.id, { id: doc.id, ...doc.data() } as Project);
+            }
+          });
 
           const allUserProjects = Array.from(userProjectsMap.values());
           allUserProjects.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
