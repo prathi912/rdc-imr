@@ -90,13 +90,14 @@ export default function AllProjectsPage() {
 
         if (isSuperAdmin || isAdmin) {
           q = query(projectsCol);
-        } else if (isCro && user.faculty) {
-          q = query(projectsCol, where('faculty', '==', user.faculty));
-        } else if (isPrincipal && user.institute) {
+        } else if (isPrincipal && user.institute) { // Check for Principal first
           q = query(projectsCol, where('institute', '==', user.institute));
-        } else if (isHod && user.department) {
+        } else if (isHod && user.department) { // Then HOD
           q = query(projectsCol, where('departmentName', '==', user.department));
+        } else if (isCro && user.faculty) { // Then CRO
+          q = query(projectsCol, where('faculty', '==', user.faculty));
         } else {
+            // Default for faculty viewing their own projects via "My Projects"
             q = query(projectsCol, where('pi_uid', '==', user.uid));
         }
         
@@ -127,11 +128,7 @@ export default function AllProjectsPage() {
   let pageDescription = "Browse and manage all projects in the system.";
   let exportFileName = 'all_projects';
 
-  if (isCro && user?.faculty) {
-    pageTitle = `Projects from ${user.faculty}`;
-    pageDescription = "Browse all projects submitted from your faculty.";
-    exportFileName = `projects_${user.faculty.replace(/[ &]/g, '_')}`;
-  } else if (isPrincipal && user?.institute) {
+  if (isPrincipal && user?.institute) {
     pageTitle = `Projects from ${user.institute}`;
     pageDescription = "Browse all projects submitted from your institute.";
     exportFileName = `projects_${user.institute.replace(/[ &]/g, '_')}`;
@@ -139,6 +136,10 @@ export default function AllProjectsPage() {
     pageTitle = `Projects from ${user.department}`;
     pageDescription = "Browse all projects submitted from your department.";
     exportFileName = `projects_${user.department.replace(/[ &]/g, '_')}`;
+  } else if (isCro && user?.faculty) {
+    pageTitle = `Projects from ${user.faculty}`;
+    pageDescription = "Browse all projects submitted from your faculty.";
+    exportFileName = `projects_${user.faculty.replace(/[ &]/g, '_')}`;
   }
 
   const filteredProjects = useMemo(() => {
