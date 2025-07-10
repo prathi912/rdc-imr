@@ -8,7 +8,7 @@ import { findJournalWebsite, type JournalWebsiteInput } from '@/ai/flows/journal
 import { db } from '@/lib/config';
 import { adminDb, adminStorage } from '@/lib/admin';
 import { doc, collection, writeBatch, query, where, getDocs, getDoc, addDoc, deleteDoc } from 'firebase/firestore';
-import type { Project, IncentiveClaim, User } from '@/types';
+import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase } from '@/types';
 import { sendEmail } from '@/lib/email';
 import * as XLSX from 'xlsx';
 import fs from 'fs';
@@ -646,7 +646,7 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
 
       const projectRef = adminDb.collection('projects').doc();
       
-      const newProjectData = {
+      const newProjectData: any = {
         title: project.project_title,
         pi_email: project.pi_email,
         status: project.status,
@@ -660,13 +660,25 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         teamInfo: "Historical data, team info not available.",
         timelineAndOutcomes: "Historical data, outcomes not available.",
         submissionDate: project.sanction_date && !isNaN(new Date(project.sanction_date).getTime()) ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
-        grant: {
-            amount: project.grant_amount || 0,
-            status: 'Completed', // Assume old grants are completed
-            disbursementDate: project.sanction_date && !isNaN(new Date(project.sanction_date).getTime()) ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
-        },
         isBulkUploaded: true,
       };
+
+      if (project.grant_amount && project.grant_amount > 0) {
+        const firstPhase: GrantPhase = {
+          id: new Date().toISOString(),
+          name: 'Phase 1',
+          amount: project.grant_amount,
+          status: 'Pending Disbursement',
+          transactions: [],
+        };
+        const grant: GrantDetails = {
+          totalAmount: project.grant_amount,
+          status: 'Awarded',
+          sanctionNumber: '',
+          phases: [firstPhase],
+        };
+        newProjectData.grant = grant;
+      }
 
       batch.set(projectRef, newProjectData);
       projectCount++;
