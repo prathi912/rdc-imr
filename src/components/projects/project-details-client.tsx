@@ -215,6 +215,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const allEvaluationsIn = (project.meetingDetails?.assignedEvaluators?.length ?? 0) > 0 && evaluations.length >= (project.meetingDetails?.assignedEvaluators?.length ?? 0);
 
+  const canManageGrants = user && (user.role === 'Super-admin' || user.role === 'admin' || user.uid === project.pi_uid);
+
+
   const assignedEvaluatorNames = useMemo(() => {
     if (!project.meetingDetails?.assignedEvaluators || !allUsers.length) {
       return [];
@@ -839,7 +842,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchData} />
       )}
       
-      {project.grant && user && (
+      {project.grant && user && canManageGrants && (
         <GrantManagement project={project} user={user} onUpdate={handleProjectUpdate} />
       )}
 

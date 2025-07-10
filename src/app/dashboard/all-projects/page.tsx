@@ -87,6 +87,7 @@ export default function AllProjectsPage() {
         const isAdmin = ['admin', 'Super-admin'].includes(user.role);
         const isCro = user.role === 'CRO';
         const isHod = user.designation === 'HOD';
+        const isPrincipalView = isPrincipal && !isCro; // A principal is not a CRO unless their role is explicitly CRO.
         const isSpecialUser = user.email === 'unnati.joshi22950@paruluniversity.ac.in';
         
         if (isSpecialUser) {
@@ -95,39 +96,8 @@ export default function AllProjectsPage() {
           q = query(projectsCol);
         } else if (isCro && user.faculty) {
           q = query(projectsCol, where('faculty', '==', user.faculty));
-        } else if (isPrincipal && user.institute) {
-          // Principals need a two-step fetch:
-          // 1. Get users from their institute.
-          const instituteUsersQuery = query(usersCol, where('institute', '==', user.institute));
-          const instituteUsersSnapshot = await getDocs(instituteUsersQuery);
-          const instituteUserIds = instituteUsersSnapshot.docs.map(doc => doc.id).filter(id => id);
-
-          // 2. Fetch projects for those linked users.
-          if (instituteUserIds.length > 0) {
-              const projectPromises = [];
-              // Firestore 'in' queries are limited to 30 values per query.
-              for (let i = 0; i < instituteUserIds.length; i += 30) {
-                const chunk = instituteUserIds.slice(i, i + 30);
-                const chunkQuery = query(projectsCol, where('pi_uid', 'in', chunk));
-                projectPromises.push(getDocs(chunkQuery));
-              }
-              const projectSnapshots = await Promise.all(projectPromises);
-              projectList = projectSnapshots.flatMap(snapshot => snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project)));
-          }
-          
-          // 3. Additionally, fetch historical projects by institute for cases where the PI hasn't logged in yet.
-          const historicalProjectsQuery = query(projectsCol, where('institute', '==', user.institute), where('isBulkUploaded', '==', true));
-          const historicalSnapshot = await getDocs(historicalProjectsQuery);
-          const historicalProjects = historicalSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));
-          
-          const combinedProjectIds = new Set(projectList.map(p => p.id));
-          historicalProjects.forEach(p => {
-              if (!combinedProjectIds.has(p.id)) {
-                  projectList.push(p);
-                  combinedProjectIds.add(p.id);
-              }
-          });
-
+        } else if (isPrincipalView && user.institute) {
+          q = query(projectsCol, where('institute', '==', user.institute));
         } else if (isHod && user.department) {
           q = query(projectsCol, where('departmentName', '==', user.department));
         }
@@ -148,11 +118,12 @@ export default function AllProjectsPage() {
       }
     }
     getProjectsAndUsers();
-  }, [user, toast, isPrincipal]);
+  }, [user, toast]);
   
   const isAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
   const isCro = user?.role === 'CRO';
   const isHod = user?.designation === 'HOD';
+  const isPrincipalView = isPrincipal && !isCro;
   const isSpecialUser = user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
   
   let pageTitle = "All Projects";
@@ -164,7 +135,7 @@ export default function AllProjectsPage() {
   } else if (isCro && user?.faculty) {
     pageTitle = `Projects from ${user.faculty}`;
     pageDescription = "Browse all projects submitted from your faculty.";
-  } else if (isPrincipal && user?.institute) {
+  } else if (isPrincipalView && user?.institute) {
     pageTitle = `Projects from ${user.institute}`;
     pageDescription = "Browse all projects submitted from your institute.";
   } else if (isHod && user?.department) {
@@ -253,7 +224,7 @@ export default function AllProjectsPage() {
     let fileName = `all_projects_${new Date().toISOString().split('T')[0]}.xlsx`;
     if (isCro && user?.faculty) {
         fileName = `projects_${user.faculty.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    } else if (isPrincipal && user?.institute) {
+    } else if (isPrincipalView && user?.institute) {
         fileName = `projects_${user.institute.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
     } else if (isHod && user?.department) {
         fileName = `projects_${user.department.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -270,7 +241,7 @@ export default function AllProjectsPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
-        {(isAdmin || isCro || isSpecialUser || isPrincipal || isHod) && (
+        {(isAdmin || isCro || isSpecialUser || isPrincipalView || isHod) && (
             <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
                 <DialogTrigger asChild>
                     <Button disabled={loading || filteredProjects.length === 0}>
@@ -385,3 +356,5 @@ export default function AllProjectsPage() {
     </div>
   );
 }
+
+    
