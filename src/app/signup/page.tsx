@@ -114,7 +114,7 @@ export default function SignupPage() {
 
     // Back-fill pi_uid for migrated projects using a server action
     try {
-      const result = await linkHistoricalData(user.uid, user.email);
+      const result = await linkHistoricalData(user);
       if (result.success && result.count > 0) {
         console.log(`Successfully linked ${result.count} historical projects for new user ${user.email}.`);
       }

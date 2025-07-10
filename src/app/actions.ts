@@ -659,11 +659,11 @@ export async function bulkUploadProjects(projectsData: any[]): Promise<{ success
         departmentName: departmentName,
         teamInfo: "Historical data, team info not available.",
         timelineAndOutcomes: "Historical data, outcomes not available.",
-        submissionDate: project.sanction_date ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
+        submissionDate: project.sanction_date && !isNaN(new Date(project.sanction_date).getTime()) ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
         grant: {
             amount: project.grant_amount || 0,
             status: 'Completed', // Assume old grants are completed
-            disbursementDate: project.sanction_date ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
+            disbursementDate: project.sanction_date && !isNaN(new Date(project.sanction_date).getTime()) ? new Date(project.sanction_date).toISOString() : new Date().toISOString(),
         },
         isBulkUploaded: true,
       };
@@ -686,7 +686,8 @@ export async function deleteBulkProject(projectId: string): Promise<{ success: b
         if (!projectId) {
             return { success: false, error: 'Project ID is required.' };
         }
-        await adminDb.collection('projects').doc(projectId).delete();
+        const projectRef = adminDb.collection('projects').doc(projectId);
+        await projectRef.delete();
         return { success: true };
     } catch (error: any) {
         console.error('Error deleting project:', error);
@@ -810,8 +811,13 @@ export async function exportClaimToExcel(claimId: string): Promise<{ success: bo
   }
 }
 
-export async function linkHistoricalData(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
+export async function linkHistoricalData(userData: Partial<User> & { uid: string; email: string; }): Promise<{ success: boolean; count: number; error?: string }> {
   try {
+    const { uid, email, institute, department, phoneNumber } = userData;
+    if (!uid || !email) {
+      return { success: false, count: 0, error: 'User UID and Email are required.' };
+    }
+
     const projectsRef = adminDb.collection('projects');
     const q = projectsRef.where('pi_email', '==', email).where('pi_uid', 'in', ['', null]);
     
@@ -823,12 +829,17 @@ export async function linkHistoricalData(uid: string, email: string): Promise<{ 
 
     const batch = adminDb.batch();
     projectsSnapshot.forEach(projectDoc => {
-      batch.update(projectDoc.ref, { pi_uid: uid });
+      const updateData: { [key: string]: any } = { pi_uid: uid };
+      if (institute) updateData.institute = institute;
+      if (department) updateData.departmentName = department;
+      if (phoneNumber) updateData.pi_phoneNumber = phoneNumber;
+      
+      batch.update(projectDoc.ref, updateData);
     });
     
     await batch.commit();
 
-    console.log(`Linked ${projectsSnapshot.size} historical projects for user ${email} (UID: ${uid})`);
+    console.log(`Linked and updated ${projectsSnapshot.size} historical projects for user ${email} (UID: ${uid})`);
     return { success: true, count: projectsSnapshot.size };
 
   } catch (error: any) {

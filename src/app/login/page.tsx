@@ -118,9 +118,9 @@ export default function LoginPage() {
     
     await setDoc(userDocRef, user, { merge: true });
 
-    // Back-fill pi_uid for migrated projects using a server action
+    // Back-fill pi_uid and other details for migrated projects using a server action
     try {
-      const result = await linkHistoricalData(user.uid, user.email);
+      const result = await linkHistoricalData(user);
       if (result.success && result.count > 0) {
         console.log(`Successfully linked ${result.count} historical projects for user ${user.email}.`);
       }
