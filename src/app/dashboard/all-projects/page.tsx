@@ -81,72 +81,67 @@ export default function AllProjectsPage() {
         setUsers(userList);
 
         const projectsCol = collection(db, 'projects');
+        let projectList: Project[] = [];
         let q;
 
         const isAdmin = ['admin', 'Super-admin'].includes(user.role);
         const isCro = user.role === 'CRO';
-        
         const isHod = user.designation === 'HOD';
         const isSpecialUser = user.email === 'unnati.joshi22950@paruluniversity.ac.in';
-
+        
         if (isSpecialUser) {
-          q = query(
-            projectsCol, 
-            where('faculty', '==', 'Faculty of Engineering & Technology'),
-            orderBy('submissionDate', 'desc')
-          );
+          q = query(projectsCol, where('faculty', '==', 'Faculty of Engineering & Technology'));
         } else if (isAdmin) {
-          q = query(projectsCol, orderBy('submissionDate', 'desc'));
+          q = query(projectsCol);
         } else if (isCro && user.faculty) {
-          q = query(
-            projectsCol, 
-            where('faculty', '==', user.faculty),
-            orderBy('submissionDate', 'desc')
-          );
+          q = query(projectsCol, where('faculty', '==', user.faculty));
         } else if (isPrincipal && user.institute) {
+          // Principals need a two-step fetch:
+          // 1. Get users from their institute.
           const instituteUsersQuery = query(usersCol, where('institute', '==', user.institute));
           const instituteUsersSnapshot = await getDocs(instituteUsersQuery);
-          const instituteUserIds = instituteUsersSnapshot.docs.map(doc => doc.id);
+          const instituteUserIds = instituteUsersSnapshot.docs.map(doc => doc.id).filter(id => id);
 
+          // 2. Fetch projects for those linked users.
           if (instituteUserIds.length > 0) {
-            // Firestore 'in' queries are limited to 30 items per query.
-            // For a larger number of users, we'd need to batch this.
-            // Assuming an institute won't have more than a few thousand users and this will be fine in chunks.
-            const projectPromises = [];
-            for (let i = 0; i < instituteUserIds.length; i += 30) {
-              const chunk = instituteUserIds.slice(i, i + 30);
-              const chunkQuery = query(projectsCol, where('pi_uid', 'in', chunk));
-              projectPromises.push(getDocs(chunkQuery));
-            }
-            const projectSnapshots = await Promise.all(projectPromises);
-            const projectList = projectSnapshots.flatMap(snapshot => snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project)));
-            projectList.sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
-            setAllProjects(projectList);
-            setLoading(false);
-            return;
-          } else {
-            setAllProjects([]);
-            setLoading(false);
-            return;
+              const projectPromises = [];
+              for (let i = 0; i < instituteUserIds.length; i += 30) {
+                const chunk = instituteUserIds.slice(i, i + 30);
+                const chunkQuery = query(projectsCol, where('pi_uid', 'in', chunk));
+                projectPromises.push(getDocs(chunkQuery));
+              }
+              const projectSnapshots = await Promise.all(projectPromises);
+              projectList = projectSnapshots.flatMap(snapshot => snapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project)));
           }
-        } else if (isHod && user.department) {
-          q = query(
-            projectsCol,
-            where('departmentName', '==', user.department),
-            orderBy('submissionDate', 'desc')
-          );
-        } else {
-          setAllProjects([]);
-          setLoading(false);
-          return;
-        }
+          
+          // 3. Additionally, fetch historical projects by Faculty for cases where the PI hasn't logged in yet.
+          // This ensures bulk-uploaded data is visible. The faculty field on user and project must match.
+          if (user.faculty) {
+              const historicalProjectsQuery = query(projectsCol, where('faculty', '==', user.faculty), where('isBulkUploaded', '==', true));
+              const historicalSnapshot = await getDocs(historicalProjectsQuery);
+              const historicalProjects = historicalSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));
+              
+              const combinedProjectIds = new Set(projectList.map(p => p.id));
+              historicalProjects.forEach(p => {
+                  if (!combinedProjectIds.has(p.id)) {
+                      projectList.push(p);
+                      combinedProjectIds.add(p.id);
+                  }
+              });
+          }
 
-        const projectSnapshot = await getDocs(q);
-        const projectList = projectSnapshot.docs.map(doc => ({
-          ...doc.data(),
-          id: doc.id,
-        } as Project));
+        } else if (isHod && user.department) {
+          q = query(projectsCol, where('departmentName', '==', user.department));
+        }
+        
+        if (q) {
+            const projectSnapshot = await getDocs(q);
+            projectList = projectSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+        }
+        
+        projectList.sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
         setAllProjects(projectList);
+
       } catch (error) {
         console.error("Error fetching data: ", error);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data. Check permissions or network.' });
