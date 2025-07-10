@@ -244,7 +244,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {grant.phases.map((phase) => {
+        {(grant.phases || []).map((phase) => {
             const totalUtilized = phase.transactions?.reduce((acc, t) => acc + t.amount, 0) || 0;
             return (
                 <Card key={phase.id} className='bg-muted/30'>
