@@ -114,7 +114,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             status: 'Pending Disbursement',
             transactions: [],
         };
-        const updatedPhases = [...grant.phases, newPhase];
+        const updatedPhases = [...(grant.phases || []), newPhase];
         const updatedGrant: GrantDetails = {
             ...grant,
             phases: updatedPhases,
@@ -160,7 +160,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             invoiceUrl: invoiceUrl,
         };
 
-        const updatedPhases = grant.phases.map(p => {
+        const updatedPhases = (grant.phases || []).map(p => {
             if (p.id === currentPhaseId) {
                 return { ...p, transactions: [...(p.transactions || []), newTransaction] };
             }
@@ -186,7 +186,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     setIsSubmitting(true);
     try {
         const projectRef = doc(db, 'projects', project.id);
-        const updatedPhases = grant.phases.map(p => {
+        const updatedPhases = (grant.phases || []).map(p => {
             if (p.id === phaseId) {
                 const updatedPhase: GrantPhase = { ...p, status: newStatus };
                 if (newStatus === 'Disbursed' && !p.disbursementDate) {
@@ -312,7 +312,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Add New Expense</DialogTitle>
-                    <DialogDescription>Fill in the details for the expense for phase: {grant.phases.find(p => p.id === currentPhaseId)?.name}.</DialogDescription>
+                    <DialogDescription>Fill in the details for the expense for phase: {(grant.phases || []).find(p => p.id === currentPhaseId)?.name}.</DialogDescription>
                 </DialogHeader>
                 <Form {...transactionForm}>
                     <form id="transaction-form" onSubmit={transactionForm.handleSubmit(handleAddTransaction)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
