@@ -75,15 +75,15 @@ export default function SignupPage() {
     },
   });
   
-  const determineUserRole = (email: string): User['role'] => {
+  const determineUserRoleAndDesignation = (email: string): { role: User['role'], designation?: User['designation'] } => {
     if (email === 'rathipranav07@gmail.com') {
-      return 'Super-admin';
+      return { role: 'Super-admin' };
     }
     if (PRINCIPAL_EMAILS.includes(email)) {
-      return 'CRO'; // Treat Principals as CROs for permissions
+      return { role: 'faculty', designation: 'Principal' };
     }
     // New users are faculty by default. Super-admin can change roles.
-    return 'faculty';
+    return { role: 'faculty' };
   }
 
   const processNewUser = async (firebaseUser: FirebaseUser, name?: string) => {
@@ -100,21 +100,16 @@ export default function SignupPage() {
       return;
     }
     
-    const role = determineUserRole(firebaseUser.email!);
+    const { role, designation } = determineUserRoleAndDesignation(firebaseUser.email!);
     const user: User = {
       uid: firebaseUser.uid,
       name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
       role: role,
-      profileComplete: role !== 'faculty', // Principals (CRO) and Admins don't need profile setup
-      allowedModules: getDefaultModulesForRole(role),
+      designation: designation,
+      profileComplete: ['Super-admin', 'admin', 'CRO'].includes(role), // Auto-complete profile for admin roles
+      allowedModules: getDefaultModulesForRole(role, designation),
     };
-
-    if (role === 'CRO') { // If it's a Principal
-        user.designation = 'Principal';
-        user.institute = 'Assigned Institute'; // You can add more specific logic to map email to institute if needed
-        user.faculty = 'Assigned Faculty';
-    }
 
     if (firebaseUser.photoURL) {
       user.photoURL = firebaseUser.photoURL;
@@ -130,7 +125,6 @@ export default function SignupPage() {
       }
       if (!result.success) {
           console.error("Failed to link historical projects:", result.error);
-          // Don't block signup for this, just log it.
       }
     } catch (e) {
       console.error("Error calling linkHistoricalData action:", e);

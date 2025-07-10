@@ -22,28 +22,31 @@ export const ALL_MODULES = [
   { id: 'settings', label: 'Settings' },
 ];
 
-// Define module sets for clarity and to avoid unintended inheritance issues.
 const coreModules = ['dashboard', 'notifications', 'settings'];
+const facultyCoreModules = ['new-submission', 'my-projects'];
+const hierarchyCoreModules = [...facultyCoreModules, 'all-projects'];
 
-const basicFacultyModules = [...coreModules, 'new-submission', 'my-projects'];
-const fullFacultyModules = [...basicFacultyModules, 'incentive-claim', 'evaluator-dashboard', 'my-evaluations'];
+const facultyDefaults = [...coreModules, ...facultyCoreModules, 'incentive-claim', 'evaluator-dashboard', 'my-evaluations'];
+const croDefaults = [...coreModules, ...hierarchyCoreModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'manage-incentive-claims'];
+const adminDefaults = [...croDefaults, 'system-health', 'bulk-upload'];
+const superAdminDefaults = [...adminDefaults, 'module-management'];
 
-const croAdminModules = ['schedule-meeting', 'pending-reviews', 'completed-reviews', 'all-projects', 'analytics', 'manage-users', 'manage-incentive-claims'];
-const generalAdminModules = ['system-health', 'bulk-upload'];
-const superAdminOnlyModules = ['module-management'];
+// Default modules for special designations who are otherwise 'faculty' role
+const principalDefaults = [...coreModules, ...hierarchyCoreModules];
+const hodDefaults = [...coreModules, ...hierarchyCoreModules];
 
-
-// Define default permissions for each role.
-// New sign-ups get the basic 'faculty' set. Admins/CROs get a comprehensive set.
-const facultyDefaults = basicFacultyModules;
-const croDefaults = [...new Set([...fullFacultyModules, ...croAdminModules])];
-const adminDefaults = [...new Set([...croDefaults, ...generalAdminModules])];
-const superAdminDefaults = [...new Set([...adminDefaults, ...superAdminOnlyModules])];
-
-export function getDefaultModulesForRole(role: User['role']): string[] {
+export function getDefaultModulesForRole(role: User['role'], designation?: User['designation']): string[] {
+  if (role === 'faculty') {
+    if (designation === 'Principal') {
+      return principalDefaults;
+    }
+    if (designation === 'HOD') {
+      return hodDefaults;
+    }
+    return facultyDefaults;
+  }
+  
   switch (role) {
-    case 'faculty':
-      return facultyDefaults;
     case 'CRO':
       return croDefaults;
     case 'admin':

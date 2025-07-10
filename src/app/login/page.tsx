@@ -61,15 +61,15 @@ export default function LoginPage() {
     },
   });
 
-  const determineUserRole = (email: string): User['role'] => {
+  const determineUserRoleAndDesignation = (email: string): { role: User['role'], designation?: User['designation'] } => {
     if (email === 'rathipranav07@gmail.com') {
-      return 'Super-admin';
+      return { role: 'Super-admin' };
     }
     if (PRINCIPAL_EMAILS.includes(email)) {
-      return 'CRO'; // Treat Principals as CROs for permissions
+      return { role: 'faculty', designation: 'Principal' };
     }
     // New users are faculty by default, admins can change roles.
-    return 'faculty';
+    return { role: 'faculty' };
   }
 
   const processSignIn = async (firebaseUser: FirebaseUser) => {
@@ -85,20 +85,16 @@ export default function LoginPage() {
       }
     } else {
       // Create new user if they don't exist in Firestore (e.g., first Google sign-in)
-      const role = determineUserRole(firebaseUser.email!);
+      const { role, designation } = determineUserRoleAndDesignation(firebaseUser.email!);
       user = {
         uid: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
         email: firebaseUser.email!,
         role: role,
+        designation: designation,
         profileComplete: false,
-        allowedModules: getDefaultModulesForRole(role),
+        allowedModules: getDefaultModulesForRole(role, designation),
       };
-      if (role === 'CRO') {
-        user.designation = 'Principal';
-        user.institute = 'Assigned Institute'; // Default, can be refined
-        user.faculty = 'Assigned Faculty'; // Default, can be refined
-      }
     }
     
     // Always update/set the photoURL from provider on sign-in
@@ -106,23 +102,18 @@ export default function LoginPage() {
         user.photoURL = firebaseUser.photoURL;
     }
 
-    // Ensure admin and evaluator roles are correctly set and bypass profile setup for them
-    const specialRole = determineUserRole(user.email);
-    if (user.role !== specialRole || (specialRole !== 'faculty' && !user.profileComplete)) {
-        user.role = specialRole;
-        if(specialRole !== 'faculty') {
-            user.profileComplete = true;
-        }
-    }
+    // Ensure admin and special roles are correctly set and bypass profile setup for them
+    const { role: determinedRole, designation: determinedDesignation } = determineUserRoleAndDesignation(user.email);
+    if (user.role !== determinedRole) user.role = determinedRole;
+    if (user.designation !== determinedDesignation) user.designation = determinedDesignation;
     
-    // For existing users, ensure roles that don't need profile setup are marked as complete
-    if (['admin', 'Super-admin', 'Evaluator', 'CRO'].includes(user.role) && !user.profileComplete) {
+    if (['admin', 'Super-admin', 'CRO'].includes(user.role) && !user.profileComplete) {
         user.profileComplete = true;
     }
 
     // Set default modules for existing users if they don't have them
     if (!user.allowedModules || user.allowedModules.length === 0) {
-      user.allowedModules = getDefaultModulesForRole(user.role);
+      user.allowedModules = getDefaultModulesForRole(user.role, user.designation);
     }
     
     await setDoc(userDocRef, user, { merge: true });
@@ -135,7 +126,6 @@ export default function LoginPage() {
       }
       if (!result.success) {
           console.error("Failed to link historical projects:", result.error);
-          // Don't block login for this, just log it.
       }
     } catch (e) {
       console.error("Error calling linkHistoricalData action:", e);

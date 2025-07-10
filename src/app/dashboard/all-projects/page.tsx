@@ -67,8 +67,6 @@ export default function AllProjectsPage() {
     }
   }, []);
 
-  const isPrincipal = user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false;
-
   useEffect(() => {
     if (!user) return;
 
@@ -83,30 +81,27 @@ export default function AllProjectsPage() {
         const projectsCol = collection(db, 'projects');
         let projectList: Project[] = [];
         let q;
-
-        const isAdmin = ['admin', 'Super-admin'].includes(user.role);
-        const isCro = user.role === 'CRO';
-        const isHod = user.designation === 'HOD';
-        // A principal's view is determined by their email, not their role.
-        const isPrincipalView = isPrincipal && user.role !== 'admin' && user.role !== 'Super-admin';
-        const isSpecialUser = user.email === 'unnati.joshi22950@paruluniversity.ac.in';
         
-        if (isSpecialUser) {
-          q = query(projectsCol, where('faculty', '==', 'Faculty of Engineering & Technology'));
-        } else if (isAdmin) {
+        const isSuperAdmin = user.role === 'Super-admin';
+        const isAdmin = user.role === 'admin';
+        const isCro = user.role === 'CRO';
+        const isPrincipal = user.designation === 'Principal';
+        const isHod = user.designation === 'HOD';
+
+        if (isSuperAdmin || isAdmin) {
           q = query(projectsCol);
         } else if (isCro && user.faculty) {
           q = query(projectsCol, where('faculty', '==', user.faculty));
-        } else if (isPrincipalView && user.institute) {
+        } else if (isPrincipal && user.institute) {
           q = query(projectsCol, where('institute', '==', user.institute));
         } else if (isHod && user.department) {
           q = query(projectsCol, where('departmentName', '==', user.department));
+        } else {
+            q = query(projectsCol, where('pi_uid', '==', user.uid));
         }
         
-        if (q) {
-            const projectSnapshot = await getDocs(q);
-            projectList = projectSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-        }
+        const projectSnapshot = await getDocs(q);
+        projectList = projectSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
         
         projectList.sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
         setAllProjects(projectList);
@@ -119,31 +114,32 @@ export default function AllProjectsPage() {
       }
     }
     getProjectsAndUsers();
-  }, [user, toast, isPrincipal]);
+  }, [user, toast]);
   
-  const isAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
+  const isSuperAdmin = user?.role === 'Super-admin';
+  const isAdmin = user?.role === 'admin';
   const isCro = user?.role === 'CRO';
+  const isPrincipal = user?.designation === 'Principal';
   const isHod = user?.designation === 'HOD';
-  const isPrincipalView = isPrincipal && user?.role !== 'admin' && user?.role !== 'Super-admin';
-  const isSpecialUser = user?.email === 'unnati.joshi22950@paruluniversity.ac.in';
+  const hasExportAccess = isSuperAdmin || isAdmin || isCro || isPrincipal || isHod;
   
   let pageTitle = "All Projects";
   let pageDescription = "Browse and manage all projects in the system.";
+  let exportFileName = 'all_projects';
 
-  if (isSpecialUser) {
-    pageTitle = "Projects from Faculty of Engineering & Technology";
-    pageDescription = "Browse all projects submitted from the Faculty of Engineering & Technology.";
-  } else if (isCro && user?.faculty && !isPrincipalView) {
+  if (isCro && user?.faculty) {
     pageTitle = `Projects from ${user.faculty}`;
     pageDescription = "Browse all projects submitted from your faculty.";
-  } else if (isPrincipalView && user?.institute) {
+    exportFileName = `projects_${user.faculty.replace(/[ &]/g, '_')}`;
+  } else if (isPrincipal && user?.institute) {
     pageTitle = `Projects from ${user.institute}`;
     pageDescription = "Browse all projects submitted from your institute.";
+    exportFileName = `projects_${user.institute.replace(/[ &]/g, '_')}`;
   } else if (isHod && user?.department) {
     pageTitle = `Projects from ${user.department}`;
     pageDescription = "Browse all projects submitted from your department.";
+    exportFileName = `projects_${user.department.replace(/[ &]/g, '_')}`;
   }
-
 
   const filteredProjects = useMemo(() => {
     return allProjects
@@ -222,18 +218,7 @@ export default function AllProjectsPage() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Projects");
     
-    let fileName = `all_projects_${new Date().toISOString().split('T')[0]}.xlsx`;
-    if (isCro && user?.faculty && !isPrincipalView) {
-        fileName = `projects_${user.faculty.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    } else if (isPrincipalView && user?.institute) {
-        fileName = `projects_${user.institute.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    } else if (isHod && user?.department) {
-        fileName = `projects_${user.department.replace(/[ &]/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    } else if (isSpecialUser) {
-        fileName = `projects_Eng_Tech_${new Date().toISOString().split('T')[0]}.xlsx`;
-    }
-    
-    XLSX.writeFile(workbook, fileName);
+    XLSX.writeFile(workbook, `${exportFileName}_${new Date().toISOString().split('T')[0]}.xlsx`);
     toast({ title: "Export Started", description: `Downloading ${projectsToExport.length} projects.` });
     setIsExportDialogOpen(false);
   };
@@ -242,7 +227,7 @@ export default function AllProjectsPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
-        {(isAdmin || isCro || isSpecialUser || isPrincipalView || isHod) && (
+        {hasExportAccess && (
             <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
                 <DialogTrigger asChild>
                     <Button disabled={loading || filteredProjects.length === 0}>
@@ -351,7 +336,7 @@ export default function AllProjectsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={filteredProjects} userRole={isSpecialUser ? 'CRO' : user!.role} />
+          <ProjectList projects={filteredProjects} userRole={user!.role} />
         )}
       </div>
     </div>
