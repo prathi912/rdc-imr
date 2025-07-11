@@ -46,7 +46,8 @@ import { getDefaultModulesForRole } from '@/lib/modules';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const ROLES: User['role'][] = ['faculty', 'admin', 'Super-admin'];
+const ROLES: User['role'][] = ['faculty', 'admin']; // Base roles for all admins
+const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin'; // Special role
 const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
 type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role'> | 'claimsCount';
 
@@ -235,15 +236,24 @@ export default function ManageUsersPage() {
 
   const handleRoleChange = useCallback(async (uid: string, newRole: User['role']) => {
     try {
-      const userDoc = doc(db, 'users', uid);
-      // When role changes, also update their default module access list
-      const defaultModules = getDefaultModulesForRole(newRole);
-      await updateDoc(userDoc, { 
+      const userDocRef = doc(db, 'users', uid);
+      
+      const newDesignation = newRole === 'Super-admin' ? 'Super-admin' : 'faculty';
+      const defaultModules = getDefaultModulesForRole(newRole, newDesignation);
+      
+      const updatePayload: { role: User['role'], allowedModules: string[], designation?: string } = {
         role: newRole,
-        allowedModules: defaultModules
-      });
+        allowedModules: defaultModules,
+      };
+
+      if (newRole === 'Super-admin') {
+          updatePayload.designation = newDesignation;
+      }
+      
+      await updateDoc(userDocRef, updatePayload);
+      
       toast({ title: 'Role Updated', description: "The user's role and permissions have been changed." });
-      fetchUsersAndClaims(); // Refresh the list
+      fetchUsersAndClaims();
     } catch (error) {
        console.error("Error updating role:", error);
        toast({ variant: 'destructive', title: "Error", description: "Could not update role." });
@@ -267,6 +277,9 @@ export default function ManageUsersPage() {
     );
   }
 
+  const isCurrentUserSuperAdmin = currentUser?.role === 'Super-admin';
+  const availableRoles = isCurrentUserSuperAdmin ? [...ROLES, SUPER_ADMIN_ROLE] : ROLES;
+
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Manage Users" description="View and manage user roles and permissions." />
@@ -284,7 +297,7 @@ export default function ManageUsersPage() {
               </SelectTrigger>
               <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  {ROLES.map(role => (
+                  {availableRoles.map(role => (
                       <SelectItem key={role} value={role}>{role.charAt(0).toUpperCase() + role.slice(1)}</SelectItem>
                   ))}
               </SelectContent>
@@ -356,7 +369,7 @@ export default function ManageUsersPage() {
                                 <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
                                 <DropdownMenuPortal>
                                     <DropdownMenuSubContent>
-                                        {ROLES.map(role => (
+                                        {availableRoles.map(role => (
                                             <DropdownMenuItem 
                                                 key={role} 
                                                 onClick={() => handleRoleChange(user.uid, role)}
@@ -407,3 +420,4 @@ export default function ManageUsersPage() {
     </div>
   );
 }
+
