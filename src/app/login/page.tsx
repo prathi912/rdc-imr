@@ -110,7 +110,7 @@ export default function LoginPage() {
     if (user.role !== determinedRole) user.role = determinedRole;
     if (user.designation !== determinedDesignation) user.designation = determinedDesignation;
     
-    if (['admin', 'Super-admin', 'CRO'].includes(user.role) && !user.profileComplete) {
+    if ((['admin', 'Super-admin', 'CRO'].includes(user.role) || PRINCIPAL_EMAILS.includes(user.email)) && !user.profileComplete) {
         user.profileComplete = true;
     }
 
