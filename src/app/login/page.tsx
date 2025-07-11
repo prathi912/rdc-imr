@@ -110,11 +110,11 @@ export default function LoginPage() {
     if (user.role !== determinedRole) user.role = determinedRole;
     if (user.designation !== determinedDesignation) user.designation = determinedDesignation;
     
-    if ((['admin', 'Super-admin', 'CRO'].includes(user.role)) && !user.profileComplete) {
+    if ((['admin', 'Super-admin'].includes(user.role)) && !user.profileComplete) {
         user.profileComplete = true;
     }
 
-    // Set default modules for existing users if they don't have them
+    // Ensure default modules for existing users if they don't have them
     if (!user.allowedModules || user.allowedModules.length === 0) {
       user.allowedModules = getDefaultModulesForRole(user.role, user.designation);
     }
