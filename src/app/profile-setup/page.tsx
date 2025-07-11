@@ -41,7 +41,7 @@ const profileSetupSchema = z.object({
 type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
 
 const faculties = [
-    "RDC","Parul Sevashram Hospital","Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
+    "Parul Sevashram Hospital","Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
     "Faculty of Computer Applications", "Faculty of Agriculture", "Faculty of Architecture & Planning",
     "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
@@ -157,7 +157,7 @@ export default function ProfileSetupPage() {
               const result = await res.json();
               if (result.success) {
                 form.reset(result.data);
-                toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+                toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled from PU-MIS data. Please review and save.' });
               }
             } catch (error) {
               console.error("Failed to fetch staff data", error);
