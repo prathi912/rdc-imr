@@ -154,6 +154,10 @@ export default function AnalyticsPage() {
     return (
       <div className="container mx-auto py-10">
         <PageHeader title="Analytics" description="Loading data..." />
+        <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+             <Card className="lg:col-span-1"><CardHeader><Skeleton className="h-6 w-32" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+             <Card className="lg:col-span-2"><CardHeader><Skeleton className="h-6 w-48" /></CardHeader><CardContent><Skeleton className="h-[250px] w-full" /></CardContent></Card>
+        </div>
         <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-2">
             <Card><CardHeader><Skeleton className="h-6 w-48" /><Skeleton className="h-4 w-3/4" /></CardHeader><CardContent><Skeleton className="h-[300px] w-full" /></CardContent></Card>
             <Card><CardHeader><Skeleton className="h-6 w-48" /><Skeleton className="h-4 w-3/4" /></CardHeader><CardContent><Skeleton className="h-[300px] w-full" /></CardContent></Card>

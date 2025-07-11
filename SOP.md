@@ -17,8 +17,6 @@ This is the base role for all teaching and research staff.
 
 **Key Responsibilities:**
 -   Submitting research project proposals.
--   Applying for research-related incentives.
--   Managing their own projects and claims.
 
 **Workflow:**
 1.  **Profile Setup:** On first login, complete your profile under **Settings**. This includes academic details and **crucially, your salary bank account details**, which are required for any grant disbursal.
@@ -31,35 +29,11 @@ This is the base role for all teaching and research staff.
     -   Go to **My Projects** to view a list of all projects you are associated with (as PI or Co-PI).
     -   Monitor the status of your projects (e.g., `Submitted`, `Under Review`, `Recommended`).
     -   If a project status is `Revision Needed`, open the project details page to view comments and submit a revised proposal.
-4.  **Incentive Claims:**
-    -   Navigate to **Incentive Claims**.
-    -   Select the appropriate category (e.g., Research Papers, Patents, Books).
-    -   Fill out the specific form and upload the required proof documents.
-    -   Track the status of your submitted claims (`Pending`, `Accepted`, `Rejected`) in the tabs on the same page.
 
 ---
 
-## 2. Evaluator
-This role is assigned to users responsible for reviewing IMR project proposals.
 
-**Workflow:**
-1.  **Evaluation Queue:**
-    -   Navigate to the **Evaluation Queue** dashboard. This is your primary workspace.
-    -   This page lists all projects currently assigned to you for review that you have not yet evaluated.
-2.  **Reviewing a Project:**
-    -   Click on a project to view its full details, including the abstract, team information, and attached documents (proposal, CVs, etc.).
-3.  **Submitting an Evaluation:**
-    -   In the project details view, an **Evaluation Form** will be visible.
-    -   Use the AI-generated prompt as a guide for your comments.
-    -   Select a recommendation: **Recommended**, **Not Recommended**, or **Revision Is Needed**.
-    -   Provide detailed, constructive comments in the text area. Your feedback is critical for the PI and the final decision-making process.
-    -   Submit your evaluation. Once submitted, the project will be removed from your queue.
-4.  **Evaluation History:**
-    -   Navigate to **My Evaluations** to see a complete history of all projects you have reviewed.
-
----
-
-## 3. Chief Research Officer (CRO)
+## 2. Chief Research Officer (CRO)
 A faculty-level administrative role with oversight of all projects and claims within their specific faculty.
 
 **Key Capabilities:**
@@ -78,7 +52,7 @@ A faculty-level administrative role with oversight of all projects and claims wi
 
 ---
 
-## 4. Principal
+## 3. Principal
 An institute-level administrative role with oversight of all activities within their specific institute.
 
 **Key Capabilities:**
