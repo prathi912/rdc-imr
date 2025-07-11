@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
@@ -28,79 +29,51 @@ export default function MyProjectsPage() {
         setLoading(true)
         try {
           const projectsRef = collection(db, "projects")
+          const isPrincipal = parsedUser.designation === "Principal"
 
           const allUserProjects: Project[] = []
           const projectIds = new Set<string>()
 
-          // Strategy 1: Try the combined OR query first
-          try {
-            const combinedQuery = query(
-              projectsRef,
-              or(
-                where("pi_uid", "==", parsedUser.uid),
-                where("coPiUids", "array-contains", parsedUser.uid),
-                where("pi_email", "==", parsedUser.email),
-              ),
-            )
-
-            const querySnapshot = await getDocs(combinedQuery)
-
-            querySnapshot.forEach((doc) => {
-              if (!projectIds.has(doc.id)) {
-                allUserProjects.push({ id: doc.id, ...doc.data() } as Project)
-                projectIds.add(doc.id)
+          const addProjectsToList = (projects: Project[]) => {
+            projects.forEach((p) => {
+              if (!projectIds.has(p.id)) {
+                allUserProjects.push(p)
+                projectIds.add(p.id)
               }
             })
-          } catch (combinedQueryError) {
-            console.warn("Combined OR query failed, trying individual queries:", combinedQueryError)
+          }
 
-            // Strategy 2: Fallback to individual queries
+          // Queries for personal projects (PI, Co-PI, email)
+          const personalProjectQueries = [
+              query(projectsRef, where("pi_uid", "==", parsedUser.uid)),
+              query(projectsRef, where("coPiUids", "array-contains", parsedUser.uid))
+          ];
+          if (parsedUser.email) {
+            personalProjectQueries.push(query(projectsRef, where("pi_email", "==", parsedUser.email)));
+          }
+
+          const personalProjectSnapshots = await Promise.all(personalProjectQueries.map(q => getDocs(q).catch(e => { console.warn("A personal project query failed:", e); return null; })));
+
+          personalProjectSnapshots.forEach(snapshot => {
+              if (snapshot) {
+                  addProjectsToList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
+              }
+          });
+
+
+          // Additional query for Principals to get all projects from their institute
+          if (isPrincipal && parsedUser.institute) {
             try {
-              // Query 1: Projects where user is PI
-              const piQuery = query(projectsRef, where("pi_uid", "==", parsedUser.uid))
-              const piSnapshot = await getDocs(piQuery)
-
-              piSnapshot.forEach((doc) => {
-                if (!projectIds.has(doc.id)) {
-                  allUserProjects.push({ id: doc.id, ...doc.data() } as Project)
-                  projectIds.add(doc.id)
-                }
+              const instituteQuery = query(projectsRef, where("institute", "==", parsedUser.institute))
+              const instituteSnapshot = await getDocs(instituteQuery)
+              addProjectsToList(instituteSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)))
+            } catch (error) {
+              console.error("Failed to fetch institute projects:", error)
+              toast({
+                variant: "destructive",
+                title: "Could not load institute projects",
+                description: "There was an error fetching all projects for your institute.",
               })
-
-              // Query 2: Projects where user is Co-PI
-              try {
-                const coPiQuery = query(projectsRef, where("coPiUids", "array-contains", parsedUser.uid))
-                const coPiSnapshot = await getDocs(coPiQuery)
-
-                coPiSnapshot.forEach((doc) => {
-                  if (!projectIds.has(doc.id)) {
-                    allUserProjects.push({ id: doc.id, ...doc.data() } as Project)
-                    projectIds.add(doc.id)
-                  }
-                })
-              } catch (coPiError) {
-                console.warn("Co-PI query failed:", coPiError)
-              }
-
-              // Query 3: Historical projects by email
-              if (parsedUser.email) {
-                try {
-                  const emailQuery = query(projectsRef, where("pi_email", "==", parsedUser.email))
-                  const emailSnapshot = await getDocs(emailQuery)
-
-                  emailSnapshot.forEach((doc) => {
-                    if (!projectIds.has(doc.id)) {
-                      allUserProjects.push({ id: doc.id, ...doc.data() } as Project)
-                      projectIds.add(doc.id)
-                    }
-                  })
-                } catch (emailError) {
-                  console.warn("Email query failed:", emailError)
-                }
-              }
-            } catch (individualQueriesError) {
-              console.error("All individual queries failed:", individualQueriesError)
-              throw individualQueriesError
             }
           }
 
