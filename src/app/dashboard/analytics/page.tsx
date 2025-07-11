@@ -77,10 +77,13 @@ export default function AnalyticsPage() {
     submissions: { label: 'Submissions', color: 'hsl(var(--primary))' },
   } satisfies ChartConfig;
 
-  // For CRO, show breakdown by department within their faculty. Otherwise, show by faculty.
-  const isCroView = user?.role === 'CRO';
-  const aggregationKey = isCroView ? 'departmentName' : 'faculty';
-  const aggregationLabel = isCroView ? 'Department' : 'Faculty';
+  const { aggregationKey, aggregationLabel } = useMemo(() => {
+    if (user?.role === 'CRO' || user?.designation === 'Principal' || user?.designation === 'HOD') {
+        return { aggregationKey: 'departmentName', aggregationLabel: 'Department' };
+    }
+    return { aggregationKey: 'faculty', aggregationLabel: 'Faculty' };
+  }, [user]);
+
 
   const projectsByGroupData = useMemo(() => 
     Object.entries(
