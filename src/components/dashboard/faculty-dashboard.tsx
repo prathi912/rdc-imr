@@ -53,7 +53,10 @@ export function FacultyDashboard({ user }: { user: User }) {
 
   const activeStatuses = ['Recommended', 'In Progress', 'Pending Completion Approval', 'Sanctioned', 'SANCTIONED'];
   const activeProjects = projects.filter(p => activeStatuses.includes(p.status)).length;
-  const pendingApproval = projects.filter(p => p.status === 'Under Review').length;
+  
+  const pendingApprovalStatuses = ['Under Review', 'Submitted', 'Revision Needed'];
+  const pendingApproval = projects.filter(p => pendingApprovalStatuses.includes(p.status)).length;
+  
   const completedProjects = projects.filter(p => p.status === 'Completed').length;
   const upcomingMeetings = projects.filter(p => p.meetingDetails && p.status !== 'Completed' && p.status !== 'Not Recommended');
 
