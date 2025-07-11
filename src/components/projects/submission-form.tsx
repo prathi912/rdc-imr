@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
@@ -457,6 +457,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                       <FormControl>
                         <Input {...fieldProps} type="file" accept=".zip" onChange={(e) => onChange(e.target.files)} />
                       </FormControl>
+                      <FormDescription>Below 5 MB</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
