@@ -568,7 +568,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                             <Input id="phase-amount" type="number" value={phaseAmount} onChange={(e) => setPhaseAmount(Number(e.target.value))} className="col-span-3" placeholder="e.g., 200000"/>
                           </div>
                         </div>
-                        <DialogFooter><Button type="button" onClick={handleAwardGrant} disabled={isAwarding}>{isAwarding ? 'Awarding...' : 'Confirm & Award'}</Button></DialogFooter>
+                        <DialogFooter><Button type="button" variant="glass" onClick={handleAwardGrant} disabled={isAwarding}>{isAwarding ? 'Awarding...' : 'Confirm & Award'}</Button></DialogFooter>
                       </DialogContent>
                     </Dialog>
                   )}
