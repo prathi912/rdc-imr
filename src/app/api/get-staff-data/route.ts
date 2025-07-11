@@ -20,6 +20,8 @@ interface StaffData {
   'Scopus_ID'?: string | number;
   'Google_Scholar_ID'?: string | number;
   'LinkedIn_URL'?: string;
+  'ORCID_ID'?: string | number;
+  'Vidwan_ID'?: string | number;
 }
 
 export async function GET(request: NextRequest) {
@@ -66,6 +68,8 @@ export async function GET(request: NextRequest) {
           misId: String(userRecord['MIS ID'] || ''),
           scopusId: String(userRecord.Scopus_ID || ''),
           googleScholarId: String(userRecord.Google_Scholar_ID || ''),
+          orcidId: String(userRecord.ORCID_ID || ''),
+          vidwanId: String(userRecord.Vidwan_ID || ''),
         },
       });
     } else {
