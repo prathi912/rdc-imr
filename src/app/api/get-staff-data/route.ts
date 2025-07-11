@@ -2,9 +2,7 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
 import * as XLSX from 'xlsx';
-import fs from 'fs';
 import { CRO_EMAILS } from '@/lib/constants';
 
 // Define the expected structure of a row in the Excel sheet
@@ -24,25 +22,27 @@ interface StaffData {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
+  const baseUrl = request.nextUrl.origin;
 
   if (!email) {
     return NextResponse.json({ success: false, error: 'Email query parameter is required.' }, { status: 400 });
   }
   
-  // Do not process for CRO emails as they have special roles
   if (CRO_EMAILS.includes(email)) {
       return NextResponse.json({ success: false, error: 'CRO accounts are handled separately.' });
   }
 
-  const filePath = path.join(process.cwd(), 'src', 'lib', 'data', 'staffdata.xlsx');
+  const fileUrl = `${baseUrl}/staffdata.xlsx`;
 
   try {
-    if (!fs.existsSync(filePath)) {
-      console.warn(`Staff data file not found at: ${filePath}. Pre-fill feature will be inactive.`);
-      return NextResponse.json({ success: false, error: 'Staff data source not found.' });
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+        console.warn(`Staff data file not found at: ${fileUrl}. Status: ${response.status}. Pre-fill feature will be inactive.`);
+        return NextResponse.json({ success: false, error: 'Staff data source not found.' }, { status: response.status });
     }
-    
-    const workbook = XLSX.readFile(filePath);
+
+    const buffer = await response.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json<StaffData>(worksheet);
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'User not found in staff data.' });
     }
   } catch (error: any) {
-    console.error('Error reading staff data file:', error);
+    console.error('Error fetching or processing staff data file:', error);
     return NextResponse.json({ success: false, error: 'Failed to process staff data.' }, { status: 500 });
   }
 }
