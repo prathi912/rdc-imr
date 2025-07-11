@@ -11,12 +11,12 @@ import path from 'path';
 interface StaffData {
   Name?: string;
   Email?: string;
-  Phone?: string;
+  Phone?: string | number;
   Institute?: string;
   Department?: string;
   Designation?: string;
   Faculty?: string;
-  'MIS ID'?: string;
+  'MIS ID'?: string | number;
   'Scopus_ID'?: string;
   'Google_Scholar_ID'?: string;
   'LinkedIn_URL'?: string;
@@ -58,12 +58,12 @@ export async function GET(request: NextRequest) {
         data: {
           name: userRecord.Name,
           email: userRecord.Email,
-          phoneNumber: userRecord.Phone,
+          phoneNumber: String(userRecord.Phone || ''),
           institute: userRecord.Institute,
           department: userRecord.Department,
           designation: userRecord.Designation,
           faculty: userRecord.Faculty,
-          misId: userRecord['MIS ID'],
+          misId: String(userRecord['MIS ID'] || ''),
           scopusId: userRecord.Scopus_ID,
           googleScholarId: userRecord.Google_Scholar_ID,
         },
