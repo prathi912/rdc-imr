@@ -24,16 +24,16 @@ export const ALL_MODULES = [
 
 const coreModules = ['dashboard', 'notifications', 'settings'];
 const facultyCoreModules = ['new-submission', 'my-projects', 'incentive-claim'];
-const hierarchyCoreModules = ['all-projects', 'analytics'];
+const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, 'all-projects'];
+const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects'];
 const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'manage-incentive-claims', 'system-health', 'bulk-upload'];
 const superAdminDefaults = [...adminDefaults, 'module-management'];
 
 // Default modules for special designations who are otherwise 'faculty' role
-const principalDefaults = [...coreModules, ...hierarchyCoreModules];
-const hodDefaults = [...coreModules, ...hierarchyCoreModules];
+const principalDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects'];
+const hodDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects'];
 
 export function getDefaultModulesForRole(role: User['role'], designation?: User['designation']): string[] {
   if (role === 'faculty') {

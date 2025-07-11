@@ -21,7 +21,7 @@ This is the base role for all teaching and research staff.
 -   Managing their own projects and claims.
 
 **Workflow:**
-1.  **Profile Setup:** On first login, complete your profile under **Settings**. This includes academic details and **crucially, your salary bank account details**, which are required for any grant or incentive disbursal.
+1.  **Profile Setup:** On first login, complete your profile under **Settings**. This includes academic details and **crucially, your salary bank account details**, which are required for any grant disbursal.
 2.  **New Project Submission:**
     -   Navigate to **New Submission**.
     -   Fill out the multi-step form, providing all required project details.
