@@ -110,7 +110,7 @@ export default function SignupPage() {
       email: firebaseUser.email!,
       role: role,
       designation: designation,
-      profileComplete: ['Super-admin', 'admin', 'CRO'].includes(role) || PRINCIPAL_EMAILS.includes(firebaseUser.email!),
+      profileComplete: ['Super-admin', 'admin', 'CRO'].includes(role),
       allowedModules: getDefaultModulesForRole(role, designation),
     };
 

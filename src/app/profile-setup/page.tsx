@@ -16,37 +16,40 @@ import { auth, db } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { uploadFileToServer, checkMisIdExists, fetchOrcidData } from '@/app/actions';
 import type { User } from '@/types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Bot, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { CRO_EMAILS } from '@/lib/constants';
+import { CRO_EMAILS, PRINCIPAL_EMAILS } from '@/lib/constants';
 
-const profileSetupSchema = z.object({
+const createProfileSetupSchema = (isPrincipal = false) => z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
   department: z.string().min(2, 'Department name is required.'),
   designation: z.string().min(2, 'Designation is required.'),
-  misId: z.string().min(1, 'MIS ID is required.'),
+  misId: isPrincipal 
+    ? z.string().optional() 
+    : z.string().min(1, 'MIS ID is required.'),
   orcidId: z.string().optional(),
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),
   googleScholarId: z.string().optional(),
-  phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
+  phoneNumber: isPrincipal 
+    ? z.string().optional() 
+    : z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
 });
 
-type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
 
 const faculties = [
-    "Parul Sevashram Hospital","Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
+    "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
     "Faculty of Computer Applications", "Faculty of Agriculture", "Faculty of Architecture & Planning",
     "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
     "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
-    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health",
+    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", "Parul Sevashram Hospital"
 ];
 
 const institutes = [
@@ -103,6 +106,10 @@ export default function ProfileSetupPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(false);
+
+  const isPrincipal = useMemo(() => user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false, [user]);
+  const profileSetupSchema = createProfileSetupSchema(isPrincipal);
+  type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
 
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
@@ -192,20 +199,22 @@ export default function ProfileSetupPage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      const misIdCheck = await checkMisIdExists(data.misId, user.uid);
-      if (misIdCheck.exists) {
-        form.setError("misId", {
-            type: "manual",
-            message: "This MIS ID is already registered. If you need help, contact helpdesk.rdc@paruluniversity.ac.in."
-        });
-        toast({
-          variant: 'destructive',
-          title: 'MIS ID Already Registered',
-          description: 'This MIS ID is already associated with another account.',
-          duration: 8000,
-        });
-        setIsSubmitting(false);
-        return;
+      if (data.misId) {
+        const misIdCheck = await checkMisIdExists(data.misId, user.uid);
+        if (misIdCheck.exists) {
+            form.setError("misId", {
+                type: "manual",
+                message: "This MIS ID is already registered. If you need help, contact helpdesk.rdc@paruluniversity.ac.in."
+            });
+            toast({
+            variant: 'destructive',
+            title: 'MIS ID Already Registered',
+            description: 'This MIS ID is already associated with another account.',
+            duration: 8000,
+            });
+            setIsSubmitting(false);
+            return;
+        }
       }
 
       const userDocRef = doc(db, 'users', user.uid);
