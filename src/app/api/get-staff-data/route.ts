@@ -15,6 +15,7 @@ interface StaffData {
   Institute?: string;
   Department?: string;
   Designation?: string;
+  Faculty?: string;
   'MIS ID'?: string;
   'Scopus_ID'?: string;
   'Google_Scholar_ID'?: string;
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest) {
           institute: userRecord.Institute,
           department: userRecord.Department,
           designation: userRecord.Designation,
+          faculty: userRecord.Faculty,
           misId: userRecord['MIS ID'],
           scopusId: userRecord.Scopus_ID,
           googleScholarId: userRecord.Google_Scholar_ID,
