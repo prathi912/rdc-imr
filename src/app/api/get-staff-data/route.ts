@@ -17,8 +17,8 @@ interface StaffData {
   Designation?: string;
   Faculty?: string;
   'MIS ID'?: string | number;
-  'Scopus_ID'?: string;
-  'Google_Scholar_ID'?: string;
+  'Scopus_ID'?: string | number;
+  'Google_Scholar_ID'?: string | number;
   'LinkedIn_URL'?: string;
 }
 
@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
           designation: userRecord.Designation,
           faculty: userRecord.Faculty,
           misId: String(userRecord['MIS ID'] || ''),
-          scopusId: userRecord.Scopus_ID || '',
-          googleScholarId: userRecord.Google_Scholar_ID || '',
+          scopusId: String(userRecord.Scopus_ID || ''),
+          googleScholarId: String(userRecord.Google_Scholar_ID || ''),
         },
       });
     } else {
