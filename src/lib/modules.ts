@@ -24,10 +24,10 @@ export const ALL_MODULES = [
 
 const coreModules = ['dashboard', 'notifications', 'settings'];
 const facultyCoreModules = ['new-submission', 'my-projects', 'incentive-claim'];
-const hierarchyCoreModules = ['my-projects', 'all-projects', 'analytics'];
+const hierarchyCoreModules = ['all-projects', 'analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, 'my-projects', 'all-projects'];
+const croDefaults = [...coreModules, 'all-projects'];
 const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'manage-incentive-claims', 'system-health', 'bulk-upload'];
 const superAdminDefaults = [...adminDefaults, 'module-management'];
 
