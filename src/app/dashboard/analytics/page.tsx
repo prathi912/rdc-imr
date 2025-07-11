@@ -4,13 +4,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DollarSign } from 'lucide-react';
+
+const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB"];
+
 
 export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -106,6 +110,34 @@ export default function AnalyticsPage() {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },
   } satisfies ChartConfig;
 
+  const statusDistributionData = useMemo(() => {
+    const statusCounts = projects.reduce((acc, project) => {
+        const status = project.status || 'Unknown';
+        acc[status] = (acc[status] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
+  }, [projects]);
+
+  const statusDistributionConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    statusDistributionData.forEach((item, index) => {
+        config[item.name] = {
+            label: item.name,
+            color: COLORS[index % COLORS.length],
+        };
+    });
+    return config;
+  }, [statusDistributionData]);
+
+  const totalGrantAmount = useMemo(() => {
+    return projects.reduce((acc, project) => {
+        return acc + (project.grant?.totalAmount || 0);
+    }, 0);
+  }, [projects]);
+
+
   const getPageTitle = () => {
       if (user?.role === 'CRO' && user.faculty) return `Analytics for ${user.faculty}`;
       if (user?.designation === 'Principal' && user.institute) return `Analytics for ${user.institute}`;
@@ -133,6 +165,40 @@ export default function AnalyticsPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title={getPageTitle()} description={getPageDescription()} />
+      <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Grant Funding</CardTitle>
+            <CardDescription>Total amount awarded to projects.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center gap-4">
+             <div className="p-3 rounded-full bg-primary/10 text-primary">
+                <DollarSign className="h-8 w-8" />
+             </div>
+             <div>
+                <p className="text-3xl font-bold">₹{totalGrantAmount.toLocaleString('en-IN')}</p>
+             </div>
+          </CardContent>
+        </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Project Status Distribution</CardTitle>
+            <CardDescription>A summary of all projects by their current status.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
+                <PieChart>
+                    <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
+                    <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                        {statusDistributionData.map((entry, index) => (
+                           <Cell key={`cell-${index}`} fill={statusDistributionConfig[entry.name]?.color || '#8884d8'} />
+                        ))}
+                    </Pie>
+                </PieChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
       <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
