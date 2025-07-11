@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ALL_MODULES } from '@/lib/modules';
 import { Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 
 export default function ModuleManagementPage() {
@@ -22,6 +23,7 @@ export default function ModuleManagementPage() {
   const [loading, setLoading] = useState(true);
   const [savingUids, setSavingUids] = useState<string[]>([]);
   const [userModules, setUserModules] = useState<Record<string, string[]>>({});
+  const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
 
   const fetchUsers = useCallback(async () => {
@@ -77,6 +79,17 @@ export default function ModuleManagementPage() {
       setSavingUids(prev => prev.filter(id => id !== uid));
     }
   };
+
+  const filteredUsers = useMemo(() => {
+    if (!searchTerm) {
+      return users;
+    }
+    const lowercasedSearch = searchTerm.toLowerCase();
+    return users.filter(user => 
+        user.name.toLowerCase().includes(lowercasedSearch) || 
+        user.email.toLowerCase().includes(lowercasedSearch)
+    );
+  }, [users, searchTerm]);
   
   if (loading) {
     return (
@@ -98,7 +111,16 @@ export default function ModuleManagementPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Module Management" description="Set module permissions for each user in the system." />
+      
       <div className="mt-8">
+         <div className="mb-4">
+            <Input 
+              placeholder="Search by name or email..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="max-w-sm"
+            />
+          </div>
         <Card>
           <CardHeader>
              <CardTitle>User Permissions</CardTitle>
@@ -106,7 +128,7 @@ export default function ModuleManagementPage() {
           </CardHeader>
           <CardContent>
             <Accordion type="single" collapsible className="w-full">
-              {users.map((user) => {
+              {filteredUsers.map((user) => {
                 const isSaving = savingUids.includes(user.uid);
                 return (
                   <AccordionItem value={user.uid} key={user.uid}>
