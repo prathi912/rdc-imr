@@ -27,8 +27,8 @@ const facultyCoreModules = ['new-submission', 'my-projects', 'incentive-claim'];
 const hierarchyCoreModules = ['my-projects', 'all-projects', 'analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, ...hierarchyCoreModules, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'manage-users', 'manage-incentive-claims'];
-const adminDefaults = [...croDefaults, 'system-health', 'bulk-upload'];
+const croDefaults = [...coreModules, 'my-projects', 'all-projects'];
+const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'manage-incentive-claims', 'system-health', 'bulk-upload'];
 const superAdminDefaults = [...adminDefaults, 'module-management'];
 
 // Default modules for special designations who are otherwise 'faculty' role
