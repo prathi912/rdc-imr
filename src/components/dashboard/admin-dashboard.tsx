@@ -133,10 +133,12 @@ export function AdminDashboard() {
   
   const isPrincipal = user?.designation === 'Principal';
   const isHod = user?.designation === 'HOD';
+  const isCro = user?.role === 'CRO';
 
   const getDashboardTitle = () => {
       if (isPrincipal && user?.institute) return `${user.institute} Dashboard`;
       if (isHod && user?.department) return `${user.department} Dashboard`;
+      if (isCro) return 'CRO Dashboard';
       return "Admin Dashboard";
   };
 
