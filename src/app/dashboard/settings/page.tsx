@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,21 +21,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Banknote, Bot, Loader2 } from 'lucide-react';
-import { CRO_EMAILS } from '@/lib/constants';
+import { CRO_EMAILS, PRINCIPAL_EMAILS } from '@/lib/constants';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z.string().email(),
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
-  department: z.string().min(2, 'Department name is required.'),
+  department: z.string().optional(),
   designation: z.string().min(2, 'Designation is required.'),
-  misId: z.string().min(1, 'MIS ID is required.'),
+  misId: z.string().optional(),
   orcidId: z.string().optional(),
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),
   googleScholarId: z.string().optional(),
-  phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
+  phoneNumber: z.string().optional(),
 });
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
@@ -127,6 +127,8 @@ export default function SettingsPage() {
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
   const [isDesignationLocked, setIsDesignationLocked] = useState(false);
 
+  const isPrincipal = useMemo(() => user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false, [user]);
+
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -176,7 +178,7 @@ export default function SettingsPage() {
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
           
-          if (CRO_EMAILS.includes(appUser.email)) {
+          if (CRO_EMAILS.includes(appUser.email) || PRINCIPAL_EMAILS.includes(appUser.email)) {
             setIsDesignationLocked(true);
           }
 
@@ -215,7 +217,7 @@ export default function SettingsPage() {
         const { email, ...updateData } = data;
         
         if (isDesignationLocked) {
-            updateData.designation = user.designation || 'CRO'; // Ensure locked designation is not changed
+            updateData.designation = user.designation || (isPrincipal ? 'Principal' : 'CRO'); // Ensure locked designation is not changed
         }
         
         await updateDoc(userDocRef, updateData);
@@ -443,7 +445,7 @@ export default function SettingsPage() {
                   <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="department" render={({ field }) => (
-                  <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="designation" render={({ field }) => (
                   <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isDesignationLocked} /></FormControl><FormMessage /></FormItem>
@@ -454,16 +456,16 @@ export default function SettingsPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={profileForm.control} name="misId" render={({ field }) => (
-                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={profileForm.control} name="orcidId" render={({ field }) => (
                         <FormItem>
                             <FormLabel>ORCID iD</FormLabel>
                             <div className="flex items-center gap-2">
                                 <FormControl>
-                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
+                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isPrincipal} />
                                 </FormControl>
-                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid} title="Fetch data from ORCID">
+                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isPrincipal} title="Fetch data from ORCID">
                                     {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                                 </Button>
                             </div>
@@ -472,18 +474,18 @@ export default function SettingsPage() {
                     )} />
                 </div>
                 <FormField control={profileForm.control} name="scopusId" render={({ field }) => (
-                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="vidwanId" render={({ field }) => (
-                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="googleScholarId" render={({ field }) => (
-                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
 
                  <Separator />
                  <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
-                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                   )} />
               </CardContent>
               <CardFooter className="border-t px-6 py-4">

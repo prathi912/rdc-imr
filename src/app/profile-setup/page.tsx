@@ -28,7 +28,9 @@ import { CRO_EMAILS, PRINCIPAL_EMAILS } from '@/lib/constants';
 const createProfileSetupSchema = (isPrincipal = false) => z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
-  department: z.string().min(2, 'Department name is required.'),
+  department: isPrincipal 
+    ? z.string().optional()
+    : z.string().min(2, 'Department name is required.'),
   designation: z.string().min(2, 'Designation is required.'),
   misId: isPrincipal 
     ? z.string().optional() 
@@ -145,7 +147,7 @@ export default function ProfileSetupPage() {
             faculty: appUser.faculty || '',
             institute: appUser.institute || '',
             department: appUser.department || '',
-            designation: appUser.designation || '',
+            designation: appUser.designation || (PRINCIPAL_EMAILS.includes(appUser.email) ? 'Principal' : ''),
             misId: appUser.misId || '',
             orcidId: appUser.orcidId || '',
             scopusId: appUser.scopusId || '',
@@ -164,7 +166,7 @@ export default function ProfileSetupPage() {
               const result = await res.json();
               if (result.success) {
                 form.reset(result.data);
-                toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled from PU-MIS data. Please review and save.' });
+                toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
               }
             } catch (error) {
               console.error("Failed to fetch staff data", error);
@@ -339,29 +341,29 @@ export default function ProfileSetupPage() {
                   <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="department" render={({ field }) => (
-                  <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="designation" render={({ field }) => (
-                  <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 
                 <Separator />
                 <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
                 
                 <FormField control={form.control} name="misId" render={({ field }) => (
-                  <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                  <FormField control={form.control} name="orcidId" render={({ field }) => (
                     <FormItem>
                         <FormLabel>ORCID iD</FormLabel>
                         <div className="flex items-center gap-2">
                             <FormControl>
-                                <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
+                                <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isPrincipal} />
                             </FormControl>
-                            <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid} title="Verify ORCID iD">
+                            <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isPrincipal} title="Verify ORCID iD">
                                 {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                             </Button>
                         </div>
@@ -369,13 +371,13 @@ export default function ProfileSetupPage() {
                     </FormItem>
                 )} />
                 <FormField control={form.control} name="scopusId" render={({ field }) => (
-                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="vidwanId" render={({ field }) => (
-                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={form.control} name="googleScholarId" render={({ field }) => (
-                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 
                 <Button type="submit" className="w-full !mt-8" disabled={isSubmitting}>
