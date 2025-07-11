@@ -393,6 +393,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                                      ? field.onChange([...(field.value || []), goal])
                                      : field.onChange(field.value?.filter((value) => value !== goal));
                                  }}
+                                 onSelect={(e) => e.preventDefault()}
                                >
                                  {goal}
                                </DropdownMenuCheckboxItem>
