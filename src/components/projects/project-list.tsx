@@ -101,7 +101,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
                     PI <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
               </TableHead>
-              <TableHead className="hidden md:table-cell">
+              <TableHead className="hidden sm:table-cell">
                 <Button variant="ghost" onClick={() => requestSort('submissionDate')}>
                     Date <ArrowUpDown className="ml-2 h-4 w-4" />
                 </Button>
@@ -142,7 +142,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
                 <TableRow key={project.id}>
                   <TableCell className="font-medium">{project.title}</TableCell>
                   <TableCell className="hidden sm:table-cell">{project.pi}</TableCell>
-                  <TableCell className="hidden md:table-cell">{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
                   <TableCell className="hidden md:table-cell">
                     <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
                   </TableCell>

@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Separator } from '../ui/separator';
 
 interface SubmissionFormProps {
   project?: Project;
@@ -368,6 +369,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                 <FormField name="projectType" control={form.control} render={({ field }) => (
                     <FormItem><FormLabel>Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Multi-Disciplinary">Multi-Disciplinary</SelectItem><SelectItem value="Inter-Disciplinary">Inter-Disciplinary</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                 )} />
+                <Separator />
                 <FormField
                   control={form.control}
                   name="sdgGoals"

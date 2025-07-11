@@ -551,7 +551,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>Award Multi-Phase Grant</DialogTitle>
+                          <DialogTitle>Award New Grant</DialogTitle>
                           <DialogDescription>Set the sanction number and details for the first phase of the grant for "{project.title}".</DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 py-4">
@@ -664,14 +664,17 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     )}
                 </dl>
                  {project.sdgGoals && project.sdgGoals.length > 0 && (
-                    <div className="space-y-2 pt-2">
-                        <p className="font-medium text-muted-foreground">UN Sustainable Development Goals</p>
-                        <div className="flex flex-wrap gap-1">
-                            {project.sdgGoals.map(goal => (
-                                <Badge key={goal} variant="secondary">{goal}</Badge>
-                            ))}
+                    <>
+                        <Separator />
+                        <div className="space-y-2 pt-2">
+                            <p className="font-medium text-muted-foreground">UN Sustainable Development Goals</p>
+                            <div className="flex flex-wrap gap-1">
+                                {project.sdgGoals.map(goal => (
+                                    <Badge key={goal} variant="secondary">{goal}</Badge>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    </>
                 )}
             </div>
              <div className="space-y-4">
