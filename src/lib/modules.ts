@@ -23,7 +23,7 @@ export const ALL_MODULES = [
 ];
 
 const coreModules = ['dashboard', 'notifications', 'settings'];
-const facultyCoreModules = ['new-submission', 'my-projects', 'incentive-claim'];
+const facultyCoreModules = ['new-submission', 'my-projects'];
 const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
