@@ -4,6 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { CRO_EMAILS } from '@/lib/constants';
+import fs from 'fs';
+import path from 'path';
 
 // Define the expected structure of a row in the Excel sheet
 interface StaffData {
@@ -22,7 +24,6 @@ interface StaffData {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
-  const baseUrl = request.nextUrl.origin;
 
   if (!email) {
     return NextResponse.json({ success: false, error: 'Email query parameter is required.' }, { status: 400 });
@@ -32,16 +33,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'CRO accounts are handled separately.' });
   }
 
-  const fileUrl = `${baseUrl}/staffdata.xlsx`;
+  // Construct the path to the file in the project's root directory.
+  const filePath = path.join(process.cwd(), 'staffdata.xlsx');
 
   try {
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-        console.warn(`Staff data file not found at: ${fileUrl}. Status: ${response.status}. Pre-fill feature will be inactive.`);
-        return NextResponse.json({ success: false, error: 'Staff data source not found.' }, { status: response.status });
+    // Check if the file exists before attempting to read it.
+    if (!fs.existsSync(filePath)) {
+        console.warn(`Staff data file not found at: ${filePath}. Pre-fill feature will be inactive.`);
+        return NextResponse.json({ success: false, error: 'Staff data source not found on the server.' }, { status: 404 });
     }
 
-    const buffer = await response.arrayBuffer();
+    const buffer = fs.readFileSync(filePath);
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
