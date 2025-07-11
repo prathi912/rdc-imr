@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -129,7 +130,7 @@ export default function ProjectDetailsPage() {
         <PageHeader
           title="Project Not Found"
           description="The project you are looking for does not exist or you do not have permission to view it."
-          backButtonHref="/dashboard/all-projects"
+          backButtonHref="/dashboard/my-projects"
           backButtonText="Back to Projects"
         />
       </div>
@@ -141,7 +142,7 @@ export default function ProjectDetailsPage() {
       <PageHeader
         title="Project Details"
         description="View project details and manage its status."
-        backButtonHref="/dashboard/all-projects"
+        backButtonHref="/dashboard/my-projects"
         backButtonText="Back to Projects"
       >
         <ProjectSummary project={project} />
