@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Book, CheckCircle, Clock, Users, XCircle, FileCheck2 } from 'lucide-react';
 import { ProjectList } from '@/components/projects/project-list';
@@ -35,7 +35,7 @@ export function AdminDashboard() {
     completedProjects: 0,
   });
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
-  const [departmentData, setDepartmentData] = useState<{ department: string, projects: number }[]>([]);
+  const [chartData, setChartData] = useState<{ group: string, projects: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
 
@@ -46,9 +46,20 @@ export function AdminDashboard() {
     }
   }, []);
 
-  const departmentConfig = {
+  const chartConfig = {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },
   } satisfies ChartConfig;
+
+  const { aggregationKey, aggregationLabel, chartTitle } = useMemo(() => {
+    if (user?.role === 'CRO') {
+        return { aggregationKey: 'institute', aggregationLabel: 'Institute', chartTitle: 'Top Institute Submissions' };
+    }
+    if (user?.designation === 'Principal' || user?.designation === 'HOD') {
+        return { aggregationKey: 'departmentName', aggregationLabel: 'Department', chartTitle: 'Top Department Submissions' };
+    }
+    return { aggregationKey: 'faculty', aggregationLabel: 'Faculty', chartTitle: 'Top Faculty Submissions' };
+  }, [user]);
+
 
   useEffect(() => {
     async function getDashboardData() {
@@ -98,17 +109,18 @@ export function AdminDashboard() {
             setStats({ totalProjects, pendingReviews, approvedProjects, totalUsers, rejectedProjects, completedProjects });
             setRecentProjects(sortedProjects);
 
-            const departmentCounts = Object.entries(
+            const groupCounts = Object.entries(
                 allProjects.reduce((acc, project) => {
-                if (project.departmentName) {
-                    acc[project.departmentName] = (acc[project.departmentName] || 0) + 1;
+                const key = project[aggregationKey as keyof Project] as string | undefined;
+                if (key) {
+                    acc[key] = (acc[key] || 0) + 1;
                 }
                 return acc;
                 }, {} as Record<string, number>)
-            ).map(([department, count]) => ({ department, projects: count }))
+            ).map(([group, count]) => ({ group, projects: count }))
             .sort((a, b) => b.projects - a.projects)
             .slice(0, 7);
-            setDepartmentData(departmentCounts);
+            setChartData(groupCounts);
 
         } catch (error) {
             console.error("Error fetching admin dashboard data: ", error);
@@ -117,7 +129,7 @@ export function AdminDashboard() {
         }
     }
     getDashboardData();
-  }, [user]);
+  }, [user, aggregationKey]);
   
   const isPrincipal = user?.designation === 'Principal';
   const isHod = user?.designation === 'HOD';
@@ -174,7 +186,7 @@ export function AdminDashboard() {
         </div>
         <div className="lg:col-span-2 animate-in fade-in-0 slide-in-from-bottom-4" style={{ animationFillMode: 'backwards', animationDelay: '700ms' }}>
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-2xl font-bold tracking-tight">Projects by Department</h3>
+              <h3 className="text-2xl font-bold tracking-tight">Projects by {aggregationLabel}</h3>
               <Link href="/dashboard/analytics" passHref>
                   <Button variant="ghost">
                     Analytics
@@ -185,22 +197,22 @@ export function AdminDashboard() {
             {loading ? <Skeleton className="h-[400px] w-full" /> : (
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Top Department Submissions</CardTitle>
+                    <CardTitle className="text-lg">{chartTitle}</CardTitle>
                     <CardDescription>
-                      Distribution of projects across the top 7 departments.
+                      Distribution of projects across the top 7 {aggregationLabel.toLowerCase()}s.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pl-0">
-                    <ChartContainer config={departmentConfig} className="h-[320px] w-full">
+                    <ChartContainer config={chartConfig} className="h-[320px] w-full">
                       <BarChart
                         accessibilityLayer
-                        data={departmentData}
+                        data={chartData}
                         layout="vertical"
                         margin={{ left: 5, right: 5 }}
                       >
                         <CartesianGrid horizontal={false} />
                         <YAxis
-                          dataKey="department"
+                          dataKey="group"
                           type="category"
                           tickLine={false}
                           tickMargin={10}

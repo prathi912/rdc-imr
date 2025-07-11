@@ -78,9 +78,13 @@ export default function AnalyticsPage() {
   } satisfies ChartConfig;
 
   const { aggregationKey, aggregationLabel } = useMemo(() => {
-    if (user?.role === 'CRO' || user?.designation === 'Principal' || user?.designation === 'HOD') {
+    if (user?.role === 'CRO') {
+        return { aggregationKey: 'institute', aggregationLabel: 'Institute' };
+    }
+    if (user?.designation === 'Principal' || user?.designation === 'HOD') {
         return { aggregationKey: 'departmentName', aggregationLabel: 'Department' };
     }
+    // Default for Admin/Super-admin
     return { aggregationKey: 'faculty', aggregationLabel: 'Faculty' };
   }, [user]);
 
