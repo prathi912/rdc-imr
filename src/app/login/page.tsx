@@ -33,7 +33,7 @@ import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { linkHistoricalData } from '@/app/actions';
-import { PRINCIPAL_EMAILS } from '@/lib/constants';
+import { PRINCIPAL_EMAILS, CRO_EMAILS } from '@/lib/constants';
 
 const loginSchema = z.object({
   email: z
@@ -64,6 +64,9 @@ export default function LoginPage() {
   const determineUserRoleAndDesignation = (email: string): { role: User['role'], designation: User['designation'] } => {
     if (email === 'rathipranav07@gmail.com') {
       return { role: 'Super-admin', designation: 'Super-admin' };
+    }
+    if (CRO_EMAILS.includes(email)) {
+      return { role: 'CRO', designation: 'CRO' };
     }
     if (PRINCIPAL_EMAILS.includes(email)) {
       return { role: 'faculty', designation: 'Principal' };

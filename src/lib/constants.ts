@@ -45,3 +45,14 @@ export const PRINCIPAL_EMAILS: string[] = [
     'rdc@paruluniversity.ac.in',
     'sop@paruluniversity.ac.in',
 ];
+
+export const CRO_EMAILS: string[] = [
+    'unnati.joshi22950@paruluniversity.ac.in',
+    'prasanna.mathad86177@paruluniversity.ac.in',
+    'ashaben.patel@paruluniversity.ac.in',
+    'sheetal.thomas40536@paruluniversity.ac.in',
+    'anupam.jyoti30554@paruluniversity.ac.in',
+    'richa.mishra31240@paruluniversity.ac.in',
+    'ankita.priyadarshini85053@paruluniversity.ac.in',
+    'neha.shah40426@paruluniversity.ac.in',
+];

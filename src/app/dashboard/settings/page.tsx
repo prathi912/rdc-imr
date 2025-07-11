@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Banknote, Bot, Loader2 } from 'lucide-react';
+import { CRO_EMAILS } from '@/lib/constants';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -124,6 +125,7 @@ export default function SettingsPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
+  const [isDesignationLocked, setIsDesignationLocked] = useState(false);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -173,6 +175,11 @@ export default function SettingsPage() {
           const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
+          
+          if (CRO_EMAILS.includes(appUser.email)) {
+            setIsDesignationLocked(true);
+          }
+
           profileForm.reset({
             name: appUser.name || '',
             email: appUser.email || '',
@@ -206,6 +213,11 @@ export default function SettingsPage() {
     try {
         const userDocRef = doc(db, 'users', user.uid);
         const { email, ...updateData } = data;
+        
+        if (isDesignationLocked) {
+            updateData.designation = user.designation || 'CRO'; // Ensure locked designation is not changed
+        }
+        
         await updateDoc(userDocRef, updateData);
         
         const updatedUser = { ...user, ...updateData };
@@ -434,7 +446,7 @@ export default function SettingsPage() {
                   <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="designation" render={({ field }) => (
-                  <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isDesignationLocked} /></FormControl><FormMessage /></FormItem>
                 )} />
                 
                 <Separator />
