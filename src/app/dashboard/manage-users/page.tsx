@@ -48,7 +48,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const ROLES: User['role'][] = ['faculty', 'admin']; // Base roles for all admins
 const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin'; // Special role
-const SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
+const PRIMARY_SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com'; // Primary Super-admin
 type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role'> | 'claimsCount';
 
 function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void }) {
@@ -335,8 +335,12 @@ export default function ManageUsersPage() {
               </TableHeader>
               <TableBody>
                 {sortedAndFilteredUsers.map((user) => {
-                   const isSuperAdminUser = user.email === SUPER_ADMIN_EMAIL;
+                   const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
                    const isCurrentUser = user.uid === currentUser?.uid;
+                   // The actions button should be disabled if:
+                   // 1. The user row is for the currently logged-in user.
+                   // 2. The user row is for the primary super admin, AND the currently logged-in user is NOT the primary super admin.
+                   const isActionsDisabled = isCurrentUser || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
 
                    return (
                     <TableRow key={user.uid}>
@@ -357,7 +361,7 @@ export default function ManageUsersPage() {
                       <TableCell className="text-right">
                          <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button aria-haspopup="true" size="icon" variant="ghost" disabled={isCurrentUser || isSuperAdminUser}>
+                            <Button aria-haspopup="true" size="icon" variant="ghost" disabled={isActionsDisabled}>
                               <MoreHorizontal className="h-4 w-4" />
                               <span className="sr-only">Toggle menu</span>
                             </Button>
@@ -420,4 +424,3 @@ export default function ManageUsersPage() {
     </div>
   );
 }
-
