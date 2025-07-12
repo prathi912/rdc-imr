@@ -136,53 +136,23 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     defaultValues: { comments: '' },
   });
   
-  useEffect(() => {
-    if (project.meetingDetails) {
-        scheduleForm.reset({
-            date: project.meetingDetails.date ? parseISO(project.meetingDetails.date) : undefined,
-            time: project.meetingDetails.time,
-            venue: project.meetingDetails.venue,
-        });
-    }
-    durationForm.reset({
-        startDate: project.projectStartDate ? new Date(project.projectStartDate) : undefined,
-        endDate: project.projectEndDate ? new Date(project.projectEndDate) : undefined,
-    });
-    evaluatorForm.reset({
-        evaluatorUids: project.meetingDetails?.assignedEvaluators || [],
-    });
-  }, [project, scheduleForm, durationForm, evaluatorForm]);
-
-  const refetchData = useCallback(async () => {
+  const refetchEvaluations = useCallback(async () => {
     try {
-        const projectRef = doc(db, 'projects', initialProject.id);
-        const projectSnap = await getDoc(projectRef);
-
-        if (projectSnap.exists()) {
-          const data = projectSnap.data();
-          setProject({ 
-              id: projectSnap.id,
-              ...data,
-              submissionDate: data.submissionDate || new Date().toISOString()
-          } as Project);
-        }
-
         const evaluationsCol = collection(db, 'projects', initialProject.id, 'evaluations');
         const evaluationsSnapshot = await getDocs(evaluationsCol);
         const evaluationsList = evaluationsSnapshot.docs.map(doc => doc.data() as Evaluation);
         setEvaluations(evaluationsList);
-
     } catch (error) {
-        console.error("Error refetching data:", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not refresh project data.' });
+        console.error("Error refetching evaluations:", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not refresh evaluation data.' });
     }
   }, [initialProject.id, toast]);
 
 
   useEffect(() => {
     setProject(initialProject);
-    refetchData();
-  }, [initialProject, refetchData]);
+    refetchEvaluations();
+  }, [initialProject, refetchEvaluations]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -203,6 +173,23 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     };
     fetchCoPiUsers();
   }, [project.coPiUids]);
+
+  useEffect(() => {
+    if (project.meetingDetails) {
+        scheduleForm.reset({
+            date: project.meetingDetails.date ? parseISO(project.meetingDetails.date) : undefined,
+            time: project.meetingDetails.time,
+            venue: project.meetingDetails.venue,
+        });
+    }
+    durationForm.reset({
+        startDate: project.projectStartDate ? new Date(project.projectStartDate) : undefined,
+        endDate: project.projectEndDate ? new Date(project.projectEndDate) : undefined,
+    });
+    evaluatorForm.reset({
+        evaluatorUids: project.meetingDetails?.assignedEvaluators || [],
+    });
+  }, [project, scheduleForm, durationForm, evaluatorForm]);
   
   const isPI = user?.uid === project.pi_uid;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
@@ -412,7 +399,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         toast({ title: 'Revision Submitted', description: 'Your revised proposal has been submitted for re-evaluation.' });
         setIsRevisionDialogOpen(false);
         setRevisedProposalFile(null);
-        refetchData();
+        const projectRef = doc(db, 'projects', project.id);
+        const projectSnap = await getDoc(projectRef);
+        setProject({ id: projectSnap.id, ...projectSnap.data() } as Project);
     } catch (error: any) {
         console.error('Error submitting revision:', error);
         toast({ variant: 'destructive', title: 'Submission Failed', description: error.message || 'Could not submit your revision.' });
@@ -842,7 +831,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       {isAdmin && evaluations.length > 0 && <EvaluationsSummary project={project} evaluations={evaluations} />}
 
       {showEvaluationForm && (
-        <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchData} />
+        <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchEvaluations} />
       )}
       
       {project.grant && user && canManageGrants && (
