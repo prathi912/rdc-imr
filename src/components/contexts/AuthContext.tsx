@@ -2,7 +2,7 @@
 
 import type { User } from "firebase/auth"
 import { createContext, useContext, useEffect, useState, type ReactNode, useCallback } from "react"
-import { auth, db, functions as firebaseFunctions } from "@/lib/firebase/config"
+import { auth, db, functions as firebaseFunctions } from "@/lib/config"
 import {
   getUserProfile,
   createUserProfileFS,
