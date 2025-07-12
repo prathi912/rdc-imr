@@ -24,79 +24,46 @@ export default function MyProjectsPage() {
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser) as User
       setUser(parsedUser)
-
-      const fetchProjects = async () => {
-        setLoading(true)
-        try {
-          const projectsRef = collection(db, "projects")
-          const isPrincipal = parsedUser.designation === "Principal"
-
-          const allUserProjects: Project[] = []
-          const projectIds = new Set<string>()
-
-          const addProjectsToList = (projects: Project[]) => {
-            projects.forEach((p) => {
-              if (!projectIds.has(p.id)) {
-                allUserProjects.push(p)
-                projectIds.add(p.id)
-              }
-            })
-          }
-
-          // Queries for personal projects (PI, Co-PI, email)
-          const personalProjectQueries = [
-              query(projectsRef, where("pi_uid", "==", parsedUser.uid)),
-              query(projectsRef, where("coPiUids", "array-contains", parsedUser.uid))
-          ];
-          if (parsedUser.email) {
-            personalProjectQueries.push(query(projectsRef, where("pi_email", "==", parsedUser.email)));
-          }
-
-          const personalProjectSnapshots = await Promise.all(personalProjectQueries.map(q => getDocs(q).catch(e => { console.warn("A personal project query failed:", e); return null; })));
-
-          personalProjectSnapshots.forEach(snapshot => {
-              if (snapshot) {
-                  addProjectsToList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
-              }
-          });
-
-
-          // Additional query for Principals to get all projects from their institute
-          if (isPrincipal && parsedUser.institute) {
-            try {
-              const instituteQuery = query(projectsRef, where("institute", "==", parsedUser.institute))
-              const instituteSnapshot = await getDocs(instituteQuery)
-              addProjectsToList(instituteSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)))
-            } catch (error) {
-              console.error("Failed to fetch institute projects:", error)
-              toast({
-                variant: "destructive",
-                title: "Could not load institute projects",
-                description: "There was an error fetching all projects for your institute.",
-              })
-            }
-          }
-
-          // Sort projects by submission date
-          allUserProjects.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
-
-          setMyProjects(allUserProjects)
-        } catch (error: any) {
-          console.error("Error fetching user's projects:", error)
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: `Could not fetch your projects. ${error.message || "Please try again later."}`,
-          })
-        } finally {
-          setLoading(false)
-        }
-      }
-      fetchProjects()
     } else {
       setLoading(false)
     }
-  }, [toast])
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+
+    const fetchProjects = async () => {
+      setLoading(true)
+      try {
+        const projectsRef = collection(db, "projects")
+
+        // This query finds projects where the user is either the PI (by UID) or a Co-PI.
+        const q = query(
+          projectsRef,
+          or(where("pi_uid", "==", user.uid), where("coPiUids", "array-contains", user.uid)),
+        )
+
+        const querySnapshot = await getDocs(q)
+        const projectList = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Project))
+
+        // Sort projects by submission date, newest first
+        projectList.sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
+
+        setMyProjects(projectList)
+      } catch (error: any) {
+        console.error("Error fetching user's projects:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Could not fetch your projects. ${error.message || "Please try again later."}`,
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProjects()
+  }, [user, toast])
 
   const filteredProjects = useMemo(() => {
     if (!searchTerm) return myProjects
