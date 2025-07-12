@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 import { uploadFileToServer } from '@/app/actions';
 import { useState } from 'react';
 import { DollarSign, Banknote, FileText, CheckCircle, PlusCircle, AlertCircle, BadgeCent, ChevronDown } from 'lucide-react';
@@ -159,15 +159,22 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             description: values.description,
             invoiceUrl: invoiceUrl,
         };
+        
+        const phaseIndex = grant.phases.findIndex(p => p.id === currentPhaseId);
+        if (phaseIndex === -1) throw new Error("Phase not found");
 
-        const updatedPhases = (grant.phases || []).map(p => {
-            if (p.id === currentPhaseId) {
-                return { ...p, transactions: [...(p.transactions || []), newTransaction] };
-            }
-            return p;
+        await updateDoc(projectRef, {
+          [`grant.phases.${phaseIndex}.transactions`]: arrayUnion(newTransaction)
         });
 
-        await updateDoc(projectRef, { 'grant.phases': updatedPhases });
+        // Optimistically update local state
+        const updatedPhases = grant.phases.map((p, index) => {
+          if (index === phaseIndex) {
+            return { ...p, transactions: [...(p.transactions || []), newTransaction] };
+          }
+          return p;
+        });
+
         onUpdate({ ...project, grant: { ...grant, phases: updatedPhases } });
         toast({ title: 'Success', description: 'Transaction added successfully.' });
         transactionForm.reset();
