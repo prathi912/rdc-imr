@@ -12,6 +12,8 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign } from 'lucide-react';
+import { PRINCIPAL_EMAILS } from '@/lib/constants';
+import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB"];
 
@@ -37,19 +39,48 @@ export default function AnalyticsPage() {
         const projectsCollection = collection(db, 'projects');
         let projectQuery;
 
-        if (user.role === 'CRO' && user.faculty) {
-            projectQuery = query(projectsCollection, where('faculty', '==', user.faculty));
-        } else if (user.designation === 'Principal' && user.institute) {
-            projectQuery = query(projectsCollection, where('institute', '==', user.institute));
-        } else if (user.designation === 'HOD' && user.department) {
-            projectQuery = query(projectsCollection, where('departmentName', '==', user.department));
+        const isPrincipal = user.designation === 'Principal';
+        const isCro = user.role === 'CRO';
+        const isHod = user.designation === 'HOD';
+
+        let projectList: Project[] = [];
+        let initialQuery;
+
+        if (isCro && user.faculty) {
+            initialQuery = query(projectsCollection, where('faculty', '==', user.faculty));
+        } else if (isPrincipal && user.institute) {
+            initialQuery = query(projectsCollection, where('institute', '==', user.institute));
+        } else if (isHod && user.department) {
+            initialQuery = query(projectsCollection, where('departmentName', '==', user.department));
         } else {
             // Admins & Super-admins see all
-            projectQuery = query(projectsCollection);
+            initialQuery = query(projectsCollection);
         }
 
-        const projectSnapshot = await getDocs(projectQuery);
-        const projectList = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        const projectSnapshot = await getDocs(initialQuery);
+        projectList = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+
+        // Fallback logic for institutional roles
+        if ((isPrincipal || isHod) && projectList.length === 0) {
+            console.warn(`Initial query for ${user.institute || user.department} returned 0 projects. Fetching all and filtering client-side as a fallback.`);
+            const allProjectsSnapshot = await getDocs(query(projectsCollection));
+            const allProjectsList = allProjectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            
+            if (isPrincipal && user.institute) {
+                projectList = allProjectsList.filter(p => p.institute?.toLowerCase() === user.institute?.toLowerCase());
+            } else if (isHod && user.department) {
+                projectList = allProjectsList.filter(p => p.departmentName?.toLowerCase() === user.department?.toLowerCase());
+            }
+
+            if (isPrincipal) {
+              const debugInfo = createDebugInfo(user, allProjectsList, PRINCIPAL_EMAILS);
+              logDebugInfo(debugInfo, 'AnalyticsPage (Fallback)');
+            }
+        } else if (isPrincipal) {
+          const debugInfo = createDebugInfo(user, projectList, PRINCIPAL_EMAILS);
+          logDebugInfo(debugInfo, 'AnalyticsPage (Standard)');
+        }
+
         setProjects(projectList);
       } catch (error) {
         console.error("Error fetching project data:", error);
@@ -141,11 +172,13 @@ export default function AnalyticsPage() {
   const getPageTitle = () => {
       if (user?.role === 'CRO' && user.faculty) return `Analytics for ${user.faculty}`;
       if (user?.designation === 'Principal' && user.institute) return `Analytics for ${user.institute}`;
+      if (user?.designation === 'Principal' && !user.institute) return 'Analytics (Principal - No Institute Set)';
       if (user?.designation === 'HOD' && user.department) return `Analytics for ${user.department}`;
       return 'Analytics';
   }
 
   const getPageDescription = () => {
+    if (user?.designation === 'Principal' && !user.institute) return 'Your institute information is not configured. Please update your profile to see institute-specific analytics.';
     if (user?.role === 'CRO' || user?.designation === 'Principal' || user?.designation === 'HOD') return 'Visualize project data and submission trends for your scope.';
     return 'Visualize project data and submission trends across the university.';
   }

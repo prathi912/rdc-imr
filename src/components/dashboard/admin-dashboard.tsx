@@ -15,6 +15,7 @@ import { Skeleton } from '../ui/skeleton';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { PRINCIPAL_EMAILS } from '@/lib/constants';
+import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
 
 interface DashboardStats {
   totalProjects: number;
@@ -60,7 +61,6 @@ export function AdminDashboard() {
     return { aggregationKey: 'faculty', aggregationLabel: 'Faculty', chartTitle: 'Top Faculty Submissions' };
   }, [user]);
 
-
   useEffect(() => {
     async function getDashboardData() {
         if (!user) return;
@@ -74,27 +74,44 @@ export function AdminDashboard() {
             const isHod = user.designation === 'HOD';
             const isCro = user.role === 'CRO';
             
-            let projectQuery;
+            let allProjects: Project[] = [];
+            let initialQuery;
 
             if (isPrincipal && user.institute) {
-                projectQuery = query(projectsRef, where('institute', '==', user.institute));
+                initialQuery = query(projectsRef, where('institute', '==', user.institute));
             } else if (isHod && user.department) {
-                projectQuery = query(projectsRef, where('departmentName', '==', user.department));
+                initialQuery = query(projectsRef, where('departmentName', '==', user.department));
             } else if (isCro && user.faculty) {
-                projectQuery = query(projectsRef, where('faculty', '==', user.faculty));
+                initialQuery = query(projectsRef, where('faculty', '==', user.faculty));
+            } else {
+                initialQuery = query(projectsRef);
             }
-            else {
-                // Admins/Super-admins see all projects
-                projectQuery = query(projectsRef);
+            
+            const projectsSnapshot = await getDocs(initialQuery);
+            allProjects = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+
+            if ((isPrincipal || isHod) && allProjects.length === 0) {
+              console.warn(`Initial query for ${user.institute || user.department} returned 0 projects. Fetching all and filtering client-side as a fallback.`);
+              const allProjectsSnapshot = await getDocs(query(projectsRef));
+              const allProjectsList = allProjectsSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));
+              
+              if (isPrincipal && user.institute) {
+                allProjects = allProjectsList.filter(p => p.institute?.toLowerCase() === user.institute?.toLowerCase());
+              } else if (isHod && user.department) {
+                allProjects = allProjectsList.filter(p => p.departmentName?.toLowerCase() === user.department?.toLowerCase());
+              }
+
+              if (isPrincipal) {
+                const debugInfo = createDebugInfo(user, allProjectsList, PRINCIPAL_EMAILS);
+                logDebugInfo(debugInfo, 'AdminDashboard (Fallback)');
+              }
+            } else if (isPrincipal) {
+              const debugInfo = createDebugInfo(user, allProjects, PRINCIPAL_EMAILS);
+              logDebugInfo(debugInfo, 'AdminDashboard (Standard)');
             }
 
-            const [projectsSnapshot, usersSnapshot] = await Promise.all([
-                getDocs(projectQuery),
-                getDocs(usersRef)
-            ]);
-            
-            const allProjects = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-            
+            const usersSnapshot = await getDocs(usersRef);
+
             const totalProjects = allProjects.length;
             const pendingReviews = allProjects.filter(p => p.status === 'Under Review' || p.status === 'Pending Completion Approval').length;
             const approvedProjects = allProjects.filter(p => p.status === 'Recommended').length;
@@ -137,6 +154,7 @@ export function AdminDashboard() {
 
   const getDashboardTitle = () => {
       if (isPrincipal && user?.institute) return `${user.institute} Dashboard`;
+      if (isPrincipal && !user?.institute) return 'Principal Dashboard (No Institute Set)';
       if (isHod && user?.department) return `${user.department} Dashboard`;
       if (isCro) return 'CRO Dashboard';
       return "Admin Dashboard";
@@ -156,6 +174,13 @@ export function AdminDashboard() {
       <h2 className="text-3xl font-bold tracking-tight">
         {getDashboardTitle()}
       </h2>
+      {isPrincipal && !user?.institute && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-yellow-800">
+            <strong>⚠️ Configuration Issue:</strong> Your institute information is not set. Please update your profile settings to see institute-specific data.
+          </p>
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {statCards.map((card, index) => (
           <Card 

@@ -24,8 +24,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { PRINCIPAL_EMAILS } from '@/lib/constants';
+import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
 
-const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommeded', 'In Progress', 'Completed', 'Pending Completion Approval'];
+const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
 const EXPORT_COLUMNS = [
   { id: 'id', label: 'Project ID' },
@@ -80,7 +81,6 @@ export default function AllProjectsPage() {
 
         const projectsCol = collection(db, 'projects');
         let projectList: Project[] = [];
-        let q;
         
         const isSuperAdmin = user.role === 'Super-admin';
         const isAdmin = user.role === 'admin';
@@ -88,21 +88,42 @@ export default function AllProjectsPage() {
         const isPrincipal = user.designation === 'Principal';
         const isHod = user.designation === 'HOD';
 
+        let q;
         if (isSuperAdmin || isAdmin) {
           q = query(projectsCol);
-        } else if (isPrincipal && user.institute) { // Check for Principal first
+        } else if (isPrincipal && user.institute) {
           q = query(projectsCol, where('institute', '==', user.institute));
-        } else if (isHod && user.department) { // Then HOD
+        } else if (isHod && user.department) {
           q = query(projectsCol, where('departmentName', '==', user.department));
-        } else if (isCro && user.faculty) { // Then CRO
+        } else if (isCro && user.faculty) {
           q = query(projectsCol, where('faculty', '==', user.faculty));
         } else {
-            // Default for faculty viewing their own projects via "My Projects"
-            q = query(projectsCol, where('pi_uid', '==', user.uid));
+          q = query(projectsCol, where('pi_uid', '==', user.uid));
         }
         
         const projectSnapshot = await getDocs(q);
         projectList = projectSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+        
+        // Fallback for Principals/HODs if strict query fails
+        if ((isPrincipal || isHod) && projectList.length === 0) {
+            console.warn(`Initial query for ${user.institute || user.department} returned 0 projects. Fetching all and filtering client-side as a fallback.`);
+            const allProjectsSnapshot = await getDocs(query(projectsCol));
+            const allProjectsList = allProjectsSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));
+            
+            if (isPrincipal && user.institute) {
+              projectList = allProjectsList.filter(p => p.institute?.toLowerCase() === user.institute?.toLowerCase());
+            } else if (isHod && user.department) {
+              projectList = allProjectsList.filter(p => p.departmentName?.toLowerCase() === user.department?.toLowerCase());
+            }
+
+            if (isPrincipal) {
+              const debugInfo = createDebugInfo(user, allProjectsList, PRINCIPAL_EMAILS);
+              logDebugInfo(debugInfo, 'AllProjectsPage (Fallback)');
+            }
+        } else if (isPrincipal) {
+            const debugInfo = createDebugInfo(user, projectList, PRINCIPAL_EMAILS);
+            logDebugInfo(debugInfo, 'AllProjectsPage (Standard)');
+        }
         
         projectList.sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
         setAllProjects(projectList);
@@ -132,6 +153,10 @@ export default function AllProjectsPage() {
     pageTitle = `Projects from ${user.institute}`;
     pageDescription = "Browse all projects submitted from your institute.";
     exportFileName = `projects_${user.institute.replace(/[ &]/g, '_')}`;
+  } else if (isPrincipal && !user?.institute) {
+    pageTitle = "All Projects (Principal - No Institute Set)";
+    pageDescription = "Your institute information is not configured. Please update your profile to see institute-specific projects.";
+    exportFileName = 'principal_all_projects';
   } else if (isHod && user?.department) {
     pageTitle = `Projects from ${user.department}`;
     pageDescription = "Browse all projects submitted from your department.";
