@@ -151,8 +151,20 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   useEffect(() => {
     setProject(initialProject);
-    refetchEvaluations();
-  }, [initialProject, refetchEvaluations]);
+  }, [initialProject]);
+  
+  const canFetchEvaluations = useMemo(() => {
+    if (!user) return false;
+    const isAdmin = ['Super-admin', 'admin'].includes(user.role);
+    const isAssignedEvaluator = initialProject.meetingDetails?.assignedEvaluators?.includes(user.uid);
+    return isAdmin || isAssignedEvaluator;
+  }, [user, initialProject]);
+
+  useEffect(() => {
+    if (canFetchEvaluations) {
+        refetchEvaluations();
+    }
+  }, [canFetchEvaluations, refetchEvaluations]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
