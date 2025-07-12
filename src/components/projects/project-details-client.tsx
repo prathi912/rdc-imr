@@ -219,7 +219,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const canRequestClosure = useMemo(() => {
     if (!isPI) return false;
     const normalizedStatus = project.status.toLowerCase();
-    const allowedStatuses = ['recommended', 'in progress', 'completed', 'sanctioned'];
+    const allowedStatuses = ['recommended', 'in progress', 'completed', 'sanctioned', 'pending completion approval'];
     return allowedStatuses.includes(normalizedStatus) && normalizedStatus !== 'pending completion approval';
   }, [isPI, project.status]);
 
@@ -501,26 +501,35 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       {project.status === 'Not Recommended' && <X className="mr-2 h-4 w-4" />}
                       {project.status}
                   </Badge>
-                  {isAdmin && project.status === 'Under Review' && (
-                     <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="outline" disabled={isUpdating}>
-                                  Update Status <ChevronDown className="ml-2 h-4 w-4" />
-                              </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleApprovalClick('Recommended')}>
-                                  <Check className="mr-2 h-4 w-4" /> Recommend
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleApprovalClick('Not Recommended')}>
-                                  <X className="mr-2 h-4 w-4 text-destructive" /> <span className="text-destructive">Not Recommend</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onSelect={() => setIsRevisionCommentDialogOpen(true)}>
-                                <Edit className="mr-2 h-4 w-4" /> Request Revision
-                              </DropdownMenuItem>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
+                  {isAdmin && (
+                    <>
+                      {project.status === 'Under Review' && (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" disabled={isUpdating}>
+                                    Update Status <ChevronDown className="ml-2 h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleApprovalClick('Recommended')}>
+                                    <Check className="mr-2 h-4 w-4" /> Recommend
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleApprovalClick('Not Recommended')}>
+                                    <X className="mr-2 h-4 w-4 text-destructive" /> <span className="text-destructive">Not Recommend</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => setIsRevisionCommentDialogOpen(true)}>
+                                  <Edit className="mr-2 h-4 w-4" /> Request Revision
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                       {project.status === 'Pending Completion Approval' && (
+                          <Button onClick={() => handleStatusUpdate('Completed')} disabled={isUpdating}>
+                            <FileCheck2 className="mr-2 h-4 w-4" /> Approve Completion
+                          </Button>
+                        )}
+                    </>
                   )}
                   {isPI && project.status === 'Revision Needed' && (
                     <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
