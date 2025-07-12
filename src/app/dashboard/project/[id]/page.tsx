@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useParams } from "next/navigation"
-import { doc, getDoc, collection, getDocs, query, where, limit } from "firebase/firestore"
+import { doc, getDoc, collection, getDocs } from "firebase/firestore"
 import { db } from "@/lib/config"
 import type { Project, User } from "@/types"
 import { PageHeader } from "@/components/page-header"
@@ -39,40 +39,19 @@ export default function ProjectDetailsPage() {
         ...projectSnap.data(),
         submissionDate: projectSnap.data().submissionDate || new Date().toISOString(),
       } as Project
-
-      // Fetch the PI's user data either by UID or by email for historical projects
-      let fetchedPiUser: User | null = null
-      const usersRef = collection(db, "users")
+      setProject(projectData)
 
       if (projectData.pi_uid) {
-        const piUserRef = doc(usersRef, projectData.pi_uid)
+        const piUserRef = doc(db, "users", projectData.pi_uid)
         const piUserSnap = await getDoc(piUserRef)
         if (piUserSnap.exists()) {
-          fetchedPiUser = { uid: piUserSnap.id, ...piUserSnap.data() } as User
-        }
-      } else if (projectData.pi_email) {
-        // Fallback for historical projects without a UID
-        const q = query(usersRef, where("email", "==", projectData.pi_email), limit(1))
-        const piQuerySnap = await getDocs(q)
-        if (!piQuerySnap.empty) {
-          const piUserDoc = piQuerySnap.docs[0]
-          fetchedPiUser = { uid: piUserDoc.id, ...piUserDoc.data() } as User
+          setPiUser({ uid: piUserSnap.id, ...piUserSnap.data() } as User)
         }
       }
-
-      // If we found a PI user, update the project data with their latest info
-      if (fetchedPiUser) {
-        setPiUser(fetchedPiUser)
-        projectData.faculty = fetchedPiUser.faculty || projectData.faculty
-        projectData.institute = fetchedPiUser.institute || projectData.institute
-        projectData.departmentName = fetchedPiUser.department || projectData.departmentName
-        projectData.pi_phoneNumber = fetchedPiUser.phoneNumber || projectData.pi_phoneNumber
-      }
-
-      setProject(projectData)
 
       // Only admins need the full user list
       if (sessionUser && ["Super-admin", "admin", "CRO"].includes(sessionUser.role)) {
+        const usersRef = collection(db, "users")
         const usersSnap = await getDocs(usersRef)
         const userList = usersSnap.docs.map((doc) => ({ uid: doc.id, ...doc.data() }) as User)
         setAllUsers(userList)

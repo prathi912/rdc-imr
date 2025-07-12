@@ -126,7 +126,6 @@ export default function SettingsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
   const [isDesignationLocked, setIsDesignationLocked] = useState(false);
-  const [isCroUser, setIsCroUser] = useState(false);
 
   const isPrincipal = useMemo(() => user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false, [user]);
 
@@ -179,9 +178,6 @@ export default function SettingsPage() {
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
           
-          if (appUser.role === 'CRO') {
-            setIsCroUser(true);
-          }
           if (CRO_EMAILS.includes(appUser.email) || PRINCIPAL_EMAILS.includes(appUser.email)) {
             setIsDesignationLocked(true);
           }
@@ -443,10 +439,10 @@ export default function SettingsPage() {
                   )} />
                 </div>
                  <FormField name="faculty" control={profileForm.control} render={({ field }) => (
-                  <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isCroUser}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
                 <FormField name="institute" control={profileForm.control} render={({ field }) => (
-                  <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isCroUser}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="department" render={({ field }) => (
                   <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
@@ -460,16 +456,16 @@ export default function SettingsPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={profileForm.control} name="misId" render={({ field }) => (
-                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isPrincipal || isCroUser} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={profileForm.control} name="orcidId" render={({ field }) => (
                         <FormItem>
                             <FormLabel>ORCID iD</FormLabel>
                             <div className="flex items-center gap-2">
                                 <FormControl>
-                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isPrincipal || isCroUser} />
+                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isPrincipal} />
                                 </FormControl>
-                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isPrincipal || isCroUser} title="Fetch data from ORCID">
+                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isPrincipal} title="Fetch data from ORCID">
                                     {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                                 </Button>
                             </div>
@@ -478,13 +474,13 @@ export default function SettingsPage() {
                     )} />
                 </div>
                 <FormField control={profileForm.control} name="scopusId" render={({ field }) => (
-                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isPrincipal || isCroUser} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="vidwanId" render={({ field }) => (
-                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isPrincipal || isCroUser} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="googleScholarId" render={({ field }) => (
-                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isPrincipal || isCroUser} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
                 )} />
 
                  <Separator />
