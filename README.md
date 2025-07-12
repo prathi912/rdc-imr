@@ -1,3 +1,4 @@
+run build
 # Research & Development Portal - Parul University
 
 This is a comprehensive, full-stack web application designed to streamline and manage the entire research lifecycle at Parul University. It serves as a central hub for faculty, evaluators, and administrators to handle Intramural Research (IMR) project proposals, incentive claims, and user management.

@@ -1,225 +1,31 @@
-'use client';
+# Terms of Use
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Logo } from '@/components/logo';
-import Image from 'next/image';
-import { Award, BookCheck, GanttChartSquare, Check, Users, ShieldCheck, FilePlus, Bot } from 'lucide-react';
-import { auth } from '@/lib/config';
-import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
-import { Skeleton } from '@/components/ui/skeleton';
+## Right of use
 
-export default function LandingPage() {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState(true);
+You have the right to utilise this platform in any manner permissible by the site administrators, and University officials, you may not transfer to another individual any rights or access granted to you upon your registration. 
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+## External Information 
 
-  return (
-    <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
-      <header className="container mx-auto px-4 lg:px-6 h-20 flex items-center justify-between sticky top-0 z-50 bg-background/80 backdrop-blur-lg">
-        <Logo />
-        <nav className="flex gap-4 sm:gap-6">
-          {loading ? (
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-10 w-24" />
-              <Skeleton className="h-10 w-24" />
-            </div>
-          ) : user ? (
-            <Link href="/dashboard">
-              <Button>Go to Dashboard</Button>
-            </Link>
-          ) : (
-            <>
-              <Link href="/login">
-                <Button variant="ghost">Sign In</Button>
-              </Link>
-              <Link href="/signup">
-                <Button>Sign Up</Button>
-              </Link>
-            </>
-          )}
-        </nav>
-      </header>
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
-          <div className="container px-4 md:px-6">
-            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
-              <div className="flex flex-col justify-center space-y-4 animate-in fade-in slide-in-from-left-8 duration-700">
-                <div className="space-y-2">
-                   <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm font-medium text-primary">
-                    Research & Development Cell
-                  </div>
-                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                    Empowering Research & Recognizing Achievement
-                  </h1>
-                  <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    Our comprehensive portal streamlines the entire research lifecycle. From IMR proposal submissions and AI-assisted evaluations to simplified claims for publication incentives, we provide the tools to foster innovation at Parul University.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  {loading ? (
-                    <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                        <Skeleton className="h-12 w-32" />
-                        <Skeleton className="h-12 w-32" />
-                    </div>
-                  ) : user ? (
-                    <Link href="/dashboard">
-                      <Button size="lg">Go to Dashboard</Button>
-                    </Link>
-                  ) : (
-                    <>
-                      <Link href="/signup">
-                        <Button size="lg">Get Started</Button>
-                      </Link>
-                      <Link href="/login">
-                        <Button variant="outline" size="lg">
-                          Sign In
-                        </Button>
-                      </Link>
-                    </>
-                  )}
-                </div>
-              </div>
-              <Image
-                src="https://www.pierc.org/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FmainBgImage.05039c52.png&w=1920&q=75"
-                width={600}
-                height={400}
-                alt="Hero"
-                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last animate-in fade-in slide-in-from-right-8 duration-700"
-              />
-            </div>
-          </div>
-        </section>
+The website may contain other information relating to non-Parul University entities or any other companies, please note that for any such information, Parul University does not endorse any such companies or recommend such entities for any purpose to our users accessing such sites shall strictly be at the user’s discretion.
 
-        {/* Features Section */}
-        <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted">
-          <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">A Unified Platform for Your Research Journey</h2>
-                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  One portal to manage everything from initial project funding to celebrating your publication success.
-                </p>
-              </div>
-            </div>
-            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 py-12 sm:grid-cols-2 lg:grid-cols-2">
-              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <GanttChartSquare className="h-8 w-8" />
-                </div>
-                <h3 className="text-xl font-bold">IMR Project Funding</h3>
-                <p className="text-muted-foreground mt-2">A guided workflow for submitting intramural research proposals, tracking their evaluation status, and managing awarded grants efficiently.</p>
-              </div>
-              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
-                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Award className="h-8 w-8" />
-                </div>
-                <h3 className="text-xl font-bold">Incentive Claims</h3>
-                <p className="text-muted-foreground mt-2">Easily apply for incentives for your published research papers, patents, books, and conference presentations through dedicated, easy-to-use forms.</p>
-              </div>
-            </div>
-          </div>
-        </section>
+## Regarding Press Releases and external Publications
 
+The website may contain press releases and publications about the University or related to the University from other sources, it shall be noted that upon placing reliance on such information it was believed to be accurate at the time and we disclaim any liability or obligation which may arise out of the untimeliness or any such discrepancies such publications.
 
-        {/* Built for you section */}
-        <section id="roles" className="w-full py-12 md:py-24">
-             <div className="container px-4 md:px-6">
-                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
-                    <div className="space-y-2">
-                        <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Tools Tailored for Your Role</h2>
-                        <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                            A dedicated experience for every user involved in the research lifecycle.
-                        </p>
-                    </div>
-                </div>
-                 <div className="mx-auto grid max-w-5xl items-start gap-8 py-12 sm:grid-cols-1 md:grid-cols-3">
-                     <div className="grid gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                               <Users className="h-6 w-6" />
-                            </div>
-                            <h3 className="text-xl font-bold">For Faculty</h3>
-                        </div>
-                        <p className="text-muted-foreground">Submit, track, and manage your research projects and incentive claims from a personalized dashboard.</p>
-                        <ul className="grid gap-2 text-sm">
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Simplified Proposal Submission</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Streamlined Incentive Claims</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Real-time Status Tracking</li>
-                        </ul>
-                    </div>
-                    <div className="grid gap-4">
-                        <div className="flex items-center gap-4">
-                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                               <BookCheck className="h-6 w-6" />
-                            </div>
-                            <h3 className="text-xl font-bold">For Evaluators</h3>
-                        </div>
-                        <p className="text-muted-foreground">Access your queue of projects, review submissions, and provide structured feedback with AI-assisted tools.</p>
-                         <ul className="grid gap-2 text-sm">
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Dedicated Evaluation Queue</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> AI-Generated Evaluation Prompts</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Fair and Consistent Scoring</li>
-                        </ul>
-                    </div>
-                    <div className="grid gap-4">
-                         <div className="flex items-center gap-4">
-                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                               <ShieldCheck className="h-6 w-6" />
-                            </div>
-                            <h3 className="text-xl font-bold">For Admins</h3>
-                        </div>
-                        <p className="text-muted-foreground">Oversee the entire process with powerful dashboards, user management tools, and comprehensive analytics.</p>
-                         <ul className="grid gap-2 text-sm">
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Centralized Project Oversight</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Incentive Claim Management</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Data Analytics & Reporting</li>
-                        </ul>
-                    </div>
-                 </div>
-             </div>
-        </section>
+## Disclaimer
 
-        {/* CTA Section */}
-        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
-            <div className="container grid items-center justify-center gap-4 px-4 text-center md:px-6">
-                <div className="space-y-3">
-                    <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">
-                        Ready to Transform Your Research Process?
-                    </h2>
-                    <p className="mx-auto max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                        Create an account today and join the future of research management at Parul University.
-                    </p>
-                </div>
-                <div className="mx-auto w-full max-w-sm space-x-2">
-                     <Link href="/signup">
-                        <Button size="lg">Sign Up Now</Button>
-                    </Link>
-                </div>
-            </div>
-        </section>
+Any of the users or visitors to this site are advised not to assume or presume the accuracy, up to date , or completeness of the information provided in this site. Users are advised to get confirmation regarding the accuracy or credibility of such information with our concerned officials before placing any reliance or making any commitments.
 
-      </main>
-      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Parul University. All rights reserved.</p>
-        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link className="text-xs hover:underline underline-offset-4" href="/TERMS_OF_USE.md" target="_blank">
-            Terms of Service
-          </Link>
-          <Link className="text-xs hover:underline underline-offset-4" href="/PRIVACY_POLICY.md" target="_blank">
-            Privacy
-          </Link>
-        </nav>
-      </footer>
-    </div>
-  );
-}
+In providing this information, the University has taken due care, hence Parul University hereby disclaims any warranty made whatsoever, either in an expressed manner or implied therein, including and not limiting any such warranties as to the title, non-infringement, merchantability, non-interruptions, relating to the usage of this site.
+
+In furtherance of the same, the University hereby disclaims any warranty that this website will operate without any form of interruptions either technical or otherwise, which may be intended or unintended at any point during the use of this site. 
+
+We create no warranty as to the usefulness, adequacy, reliability, authenticity, of any information or content provided either original or outsourced, written or graphical, in relation to our services, products and operations.
+
+Parul University and its affiliated parties will not be held liable for any direct, indirect, special or consequential damages which may arise out of any manner of use, or reliance of any information provided on this site. Thus, you are advised to make use of this site at your own risk, with the necessary caution. Such damages may include but not limited to loss of business, loss of profits, arising out of any breach of contract, breach of warranty, tort (including negligence), product liability or otherwise relating to the use of this site. 
+
+This exclusion from liability shall also extend to any claims of copyright infringement on this site or any other claims made in whatsoever manner.
+
+Any link from other sources including google search engine sources is simply for the convenience of the users and creates no obligation between Parul University and such sites. In regards to any links provided on the site, the University disclaims any liability which may arise out of any inconvenience, or violations caused by any such sites, as they have only been provided for reference and for enhancing the user experience of our visitors.
+
+We may use your information to respond to your inquiries, provide customer service support, send you important information about the services, and send you marketing communications (with your consent) via different channels, including but not limited to SMS, Email, RCS, WhatsApp, and Voice.
