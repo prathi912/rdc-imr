@@ -81,7 +81,9 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [isTransactionOpen, setIsTransactionOpen] = useState(false)
   const [currentPhaseId, setCurrentPhaseId] = useState<string | null>(null)
 
-  const isAdmin = user.role === "admin" || user.role === "Super-admin" || user.role === "CRO"
+  // Define roles for adding phases and changing status
+  const canAddPhase = user.role === "admin" || user.role === "Super-admin"
+  const canChangeStatus = user.role === "admin" || user.role === "Super-admin" 
   const isPI = user.uid === project.pi_uid || user.email === project.pi_email
   const grant = project.grant
 
@@ -184,7 +186,8 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             <DollarSign className="h-6 w-6" />
             <CardTitle>Grant Management</CardTitle>
           </div>
-          {isAdmin && (
+          {/* Only admins and Super-admins can add new phases */}
+          {canAddPhase && (
             <Dialog open={isAddPhaseOpen} onOpenChange={setIsAddPhaseOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -265,7 +268,8 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={phase.status === "Disbursed" ? "default" : "secondary"}>{phase.status}</Badge>
-                    {isAdmin && (
+                    {/* Admins, Super-admins, and CROs can change phase status */}
+                    {canChangeStatus && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" size="sm" disabled={isSubmitting}>
@@ -335,6 +339,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         <FileText className="h-4 w-4" />
                         Transactions ({phase.transactions.length})
                       </h4>
+                      {/* PIs can add transactions to disbursed phases */}
                       {isPI && phase.status === "Disbursed" && (
                         <Button
                           size="sm"
@@ -397,6 +402,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   <div className="text-center py-8">
                     <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground mb-4">No transactions recorded for this phase.</p>
+                    {/* PIs can add transactions to disbursed phases */}
                     {isPI && phase.status === "Disbursed" && (
                       <Button
                         onClick={() => {

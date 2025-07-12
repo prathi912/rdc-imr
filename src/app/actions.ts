@@ -337,19 +337,26 @@ export async function uploadFileToServer(
   path: string,
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
-    if (!fileDataUrl) {
-      throw new Error("Empty file data URL.")
+    if (!fileDataUrl || typeof fileDataUrl !== "string") {
+      throw new Error("Invalid file data URL provided.")
     }
+
     const bucket = adminStorage.bucket()
     const file = bucket.file(path)
 
     // Extract mime type and base64 data from data URL
     const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/)
-    if (!match) {
-      throw new Error("Invalid data URL.")
+    if (!match || match.length < 3) {
+      throw new Error("Invalid data URL format.")
     }
+
     const mimeType = match[1]
     const base64Data = match[2]
+
+    if (!mimeType || !base64Data) {
+      throw new Error("Could not extract file data from data URL.")
+    }
+
     const buffer = Buffer.from(base64Data, "base64")
 
     // Upload the file buffer
