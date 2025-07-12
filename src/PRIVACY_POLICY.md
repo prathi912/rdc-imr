@@ -1,82 +1,225 @@
-# Privacy Policy for the Parul University Research & Development Portal
+'use client';
 
-**Last Updated:** [Date]
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Logo } from '@/components/logo';
+import Image from 'next/image';
+import { Award, BookCheck, GanttChartSquare, Check, Users, ShieldCheck, FilePlus, Bot } from 'lucide-react';
+import { auth } from '@/lib/config';
+import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
+import { Skeleton } from '@/components/ui/skeleton';
 
-## 1. Introduction
+export default function LandingPage() {
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-Welcome to the Parul University Research & Development (R&D) Portal. This portal is designed to streamline and manage the research lifecycle at Parul University. We are committed to protecting the privacy and security of our users' data. This Privacy Policy outlines the types of information we collect, how it is used and protected, and your rights regarding your personal data.
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-This policy applies to all users of the portal, including Faculty, Evaluators, Chief Research Officers (CROs), Principals, Heads of Department (HODs), and Administrators.
+  return (
+    <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
+      <header className="container mx-auto px-4 lg:px-6 h-20 flex items-center justify-between sticky top-0 z-50 bg-background/80 backdrop-blur-lg">
+        <Logo />
+        <nav className="flex gap-4 sm:gap-6">
+          {loading ? (
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-24" />
+            </div>
+          ) : user ? (
+            <Link href="/dashboard">
+              <Button>Go to Dashboard</Button>
+            </Link>
+          ) : (
+            <>
+              <Link href="/login">
+                <Button variant="ghost">Sign In</Button>
+              </Link>
+              <Link href="/signup">
+                <Button>Sign Up</Button>
+              </Link>
+            </>
+          )}
+        </nav>
+      </header>
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
+          <div className="container px-4 md:px-6">
+            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+              <div className="flex flex-col justify-center space-y-4 animate-in fade-in slide-in-from-left-8 duration-700">
+                <div className="space-y-2">
+                   <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm font-medium text-primary">
+                    Research & Development Cell
+                  </div>
+                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
+                    Empowering Research & Recognizing Achievement
+                  </h1>
+                  <p className="max-w-[600px] text-muted-foreground md:text-xl">
+                    Our comprehensive portal streamlines the entire research lifecycle. From IMR proposal submissions and AI-assisted evaluations to simplified claims for publication incentives, we provide the tools to foster innovation at Parul University.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                  {loading ? (
+                    <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                        <Skeleton className="h-12 w-32" />
+                        <Skeleton className="h-12 w-32" />
+                    </div>
+                  ) : user ? (
+                    <Link href="/dashboard">
+                      <Button size="lg">Go to Dashboard</Button>
+                    </Link>
+                  ) : (
+                    <>
+                      <Link href="/signup">
+                        <Button size="lg">Get Started</Button>
+                      </Link>
+                      <Link href="/login">
+                        <Button variant="outline" size="lg">
+                          Sign In
+                        </Button>
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </div>
+              <Image
+                src="https://www.pierc.org/_next/image?url=%2F_next%2Fstatic%2Fmedia%2FmainBgImage.05039c52.png&w=1920&q=75"
+                width={600}
+                height={400}
+                alt="Hero"
+                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last animate-in fade-in slide-in-from-right-8 duration-700"
+              />
+            </div>
+          </div>
+        </section>
 
-## 2. Information We Collect
+        {/* Features Section */}
+        <section id="features" className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">A Unified Platform for Your Research Journey</h2>
+                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                  One portal to manage everything from initial project funding to celebrating your publication success.
+                </p>
+              </div>
+            </div>
+            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 py-12 sm:grid-cols-2 lg:grid-cols-2">
+              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <GanttChartSquare className="h-8 w-8" />
+                </div>
+                <h3 className="text-xl font-bold">IMR Project Funding</h3>
+                <p className="text-muted-foreground mt-2">A guided workflow for submitting intramural research proposals, tracking their evaluation status, and managing awarded grants efficiently.</p>
+              </div>
+              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Award className="h-8 w-8" />
+                </div>
+                <h3 className="text-xl font-bold">Incentive Claims</h3>
+                <p className="text-muted-foreground mt-2">Easily apply for incentives for your published research papers, patents, books, and conference presentations through dedicated, easy-to-use forms.</p>
+              </div>
+            </div>
+          </div>
+        </section>
 
-We collect information that is necessary for the functioning of the portal and the management of the research process. This includes:
 
-### a. Personal Identification & Contact Information
--   **Full Name**
--   **Email Address** (specifically your `@paruluniversity.ac.in` email)
--   **Phone Number**
--   **Profile Picture** (optional)
+        {/* Built for you section */}
+        <section id="roles" className="w-full py-12 md:py-24">
+             <div className="container px-4 md:px-6">
+                 <div className="flex flex-col items-center justify-center space-y-4 text-center">
+                    <div className="space-y-2">
+                        <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Tools Tailored for Your Role</h2>
+                        <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                            A dedicated experience for every user involved in the research lifecycle.
+                        </p>
+                    </div>
+                </div>
+                 <div className="mx-auto grid max-w-5xl items-start gap-8 py-12 sm:grid-cols-1 md:grid-cols-3">
+                     <div className="grid gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                               <Users className="h-6 w-6" />
+                            </div>
+                            <h3 className="text-xl font-bold">For Faculty</h3>
+                        </div>
+                        <p className="text-muted-foreground">Submit, track, and manage your research projects and incentive claims from a personalized dashboard.</p>
+                        <ul className="grid gap-2 text-sm">
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Simplified Proposal Submission</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Streamlined Incentive Claims</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Real-time Status Tracking</li>
+                        </ul>
+                    </div>
+                    <div className="grid gap-4">
+                        <div className="flex items-center gap-4">
+                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                               <BookCheck className="h-6 w-6" />
+                            </div>
+                            <h3 className="text-xl font-bold">For Evaluators</h3>
+                        </div>
+                        <p className="text-muted-foreground">Access your queue of projects, review submissions, and provide structured feedback with AI-assisted tools.</p>
+                         <ul className="grid gap-2 text-sm">
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Dedicated Evaluation Queue</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> AI-Generated Evaluation Prompts</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Fair and Consistent Scoring</li>
+                        </ul>
+                    </div>
+                    <div className="grid gap-4">
+                         <div className="flex items-center gap-4">
+                           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                               <ShieldCheck className="h-6 w-6" />
+                            </div>
+                            <h3 className="text-xl font-bold">For Admins</h3>
+                        </div>
+                        <p className="text-muted-foreground">Oversee the entire process with powerful dashboards, user management tools, and comprehensive analytics.</p>
+                         <ul className="grid gap-2 text-sm">
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Centralized Project Oversight</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Incentive Claim Management</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Data Analytics & Reporting</li>
+                        </ul>
+                    </div>
+                 </div>
+             </div>
+        </section>
 
-### b. Academic & Professional Information
--   **Faculty, Institute, and Department**
--   **Designation** (e.g., Professor, HOD, Principal)
--   **Researcher IDs** (MIS ID, ORCID iD, Scopus ID, Vidwan ID, Google Scholar ID)
--   **CVs/Resumes** of project team members.
--   **Publications and Research Output**: Details submitted for incentive claims, including paper titles, journal names, patent details, conference presentations, etc.
+        {/* CTA Section */}
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+            <div className="container grid items-center justify-center gap-4 px-4 text-center md:px-6">
+                <div className="space-y-3">
+                    <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">
+                        Ready to Transform Your Research Process?
+                    </h2>
+                    <p className="mx-auto max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                        Create an account today and join the future of research management at Parul University.
+                    </p>
+                </div>
+                <div className="mx-auto w-full max-w-sm space-x-2">
+                     <Link href="/signup">
+                        <Button size="lg">Sign Up Now</Button>
+                    </Link>
+                </div>
+            </div>
+        </section>
 
-### c. Financial Information
--   **Salary Bank Account Details**: We collect your beneficiary name, account number, bank name, branch, and IFSC code. This information is **strictly** for the purpose of disbursing grants for Intramural Research (IMR) projects and processing payments for approved incentive claims.
-
-### d. Project & Research Data
--   **Project Proposals**: Including title, abstract, methodology, timeline, expected outcomes, and associated files.
--   **Team Information**: Names and roles of Principal Investigators (PI), Co-PIs, and student members.
--   **Ethics Approvals** and other supporting documents.
--   **Grant Utilization Data**: Transaction logs and invoices submitted for expense tracking.
--   **Evaluation Data**: Comments, scores, and recommendations provided by assigned evaluators.
-
-### e. Information Processed by AI
--   To provide features like project summarization and research domain suggestions, project data (such as titles and abstracts) is processed by Google's Generative AI models via the Genkit framework. We do not store the AI-generated outputs beyond their immediate use in the application.
-
-## 3. How We Use Your Information
-
-Your information is used for the following purposes:
--   **To Provide Core Services**: To manage your account, authenticate you, and provide access based on your assigned role (e.g., Faculty, CRO, Admin).
--   **To Manage the Research Lifecycle**: To process IMR project submissions, facilitate the review and evaluation process, schedule meetings, and track project status.
--   **To Process Grants & Incentives**: To award grants, disburse funds, and process incentive claims based on your research output.
--   **To Facilitate Communication**: To send important notifications, such as status updates on your projects/claims, meeting schedules, and password reset links.
--   **To Improve University Research Oversight**: To provide administrators (like HODs, Principals, and CROs) with analytics and reports on research activity within their respective domains (department, institute, or faculty).
-
-## 4. Data Sharing and Disclosure
-
-We do not sell or rent your personal data to third parties. Your information is shared only in the following circumstances:
--   **Within the Portal**: Your project information is visible to relevant administrative roles (e.g., your HOD, Principal, CRO, and central Admins) for review and management purposes. Your public profile information may be visible to other authenticated users of the portal.
--   **With Evaluators**: When you submit a project, the proposal and supporting documents are shared with the evaluators assigned to your project.
--   **With Service Providers**: We use Google Firebase (Authentication, Firestore, Storage) and Google's Generative AI services to power the portal. These services have their own robust privacy and security policies.
--   **For Legal Requirements**: We may disclose your information if required to do so by law or in response to valid requests by public authorities.
-
-## 5. Data Security
-
-We implement a variety of security measures to maintain the safety of your personal information:
--   All data is transmitted over secure connections (HTTPS).
--   We use Firebase, a platform with industry-standard security, for our database, authentication, and file storage.
--   Access to data within the portal is strictly controlled by a role-based access control (RBAC) system. You can only see the information relevant to your role.
--   Financial information is collected solely for disbursement purposes and is accessible only to authorized administrative personnel.
-
-## 6. Your Rights
-
-As a user of the portal, you have the right to:
--   **Access and Update Your Information**: You can review and update your personal, academic, and bank details at any time through the "Settings" page.
--   **View Your Submissions**: You can access a complete history of your submitted projects and incentive claims through your dashboard.
-
-## 7. Changes to This Privacy Policy
-
-We may update this Privacy Policy from time to time. We will notify you of any significant changes by posting the new policy on this page and, where appropriate, through an email notification.
-
-## 8. Contact Us
-
-If you have any questions about this Privacy Policy, please contact the Research & Development Cell at **helpdesk.rdc@paruluniversity.ac.in**.
-
-***
-
-*Disclaimer: This is a template Privacy Policy. It is recommended to have this document reviewed by a legal professional to ensure it complies with all applicable laws and regulations.*
+      </main>
+      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
+        <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Parul University. All rights reserved.</p>
+        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
+          <Link className="text-xs hover:underline underline-offset-4" href="/TERMS_OF_USE.md" target="_blank">
+            Terms of Service
+          </Link>
+          <Link className="text-xs hover:underline underline-offset-4" href="/PRIVACY_POLICY.md" target="_blank">
+            Privacy
+          </Link>
+        </nav>
+      </footer>
+    </div>
+  );
+}
