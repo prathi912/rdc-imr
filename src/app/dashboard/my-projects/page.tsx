@@ -108,9 +108,11 @@ export default function MyProjectsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={filteredProjects} userRole="faculty" />
+          <ProjectList projects={filteredProjects} userRole={user.role} />
         )}
       </div>
     </div>
   )
 }
+
+    
