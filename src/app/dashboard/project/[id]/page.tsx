@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/page-header"
 import { ProjectDetailsClient } from "@/components/projects/project-details-client"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
+import { ProjectSummary } from "@/components/projects/project-summary"
 
 export default function ProjectDetailsPage() {
   const params = useParams()
