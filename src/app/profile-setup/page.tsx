@@ -239,6 +239,13 @@ export default function ProfileSetupPage() {
         profileComplete: true,
       };
 
+      // Sanitize data: Ensure optional fields that are empty strings are not sent as undefined
+      for (const key in updateData) {
+        if ((updateData as any)[key] === undefined) {
+          (updateData as any)[key] = '';
+        }
+      }
+
       await updateDoc(userDocRef, updateData);
       
       const updatedUser = { ...user, ...updateData };
@@ -294,6 +301,8 @@ export default function ProfileSetupPage() {
     )
   }
 
+  const isAcademicInfoLocked = isPrincipal || CRO_EMAILS.includes(user.email);
+
   return (
     <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
       <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -337,10 +346,10 @@ export default function ProfileSetupPage() {
 
                   <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
                   <FormField name="faculty" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   <FormField name="institute" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="department" render={({ field }) => (
                     <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>

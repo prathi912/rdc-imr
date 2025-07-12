@@ -125,8 +125,6 @@ export default function SettingsPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
-  const [isDesignationLocked, setIsDesignationLocked] = useState(false);
-  const [isAcademicInfoLocked, setIsAcademicInfoLocked] = useState(false);
 
   const isPrincipal = useMemo(() => user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false, [user]);
   const isCro = useMemo(() => user?.email ? CRO_EMAILS.includes(user.email) : false, [user]);
@@ -180,13 +178,6 @@ export default function SettingsPage() {
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
           
-          if (CRO_EMAILS.includes(appUser.email) || PRINCIPAL_EMAILS.includes(appUser.email)) {
-            setIsDesignationLocked(true);
-          }
-          if (CRO_EMAILS.includes(appUser.email)) {
-            setIsAcademicInfoLocked(true);
-          }
-
           profileForm.reset({
             name: appUser.name || '',
             email: appUser.email || '',
@@ -221,12 +212,11 @@ export default function SettingsPage() {
         const userDocRef = doc(db, 'users', user.uid);
         const { email, ...updateData } = data;
         
-        if (isDesignationLocked) {
-            updateData.designation = user.designation || (isPrincipal ? 'Principal' : 'CRO'); // Ensure locked designation is not changed
-        }
-        if (isCro) {
-            updateData.faculty = user.faculty || '';
-            updateData.institute = user.institute || '';
+        // Sanitize data: Ensure optional fields that are empty strings are not sent as undefined
+        for (const key in updateData) {
+          if ((updateData as any)[key] === undefined) {
+            (updateData as any)[key] = '';
+          }
         }
         
         await updateDoc(userDocRef, updateData);
@@ -371,6 +361,9 @@ export default function SettingsPage() {
     }
 };
 
+  const isAcademicInfoLocked = isPrincipal || isCro;
+  const isIdFieldsLocked = isPrincipal || isCro;
+
 
   if (loading) {
     return (
@@ -454,10 +447,10 @@ export default function SettingsPage() {
                   <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="department" render={({ field }) => (
-                  <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isAcademicInfoLocked} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="designation" render={({ field }) => (
-                  <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isDesignationLocked} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isAcademicInfoLocked} /></FormControl><FormMessage /></FormItem>
                 )} />
                 
                 <Separator />
@@ -465,16 +458,16 @@ export default function SettingsPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={profileForm.control} name="misId" render={({ field }) => (
-                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={profileForm.control} name="orcidId" render={({ field }) => (
                         <FormItem>
                             <FormLabel>ORCID iD</FormLabel>
                             <div className="flex items-center gap-2">
                                 <FormControl>
-                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isPrincipal} />
+                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isIdFieldsLocked} />
                                 </FormControl>
-                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isPrincipal} title="Fetch data from ORCID">
+                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isIdFieldsLocked} title="Fetch data from ORCID">
                                     {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                                 </Button>
                             </div>
@@ -483,13 +476,13 @@ export default function SettingsPage() {
                     )} />
                 </div>
                 <FormField control={profileForm.control} name="scopusId" render={({ field }) => (
-                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="vidwanId" render={({ field }) => (
-                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="googleScholarId" render={({ field }) => (
-                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
                 )} />
 
                  <Separator />
