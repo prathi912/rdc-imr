@@ -82,7 +82,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [currentPhaseId, setCurrentPhaseId] = useState<string | null>(null);
 
   const isAdmin = user.role === 'admin' || user.role === 'Super-admin' || user.role === 'CRO';
-  const isPI = user.uid === project.pi_uid;
+  const isPI = user.uid === project.pi_uid || user.email === project.pi_email;
   const grant = project.grant;
 
   const phaseForm = useForm<z.infer<typeof addPhaseSchema>>({
