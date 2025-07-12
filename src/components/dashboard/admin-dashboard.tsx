@@ -96,7 +96,7 @@ export function AdminDashboard() {
             const allProjects = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
             
             const totalProjects = allProjects.length;
-            const pendingReviews = allProjects.filter(p => p.status === 'Under Review').length;
+            const pendingReviews = allProjects.filter(p => p.status === 'Under Review' || p.status === 'Pending Completion Approval').length;
             const approvedProjects = allProjects.filter(p => p.status === 'Recommended').length;
             const rejectedProjects = allProjects.filter(p => p.status === 'Not Recommended').length;
             const completedProjects = allProjects.filter(p => p.status === 'Completed').length;
