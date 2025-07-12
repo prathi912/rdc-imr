@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
@@ -12,6 +11,7 @@ import { ProjectSummary } from "@/components/projects/project-summary"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { PRINCIPAL_EMAILS } from "@/lib/constants"
+import { useAuth } from "@/components/contexts/AuthContext"
 
 export default function ProjectDetailsPage() {
   const params = useParams()
@@ -21,23 +21,52 @@ export default function ProjectDetailsPage() {
   const [allUsers, setAllUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [sessionUser, setSessionUser] = useState<User | null>(null)
 
-  useEffect(() => {
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      setSessionUser(JSON.parse(storedUser))
-    }
-  }, [])
+  // Use AuthContext instead of localStorage
+  const { user: firebaseUser, userProfile, loading: authLoading, initialLoadComplete } = useAuth()
+
+  // Convert Firebase user and profile to the expected User type
+  const sessionUser =
+    firebaseUser && userProfile
+      ? {
+          uid: firebaseUser.uid,
+          name: userProfile.fullName || firebaseUser.displayName || "",
+          email: firebaseUser.email || "",
+          role: userProfile.isSuperAdmin
+            ? ("Super-admin" as const)
+            : userProfile.role === "ADMIN_FACULTY"
+              ? ("admin" as const)
+              : ("faculty" as const),
+          designation: userProfile.designation || "faculty",
+          department: userProfile.department,
+          institute: userProfile.instituteName,
+          faculty: userProfile.faculty,
+          photoURL: firebaseUser.photoURL || "",
+        }
+      : firebaseUser
+        ? {
+            uid: firebaseUser.uid,
+            name: firebaseUser.displayName || "",
+            email: firebaseUser.email || "",
+            role: "faculty" as const,
+            photoURL: firebaseUser.photoURL || "",
+          }
+        : null
 
   const getProjectAndUsers = useCallback(
     async (id: string) => {
+      if (!sessionUser) {
+        console.log("No session user available for authorization check")
+        return
+      }
+
       setLoading(true)
       try {
         const projectRef = doc(db, "projects", id)
         const projectSnap = await getDoc(projectRef)
 
         if (!projectSnap.exists()) {
+          console.log("Project document does not exist:", id)
           setNotFound(true)
           setLoading(false)
           return
@@ -49,28 +78,53 @@ export default function ProjectDetailsPage() {
           submissionDate: projectSnap.data().submissionDate || new Date().toISOString(),
         } as Project
 
-        // Only perform authorization check if we have a session user
-        if (sessionUser) {
-          // Perform comprehensive client-side authorization check
-          const isAdmin = ["Super-admin", "admin", "CRO"].includes(sessionUser.role)
-          const isPrincipal = sessionUser.email ? PRINCIPAL_EMAILS.includes(sessionUser.email) : false
-          const isPrincipalForProject = isPrincipal && sessionUser.institute === projectData.institute
-          const isHod = sessionUser.designation === "HOD" && sessionUser.department === projectData.departmentName
-          const isPI = sessionUser.uid === projectData.pi_uid
-          const isCoPI = projectData.coPiUids?.includes(sessionUser.uid)
-          const isAssignedEvaluator = projectData.meetingDetails?.assignedEvaluators?.includes(sessionUser.uid)
-          const isSpecialUser =
-            sessionUser.email === "unnati.joshi22950@paruluniversity.ac.in" &&
-            projectData.faculty === "Faculty of Engineering & Technology"
+        // Debug logging
+        console.log("Authorization check:", {
+          sessionUserUid: sessionUser.uid,
+          projectPiUid: projectData.pi_uid,
+          sessionUserRole: sessionUser.role,
+          sessionUserEmail: sessionUser.email,
+          sessionUserDesignation: sessionUser.designation,
+          sessionUserDepartment: sessionUser.department,
+          sessionUserInstitute: sessionUser.institute,
+          projectInstitute: projectData.institute,
+          projectDepartment: projectData.departmentName,
+        })
 
-          const hasPermission =
-            isPI || isCoPI || isAdmin || isPrincipalForProject || isHod || isAssignedEvaluator || isSpecialUser
+        // Perform comprehensive client-side authorization check
+        const isAdmin = ["Super-admin", "admin", "CRO"].includes(sessionUser.role)
+        const isPrincipal = sessionUser.email ? PRINCIPAL_EMAILS.includes(sessionUser.email) : false
+        const isPrincipalForProject = isPrincipal && sessionUser.institute === projectData.institute
+        const isHod = sessionUser.designation === "HOD" && sessionUser.department === projectData.departmentName
+        const isPI = sessionUser.uid === projectData.pi_uid
+        const isCoPI = projectData.coPiUids?.includes(sessionUser.uid)
+        const isAssignedEvaluator = projectData.meetingDetails?.assignedEvaluators?.includes(sessionUser.uid)
+        const isSpecialUser =
+          sessionUser.email === "unnati.joshi22950@paruluniversity.ac.in" &&
+          projectData.faculty === "Faculty of Engineering & Technology"
 
-          if (!hasPermission) {
-            setNotFound(true)
-            setLoading(false)
-            return
-          }
+        // Debug logging for permission checks
+        console.log("Permission checks:", {
+          isPI,
+          isCoPI,
+          isAdmin,
+          isPrincipal,
+          isPrincipalForProject,
+          isHod,
+          isAssignedEvaluator,
+          isSpecialUser,
+        })
+
+        const hasPermission =
+          isPI || isCoPI || isAdmin || isPrincipalForProject || isHod || isAssignedEvaluator || isSpecialUser
+
+        console.log("Final permission result:", hasPermission)
+
+        if (!hasPermission) {
+          console.log("User does not have permission to view this project")
+          setNotFound(true)
+          setLoading(false)
+          return
         }
 
         setProject(projectData)
@@ -104,12 +158,22 @@ export default function ProjectDetailsPage() {
   )
 
   useEffect(() => {
-    if (projectId && sessionUser) {
-      getProjectAndUsers(projectId)
+    // Wait for auth to complete loading and have initial load complete
+    if (!authLoading && initialLoadComplete) {
+      if (projectId && sessionUser) {
+        console.log("Fetching project data for:", { projectId, sessionUserUid: sessionUser.uid })
+        getProjectAndUsers(projectId)
+      } else if (projectId && !sessionUser) {
+        // If we have projectId but no sessionUser after auth is complete, show not found
+        console.log("No session user found after auth completion, showing not found")
+        setNotFound(true)
+        setLoading(false)
+      }
     }
-  }, [projectId, sessionUser, getProjectAndUsers])
+  }, [projectId, sessionUser, authLoading, initialLoadComplete, getProjectAndUsers])
 
-  if (loading) {
+  // Show loading while auth is loading or while we're fetching project data
+  if (authLoading || !initialLoadComplete || (loading && !notFound)) {
     return (
       <div className="container mx-auto py-10">
         <PageHeader title="Project Details" description="Loading project details..." />
