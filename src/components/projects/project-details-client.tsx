@@ -30,7 +30,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users } from 'lucide-react';
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, Calendar as CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2 } from 'lucide-react';
 
 import { GrantManagement } from './grant-management';
 import { EvaluationForm } from './evaluation-form';
@@ -216,6 +216,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const canManageGrants = user && (user.role === 'Super-admin' || user.role === 'admin' || user.uid === project.pi_uid || user.email === project.pi_email);
 
+  const canRequestClosure = useMemo(() => {
+    if (!isPI) return false;
+    const allowedStatuses: Project['status'][] = ['Recommended', 'In Progress', 'Completed', 'Sanctioned'];
+    return allowedStatuses.includes(project.status) && project.status !== 'Pending Completion Approval';
+  }, [isPI, project.status]);
 
   const assignedEvaluatorNames = useMemo(() => {
     if (!project.meetingDetails?.assignedEvaluators || !allUsers.length) {
@@ -574,7 +579,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </Dialog>
                   )}
                   
-                  {isPI && (project.status === 'Recommended' || project.status === 'In Progress') && (
+                  {canRequestClosure && (
                     <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
                       <DialogTrigger asChild><Button variant="outline"><FileCheck2 className="mr-2 h-4 w-4" /> Request Project Closure</Button></DialogTrigger>
                       <DialogContent>
