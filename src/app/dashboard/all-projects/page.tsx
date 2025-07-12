@@ -85,7 +85,7 @@ export default function AllProjectsPage() {
         const isSuperAdmin = user.role === 'Super-admin';
         const isAdmin = user.role === 'admin';
         const isCro = user.role === 'CRO';
-        const isPrincipal = user.designation === 'Principal' || PRINCIPAL_EMAILS.includes(user.email);
+        const isPrincipal = user.designation === 'Principal';
         const isHod = user.designation === 'HOD';
 
         if (isSuperAdmin || isAdmin) {
@@ -120,7 +120,7 @@ export default function AllProjectsPage() {
   const isSuperAdmin = user?.role === 'Super-admin';
   const isAdmin = user?.role === 'admin';
   const isCro = user?.role === 'CRO';
-  const isPrincipal = user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false;
+  const isPrincipal = user?.designation === 'Principal';
   const isHod = user?.designation === 'HOD';
   const hasExportAccess = isSuperAdmin || isAdmin || isCro || isPrincipal || isHod;
   
@@ -343,5 +343,3 @@ export default function AllProjectsPage() {
     </div>
   );
 }
-
-    
