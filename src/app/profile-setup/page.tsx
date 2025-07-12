@@ -24,6 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { Bot, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { CRO_EMAILS, PRINCIPAL_EMAILS } from '@/lib/constants';
+import Link from 'next/link';
 
 const createProfileSetupSchema = (isPrincipal = false) => z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
@@ -294,101 +295,117 @@ export default function ProfileSetupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <div className="w-full max-w-lg">
-        <Card className="shadow-xl">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-6 flex justify-center">
-              <Logo />
-            </div>
-            <CardTitle className="text-2xl font-bold">Complete Your Profile</CardTitle>
-            <CardDescription>
-              Please provide the following details to continue.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isPrefilling ? (
-               <div className="flex items-center justify-center p-8 text-muted-foreground">
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  <span>Attempting to pre-fill your data...</span>
+    <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
+      <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <div className="w-full max-w-lg">
+          <Card className="shadow-xl">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-6 flex justify-center">
+                <Logo />
               </div>
-            ) : (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="flex flex-col items-center space-y-4 pt-4 pb-6">
-                    <Avatar className="h-24 w-24">
-                        <AvatarImage src={previewUrl || undefined} alt={user.name} />
-                        <AvatarFallback>{user.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
-                    </Avatar>
-                    <FormControl>
-                        <Input id="picture" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" className="max-w-xs" />
-                    </FormControl>
+              <CardTitle className="text-2xl font-bold">Complete Your Profile</CardTitle>
+              <CardDescription>
+                Please provide the following details to continue.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isPrefilling ? (
+                 <div className="flex items-center justify-center p-8 text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <span>Attempting to pre-fill your data...</span>
                 </div>
-                
-                <div className="space-y-2">
-                    <Label>Full Name</Label>
-                    <Input value={user.name} disabled />
-                    <p className="text-sm text-muted-foreground">
-                        This name was set from your sign-up details. It can be changed in Settings after setup.
-                    </p>
-                </div>
+              ) : (
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="flex flex-col items-center space-y-4 pt-4 pb-6">
+                      <Avatar className="h-24 w-24">
+                          <AvatarImage src={previewUrl || undefined} alt={user.name} />
+                          <AvatarFallback>{user.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <FormControl>
+                          <Input id="picture" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" className="max-w-xs" />
+                      </FormControl>
+                  </div>
+                  
+                  <div className="space-y-2">
+                      <Label>Full Name</Label>
+                      <Input value={user.name} disabled />
+                      <p className="text-sm text-muted-foreground">
+                          This name was set from your sign-up details. It can be changed in Settings after setup.
+                      </p>
+                  </div>
 
-                <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
-                <FormField name="faculty" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-                )} />
-                <FormField name="institute" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="department" render={({ field }) => (
-                  <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="designation" render={({ field }) => (
-                  <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-                  <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
-                )} />
-                
-                <Separator />
-                <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
-                
-                <FormField control={form.control} name="misId" render={({ field }) => (
-                  <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
-                )} />
-                 <FormField control={form.control} name="orcidId" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>ORCID iD</FormLabel>
-                        <div className="flex items-center gap-2">
-                            <FormControl>
-                                <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isPrincipal} />
-                            </FormControl>
-                            <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isPrincipal} title="Verify ORCID iD">
-                                {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                            </Button>
-                        </div>
-                        <FormMessage />
-                    </FormItem>
-                )} />
-                <FormField control={form.control} name="scopusId" render={({ field }) => (
-                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="vidwanId" render={({ field }) => (
-                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField control={form.control} name="googleScholarId" render={({ field }) => (
-                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
-                )} />
-                
-                <Button type="submit" className="w-full !mt-8" disabled={isSubmitting}>
-                  {isSubmitting ? "Saving..." : "Save and Continue"}
-                </Button>
-              </form>
-            </Form>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+                  <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
+                  <FormField name="faculty" control={form.control} render={({ field }) => (
+                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  )} />
+                  <FormField name="institute" control={form.control} render={({ field }) => (
+                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="department" render={({ field }) => (
+                    <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="designation" render={({ field }) => (
+                    <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="phoneNumber" render={({ field }) => (
+                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  
+                  <Separator />
+                  <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
+                  
+                  <FormField control={form.control} name="misId" render={({ field }) => (
+                    <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                   <FormField control={form.control} name="orcidId" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>ORCID iD</FormLabel>
+                          <div className="flex items-center gap-2">
+                              <FormControl>
+                                  <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isPrincipal} />
+                              </FormControl>
+                              <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isPrincipal} title="Verify ORCID iD">
+                                  {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                              </Button>
+                          </div>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+                  <FormField control={form.control} name="scopusId" render={({ field }) => (
+                      <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="vidwanId" render={({ field }) => (
+                      <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="googleScholarId" render={({ field }) => (
+                      <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  
+                  <Button type="submit" className="w-full !mt-8" disabled={isSubmitting}>
+                    {isSubmitting ? "Saving..." : "Save and Continue"}
+                  </Button>
+                </form>
+              </Form>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+       <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
+        <p className="text-xs text-muted-foreground">&copy; {new Date().getFullYear()} Parul University. All rights reserved.</p>
+        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
+          <Link className="text-xs hover:underline underline-offset-4" href="/help">
+            Help
+          </Link>
+          <Link className="text-xs hover:underline underline-offset-4" href="/terms-of-use">
+            Terms of Service
+          </Link>
+          <Link className="text-xs hover:underline underline-offset-4" href="/privacy-policy">
+            Privacy
+          </Link>
+        </nav>
+      </footer>
+    </div>
   );
 }
