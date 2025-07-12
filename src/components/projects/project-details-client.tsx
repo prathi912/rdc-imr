@@ -155,7 +155,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   
   const canFetchEvaluations = useMemo(() => {
     if (!user) return false;
-    const isAdmin = ['Super-admin', 'admin'].includes(user.role);
+    const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(user.role);
     const isAssignedEvaluator = initialProject.meetingDetails?.assignedEvaluators?.includes(user.uid);
     return isAdmin || isAssignedEvaluator;
   }, [user, initialProject]);
@@ -218,9 +218,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const canRequestClosure = useMemo(() => {
     if (!isPI) return false;
-    const allowedStatuses: Project['status'][] = ['Recommended', 'In Progress', 'Completed', 'Sanctioned'];
-    return allowedStatuses.includes(project.status) && project.status !== 'Pending Completion Approval';
+    const normalizedStatus = project.status.toLowerCase();
+    const allowedStatuses = ['recommended', 'in progress', 'completed', 'sanctioned'];
+    return allowedStatuses.includes(normalizedStatus) && normalizedStatus !== 'pending completion approval';
   }, [isPI, project.status]);
+
 
   const assignedEvaluatorNames = useMemo(() => {
     if (!project.meetingDetails?.assignedEvaluators || !allUsers.length) {
