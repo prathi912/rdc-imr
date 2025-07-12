@@ -1,13 +1,13 @@
+
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
-import { doc, getDoc, collection, getDocs } from "firebase/firestore"
+import { doc, getDoc, collection, getDocs, query, where, limit } from "firebase/firestore"
 import { db } from "@/lib/config"
 import type { Project, User } from "@/types"
 import { PageHeader } from "@/components/page-header"
 import { ProjectDetailsClient } from "@/components/projects/project-details-client"
-import { ProjectSummary } from "@/components/projects/project-summary"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 
@@ -34,20 +34,45 @@ export default function ProjectDetailsPage() {
         return
       }
 
-      const projectData = {
+      let projectData = {
         id: projectSnap.id,
         ...projectSnap.data(),
         submissionDate: projectSnap.data().submissionDate || new Date().toISOString(),
       } as Project
-      setProject(projectData)
+      
 
+      let fetchedPiUser: User | null = null;
+      // First, try to fetch the PI user by their UID
       if (projectData.pi_uid) {
         const piUserRef = doc(db, "users", projectData.pi_uid)
         const piUserSnap = await getDoc(piUserRef)
         if (piUserSnap.exists()) {
-          setPiUser({ uid: piUserSnap.id, ...piUserSnap.data() } as User)
+          fetchedPiUser = { uid: piUserSnap.id, ...piUserSnap.data() } as User
         }
       }
+      
+      // If no user was found by UID, try fetching by email (for historical projects)
+      if (!fetchedPiUser && projectData.pi_email) {
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('email', '==', projectData.pi_email), limit(1));
+          const userQuerySnap = await getDocs(q);
+          if (!userQuerySnap.empty) {
+              const userDoc = userQuerySnap.docs[0];
+              fetchedPiUser = { uid: userDoc.id, ...userDoc.data() } as User;
+          }
+      }
+
+      // If we found a PI user, enrich the project data with their latest info
+      if (fetchedPiUser) {
+        setPiUser(fetchedPiUser);
+        projectData.pi = fetchedPiUser.name || projectData.pi;
+        projectData.faculty = fetchedPiUser.faculty || projectData.faculty;
+        projectData.institute = fetchedPiUser.institute || projectData.institute;
+        projectData.departmentName = fetchedPiUser.department || projectData.departmentName;
+        projectData.pi_phoneNumber = fetchedPiUser.phoneNumber || projectData.pi_phoneNumber;
+      }
+      
+      setProject(projectData);
 
       // Only admins need the full user list
       if (sessionUser && ["Super-admin", "admin", "CRO"].includes(sessionUser.role)) {
