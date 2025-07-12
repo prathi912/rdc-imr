@@ -126,8 +126,10 @@ export default function SettingsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
   const [isDesignationLocked, setIsDesignationLocked] = useState(false);
+  const [isAcademicInfoLocked, setIsAcademicInfoLocked] = useState(false);
 
   const isPrincipal = useMemo(() => user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false, [user]);
+  const isCro = useMemo(() => user?.email ? CRO_EMAILS.includes(user.email) : false, [user]);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -181,6 +183,9 @@ export default function SettingsPage() {
           if (CRO_EMAILS.includes(appUser.email) || PRINCIPAL_EMAILS.includes(appUser.email)) {
             setIsDesignationLocked(true);
           }
+          if (CRO_EMAILS.includes(appUser.email)) {
+            setIsAcademicInfoLocked(true);
+          }
 
           profileForm.reset({
             name: appUser.name || '',
@@ -218,6 +223,10 @@ export default function SettingsPage() {
         
         if (isDesignationLocked) {
             updateData.designation = user.designation || (isPrincipal ? 'Principal' : 'CRO'); // Ensure locked designation is not changed
+        }
+        if (isCro) {
+            updateData.faculty = user.faculty || '';
+            updateData.institute = user.institute || '';
         }
         
         await updateDoc(userDocRef, updateData);
@@ -439,10 +448,10 @@ export default function SettingsPage() {
                   )} />
                 </div>
                  <FormField name="faculty" control={profileForm.control} render={({ field }) => (
-                  <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
                 <FormField name="institute" control={profileForm.control} render={({ field }) => (
-                  <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="department" render={({ field }) => (
                   <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
