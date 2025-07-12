@@ -437,6 +437,40 @@ export async function notifySuperAdminsOnEvaluation(projectId: string, projectNa
   }
 }
 
+export async function notifyAdminsOnCompletionRequest(projectId: string, projectTitle: string, piName: string) {
+  try {
+    const adminRoles = ["admin", "Super-admin"]
+    const usersRef = adminDb.collection("users")
+    const q = usersRef.where("role", "in", adminRoles)
+
+    const adminUsersSnapshot = await q.get()
+    if (adminUsersSnapshot.empty) {
+      console.log("No admin users found to notify for completion request.")
+      return { success: true, message: "No admins to notify." }
+    }
+
+    const batch = adminDb.batch()
+    const notificationTitle = `Project Completion Requested: "${projectTitle}" by ${piName}`
+
+    adminUsersSnapshot.forEach((userDoc) => {
+      const notificationRef = adminDb.collection("notifications").doc()
+      batch.set(notificationRef, {
+        uid: userDoc.id,
+        projectId: projectId,
+        title: notificationTitle,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      })
+    })
+
+    await batch.commit()
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error notifying admins on completion request:", error)
+    return { success: false, error: error.message || "Failed to notify admins." }
+  }
+}
+
 export async function checkMisIdExists(misId: string, currentUid: string): Promise<{ exists: boolean }> {
   try {
     const usersRef = adminDb.collection("users")

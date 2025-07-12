@@ -12,7 +12,7 @@ import Link from 'next/link';
 import type { Project, User, GrantDetails, Evaluation, BankDetails, GrantPhase } from '@/types';
 import { db } from '@/lib/config';
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs, where, query } from 'firebase/firestore';
-import { uploadFileToServer, updateProjectStatus, updateProjectWithRevision, updateProjectDuration, updateProjectEvaluators } from '@/app/actions';
+import { uploadFileToServer, updateProjectStatus, updateProjectWithRevision, updateProjectDuration, updateProjectEvaluators, notifyAdminsOnCompletionRequest } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -355,6 +355,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         toast({ variant: 'destructive', title: 'Files Missing', description: 'Please upload both the completion report and the utilization certificate.' });
         return;
     }
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Authentication Error', description: 'Could not identify user.' });
+        return;
+    }
     setIsSubmittingCompletion(true);
     try {
         const projectRef = doc(db, 'projects', project.id);
@@ -381,14 +385,17 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
         await updateDoc(projectRef, updateData);
         setProject({ ...project, ...updateData });
+        
+        // Notify Super Admins
+        await notifyAdminsOnCompletionRequest(project.id, project.title, user.name);
 
         toast({ title: 'Documents Submitted', description: 'Your completion documents have been submitted for review.' });
         setIsCompletionDialogOpen(false);
         setCompletionReportFile(null);
         setUtilizationCertificateFile(null);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error submitting completion documents:', error);
-        toast({ variant: 'destructive', title: 'Submission Failed', description: 'Could not submit the completion documents.' });
+        toast({ variant: 'destructive', title: 'Submission Failed', description: error.message || 'Could not submit the completion documents.' });
     } finally {
         setIsSubmittingCompletion(false);
     }
