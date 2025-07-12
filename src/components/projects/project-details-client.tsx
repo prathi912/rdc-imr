@@ -191,7 +191,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     });
   }, [project, scheduleForm, durationForm, evaluatorForm]);
   
-  const isPI = user?.uid === project.pi_uid;
+  const isPI = user?.uid === project.pi_uid || user?.email === project.pi_email;
   const isAdmin = user && ['Super-admin', 'admin', 'CRO'].includes(user.role);
   const isSuperAdmin = user?.role === 'Super-admin';
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid);
@@ -202,7 +202,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const allEvaluationsIn = (project.meetingDetails?.assignedEvaluators?.length ?? 0) > 0 && evaluations.length >= (project.meetingDetails?.assignedEvaluators?.length ?? 0);
 
-  const canManageGrants = user && (user.role === 'Super-admin' || user.role === 'admin' || user.uid === project.pi_uid);
+  const canManageGrants = user && (user.role === 'Super-admin' || user.role === 'admin' || user.uid === project.pi_uid || user.email === project.pi_email);
 
 
   const assignedEvaluatorNames = useMemo(() => {
