@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useParams } from "next/navigation"
-import { doc, getDoc, collection, getDocs } from "firebase/firestore"
+import { doc, getDoc, collection, getDocs, query, where, limit } from "firebase/firestore"
 import { db } from "@/lib/config"
 import type { Project, User } from "@/types"
 import { PageHeader } from "@/components/page-header"
@@ -40,21 +40,39 @@ export default function ProjectDetailsPage() {
         submissionDate: projectSnap.data().submissionDate || new Date().toISOString(),
       } as Project
 
-      // We don't need a complex auth check here if we rely on Firestore rules.
-      // The fetch will fail if the user doesn't have permission.
-      setProject(projectData)
+      // Fetch the PI's user data either by UID or by email for historical projects
+      let fetchedPiUser: User | null = null
+      const usersRef = collection(db, "users")
 
       if (projectData.pi_uid) {
-        const piUserRef = doc(db, "users", projectData.pi_uid)
+        const piUserRef = doc(usersRef, projectData.pi_uid)
         const piUserSnap = await getDoc(piUserRef)
         if (piUserSnap.exists()) {
-          setPiUser({ uid: piUserSnap.id, ...piUserSnap.data() } as User)
+          fetchedPiUser = { uid: piUserSnap.id, ...piUserSnap.data() } as User
+        }
+      } else if (projectData.pi_email) {
+        // Fallback for historical projects without a UID
+        const q = query(usersRef, where("email", "==", projectData.pi_email), limit(1))
+        const piQuerySnap = await getDocs(q)
+        if (!piQuerySnap.empty) {
+          const piUserDoc = piQuerySnap.docs[0]
+          fetchedPiUser = { uid: piUserDoc.id, ...piUserDoc.data() } as User
         }
       }
 
+      // If we found a PI user, update the project data with their latest info
+      if (fetchedPiUser) {
+        setPiUser(fetchedPiUser)
+        projectData.faculty = fetchedPiUser.faculty || projectData.faculty
+        projectData.institute = fetchedPiUser.institute || projectData.institute
+        projectData.departmentName = fetchedPiUser.department || projectData.departmentName
+        projectData.pi_phoneNumber = fetchedPiUser.phoneNumber || projectData.pi_phoneNumber
+      }
+
+      setProject(projectData)
+
       // Only admins need the full user list
       if (sessionUser && ["Super-admin", "admin", "CRO"].includes(sessionUser.role)) {
-        const usersRef = collection(db, "users")
         const usersSnap = await getDocs(usersRef)
         const userList = usersSnap.docs.map((doc) => ({ uid: doc.id, ...doc.data() }) as User)
         setAllUsers(userList)
@@ -68,19 +86,19 @@ export default function ProjectDetailsPage() {
   }, [sessionUser])
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
+    const storedUser = localStorage.getItem("user")
     if (storedUser) {
-        setSessionUser(JSON.parse(storedUser));
+      setSessionUser(JSON.parse(storedUser))
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
     if (projectId && sessionUser) {
-        getProjectAndUsers(projectId)
+      getProjectAndUsers(projectId)
     } else if (!sessionUser) {
-        setLoading(true); // Wait for user to be set
+      setLoading(true) // Wait for user to be set
     }
-  }, [projectId, sessionUser, getProjectAndUsers]);
+  }, [projectId, sessionUser, getProjectAndUsers])
 
   if (loading) {
     return (
