@@ -33,7 +33,7 @@ import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { linkHistoricalData } from '@/app/actions';
-import { PRINCIPAL_EMAILS, CRO_EMAILS } from '@/lib/constants';
+import { CRO_EMAILS } from '@/lib/constants';
 import { Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -70,10 +70,8 @@ export default function LoginPage() {
     if (CRO_EMAILS.includes(email)) {
       return { role: 'CRO', designation: 'CRO' };
     }
-    if (PRINCIPAL_EMAILS.includes(email)) {
-      return { role: 'faculty', designation: 'Principal' };
-    }
-    // New users are faculty by default, admins can change roles.
+    // The new sign-up logic handles institutional roles from the database.
+    // Existing users will have their roles fetched from their profile.
     return { role: 'faculty', designation: 'faculty' };
   }
 
