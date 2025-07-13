@@ -123,7 +123,7 @@ export default function ProfileSetupPage() {
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(false);
 
-  const isPrincipal = useMemo(() => user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false, [user]);
+  const isPrincipal = useMemo(() => user?.designation === 'Principal', [user]);
   const isCro = useMemo(() => user?.role === 'CRO', [user]);
   const profileSetupSchema = createProfileSetupSchema(isPrincipal, isCro);
   type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
@@ -159,12 +159,12 @@ export default function ProfileSetupPage() {
           setPreviewUrl(appUser.photoURL || null);
           
           const isUserCro = appUser.role === 'CRO';
-          const isUserPrincipal = PRINCIPAL_EMAILS.includes(appUser.email);
+          const isUserPrincipal = appUser.designation === 'Principal';
           
           const prefillData: Partial<ProfileSetupFormValues> = {
             faculty: appUser.faculty || '',
             institute: appUser.institute || '',
-            designation: appUser.designation || (isUserPrincipal ? 'Principal' : (isUserCro ? 'CRO' : '')),
+            designation: appUser.designation || '',
             misId: appUser.misId || '',
             orcidId: appUser.orcidId || '',
             scopusId: appUser.scopusId || '',
@@ -180,8 +180,8 @@ export default function ProfileSetupPage() {
 
           form.reset(prefillData);
 
-          // If profile is not complete, try to prefill from staff data
-          if (!appUser.profileComplete) {
+          // If profile is not complete, try to pre-fill from staff data
+          if (!appUser.profileComplete && !isUserPrincipal) {
             setIsPrefilling(true);
             try {
               const res = await fetch(`/api/get-staff-data?email=${appUser.email}`);

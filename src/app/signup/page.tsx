@@ -107,15 +107,28 @@ export default function SignupPage() {
     }
     
     const { role, designation } = determineUserRoleAndDesignation(firebaseUser.email!);
-    const user: User = {
+    
+    let user: User = {
       uid: firebaseUser.uid,
       name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
       role: role,
       designation: designation,
-      profileComplete: role === 'Super-admin',
+      profileComplete: role === 'Super-admin' || role === 'CRO' || designation === 'Principal',
       allowedModules: getDefaultModulesForRole(role, designation),
     };
+
+    // Check if it's an institutional account to pre-fill data
+    if (designation === 'Principal') {
+        const res = await fetch(`/api/get-institute-data?email=${firebaseUser.email}`);
+        const result = await res.json();
+        if (result.success) {
+            user.name = result.data.name || user.name;
+            user.faculty = result.data.faculty;
+            user.institute = result.data.institute;
+        }
+    }
+
 
     if (firebaseUser.photoURL) {
       user.photoURL = firebaseUser.photoURL;

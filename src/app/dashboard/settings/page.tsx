@@ -139,7 +139,7 @@ export default function SettingsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
 
-  const isPrincipal = useMemo(() => user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false, [user]);
+  const isPrincipal = useMemo(() => user?.designation === 'Principal', [user]);
   const isCro = useMemo(() => user?.role === 'CRO', [user]);
 
   const profileForm = useForm<ProfileFormValues>({
@@ -374,7 +374,7 @@ export default function SettingsPage() {
     }
 };
 
-  const isAcademicInfoLocked = isCro;
+  const isAcademicInfoLocked = isCro || isPrincipal;
 
 
   if (loading) {
