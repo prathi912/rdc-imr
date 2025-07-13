@@ -145,48 +145,44 @@ export default function ProfileSetupPage() {
   });
 
   const prefillData = useCallback(async (appUser: User) => {
-    if (appUser.profileComplete) return;
-    setIsPrefilling(true);
-    try {
-      const isUserPrincipalByEmail = PRINCIPAL_EMAILS.includes(appUser.email);
-      let prefillDataSourceUrl = '';
-      if (isUserPrincipalByEmail) {
-        prefillDataSourceUrl = `/api/get-institute-data?email=${appUser.email}`;
-      } else {
-        prefillDataSourceUrl = `/api/get-staff-data?email=${appUser.email}`;
+      if (appUser.profileComplete) return;
+      setIsPrefilling(true);
+      try {
+          // 1. Always attempt to fetch from the institutional data source first.
+          const instituteRes = await fetch(`/api/get-institute-data?email=${appUser.email}`);
+          const instituteResult = await instituteRes.json();
+          let finalPrefillData = { ...form.getValues() };
+
+          if (instituteResult.success) {
+              // Institutional account found. Pre-fill and set designation.
+              finalPrefillData = { ...finalPrefillData, ...instituteResult.data, designation: 'Principal' };
+              toast({ title: 'Institutional Profile Detected', description: 'Your information has been pre-filled. Please review and save.' });
+          } else {
+              // 2. If not found in institutional data, fall back to staff data.
+              const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email}`);
+              const staffResult = await staffRes.json();
+              if (staffResult.success) {
+                  finalPrefillData = { ...finalPrefillData, ...staffResult.data };
+                  toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+              }
+          }
+          
+          const isUserCro = appUser.role === 'CRO';
+          const isUserPrincipal = finalPrefillData.designation === 'Principal';
+
+          if (isUserPrincipal || isUserCro) {
+              delete (finalPrefillData as any).department;
+              delete (finalPrefillData as any).misId;
+              delete (finalPrefillData as any).phoneNumber;
+          }
+          
+          form.reset(finalPrefillData);
+
+      } catch (error) {
+          console.error("Failed to fetch prefill data", error);
+      } finally {
+          setIsPrefilling(false);
       }
-
-      const res = await fetch(prefillDataSourceUrl);
-      const result = await res.json();
-      
-      let finalPrefillData = { ...form.getValues() };
-
-      if (result.success) {
-        if (isUserPrincipalByEmail) {
-           finalPrefillData = { ...finalPrefillData, ...result.data, designation: 'Principal' };
-           toast({ title: 'Institutional Profile Detected', description: 'Your information has been pre-filled. Please review and save.' });
-        } else {
-           finalPrefillData = { ...finalPrefillData, ...result.data };
-           toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
-        }
-      }
-
-      const isUserCro = appUser.role === 'CRO';
-      const isUserPrincipal = appUser.designation === 'Principal' || isUserPrincipalByEmail;
-
-      if (isUserPrincipal || isUserCro) {
-          delete (finalPrefillData as any).department;
-          delete (finalPrefillData as any).misId;
-          delete (finalPrefillData as any).phoneNumber;
-      }
-      
-      form.reset(finalPrefillData);
-
-    } catch (error) {
-      console.error("Failed to fetch prefill data", error);
-    } finally {
-      setIsPrefilling(false);
-    }
   }, [form, toast]);
 
 
