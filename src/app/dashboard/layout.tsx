@@ -20,6 +20,7 @@ import {
   Upload,
   Users,
   History,
+  Building2,
 } from 'lucide-react';
 
 import {
@@ -43,7 +44,6 @@ import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase
 import { useToast } from '@/hooks/use-toast';
 import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
 import { getDefaultModulesForRole } from '@/lib/modules';
-import { PRINCIPAL_EMAILS } from '@/lib/constants';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -72,8 +72,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 appUser.allowedModules = getDefaultModulesForRole(appUser.role, appUser.designation);
             }
             
-            const isPrincipalByEmail = PRINCIPAL_EMAILS.includes(appUser.email);
-            const isPrincipal = appUser.designation === 'Principal' || isPrincipalByEmail;
+            const isPrincipal = appUser.designation === 'Principal';
             const isHod = appUser.designation === 'HOD';
 
             // Add special permission for Principals and HODs to see the 'All Projects' page
@@ -295,6 +294,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarMenuButton href="/dashboard/manage-users" tooltip="Manage Users" isActive={pathname === '/dashboard/manage-users'}>
                   <Users />
                   Manage Users
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+             {user.allowedModules?.includes('manage-institutes') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/manage-institutes" tooltip="Manage Institutes" isActive={pathname === '/dashboard/manage-institutes'}>
+                  <Building2 />
+                  Manage Institutes
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}

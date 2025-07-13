@@ -23,8 +23,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { PRINCIPAL_EMAILS } from '@/lib/constants';
-import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
+import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
@@ -118,11 +117,11 @@ export default function AllProjectsPage() {
             }
 
             if (isPrincipal) {
-              const debugInfo = createDebugInfo(user, allProjectsList, PRINCIPAL_EMAILS);
+              const debugInfo = createDebugInfo(user, allProjectsList);
               logDebugInfo(debugInfo, 'AllProjectsPage (Fallback)');
             }
         } else if (isPrincipal) {
-            const debugInfo = createDebugInfo(user, projectList, PRINCIPAL_EMAILS);
+            const debugInfo = createDebugInfo(user, projectList);
             logDebugInfo(debugInfo, 'AllProjectsPage (Standard)');
         }
         

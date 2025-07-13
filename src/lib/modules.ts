@@ -14,6 +14,7 @@ export const ALL_MODULES = [
   { id: 'all-projects', label: 'All Projects' },
   { id: 'analytics', label: 'Analytics' },
   { id: 'manage-users', label: 'Manage Users' },
+  { id: 'manage-institutes', label: 'Manage Institutes' },
   { id: 'manage-incentive-claims', label: 'Manage Incentive Claims' },
   { id: 'bulk-upload', label: 'Bulk Upload' },
   { id: 'module-management', label: 'Module Management' },
@@ -29,7 +30,7 @@ const hierarchyCoreModules = ['analytics'];
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
 const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects'];
 const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'manage-incentive-claims', 'system-health', 'bulk-upload'];
-const superAdminDefaults = [...adminDefaults, 'module-management'];
+const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes'];
 
 // Default modules for special designations who are otherwise 'faculty' role
 const principalDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects'];

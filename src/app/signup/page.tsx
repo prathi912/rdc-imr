@@ -28,12 +28,12 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { auth, db } from '@/lib/config';
 import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, limit } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { linkHistoricalData } from '@/app/actions';
-import { PRINCIPAL_EMAILS, CRO_EMAILS } from '@/lib/constants';
+import { CRO_EMAILS } from '@/lib/constants';
 import { Eye, EyeOff } from 'lucide-react';
 
 const signupSchema = z.object({
@@ -78,18 +78,18 @@ export default function SignupPage() {
     },
   });
   
-  const determineUserRoleAndDesignation = (email: string): { role: User['role'], designation: User['designation'] } => {
+  const determineUserRoleAndDesignation = (email: string, institute?: string, faculty?: string): { role: User['role'], designation: User['designation'], profileComplete: boolean } => {
     if (email === 'rathipranav07@gmail.com') {
-      return { role: 'Super-admin', designation: 'Super-admin' };
+      return { role: 'Super-admin', designation: 'Super-admin', profileComplete: true };
     }
     if (CRO_EMAILS.includes(email)) {
-      return { role: 'CRO', designation: 'CRO' };
+      return { role: 'CRO', designation: 'CRO', profileComplete: false };
     }
-    if (PRINCIPAL_EMAILS.includes(email)) {
-      return { role: 'faculty', designation: 'Principal' };
+    if (institute) { // If an institute is mapped, they are a Principal
+        return { role: 'faculty', designation: 'Principal', profileComplete: true };
     }
     // New users are faculty by default. Super-admin can change roles.
-    return { role: 'faculty', designation: 'faculty' };
+    return { role: 'faculty', designation: 'faculty', profileComplete: false };
   }
 
   const processNewUser = async (firebaseUser: FirebaseUser, name?: string) => {
@@ -106,24 +106,43 @@ export default function SignupPage() {
       return;
     }
     
-    let { role, designation } = determineUserRoleAndDesignation(firebaseUser.email!);
+    // Check if the email is mapped to an institute
+    let mappedInstituteData: { institute: string; faculty: string } | null = null;
+    const mappingsRef = collection(db, 'institute_mappings');
+    const q = query(mappingsRef, where('email', '==', firebaseUser.email!));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+        const mappingDoc = querySnapshot.docs[0];
+        const instituteName = mappingDoc.id;
+        const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email}`);
+        const staffResult = await staffRes.json();
+        const faculty = staffResult.success ? staffResult.data.faculty : 'Unknown';
+        
+        mappedInstituteData = { institute: instituteName, faculty: faculty };
+    }
+    
+    let { role, designation, profileComplete } = determineUserRoleAndDesignation(
+        firebaseUser.email!,
+        mappedInstituteData?.institute,
+        mappedInstituteData?.faculty
+    );
     
     let user: User = {
       uid: firebaseUser.uid,
       name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
-      role: role,
-      designation: designation,
-      profileComplete: false,
+      role,
+      designation,
+      profileComplete,
       allowedModules: [], // Will be set after role/designation is finalized
+      faculty: mappedInstituteData?.faculty,
+      institute: mappedInstituteData?.institute,
     };
     
     // Final check for super-admin and CRO roles which override institutional checks
-    const superAdminCheck = determineUserRoleAndDesignation(firebaseUser.email!);
-    if (superAdminCheck.role !== 'faculty') {
-      user.role = superAdminCheck.role;
-      user.designation = superAdminCheck.designation;
-      user.profileComplete = true; // Super-admins and CROs don't need detailed setup
+    if (user.role !== 'faculty') {
+        user.profileComplete = true; // Super-admins and CROs don't need detailed setup
     }
     
     // Set modules based on the final, determined role

@@ -12,8 +12,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign } from 'lucide-react';
-import { PRINCIPAL_EMAILS } from '@/lib/constants';
-import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
+import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB"];
 
@@ -73,11 +72,11 @@ export default function AnalyticsPage() {
             }
 
             if (isPrincipal) {
-              const debugInfo = createDebugInfo(user, allProjectsList, PRINCIPAL_EMAILS);
+              const debugInfo = createDebugInfo(user, allProjectsList);
               logDebugInfo(debugInfo, 'AnalyticsPage (Fallback)');
             }
         } else if (isPrincipal) {
-          const debugInfo = createDebugInfo(user, projectList, PRINCIPAL_EMAILS);
+          const debugInfo = createDebugInfo(user, projectList);
           logDebugInfo(debugInfo, 'AnalyticsPage (Standard)');
         }
 

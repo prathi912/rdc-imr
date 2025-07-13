@@ -14,8 +14,7 @@ import type { Project, User } from '@/types';
 import { Skeleton } from '../ui/skeleton';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import { PRINCIPAL_EMAILS } from '@/lib/constants';
-import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
+import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 
 interface DashboardStats {
   totalProjects: number;
@@ -102,11 +101,11 @@ export function AdminDashboard() {
               }
 
               if (isPrincipal) {
-                const debugInfo = createDebugInfo(user, allProjectsList, PRINCIPAL_EMAILS);
+                const debugInfo = createDebugInfo(user, allProjectsList);
                 logDebugInfo(debugInfo, 'AdminDashboard (Fallback)');
               }
             } else if (isPrincipal) {
-              const debugInfo = createDebugInfo(user, allProjects, PRINCIPAL_EMAILS);
+              const debugInfo = createDebugInfo(user, allProjects);
               logDebugInfo(debugInfo, 'AdminDashboard (Standard)');
             }
 
