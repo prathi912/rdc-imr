@@ -69,38 +69,50 @@ const faculties = [
 ];
 
 const institutes = [
-    "RDC",
-    "Parul Sevashram Hospital",
-    "Parul Institute of Engineering & Technology",
     "Parul Institute of Technology",
-    "Parul Institute of Engineering & Technology (Diploma Studies)",
-    "Parul Polytechnic Institute",
+    "Ahmedabad Homoeopathic Medical College",
+    "Ahmedabad Physiotherapy College",
     "College of Agriculture",
+    "Department of Paramedical & Health Sciences",
+    "Faculty of Library & Information Science",
+    "Institute of Pharmaceutical Sciences",
+    "Jawaharlal Nehru Homoeopathic Medical College",
+    "Parul College of Pharmacy & Research",
+    "Parul Institute of Applied Sciences (Ahmedabad Campus)",
+    "Parul Institute of Applied Sciences (Vadodara Campus)",
     "Parul Institute of Architecture & Research",
-    "Parul Institute of Management",
-    "Parul Institute of Management & Research",
+    "Parul Institute of Arts",
+    "Parul Institute of Ayurveda",
+    "Parul Institute of Ayurveda & Research",
     "Parul Institute of Business Administration",
+    "Parul Institute of Commerce",
     "Parul Institute of Computer Application",
     "Parul Institute of Design",
-    "Parul Institute of Law",
-    "Parul Institute of Commerce",
-    "Parul Institute of Arts",
+    "Parul Institute of Engineering & Technology",
+    "Parul Institute of Engineering & Technology (Diploma Studies)",
     "Parul Institute of Fine Arts",
-    "Parul Institute of Ayurved",
-    "Jawaharlal Nehru Homoeopathic Medical College",
-    "Ahmedabad Homoeopathic Medical College",
-    "Rajkot Homoeopathic Medical College",
-    "Parul Institute of Physiotherapy",
-    "Ahmedabad Physiotherapy College",
-    "Parul Institute of Nursing",
+    "Parul Institute of Homeopathy & Research",
+    "Parul Institute of Hotel Management & Catering Technology",
+    "Parul Institute of Law",
+    "Parul Institute of Management",
+    "Parul Institute of Management & Research",
     "Parul Institute of Medical Sciences & Research",
+    "Parul Institute of Nursing",
+    "Parul Institute of Performing Arts",
+    "Parul Institute of Pharmaceutical Education & Research",
     "Parul Institute of Pharmacy",
     "Parul Institute of Pharmacy & Research",
-    "Parul Institute of Applied Sciences (Vadodara Campus)",
-    "Parul Institute of Applied Sciences & Research (Ahmedabad Campus)",
+    "Parul Institute of Physiotherapy",
+    "Parul Institute of Physiotherapy and Research",
     "Parul Institute of Social Work",
     "Parul Institute of Vocational Education",
-    "Parul Institute of Library & Information Science",
+    "Parul Medical Institute & Hospital",
+    "Parul Polytechnic Institute",
+    "Parul Institute of Public Health",
+    "Parul Sevashram Hospital",
+    "Rajkot Homoeopathic Medical College",
+    "RDC",
+    "School of Pharmacy",
 ];
 
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"];
@@ -127,7 +139,7 @@ export default function SettingsPage() {
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
 
   const isPrincipal = useMemo(() => user?.email ? PRINCIPAL_EMAILS.includes(user.email) : false, [user]);
-  const isCro = useMemo(() => user?.email ? CRO_EMAILS.includes(user.email) : false, [user]);
+  const isCro = useMemo(() => user?.role === 'CRO', [user]);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -361,8 +373,7 @@ export default function SettingsPage() {
     }
 };
 
-  const isAcademicInfoLocked = isPrincipal || isCro;
-  const isIdFieldsLocked = isPrincipal || isCro;
+  const isAcademicInfoLocked = isCro;
 
 
   if (loading) {
@@ -458,16 +469,16 @@ export default function SettingsPage() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={profileForm.control} name="misId" render={({ field }) => (
-                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={profileForm.control} name="orcidId" render={({ field }) => (
                         <FormItem>
                             <FormLabel>ORCID iD</FormLabel>
                             <div className="flex items-center gap-2">
                                 <FormControl>
-                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isIdFieldsLocked} />
+                                    <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
                                 </FormControl>
-                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isIdFieldsLocked} title="Fetch data from ORCID">
+                                <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid} title="Fetch data from ORCID">
                                     {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                                 </Button>
                             </div>
@@ -476,18 +487,18 @@ export default function SettingsPage() {
                     )} />
                 </div>
                 <FormField control={profileForm.control} name="scopusId" render={({ field }) => (
-                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="vidwanId" render={({ field }) => (
-                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
                 <FormField control={profileForm.control} name="googleScholarId" render={({ field }) => (
-                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
 
                  <Separator />
                  <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
-                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} disabled={isPrincipal} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
               </CardContent>
               <CardFooter className="border-t px-6 py-4">
