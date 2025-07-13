@@ -8,7 +8,7 @@ import type { DateRange } from 'react-day-picker';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,7 +23,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
@@ -70,72 +69,47 @@ export default function AllProjectsPage() {
   useEffect(() => {
     if (!user) return;
 
-    async function getProjectsAndUsers() {
-      setLoading(true);
-      try {
-        const usersCol = collection(db, 'users');
-        const userSnapshot = await getDocs(usersCol);
+    setLoading(true);
+
+    const usersCol = collection(db, 'users');
+    getDocs(usersCol).then(userSnapshot => {
         const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(userList);
+    }).catch(error => {
+        console.error("Error fetching users:", error);
+    });
 
-        const projectsCol = collection(db, 'projects');
-        let projectList: Project[] = [];
-        
-        const isSuperAdmin = user.role === 'Super-admin';
-        const isAdmin = user.role === 'admin';
-        const isCro = user.role === 'CRO';
-        const isPrincipal = user.designation === 'Principal';
-        const isHod = user.designation === 'HOD';
+    const projectsCol = collection(db, 'projects');
+    const isSuperAdmin = user.role === 'Super-admin';
+    const isAdmin = user.role === 'admin';
+    const isCro = user.role === 'CRO';
+    const isPrincipal = user.designation === 'Principal';
+    const isHod = user.designation === 'HOD';
 
-        let q;
-        if (isSuperAdmin || isAdmin) {
-          q = query(projectsCol);
-        } else if (isCro && user.faculty) {
-          q = query(projectsCol, where('faculty', '==', user.faculty));
-        } else if (isPrincipal && user.institute) {
-          q = query(projectsCol, where('institute', '==', user.institute));
-        } else if (isHod && user.department) {
-          q = query(projectsCol, where('departmentName', '==', user.department));
-        } else {
-           // Default query for standard faculty, though this page is mainly for admins
-          q = query(projectsCol, where('pi_uid', '==', user.uid));
-        }
-        
-        const projectSnapshot = await getDocs(q);
-        projectList = projectSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-        
-        // Fallback for Principals/HODs if strict query fails
-        if ((isPrincipal || isHod) && projectList.length === 0) {
-            console.warn(`Initial query for ${user.institute || user.department} returned 0 projects. Fetching all and filtering client-side as a fallback.`);
-            const allProjectsSnapshot = await getDocs(query(projectsCol));
-            const allProjectsList = allProjectsSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));
-            
-            if (isPrincipal && user.institute) {
-              projectList = allProjectsList.filter(p => p.institute?.toLowerCase() === user.institute?.toLowerCase());
-            } else if (isHod && user.department) {
-              projectList = allProjectsList.filter(p => p.departmentName?.toLowerCase() === user.department?.toLowerCase());
-            }
-
-            if (isPrincipal) {
-              const debugInfo = createDebugInfo(user, allProjectsList);
-              logDebugInfo(debugInfo, 'AllProjectsPage (Fallback)');
-            }
-        } else if (isPrincipal) {
-            const debugInfo = createDebugInfo(user, projectList);
-            logDebugInfo(debugInfo, 'AllProjectsPage (Standard)');
-        }
-        
-        projectList.sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
-        setAllProjects(projectList);
-
-      } catch (error) {
-        console.error("Error fetching data: ", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data. Check permissions or network.' });
-      } finally {
-        setLoading(false);
-      }
+    let q;
+    if (isSuperAdmin || isAdmin) {
+      q = query(projectsCol, orderBy('submissionDate', 'desc'));
+    } else if (isCro && user.faculty) {
+      q = query(projectsCol, where('faculty', '==', user.faculty), orderBy('submissionDate', 'desc'));
+    } else if (isPrincipal && user.institute) {
+      q = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
+    } else if (isHod && user.department) {
+      q = query(projectsCol, where('departmentName', '==', user.department), orderBy('submissionDate', 'desc'));
+    } else {
+      q = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
     }
-    getProjectsAndUsers();
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+      setAllProjects(projectList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching projects in real-time: ", error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data. Check permissions or network.' });
+      setLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
   }, [user, toast]);
   
   const isSuperAdmin = user?.role === 'Super-admin';

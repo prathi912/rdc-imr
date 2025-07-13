@@ -8,11 +8,10 @@ import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContain
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign } from 'lucide-react';
-import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB"];
 
@@ -32,63 +31,35 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (!user) return;
     
-    const fetchProjects = async () => {
-      setLoading(true);
-      try {
-        const projectsCollection = collection(db, 'projects');
-        let projectQuery;
+    setLoading(true);
+    
+    const projectsCollection = collection(db, 'projects');
+    let projectsQuery;
 
-        const isPrincipal = user.designation === 'Principal';
-        const isCro = user.role === 'CRO';
-        const isHod = user.designation === 'HOD';
+    const isPrincipal = user.designation === 'Principal';
+    const isCro = user.role === 'CRO';
+    const isHod = user.designation === 'HOD';
 
-        let projectList: Project[] = [];
-        let initialQuery;
+    if (isCro && user.faculty) {
+        projectsQuery = query(projectsCollection, where('faculty', '==', user.faculty));
+    } else if (isPrincipal && user.institute) {
+        projectsQuery = query(projectsCollection, where('institute', '==', user.institute));
+    } else if (isHod && user.department) {
+        projectsQuery = query(projectsCollection, where('departmentName', '==', user.department));
+    } else {
+        projectsQuery = query(projectsCollection);
+    }
+    
+    const unsubscribe = onSnapshot(projectsQuery, (snapshot) => {
+      const projectList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      setProjects(projectList);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching project data in real-time:", error);
+      setLoading(false);
+    });
 
-        if (isCro && user.faculty) {
-            initialQuery = query(projectsCollection, where('faculty', '==', user.faculty));
-        } else if (isPrincipal && user.institute) {
-            initialQuery = query(projectsCollection, where('institute', '==', user.institute));
-        } else if (isHod && user.department) {
-            initialQuery = query(projectsCollection, where('departmentName', '==', user.department));
-        } else {
-            // Admins & Super-admins see all
-            initialQuery = query(projectsCollection);
-        }
-
-        const projectSnapshot = await getDocs(initialQuery);
-        projectList = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-
-        // Fallback logic for institutional roles
-        if ((isPrincipal || isHod) && projectList.length === 0 && (user.institute || user.department)) {
-            console.warn(`Initial query for ${user.institute || user.department} returned 0 projects. Fetching all and filtering client-side as a fallback.`);
-            const allProjectsSnapshot = await getDocs(query(projectsCollection));
-            const allProjectsList = allProjectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-            
-            if (isPrincipal && user.institute) {
-                projectList = allProjectsList.filter(p => p.institute?.toLowerCase() === user.institute?.toLowerCase());
-            } else if (isHod && user.department) {
-                projectList = allProjectsList.filter(p => p.departmentName?.toLowerCase() === user.department?.toLowerCase());
-            }
-
-            if (isPrincipal) {
-              const debugInfo = createDebugInfo(user, allProjectsList);
-              logDebugInfo(debugInfo, 'AnalyticsPage (Fallback)');
-            }
-        } else if (isPrincipal) {
-          const debugInfo = createDebugInfo(user, projectList);
-          logDebugInfo(debugInfo, 'AnalyticsPage (Standard)');
-        }
-
-        setProjects(projectList);
-      } catch (error) {
-        console.error("Error fetching project data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProjects();
+    return () => unsubscribe(); // Cleanup listener on component unmount
   }, [user]);
 
   // --- Data Processing ---
