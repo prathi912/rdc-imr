@@ -180,32 +180,36 @@ export default function ProfileSetupPage() {
 
           form.reset(prefillData);
 
-          // If profile is not complete, try to pre-fill from staff data
-          if (!appUser.profileComplete && !isUserPrincipal) {
+          // Try to pre-fill from data sources
+          if (!appUser.profileComplete) {
             setIsPrefilling(true);
             try {
-              const res = await fetch(`/api/get-staff-data?email=${appUser.email}`);
-              const result = await res.json();
-              if (result.success) {
-                const staffData = result.data;
-                const finalPrefillData = {
-                  ...prefillData,
-                  ...staffData,
-                   designation: isUserPrincipal ? 'Principal' : (isUserCro ? 'CRO' : staffData.designation),
-                };
+              // Check institutional data first
+              const instRes = await fetch(`/api/get-institute-data?email=${appUser.email}`);
+              const instResult = await instRes.json();
+              let finalPrefillData = { ...prefillData };
 
-                // Ensure optional fields are handled correctly
-                if (isUserPrincipal || isUserCro) {
-                    delete finalPrefillData.department;
-                    delete finalPrefillData.misId;
-                    delete finalPrefillData.phoneNumber;
-                }
-                
-                form.reset(finalPrefillData);
-                toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+              if (instResult.success) {
+                  finalPrefillData = { ...finalPrefillData, ...instResult.data, designation: 'Principal' };
+                  toast({ title: 'Institutional Profile Detected', description: 'Your information has been pre-filled. Please review and save.' });
+              } else {
+                  // If not an institutional account, check staff data
+                  const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email}`);
+                  const staffResult = await staffRes.json();
+                  if (staffResult.success) {
+                      finalPrefillData = { ...finalPrefillData, ...staffResult.data };
+                      toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+                  }
               }
+              
+              if (isUserPrincipal || isUserCro) {
+                  delete (finalPrefillData as any).department;
+                  delete (finalPrefillData as any).misId;
+                  delete (finalPrefillData as any).phoneNumber;
+              }
+              form.reset(finalPrefillData);
             } catch (error) {
-              console.error("Failed to fetch staff data", error);
+              console.error("Failed to fetch prefill data", error);
               // Fail silently, user can fill manually
             } finally {
               setIsPrefilling(false);
