@@ -16,7 +16,7 @@ import { auth, db } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { uploadFileToServer, checkMisIdExists, fetchOrcidData } from '@/app/actions';
 import type { User } from '@/types';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -144,6 +144,52 @@ export default function ProfileSetupPage() {
     },
   });
 
+  const prefillData = useCallback(async (appUser: User) => {
+    if (appUser.profileComplete) return;
+    setIsPrefilling(true);
+    try {
+      const isUserPrincipalByEmail = PRINCIPAL_EMAILS.includes(appUser.email);
+      let prefillDataSourceUrl = '';
+      if (isUserPrincipalByEmail) {
+        prefillDataSourceUrl = `/api/get-institute-data?email=${appUser.email}`;
+      } else {
+        prefillDataSourceUrl = `/api/get-staff-data?email=${appUser.email}`;
+      }
+
+      const res = await fetch(prefillDataSourceUrl);
+      const result = await res.json();
+      
+      let finalPrefillData = { ...form.getValues() };
+
+      if (result.success) {
+        if (isUserPrincipalByEmail) {
+           finalPrefillData = { ...finalPrefillData, ...result.data, designation: 'Principal' };
+           toast({ title: 'Institutional Profile Detected', description: 'Your information has been pre-filled. Please review and save.' });
+        } else {
+           finalPrefillData = { ...finalPrefillData, ...result.data };
+           toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+        }
+      }
+
+      const isUserCro = appUser.role === 'CRO';
+      const isUserPrincipal = appUser.designation === 'Principal' || isUserPrincipalByEmail;
+
+      if (isUserPrincipal || isUserCro) {
+          delete (finalPrefillData as any).department;
+          delete (finalPrefillData as any).misId;
+          delete (finalPrefillData as any).phoneNumber;
+      }
+      
+      form.reset(finalPrefillData);
+
+    } catch (error) {
+      console.error("Failed to fetch prefill data", error);
+    } finally {
+      setIsPrefilling(false);
+    }
+  }, [form, toast]);
+
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
@@ -158,64 +204,7 @@ export default function ProfileSetupPage() {
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
           
-          const isUserCro = appUser.role === 'CRO';
-          const isUserPrincipal = appUser.designation === 'Principal';
-          
-          const prefillData: Partial<ProfileSetupFormValues> = {
-            faculty: appUser.faculty || '',
-            institute: appUser.institute || '',
-            designation: appUser.designation || '',
-            misId: appUser.misId || '',
-            orcidId: appUser.orcidId || '',
-            scopusId: appUser.scopusId || '',
-            vidwanId: appUser.vidwanId || '',
-            googleScholarId: appUser.googleScholarId || '',
-            phoneNumber: appUser.phoneNumber || '',
-          };
-          
-          if (!isUserPrincipal && !isUserCro) {
-            prefillData.department = appUser.department || '';
-          }
-
-
-          form.reset(prefillData);
-
-          // Try to pre-fill from data sources
-          if (!appUser.profileComplete) {
-            setIsPrefilling(true);
-            try {
-              // Check institutional data first
-              const instRes = await fetch(`/api/get-institute-data?email=${appUser.email}`);
-              const instResult = await instRes.json();
-              let finalPrefillData = { ...prefillData };
-
-              if (instResult.success) {
-                  finalPrefillData = { ...finalPrefillData, ...instResult.data, designation: 'Principal' };
-                  toast({ title: 'Institutional Profile Detected', description: 'Your information has been pre-filled. Please review and save.' });
-              } else {
-                  // If not an institutional account, check staff data
-                  const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email}`);
-                  const staffResult = await staffRes.json();
-                  if (staffResult.success) {
-                      finalPrefillData = { ...finalPrefillData, ...staffResult.data };
-                      toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
-                  }
-              }
-              
-              if (isUserPrincipal || isUserCro) {
-                  delete (finalPrefillData as any).department;
-                  delete (finalPrefillData as any).misId;
-                  delete (finalPrefillData as any).phoneNumber;
-              }
-              form.reset(finalPrefillData);
-            } catch (error) {
-              console.error("Failed to fetch prefill data", error);
-              // Fail silently, user can fill manually
-            } finally {
-              setIsPrefilling(false);
-            }
-          }
-
+          await prefillData(appUser);
         } else {
           toast({ variant: 'destructive', title: 'Error', description: 'Could not find user profile.' });
           router.replace('/login');
@@ -227,7 +216,8 @@ export default function ProfileSetupPage() {
     });
 
     return () => unsubscribe();
-  }, [router, form, toast]);
+  }, [router, toast, prefillData]);
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
