@@ -52,7 +52,8 @@ const faculties = [
     "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
     "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
-    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", "Parul Sevashram Hospital"
+    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
+    "Parul Sevashram Hospital", "RDC"
 ];
 
 const institutes = [
@@ -335,7 +336,7 @@ export default function ProfileSetupPage() {
     )
   }
 
-  const isAcademicInfoLocked = isCro;
+  const isAcademicInfoLocked = isCro || isPrincipal;
   const isIdFieldsLocked = isPrincipal || isCro;
 
 

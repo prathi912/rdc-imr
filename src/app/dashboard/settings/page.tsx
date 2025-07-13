@@ -60,12 +60,13 @@ const bankDetailsSchema = z.object({
 type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>;
 
 const faculties = [
-    "Parul Sevashram Hospital","Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
+    "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
     "Faculty of Computer Applications", "Faculty of Agriculture", "Faculty of Architecture & Planning",
     "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
     "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
-    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health",
+    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
+    "Parul Sevashram Hospital", "RDC"
 ];
 
 const institutes = [
