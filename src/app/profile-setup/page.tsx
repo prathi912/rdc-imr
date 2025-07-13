@@ -36,7 +36,9 @@ const createProfileSetupSchema = (isPrincipal = false, isCro = false) => z.objec
   misId: (isPrincipal || isCro)
     ? z.string().optional() 
     : z.string().min(1, 'MIS ID is required.'),
-  orcidId: z.string().optional(),
+  orcidId: (isPrincipal || isCro)
+    ? z.string().optional()
+    : z.string().optional(),
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),
   googleScholarId: z.string().optional(),
