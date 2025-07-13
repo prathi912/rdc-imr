@@ -27,9 +27,9 @@ const coreModules = ['dashboard', 'notifications', 'settings'];
 const facultyCoreModules = ['new-submission', 'my-projects'];
 const hierarchyCoreModules = ['analytics'];
 
-const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects'];
-const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'manage-incentive-claims', 'system-health', 'bulk-upload'];
+const facultyDefaults = [...coreModules, ...facultyCoreModules, 'incentive-claim'];
+const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'manage-incentive-claims'];
+const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'system-health', 'bulk-upload'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes'];
 
 // Default modules for special designations who are otherwise 'faculty' role
@@ -45,6 +45,10 @@ export function getDefaultModulesForRole(role: User['role'], designation?: User[
       return hodDefaults;
     }
     return facultyDefaults;
+  }
+  
+  if (role === 'Evaluator') {
+    return [...coreModules, 'evaluator-dashboard', 'my-evaluations'];
   }
   
   switch (role) {

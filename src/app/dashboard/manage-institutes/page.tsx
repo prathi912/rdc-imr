@@ -6,7 +6,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { PageHeader } from '@/components/page-header';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,10 +16,6 @@ import { collection, doc, getDocs, writeBatch } from 'firebase/firestore';
 import { Loader2, Save } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { INSTITUTES } from '@/lib/constants';
-
-const instituteMappingSchema = z.object({
-  email: z.string().email({ message: "Invalid email address." }).optional().or(z.literal('')),
-});
 
 const formSchema = z.object({
   mappings: z.array(z.object({

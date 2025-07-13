@@ -158,7 +158,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       if(lastSegment === 'project' && segments.includes('dashboard')) return "Project Details";
       if(lastSegment === 'incentive-claim' && segments.includes('dashboard')) return "Incentive Claims";
-      if(lastSegment === 'manage-incentive-claims' && segments.includes('dashboard')) return "Manage Incentive Claims";
+      if(pathname.includes('/dashboard/manage-incentive-claims')) return "Manage Incentive Claims";
 
 
       if (lastSegment === 'dashboard') return 'Dashboard';
@@ -307,7 +307,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
             {user.allowedModules?.includes('manage-incentive-claims') && (
               <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname === '/dashboard/manage-incentive-claims'}>
+                <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname.startsWith('/dashboard/manage-incentive-claims')}>
                   <Award />
                   Manage Claims
                 </SidebarMenuButton>

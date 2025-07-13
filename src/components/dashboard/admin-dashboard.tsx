@@ -155,7 +155,7 @@ export function AdminDashboard() {
       if (isPrincipal && user?.institute) return `${user.institute} Dashboard`;
       if (isPrincipal && !user?.institute) return 'Principal Dashboard (No Institute Set)';
       if (isHod && user?.department) return `${user.department} Dashboard`;
-      if (isCro) return 'CRO Dashboard';
+      if (isCro && user?.faculty) return `${user.faculty} Dashboard`;
       return "Admin Dashboard";
   };
 

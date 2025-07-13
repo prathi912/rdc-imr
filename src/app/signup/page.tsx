@@ -83,7 +83,7 @@ export default function SignupPage() {
       return { role: 'Super-admin', designation: 'Super-admin', profileComplete: true };
     }
     if (CRO_EMAILS.includes(email)) {
-      return { role: 'CRO', designation: 'CRO', profileComplete: false };
+      return { role: 'CRO', designation: 'CRO', profileComplete: true };
     }
     if (institute) { // If an institute is mapped, they are a Principal
         return { role: 'faculty', designation: 'Principal', profileComplete: true };
@@ -108,18 +108,21 @@ export default function SignupPage() {
     
     // Check if the email is mapped to an institute
     let mappedInstituteData: { institute: string; faculty: string } | null = null;
-    const mappingsRef = collection(db, 'institute_mappings');
-    const q = query(mappingsRef, where('email', '==', firebaseUser.email!));
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-        const mappingDoc = querySnapshot.docs[0];
-        const instituteName = mappingDoc.id;
-        const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email}`);
-        const staffResult = await staffRes.json();
-        const faculty = staffResult.success ? staffResult.data.faculty : 'Unknown';
-        
-        mappedInstituteData = { institute: instituteName, faculty: faculty };
+    try {
+      const mappingsRef = collection(db, 'institute_mappings');
+      const q = query(mappingsRef, where('email', '==', firebaseUser.email!));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+          const mappingDoc = querySnapshot.docs[0];
+          const instituteName = mappingDoc.id;
+          // Since we can't reliably know the faculty from just the institute mapping,
+          // we'll assign a placeholder or leave it for the profile setup.
+          // For now, let's assign a generic faculty and let them change it if needed.
+          mappedInstituteData = { institute: instituteName, faculty: 'Unknown' };
+      }
+    } catch(e) {
+      console.error("Could not check institute mappings:", e);
     }
     
     let { role, designation, profileComplete } = determineUserRoleAndDesignation(
@@ -139,11 +142,6 @@ export default function SignupPage() {
       faculty: mappedInstituteData?.faculty,
       institute: mappedInstituteData?.institute,
     };
-    
-    // Final check for super-admin and CRO roles which override institutional checks
-    if (user.role !== 'faculty') {
-        user.profileComplete = true; // Super-admins and CROs don't need detailed setup
-    }
     
     // Set modules based on the final, determined role
     user.allowedModules = getDefaultModulesForRole(user.role, user.designation);
@@ -176,7 +174,7 @@ export default function SignupPage() {
         title: 'Account Created',
         description: "Welcome! Redirecting to your dashboard.",
       });
-      router.push('/dashboard');
+      router.push('/dashboard/all-projects');
     } else {
        toast({
         title: 'Account Created',

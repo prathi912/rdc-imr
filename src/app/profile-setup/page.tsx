@@ -23,7 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Bot, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { CRO_EMAILS, PRINCIPAL_EMAILS } from '@/lib/constants';
+import { CRO_EMAILS } from '@/lib/constants';
 import Link from 'next/link';
 
 const createProfileSetupSchema = (isPrincipal = false, isCro = false) => z.object({
@@ -148,32 +148,27 @@ export default function ProfileSetupPage() {
       if (appUser.profileComplete) return;
       setIsPrefilling(true);
       try {
-          // 1. Always attempt to fetch from the institutional data source first.
-          const instituteRes = await fetch(`/api/get-institute-data?email=${appUser.email}`);
-          const instituteResult = await instituteRes.json();
-          let finalPrefillData = { ...form.getValues() };
+          const finalPrefillData = { ...form.getValues() };
 
-          if (instituteResult.success) {
-              // Institutional account found. Pre-fill and set designation.
-              finalPrefillData = { ...finalPrefillData, ...instituteResult.data, designation: 'Principal' };
-              toast({ title: 'Institutional Profile Detected', description: 'Your information has been pre-filled. Please review and save.' });
+          // CROs have a simplified profile.
+          if (appUser.role === 'CRO') {
+              finalPrefillData.designation = 'CRO';
+              finalPrefillData.faculty = appUser.faculty || '';
+              finalPrefillData.institute = appUser.institute || '';
+          }
+          // The sign-up process now handles institutional mapping, so we just check the designation.
+          else if (appUser.designation === 'Principal') {
+              finalPrefillData.designation = 'Principal';
+              finalPrefillData.faculty = appUser.faculty || '';
+              finalPrefillData.institute = appUser.institute || '';
           } else {
-              // 2. If not found in institutional data, fall back to staff data.
+              // Standard faculty pre-fill from staffdata.xlsx
               const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email}`);
               const staffResult = await staffRes.json();
               if (staffResult.success) {
-                  finalPrefillData = { ...finalPrefillData, ...staffResult.data };
+                  Object.assign(finalPrefillData, staffResult.data);
                   toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
               }
-          }
-          
-          const isUserCro = appUser.role === 'CRO';
-          const isUserPrincipal = finalPrefillData.designation === 'Principal';
-
-          if (isUserPrincipal || isUserCro) {
-              delete (finalPrefillData as any).department;
-              delete (finalPrefillData as any).misId;
-              delete (finalPrefillData as any).phoneNumber;
           }
           
           form.reset(finalPrefillData);
