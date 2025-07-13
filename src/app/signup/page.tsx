@@ -28,7 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { auth, db } from '@/lib/config';
 import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, limit } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
