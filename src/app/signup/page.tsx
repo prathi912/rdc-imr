@@ -106,7 +106,7 @@ export default function SignupPage() {
       return;
     }
     
-    const { role, designation } = determineUserRoleAndDesignation(firebaseUser.email!);
+    let { role, designation } = determineUserRoleAndDesignation(firebaseUser.email!);
     
     let user: User = {
       uid: firebaseUser.uid,
@@ -114,21 +114,42 @@ export default function SignupPage() {
       email: firebaseUser.email!,
       role: role,
       designation: designation,
-      profileComplete: role === 'Super-admin' || role === 'CRO' || designation === 'Principal',
-      allowedModules: getDefaultModulesForRole(role, designation),
+      profileComplete: false, // Default to false, will be updated below
+      allowedModules: [], // Will be set after role/designation is finalized
     };
 
-    // Check if it's an institutional account to pre-fill data
-    if (designation === 'Principal') {
+    // Check if it's an institutional account to pre-fill data and update role
+    // This runs for ANY @paruluniversity.ac.in email, not just the hardcoded list
+    try {
         const res = await fetch(`/api/get-institute-data?email=${firebaseUser.email}`);
         const result = await res.json();
-        if (result.success) {
+        if (result.success && result.data) {
             user.name = result.data.name || user.name;
             user.faculty = result.data.faculty;
             user.institute = result.data.institute;
+            user.designation = 'Principal'; // Mark them as a principal-type user
+            user.role = 'faculty'; // Set role to faculty for permissions
+            user.profileComplete = true; // Mark profile as complete for institutional IDs
+            
+            // Re-assign role/designation from our new source of truth
+            role = user.role;
+            designation = user.designation;
         }
+    } catch (e) {
+      console.error("Could not fetch institute data during signup:", e);
+      // Proceed with default faculty role if the API fails
     }
 
+    // Final check for super-admin and CRO roles which override institutional checks
+    const superAdminCheck = determineUserRoleAndDesignation(firebaseUser.email!);
+    if (superAdminCheck.role !== 'faculty') {
+      user.role = superAdminCheck.role;
+      user.designation = superAdminCheck.designation;
+      user.profileComplete = true; // Super-admins and CROs don't need detailed setup
+    }
+    
+    // Set modules based on the final, determined role
+    user.allowedModules = getDefaultModulesForRole(user.role, user.designation);
 
     if (firebaseUser.photoURL) {
       user.photoURL = firebaseUser.photoURL;
