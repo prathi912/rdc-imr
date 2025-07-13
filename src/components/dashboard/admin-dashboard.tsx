@@ -90,7 +90,7 @@ export function AdminDashboard() {
             const projectsSnapshot = await getDocs(initialQuery);
             allProjects = projectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
 
-            if ((isPrincipal || isHod) && allProjects.length === 0) {
+            if ((isPrincipal || isHod) && allProjects.length === 0 && (user.institute || user.department)) {
               console.warn(`Initial query for ${user.institute || user.department} returned 0 projects. Fetching all and filtering client-side as a fallback.`);
               const allProjectsSnapshot = await getDocs(query(projectsRef));
               const allProjectsList = allProjectsSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));

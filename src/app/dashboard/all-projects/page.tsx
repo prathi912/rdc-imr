@@ -91,13 +91,14 @@ export default function AllProjectsPage() {
         let q;
         if (isSuperAdmin || isAdmin) {
           q = query(projectsCol);
+        } else if (isCro && user.faculty) {
+          q = query(projectsCol, where('faculty', '==', user.faculty));
         } else if (isPrincipal && user.institute) {
           q = query(projectsCol, where('institute', '==', user.institute));
         } else if (isHod && user.department) {
           q = query(projectsCol, where('departmentName', '==', user.department));
-        } else if (isCro && user.faculty) {
-          q = query(projectsCol, where('faculty', '==', user.faculty));
         } else {
+           // Default query for standard faculty, though this page is mainly for admins
           q = query(projectsCol, where('pi_uid', '==', user.uid));
         }
         

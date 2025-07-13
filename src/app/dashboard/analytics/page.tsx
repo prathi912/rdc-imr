@@ -61,7 +61,7 @@ export default function AnalyticsPage() {
         projectList = projectSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
 
         // Fallback logic for institutional roles
-        if ((isPrincipal || isHod) && projectList.length === 0) {
+        if ((isPrincipal || isHod) && projectList.length === 0 && (user.institute || user.department)) {
             console.warn(`Initial query for ${user.institute || user.department} returned 0 projects. Fetching all and filtering client-side as a fallback.`);
             const allProjectsSnapshot = await getDocs(query(projectsCollection));
             const allProjectsList = allProjectsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
@@ -226,7 +226,7 @@ export default function AnalyticsPage() {
             <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
                 <PieChart>
                     <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
-                    <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} labelLine={false} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                    <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
                         {statusDistributionData.map((entry, index) => (
                            <Cell key={`cell-${index}`} fill={statusDistributionConfig[entry.name]?.color || '#8884d8'} />
                         ))}
