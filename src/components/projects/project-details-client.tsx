@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -20,6 +21,8 @@ import {
   updateProjectDuration,
   updateProjectEvaluators,
   notifyAdminsOnCompletionRequest,
+  findUserByMisId,
+  updateCoInvestigators,
 } from "@/app/actions"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -165,6 +168,13 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false)
   const [isRevisionCommentDialogOpen, setIsRevisionCommentDialogOpen] = useState(false)
 
+  // Co-PI management state
+  const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
+  const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null)
+  const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [isSavingCoPis, setIsSavingCoPis] = useState(false)
+
   const scheduleForm = useForm<ScheduleFormData>({
     resolver: zodResolver(scheduleSchema),
   })
@@ -226,6 +236,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         const querySnapshot = await getDocs(q)
         const fetchedUsers = querySnapshot.docs.map((d) => ({ uid: d.id, ...d.data() }) as User)
         setCoPiUsers(fetchedUsers)
+        setCoPiList(fetchedUsers.map((u) => ({ uid: u.uid, name: u.name })))
       }
     }
     fetchCoPiUsers()
@@ -301,6 +312,53 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     } else {
       toast({ variant: "destructive", title: "Error", description: result.error || "Failed to update project status." })
     }
+  }
+
+  const handleSearchCoPi = async () => {
+    if (!coPiSearchTerm) return
+    setIsSearching(true)
+    setFoundCoPi(null)
+    try {
+      const result = await findUserByMisId(coPiSearchTerm)
+      if (result.success && result.user) {
+        setFoundCoPi(result.user)
+      } else {
+        toast({ variant: "destructive", title: "User Not Found", description: result.error })
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Search Failed", description: "An error occurred while searching." })
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleAddCoPi = () => {
+    if (foundCoPi && !coPiList.some((coPi) => coPi.uid === foundCoPi.uid)) {
+      if (user && foundCoPi.uid === user.uid) {
+        toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself as a Co-PI." })
+        return
+      }
+      setCoPiList([...coPiList, foundCoPi])
+    }
+    setFoundCoPi(null)
+    setCoPiSearchTerm("")
+  }
+
+  const handleRemoveCoPi = (uidToRemove: string) => {
+    setCoPiList(coPiList.filter((coPi) => coPi.uid !== uidToRemove))
+  }
+
+  const handleSaveCoPis = async () => {
+    setIsSavingCoPis(true)
+    const coPiUids = coPiList.map((coPi) => coPi.uid)
+    const result = await updateCoInvestigators(project.id, coPiUids)
+    if (result.success) {
+      toast({ title: "Success", description: "Co-PI list has been updated." })
+      setProject((prev) => ({ ...prev, coPiUids }))
+    } else {
+      toast({ variant: "destructive", title: "Error", description: result.error })
+    }
+    setIsSavingCoPis(false)
   }
 
   const handleScheduleUpdate = async (data: ScheduleFormData) => {
@@ -1169,26 +1227,62 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             </div>
           </div>
           <Separator />
-          {(project.teamInfo || (coPiUsers && coPiUsers.length > 0)) && (
+          {(project.teamInfo || (coPiUsers && coPiUsers.length > 0) || isPI) && (
             <>
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   Team Information
                 </h3>
-                {coPiUsers && coPiUsers.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="font-medium">Co-PI(s):</p>
-                    <ul className="list-disc list-inside pl-4 text-muted-foreground">
-                      {coPiUsers.map((copi) => (
-                        <li key={copi.uid}>
-                          <Link href={`/profile/${copi.misId}`} className="hover:underline text-primary">
-                            {copi.name}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                {isPI && (
+                  <Card className="bg-muted/50">
+                    <CardHeader>
+                      <CardTitle className="text-base">Manage Co-Investigators</CardTitle>
+                      <CardDescription>Add or remove Co-PIs for this project.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Search & Add Co-PI by MIS ID</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Search by Co-PI's MIS ID"
+                            value={coPiSearchTerm}
+                            onChange={(e) => setCoPiSearchTerm(e.target.value)}
+                          />
+                          <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
+                            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+                          </Button>
+                        </div>
+                        {foundCoPi && (
+                          <div className="flex items-center justify-between p-2 border rounded-md">
+                            <p>{foundCoPi.name}</p>
+                            <Button type="button" size="sm" onClick={handleAddCoPi}>
+                              Add
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Current Co-PI(s)</Label>
+                        {coPiList.length > 0 ? (
+                          coPiList.map((coPi) => (
+                            <div key={coPi.uid} className="flex items-center justify-between p-2 bg-background rounded-md">
+                              <p className="text-sm font-medium">{coPi.name}</p>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>
+                                Remove
+                              </Button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No Co-PIs added.</p>
+                        )}
+                      </div>
+                      <Button onClick={handleSaveCoPis} disabled={isSavingCoPis}>
+                        {isSavingCoPis && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Co-PI List
+                      </Button>
+                    </CardContent>
+                  </Card>
                 )}
                 {project.teamInfo && (
                   <p className="text-muted-foreground whitespace-pre-wrap">

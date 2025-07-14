@@ -694,24 +694,23 @@ export async function fetchWosDataByUrl(
 
 // Function to convert Excel serial date number to JS Date
 function excelDateToJSDate(serial: number) {
-    const utc_days  = Math.floor(serial - 25569);
-    const utc_value = utc_days * 86400;                                        
-    const date_info = new Date(utc_value * 1000);
+  const utc_days = Math.floor(serial - 25569)
+  const utc_value = utc_days * 86400
+  const date_info = new Date(utc_value * 1000)
 
-    const fractional_day = serial - Math.floor(serial) + 0.0000001;
+  const fractional_day = serial - Math.floor(serial) + 0.0000001
 
-    let total_seconds = Math.floor(86400 * fractional_day);
+  let total_seconds = Math.floor(86400 * fractional_day)
 
-    const seconds = total_seconds % 60;
+  const seconds = total_seconds % 60
 
-    total_seconds -= seconds;
+  total_seconds -= seconds
 
-    const hours = Math.floor(total_seconds / (60 * 60));
-    const minutes = Math.floor(total_seconds / 60) % 60;
+  const hours = Math.floor(total_seconds / (60 * 60))
+  const minutes = Math.floor(total_seconds / 60) % 60
 
-    return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds)
 }
-
 
 export async function bulkUploadProjects(
   projectsData: any[],
@@ -755,22 +754,27 @@ export async function bulkUploadProjects(
       }
 
       const projectRef = adminDb.collection("projects").doc()
-      
-      let submissionDate;
+
+      let submissionDate
       if (project.sanction_date) {
         if (project.sanction_date instanceof Date) {
-          submissionDate = project.sanction_date.toISOString();
-        } else if (typeof project.sanction_date === 'number') { // Handle Excel serial date format
-          submissionDate = excelDateToJSDate(project.sanction_date).toISOString();
-        } else if (typeof project.sanction_date === 'string') {
-          submissionDate = new Date(project.sanction_date).toISOString();
+          submissionDate = project.sanction_date.toISOString()
+        } else if (typeof project.sanction_date === "number") {
+          // Handle Excel serial date format
+          submissionDate = excelDateToJSDate(project.sanction_date).toISOString()
+        } else if (typeof project.sanction_date === "string") {
+          const parsedDate = new Date(project.sanction_date)
+          if (!isNaN(parsedDate.getTime())) {
+            submissionDate = parsedDate.toISOString()
+          } else {
+            submissionDate = new Date().toISOString() // Fallback
+          }
         } else {
-          submissionDate = new Date().toISOString();
+          submissionDate = new Date().toISOString() // Fallback
         }
       } else {
-        submissionDate = new Date().toISOString();
+        submissionDate = new Date().toISOString() // Fallback
       }
-
 
       const newProjectData: Partial<Project> = {
         title: project.project_title,
@@ -1286,5 +1290,24 @@ export async function updatePhaseStatus(
   } catch (error: any) {
     console.error("Error updating phase status:", error)
     return { success: false, error: error.message || "Failed to update phase status." }
+  }
+}
+
+export async function updateCoInvestigators(
+  projectId: string,
+  coPiUids: string[],
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!projectId) {
+      return { success: false, error: "Project ID is required." }
+    }
+    const projectRef = adminDb.collection("projects").doc(projectId)
+    await projectRef.update({
+      coPiUids: coPiUids,
+    })
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error updating Co-PIs:", error)
+    return { success: false, error: "Failed to update Co-PIs." }
   }
 }
