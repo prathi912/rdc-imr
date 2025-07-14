@@ -28,12 +28,11 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { auth, db } from '@/lib/config';
 import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc, collection, query, where, limit, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { linkHistoricalData } from '@/app/actions';
-import { CRO_EMAILS } from '@/lib/constants';
 import { Eye, EyeOff } from 'lucide-react';
 
 const signupSchema = z.object({
@@ -77,20 +76,6 @@ export default function SignupPage() {
       confirmPassword: '',
     },
   });
-  
-  const determineUserRoleAndDesignation = (email: string, institute?: string, faculty?: string): { role: User['role'], designation: User['designation'], profileComplete: boolean } => {
-    if (email === 'rathipranav07@gmail.com') {
-      return { role: 'Super-admin', designation: 'Super-admin', profileComplete: true };
-    }
-    if (CRO_EMAILS.includes(email)) {
-      return { role: 'CRO', designation: 'CRO', profileComplete: true };
-    }
-    if (institute) { // If an institute is mapped, they are a Principal
-        return { role: 'faculty', designation: 'Principal', profileComplete: true };
-    }
-    // New users are faculty by default. Super-admin can change roles.
-    return { role: 'faculty', designation: 'faculty', profileComplete: false };
-  }
 
   const processNewUser = async (firebaseUser: FirebaseUser, name?: string) => {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -106,45 +91,44 @@ export default function SignupPage() {
       return;
     }
     
-    // Check if the email is mapped to an institute
-    let mappedInstituteData: { institute: string; faculty: string } | null = null;
-    try {
-      const mappingsRef = collection(db, 'institute_mappings');
-      const q = query(mappingsRef, where('email', '==', firebaseUser.email!));
-      const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-          const mappingDoc = querySnapshot.docs[0];
-          const instituteName = mappingDoc.id;
-          // Since we can't reliably know the faculty from just the institute mapping,
-          // we'll assign a placeholder or leave it for the profile setup.
-          // For now, let's assign a generic faculty and let them change it if needed.
-          mappedInstituteData = { institute: instituteName, faculty: 'Unknown' };
-      }
-    } catch(e) {
-      console.error("Could not check institute mappings:", e);
-    }
+    // Check staffdata.xlsx for role and pre-fill info
+    const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`);
+    const staffResult = await staffRes.json();
     
-    let { role, designation, profileComplete } = determineUserRoleAndDesignation(
-        firebaseUser.email!,
-        mappedInstituteData?.institute,
-        mappedInstituteData?.faculty
-    );
+    let userDataFromExcel: Partial<User> = {};
+    let role: User['role'] = 'faculty';
+    let designation: User['designation'] = 'faculty';
+    let profileComplete = false;
+
+    if (staffResult.success) {
+        userDataFromExcel = staffResult.data;
+        const userType = staffResult.data.type;
+        
+        if (userType === 'CRO') {
+            role = 'CRO';
+            designation = 'CRO';
+            profileComplete = true;
+        } else if (userType === 'Institutional') {
+            role = 'faculty';
+            designation = 'Principal';
+            profileComplete = true;
+        }
+    }
     
     let user: User = {
       uid: firebaseUser.uid,
-      name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
+      name: name || userDataFromExcel.name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
       role,
       designation,
+      faculty: userDataFromExcel.faculty,
+      institute: userDataFromExcel.institute,
+      department: userDataFromExcel.department,
+      phoneNumber: userDataFromExcel.phoneNumber,
+      misId: userDataFromExcel.misId,
       profileComplete,
-      allowedModules: [], // Will be set after role/designation is finalized
-      faculty: mappedInstituteData?.faculty,
-      institute: mappedInstituteData?.institute,
+      allowedModules: getDefaultModulesForRole(role, designation),
     };
-    
-    // Set modules based on the final, determined role
-    user.allowedModules = getDefaultModulesForRole(user.role, user.designation);
 
     if (firebaseUser.photoURL) {
       user.photoURL = firebaseUser.photoURL;

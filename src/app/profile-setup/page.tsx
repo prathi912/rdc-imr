@@ -23,29 +23,22 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Bot, Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
-import { CRO_EMAILS } from '@/lib/constants';
 import Link from 'next/link';
 
-const createProfileSetupSchema = (isPrincipal = false, isCro = false) => z.object({
+const profileSetupSchema = z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
-  department: (isPrincipal || isCro)
-    ? z.string().optional()
-    : z.string().min(2, 'Department name is required.'),
+  department: z.string().optional(),
   designation: z.string().min(2, 'Designation is required.'),
-  misId: (isPrincipal || isCro)
-    ? z.string().optional() 
-    : z.string().min(1, 'MIS ID is required.'),
-  orcidId: (isPrincipal || isCro)
-    ? z.string().optional()
-    : z.string().optional(),
+  misId: z.string().min(1, 'MIS ID is required.'),
+  orcidId: z.string().optional(),
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),
   googleScholarId: z.string().optional(),
-  phoneNumber: (isPrincipal || isCro)
-    ? z.string().optional() 
-    : z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
+  phoneNumber: z.string().min(10, 'A valid 10-digit phone number is required.').max(10, 'A valid 10-digit phone number is required.'),
 });
+
+type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
 
 
 const faculties = [
@@ -59,50 +52,19 @@ const faculties = [
 ];
 
 const institutes = [
-    "Parul Institute of Technology",
-    "Ahmedabad Homoeopathic Medical College",
-    "Ahmedabad Physiotherapy College",
-    "College of Agriculture",
-    "Department of Paramedical & Health Sciences",
-    "Faculty of Library & Information Science",
-    "Institute of Pharmaceutical Sciences",
-    "Jawaharlal Nehru Homoeopathic Medical College",
-    "Parul College of Pharmacy & Research",
-    "Parul Institute of Applied Sciences (Ahmedabad Campus)",
-    "Parul Institute of Applied Sciences (Vadodara Campus)",
-    "Parul Institute of Architecture & Research",
-    "Parul Institute of Arts",
-    "Parul Institute of Ayurveda",
-    "Parul Institute of Ayurveda & Research",
-    "Parul Institute of Business Administration",
-    "Parul Institute of Commerce",
-    "Parul Institute of Computer Application",
-    "Parul Institute of Design",
-    "Parul Institute of Engineering & Technology",
-    "Parul Institute of Engineering & Technology (Diploma Studies)",
-    "Parul Institute of Fine Arts",
-    "Parul Institute of Homeopathy & Research",
-    "Parul Institute of Hotel Management & Catering Technology",
-    "Parul Institute of Law",
-    "Parul Institute of Management",
-    "Parul Institute of Management & Research",
-    "Parul Institute of Medical Sciences & Research",
-    "Parul Institute of Nursing",
-    "Parul Institute of Performing Arts",
-    "Parul Institute of Pharmaceutical Education & Research",
-    "Parul Institute of Pharmacy",
-    "Parul Institute of Pharmacy & Research",
-    "Parul Institute of Physiotherapy",
-    "Parul Institute of Physiotherapy and Research",
-    "Parul Institute of Social Work",
-    "Parul Institute of Vocational Education",
-    "Parul Medical Institute & Hospital",
-    "Parul Polytechnic Institute",
-    "Parul Institute of Public Health",
-    "Parul Sevashram Hospital",
-    "Rajkot Homoeopathic Medical College",
-    "RDC",
-    "School of Pharmacy",
+    "Parul Institute of Technology", "Ahmedabad Homoeopathic Medical College", "Ahmedabad Physiotherapy College",
+    "College of Agriculture", "Department of Paramedical & Health Sciences", "Faculty of Library & Information Science",
+    "Institute of Pharmaceutical Sciences", "Jawaharlal Nehru Homoeopathic Medical College", "Parul College of Pharmacy & Research",
+    "Parul Institute of Applied Sciences (Ahmedabad Campus)", "Parul Institute of Applied Sciences (Vadodara Campus)", "Parul Institute of Architecture & Research",
+    "Parul Institute of Arts", "Parul Institute of Ayurveda", "Parul Institute of Ayurveda & Research", "Parul Institute of Business Administration",
+    "Parul Institute of Commerce", "Parul Institute of Computer Application", "Parul Institute of Design", "Parul Institute of Engineering & Technology",
+    "Parul Institute of Engineering & Technology (Diploma Studies)", "Parul Institute of Fine Arts", "Parul Institute of Homeopathy & Research",
+    "Parul Institute of Hotel Management & Catering Technology", "Parul Institute of Law", "Parul Institute of Management", "Parul Institute of Management & Research",
+    "Parul Institute of Medical Sciences & Research", "Parul Institute of Nursing", "Parul Institute of Performing Arts",
+    "Parul Institute of Pharmaceutical Education & Research", "Parul Institute of Pharmacy", "Parul Institute of Pharmacy & Research",
+    "Parul Institute of Physiotherapy", "Parul Institute of Physiotherapy and Research", "Parul Institute of Social Work",
+    "Parul Institute of Vocational Education", "Parul Medical Institute & Hospital", "Parul Polytechnic Institute", "Parul Institute of Public Health",
+    "Parul Sevashram Hospital", "Rajkot Homoeopathic Medical College", "RDC", "School of Pharmacy",
 ];
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -125,11 +87,6 @@ export default function ProfileSetupPage() {
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(false);
 
-  const isPrincipal = useMemo(() => user?.designation === 'Principal', [user]);
-  const isCro = useMemo(() => user?.role === 'CRO', [user]);
-  const profileSetupSchema = createProfileSetupSchema(isPrincipal, isCro);
-  type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
-
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
     defaultValues: {
@@ -150,31 +107,12 @@ export default function ProfileSetupPage() {
       if (appUser.profileComplete) return;
       setIsPrefilling(true);
       try {
-          const finalPrefillData = { ...form.getValues() };
-
-          // CROs have a simplified profile.
-          if (appUser.role === 'CRO') {
-              finalPrefillData.designation = 'CRO';
-              finalPrefillData.faculty = appUser.faculty || '';
-              finalPrefillData.institute = appUser.institute || '';
+          const res = await fetch(`/api/get-staff-data?email=${appUser.email}`);
+          const result = await res.json();
+          if (result.success) {
+            form.reset(result.data);
+            toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
           }
-          // The sign-up process now handles institutional mapping, so we just check the designation.
-          else if (appUser.designation === 'Principal') {
-              finalPrefillData.designation = 'Principal';
-              finalPrefillData.faculty = appUser.faculty || '';
-              finalPrefillData.institute = appUser.institute || '';
-          } else {
-              // Standard faculty pre-fill from staffdata.xlsx
-              const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email}`);
-              const staffResult = await staffRes.json();
-              if (staffResult.success) {
-                  Object.assign(finalPrefillData, staffResult.data);
-                  toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
-              }
-          }
-          
-          form.reset(finalPrefillData);
-
       } catch (error) {
           console.error("Failed to fetch prefill data", error);
       } finally {
@@ -323,10 +261,6 @@ export default function ProfileSetupPage() {
     )
   }
 
-  const isAcademicInfoLocked = isCro || isPrincipal;
-  const isIdFieldsLocked = isPrincipal || isCro;
-
-
   return (
     <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
       <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -370,41 +304,35 @@ export default function ProfileSetupPage() {
 
                   <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
                   <FormField name="faculty" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   <FormField name="institute" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                   )} />
-                  {!(isPrincipal || isCro) && (
-                    <FormField control={form.control} name="department" render={({ field }) => (
-                      <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                  )}
+                  <FormField control={form.control} name="department" render={({ field }) => (
+                    <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
                   <FormField control={form.control} name="designation" render={({ field }) => (
-                    <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isPrincipal || isCro} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
-                  {!(isPrincipal || isCro) && (
-                    <FormField control={form.control} name="phoneNumber" render={({ field }) => (
-                      <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                  )}
+                  <FormField control={form.control} name="phoneNumber" render={({ field }) => (
+                    <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
                   
                   <Separator />
                   <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
                   
-                  {!(isPrincipal || isCro) && (
-                    <FormField control={form.control} name="misId" render={({ field }) => (
-                      <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                  )}
+                  <FormField control={form.control} name="misId" render={({ field }) => (
+                    <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
                    <FormField control={form.control} name="orcidId" render={({ field }) => (
                       <FormItem>
                           <FormLabel>ORCID iD</FormLabel>
                           <div className="flex items-center gap-2">
                               <FormControl>
-                                  <Input placeholder="e.g., 0000-0001-2345-6789" {...field} disabled={isIdFieldsLocked} />
+                                  <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
                               </FormControl>
-                              <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid || isIdFieldsLocked} title="Verify ORCID iD">
+                              <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid} title="Verify ORCID iD">
                                   {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
                               </Button>
                           </div>
@@ -412,13 +340,13 @@ export default function ProfileSetupPage() {
                       </FormItem>
                   )} />
                   <FormField control={form.control} name="scopusId" render={({ field }) => (
-                      <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>Scopus ID (Optional)</FormLabel><FormControl><Input placeholder="Your Scopus Author ID" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="vidwanId" render={({ field }) => (
-                      <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>Vidwan ID (Optional)</FormLabel><FormControl><Input placeholder="Your Vidwan-ID" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="googleScholarId" render={({ field }) => (
-                      <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} disabled={isIdFieldsLocked} /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>Google Scholar ID (Optional)</FormLabel><FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   
                   <Button type="submit" className="w-full !mt-8" disabled={isSubmitting}>

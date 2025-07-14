@@ -3,7 +3,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import { CRO_EMAILS } from '@/lib/constants';
 import fs from 'fs';
 import path from 'path';
 
@@ -22,6 +21,7 @@ interface StaffData {
   'LinkedIn_URL'?: string;
   'ORCID_ID'?: string | number;
   'Vidwan_ID'?: string | number;
+  Type?: 'CRO' | 'Institutional' | 'faculty';
 }
 
 export async function GET(request: NextRequest) {
@@ -32,10 +32,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email query parameter is required.' }, { status: 400 });
   }
   
-  if (CRO_EMAILS.includes(email)) {
-      return NextResponse.json({ success: false, error: 'CRO accounts are handled separately.' });
-  }
-
   // Construct the path to the file in the project's root directory.
   const filePath = path.join(process.cwd(), 'staffdata.xlsx');
 
@@ -55,13 +51,15 @@ export async function GET(request: NextRequest) {
     const userRecord = jsonData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
 
     if (userRecord) {
+      const instituteName = userRecord.Type === 'Institutional' ? userRecord.Name : userRecord.Institute;
+
       return NextResponse.json({
         success: true,
         data: {
           name: userRecord.Name,
           email: userRecord.Email,
           phoneNumber: String(userRecord.Phone || ''),
-          institute: userRecord.Institute,
+          institute: instituteName,
           department: userRecord.Department,
           designation: userRecord.Designation,
           faculty: userRecord.Faculty,
@@ -70,6 +68,7 @@ export async function GET(request: NextRequest) {
           googleScholarId: String(userRecord.Google_Scholar_ID || ''),
           orcidId: String(userRecord.ORCID_ID || ''),
           vidwanId: String(userRecord.Vidwan_ID || ''),
+          type: userRecord.Type || 'faculty',
         },
       });
     } else {

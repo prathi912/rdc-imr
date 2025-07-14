@@ -297,14 +297,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
-             {user.allowedModules?.includes('manage-institutes') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/manage-institutes" tooltip="Manage Institutes" isActive={pathname === '/dashboard/manage-institutes'}>
-                  <Building2 />
-                  Manage Institutes
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
             {user.allowedModules?.includes('manage-incentive-claims') && (
               <SidebarMenuItem>
                 <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname.startsWith('/dashboard/manage-incentive-claims')}>
