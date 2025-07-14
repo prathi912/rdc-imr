@@ -692,6 +692,27 @@ export async function fetchWosDataByUrl(
   }
 }
 
+// Function to convert Excel serial date number to JS Date
+function excelDateToJSDate(serial: number) {
+    const utc_days  = Math.floor(serial - 25569);
+    const utc_value = utc_days * 86400;                                        
+    const date_info = new Date(utc_value * 1000);
+
+    const fractional_day = serial - Math.floor(serial) + 0.0000001;
+
+    let total_seconds = Math.floor(86400 * fractional_day);
+
+    const seconds = total_seconds % 60;
+
+    total_seconds -= seconds;
+
+    const hours = Math.floor(total_seconds / (60 * 60));
+    const minutes = Math.floor(total_seconds / 60) % 60;
+
+    return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+}
+
+
 export async function bulkUploadProjects(
   projectsData: any[],
 ): Promise<{ success: boolean; count: number; error?: string }> {
@@ -739,7 +760,9 @@ export async function bulkUploadProjects(
       if (project.sanction_date) {
         if (project.sanction_date instanceof Date) {
           submissionDate = project.sanction_date.toISOString();
-        } else if (typeof project.sanction_date === 'string' || typeof project.sanction_date === 'number') {
+        } else if (typeof project.sanction_date === 'number') { // Handle Excel serial date format
+          submissionDate = excelDateToJSDate(project.sanction_date).toISOString();
+        } else if (typeof project.sanction_date === 'string') {
           submissionDate = new Date(project.sanction_date).toISOString();
         } else {
           submissionDate = new Date().toISOString();
@@ -1265,5 +1288,3 @@ export async function updatePhaseStatus(
     return { success: false, error: error.message || "Failed to update phase status." }
   }
 }
-
-    
