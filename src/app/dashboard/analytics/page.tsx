@@ -8,7 +8,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContain
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign } from 'lucide-react';
@@ -27,6 +27,8 @@ export default function AnalyticsPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
         setUser(JSON.parse(storedUser));
+    } else {
+        setLoading(false);
     }
   }, []);
 
@@ -35,52 +37,50 @@ export default function AnalyticsPage() {
     
     setLoading(true);
     
-    async function fetchProjects() {
-        try {
-            const projectsCollection = collection(db, 'projects');
-            let projectsQuery;
+    const projectsCollection = collection(db, 'projects');
+    let projectsQuery;
 
-            const isPrincipal = user?.designation === 'Principal';
-            const isCro = user?.role === 'CRO';
-            const isHod = user?.designation === 'HOD';
+    const isPrincipal = user?.designation === 'Principal';
+    const isCro = user?.role === 'CRO';
+    const isHod = user?.designation === 'HOD';
 
-            let projectList: Project[] = [];
-
-            if (isCro && user.faculty) {
-                projectsQuery = query(projectsCollection, where('faculty', '==', user.faculty));
-            } else if (isHod && user.department) {
-                projectsQuery = query(projectsCollection, where('departmentName', '==', user.department));
-            } else if (isPrincipal && user.institute) {
-                const exactQuery = query(projectsCollection, where('institute', '==', user.institute));
-                let snapshot = await getDocs(exactQuery);
-                 if (snapshot.empty) {
-                    const allProjectsSnapshot = await getDocs(query(projectsCollection));
-                    projectList = allProjectsSnapshot.docs
-                        .map(doc => ({ ...doc.data(), id: doc.id } as Project))
-                        .filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
-                     const debugInfo = createDebugInfo(user, projectList);
-                     logDebugInfo(debugInfo, 'Analytics Fallback');
-                } else {
-                    projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-                }
-                 setProjects(projectList);
-                 setLoading(false);
-                 return;
-            } else {
-                projectsQuery = query(projectsCollection);
-            }
-            
-            const snapshot = await getDocs(projectsQuery);
-            projectList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-            setProjects(projectList);
-        } catch (error) {
-            console.error("Error fetching project data:", error);
-        } finally {
-            setLoading(false);
-        }
+    if (isCro && user.faculty) {
+        projectsQuery = query(projectsCollection, where('faculty', '==', user.faculty));
+    } else if (isHod && user.department) {
+        projectsQuery = query(projectsCollection, where('departmentName', '==', user.department));
+    } else if (isPrincipal && user.institute) {
+        projectsQuery = query(projectsCollection, where('institute', '==', user.institute));
+    } else {
+        projectsQuery = query(projectsCollection);
     }
     
-    fetchProjects();
+    const unsubscribe = onSnapshot(projectsQuery, (snapshot) => {
+        let projectList: Project[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        
+        // This is a special fallback for principals if their direct institute match returns no results.
+        // It's less efficient but handles potential mismatches in institute names.
+        if (isPrincipal && user.institute && snapshot.empty) {
+            const allProjectsQuery = query(collection(db, 'projects'));
+            onSnapshot(allProjectsQuery, (allSnapshot) => {
+                 const allProjects = allSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                 const filteredList = allProjects.filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
+                 
+                 const debugInfo = createDebugInfo(user, filteredList);
+                 logDebugInfo(debugInfo, 'Analytics Fallback');
+                 
+                 setProjects(filteredList);
+                 setLoading(false);
+            });
+        } else {
+            setProjects(projectList);
+            setLoading(false);
+        }
+    }, (error) => {
+        console.error("Error fetching project data:", error);
+        setLoading(false);
+    });
+
+    return () => unsubscribe();
 
   }, [user]);
 
