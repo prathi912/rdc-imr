@@ -170,7 +170,7 @@ export default function BulkUploadPage() {
         'Status': p.status,
         'Sanction Number': p.grant?.sanctionNumber || 'N/A',
         'Grant Amount': p.grant?.totalAmount || 0,
-        'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
+        'Sanction Date': new Date(p.submissionDate).toLocaleDateString(),
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -339,3 +339,5 @@ export default function BulkUploadPage() {
     </div>
   );
 }
+
+    

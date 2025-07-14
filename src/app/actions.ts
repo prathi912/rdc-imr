@@ -709,7 +709,7 @@ export async function bulkUploadProjects(
         !project.sanction_number ||
         !project.Name_of_staff ||
         !project.Faculty ||
-        !project.Institute // Add check for Institute
+        !project.Institute
       ) {
         console.warn("Skipping incomplete project record:", project)
         continue
@@ -718,7 +718,7 @@ export async function bulkUploadProjects(
       let pi_uid = ""
       let pi_name = project.Name_of_staff
       let faculty = project.Faculty
-      let institute = project.Institute // Use institute from sheet
+      let institute = project.Institute
       let departmentName = "Unknown"
 
       // Find user by email to get UID and profile data
@@ -729,15 +729,16 @@ export async function bulkUploadProjects(
         pi_uid = userDoc.id
         pi_name = userData.name || pi_name
         faculty = userData.faculty || faculty
-        institute = userData.institute || institute // User's profile institute can override sheet if present
+        institute = userData.institute || institute
         departmentName = userData.department || "Unknown"
       }
 
       const projectRef = adminDb.collection("projects").doc()
-      const submissionDate =
-        project.sanction_date && !isNaN(new Date(project.sanction_date).getTime())
-          ? new Date(project.sanction_date).toISOString()
-          : new Date().toISOString()
+      
+      const submissionDate = project.sanction_date 
+        ? new Date(project.sanction_date).toISOString() 
+        : new Date().toISOString();
+
 
       const newProjectData: Partial<Project> = {
         title: project.project_title,
@@ -1255,3 +1256,5 @@ export async function updatePhaseStatus(
     return { success: false, error: error.message || "Failed to update phase status." }
   }
 }
+
+    
