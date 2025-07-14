@@ -735,9 +735,18 @@ export async function bulkUploadProjects(
 
       const projectRef = adminDb.collection("projects").doc()
       
-      const submissionDate = project.sanction_date 
-        ? new Date(project.sanction_date).toISOString() 
-        : new Date().toISOString();
+      let submissionDate;
+      if (project.sanction_date) {
+        if (project.sanction_date instanceof Date) {
+          submissionDate = project.sanction_date.toISOString();
+        } else if (typeof project.sanction_date === 'string' || typeof project.sanction_date === 'number') {
+          submissionDate = new Date(project.sanction_date).toISOString();
+        } else {
+          submissionDate = new Date().toISOString();
+        }
+      } else {
+        submissionDate = new Date().toISOString();
+      }
 
 
       const newProjectData: Partial<Project> = {
