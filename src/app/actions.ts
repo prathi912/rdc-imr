@@ -708,7 +708,8 @@ export async function bulkUploadProjects(
         !project.status ||
         !project.sanction_number ||
         !project.Name_of_staff ||
-        !project.Faculty
+        !project.Faculty ||
+        !project.Institute // Add check for Institute
       ) {
         console.warn("Skipping incomplete project record:", project)
         continue
@@ -717,7 +718,7 @@ export async function bulkUploadProjects(
       let pi_uid = ""
       let pi_name = project.Name_of_staff
       let faculty = project.Faculty
-      let institute = "Unknown"
+      let institute = project.Institute // Use institute from sheet
       let departmentName = "Unknown"
 
       // Find user by email to get UID and profile data
@@ -728,7 +729,7 @@ export async function bulkUploadProjects(
         pi_uid = userDoc.id
         pi_name = userData.name || pi_name
         faculty = userData.faculty || faculty
-        institute = userData.institute || "Unknown"
+        institute = userData.institute || institute // User's profile institute can override sheet if present
         departmentName = userData.department || "Unknown"
       }
 
@@ -738,11 +739,11 @@ export async function bulkUploadProjects(
           ? new Date(project.sanction_date).toISOString()
           : new Date().toISOString()
 
-      const newProjectData: any = {
+      const newProjectData: Partial<Project> = {
         title: project.project_title,
         pi_email: project.pi_email,
         status: project.status,
-        pi_uid: pi_uid, // Will be empty if user not found yet
+        pi_uid: pi_uid,
         pi: pi_name,
         abstract: "Historical data migrated from bulk upload.",
         type: "Research", // Default type
@@ -773,7 +774,7 @@ export async function bulkUploadProjects(
         newProjectData.grant = grant
       }
 
-      batch.set(projectRef, newProjectData)
+      batch.set(projectRef, newProjectData as Project)
       projectCount++
     }
 

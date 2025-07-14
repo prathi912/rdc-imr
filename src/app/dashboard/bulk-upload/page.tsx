@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { FileWarning, Upload, Loader2, Trash2 } from 'lucide-react';
+import { FileWarning, Upload, Loader2, Trash2, Download } from 'lucide-react';
 import { bulkUploadProjects, deleteBulkProject } from '@/app/actions';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/config';
@@ -36,6 +36,7 @@ type ProjectData = {
   sanction_date: string;
   Name_of_staff: string;
   Faculty: string;
+  Institute: string;
   sanction_number: string;
 };
 
@@ -83,7 +84,7 @@ export default function BulkUploadPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty', 'sanction_number'];
+        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty', 'Institute', 'sanction_number'];
         
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
@@ -106,6 +107,7 @@ export default function BulkUploadPage() {
           sanction_date: row.sanction_date instanceof Date ? row.sanction_date.toISOString() : new Date().toISOString(),
           Name_of_staff: String(row.Name_of_staff || ''),
           Faculty: String(row.Faculty || ''),
+          Institute: String(row.Institute || ''),
           sanction_number: String(row.sanction_number || ''),
         }));
         setData(formattedData);
@@ -151,6 +153,30 @@ export default function BulkUploadPage() {
         toast({ variant: 'destructive', title: 'Deletion Failed', description: result.error || "Could not delete project." });
     }
     setProjectToDelete(null);
+  };
+  
+  const handleExport = () => {
+    if (history.length === 0) {
+      toast({ variant: 'destructive', title: 'No Data', description: 'There is no upload history to export.' });
+      return;
+    }
+    const dataToExport = history.map(p => ({
+        'Project ID': p.id,
+        'Project Title': p.title,
+        'PI Name': p.pi,
+        'PI Email': p.pi_email,
+        'Faculty': p.faculty,
+        'Institute': p.institute,
+        'Status': p.status,
+        'Sanction Number': p.grant?.sanctionNumber || 'N/A',
+        'Grant Amount': p.grant?.totalAmount || 0,
+        'Submission Date': new Date(p.submissionDate).toLocaleDateString(),
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Bulk Upload History");
+    XLSX.writeFile(workbook, `bulk_upload_history_${new Date().toISOString().split('T')[0]}.xlsx`);
   }
 
   return (
@@ -176,7 +202,8 @@ export default function BulkUploadPage() {
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">grant_amount</code>,
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_date</code>,
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Name_of_staff</code>, 
-                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>, and
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>, 
+                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Institute</code>, and
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_number</code>.
               </AlertDescription>
             </Alert>
@@ -206,7 +233,7 @@ export default function BulkUploadPage() {
                         <TableRow>
                             <TableHead>PI Name</TableHead>
                             <TableHead>Project Title</TableHead>
-                            <TableHead>Sanction No.</TableHead>
+                            <TableHead>Institute</TableHead>
                             <TableHead>Faculty</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
@@ -217,7 +244,7 @@ export default function BulkUploadPage() {
                             <TableRow key={index}>
                             <TableCell>{row.Name_of_staff}</TableCell>
                             <TableCell className="font-medium">{row.project_title}</TableCell>
-                            <TableCell>{row.sanction_number}</TableCell>
+                            <TableCell>{row.Institute}</TableCell>
                             <TableCell>{row.Faculty}</TableCell>
                             <TableCell>{row.status}</TableCell>
                             <TableCell className="text-right">{row.grant_amount.toLocaleString()}</TableCell>
@@ -232,10 +259,18 @@ export default function BulkUploadPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Upload History</CardTitle>
-            <CardDescription>
-              A list of all projects added via the bulk upload feature.
-            </CardDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                  <CardTitle>Upload History</CardTitle>
+                  <CardDescription>
+                    A list of all projects added via the bulk upload feature.
+                  </CardDescription>
+              </div>
+              <Button onClick={handleExport} variant="outline" size="sm" disabled={loadingHistory || history.length === 0}>
+                <Download className="mr-2 h-4 w-4"/>
+                Export XLSX
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {loadingHistory ? (
@@ -253,6 +288,7 @@ export default function BulkUploadPage() {
                         <TableRow>
                             <TableHead>Project Title</TableHead>
                             <TableHead>PI Email</TableHead>
+                            <TableHead>Institute</TableHead>
                             <TableHead>Sanction Date</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -262,6 +298,7 @@ export default function BulkUploadPage() {
                             <TableRow key={project.id}>
                                 <TableCell className="font-medium">{project.title}</TableCell>
                                 <TableCell>{project.pi_email}</TableCell>
+                                <TableCell>{project.institute}</TableCell>
                                 <TableCell>{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
                                 <TableCell className="text-right">
                                     <Button variant="destructive" size="icon" onClick={() => setProjectToDelete(project)}>
@@ -302,5 +339,3 @@ export default function BulkUploadPage() {
     </div>
   );
 }
-
-    
