@@ -28,7 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { auth, db } from '@/lib/config';
 import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
@@ -123,7 +123,7 @@ export default function SignupPage() {
       designation,
       faculty: userDataFromExcel.faculty,
       institute: userDataFromExcel.institute,
-      department: userDataFromExcel.department,
+      department: userDataFromExcel.department || null,
       phoneNumber: userDataFromExcel.phoneNumber,
       misId: userDataFromExcel.misId,
       profileComplete,
@@ -158,7 +158,7 @@ export default function SignupPage() {
         title: 'Account Created',
         description: "Welcome! Redirecting to your dashboard.",
       });
-      router.push('/dashboard/all-projects');
+      router.push('/dashboard');
     } else {
        toast({
         title: 'Account Created',

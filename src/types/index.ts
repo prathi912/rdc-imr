@@ -16,7 +16,7 @@ export type User = {
   designation?: 'Principal' | 'HOD' | 'Super-admin' | 'faculty' | string;
   faculty?: string;
   institute?: string;
-  department?: string;
+  department?: string | null;
   misId?: string;
   orcidId?: string;
   scopusId?: string;

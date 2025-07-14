@@ -107,7 +107,7 @@ export default function LoginPage() {
         designation,
         faculty: userDataFromExcel.faculty,
         institute: userDataFromExcel.institute,
-        department: userDataFromExcel.department,
+        department: userDataFromExcel.department || null,
         phoneNumber: userDataFromExcel.phoneNumber,
         misId: userDataFromExcel.misId,
         profileComplete,
