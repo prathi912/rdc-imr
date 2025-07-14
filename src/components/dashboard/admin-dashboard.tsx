@@ -9,11 +9,12 @@ import Link from 'next/link';
 import { Button } from '../ui/button';
 import { ArrowRight } from 'lucide-react';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '../ui/skeleton';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 
 interface DashboardStats {
   totalProjects: number;
@@ -62,69 +63,83 @@ export function AdminDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    setLoading(true);
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const projectsRef = collection(db, "projects");
+            const usersRef = collection(db, "users");
+            
+            const isPrincipal = user.designation === 'Principal';
+            const isHod = user.designation === 'HOD';
+            const isCro = user.role === 'CRO';
 
-    const projectsRef = collection(db, "projects");
-    const usersRef = collection(db, "users");
+            let projectsQuery;
+            let allProjects: Project[] = [];
 
-    const isPrincipal = user.designation === 'Principal';
-    const isHod = user.designation === 'HOD';
-    const isCro = user.role === 'CRO';
-    
-    let projectsQuery;
-
-    if (isPrincipal && user.institute) {
-        projectsQuery = query(projectsRef, where('institute', '==', user.institute));
-    } else if (isHod && user.department) {
-        projectsQuery = query(projectsRef, where('departmentName', '==', user.department));
-    } else if (isCro && user.faculty) {
-        projectsQuery = query(projectsRef, where('faculty', '==', user.faculty));
-    } else {
-        projectsQuery = query(projectsRef);
-    }
-
-    const unsubscribeProjects = onSnapshot(projectsQuery, (snapshot) => {
-      const allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-
-      const totalProjects = allProjects.length;
-      const pendingReviews = allProjects.filter(p => p.status === 'Under Review' || p.status === 'Pending Completion Approval').length;
-      const approvedProjects = allProjects.filter(p => p.status === 'Recommended').length;
-      const rejectedProjects = allProjects.filter(p => p.status === 'Not Recommended').length;
-      const completedProjects = allProjects.filter(p => p.status === 'Completed').length;
-      
-      const sortedProjects = allProjects
-          .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
-          .slice(0, 5);
-      
-      const groupCounts = Object.entries(
-          allProjects.reduce((acc, project) => {
-            const key = project[aggregationKey as keyof Project] as string | undefined;
-            if (key) {
-                acc[key] = (acc[key] || 0) + 1;
+            if (isPrincipal && user.institute) {
+                projectsQuery = query(projectsRef, where('institute', '==', user.institute));
+                let snapshot = await getDocs(projectsQuery);
+                if (snapshot.empty) {
+                    const allProjectsSnapshot = await getDocs(query(projectsRef));
+                    allProjects = allProjectsSnapshot.docs
+                        .map(doc => ({ ...doc.data(), id: doc.id } as Project))
+                        .filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
+                     const debugInfo = createDebugInfo(user, allProjects);
+                     logDebugInfo(debugInfo, 'Admin Dashboard Fallback');
+                } else {
+                    allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                }
+            } else if (isHod && user.department) {
+                projectsQuery = query(projectsRef, where('departmentName', '==', user.department));
+                const snapshot = await getDocs(projectsQuery);
+                allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            } else if (isCro && user.faculty) {
+                projectsQuery = query(projectsRef, where('faculty', '==', user.faculty));
+                 const snapshot = await getDocs(projectsQuery);
+                allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            } else { // Admin or Super-admin
+                projectsQuery = query(projectsRef);
+                 const snapshot = await getDocs(projectsQuery);
+                allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
             }
-            return acc;
-          }, {} as Record<string, number>)
-      ).map(([group, count]) => ({ group, projects: count }))
-      .sort((a, b) => b.projects - a.projects)
-      .slice(0, 7);
+            
+            const usersSnapshot = await getDocs(usersRef);
 
-      setStats(prev => ({ ...prev, totalProjects, pendingReviews, approvedProjects, rejectedProjects, completedProjects }));
-      setRecentProjects(sortedProjects);
-      setChartData(groupCounts);
-      setLoading(false);
-    }, (error) => {
-        console.error("Error fetching projects in real-time:", error);
-        setLoading(false);
-    });
-    
-    const unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
-        setStats(prev => ({...prev, totalUsers: snapshot.size}));
-    });
+            const totalProjects = allProjects.length;
+            const pendingReviews = allProjects.filter(p => p.status === 'Under Review' || p.status === 'Pending Completion Approval').length;
+            const approvedProjects = allProjects.filter(p => p.status === 'Recommended').length;
+            const rejectedProjects = allProjects.filter(p => p.status === 'Not Recommended').length;
+            const completedProjects = allProjects.filter(p => p.status === 'Completed').length;
+            const totalUsers = usersSnapshot.size;
 
-    return () => {
-        unsubscribeProjects();
-        unsubscribeUsers();
-    }
+            setStats({ totalProjects, pendingReviews, approvedProjects, rejectedProjects, completedProjects, totalUsers });
+
+            const sortedProjects = allProjects
+                .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
+                .slice(0, 5);
+            setRecentProjects(sortedProjects);
+            
+             const groupCounts = Object.entries(
+                allProjects.reduce((acc, project) => {
+                    const key = project[aggregationKey as keyof Project] as string | undefined;
+                    if (key) {
+                        acc[key] = (acc[key] || 0) + 1;
+                    }
+                    return acc;
+                }, {} as Record<string, number>)
+            ).map(([group, count]) => ({ group, projects: count }))
+            .sort((a, b) => b.projects - a.projects)
+            .slice(0, 7);
+            setChartData(groupCounts);
+
+        } catch (error) {
+            console.error("Error fetching admin dashboard data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchData();
   }, [user, aggregationKey]);
   
   const isPrincipal = user?.designation === 'Principal';

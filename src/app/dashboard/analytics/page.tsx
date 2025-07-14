@@ -8,10 +8,12 @@ import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContain
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign } from 'lucide-react';
+import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
+
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB"];
 
@@ -33,33 +35,53 @@ export default function AnalyticsPage() {
     
     setLoading(true);
     
-    const projectsCollection = collection(db, 'projects');
-    let projectsQuery;
+    async function fetchProjects() {
+        try {
+            const projectsCollection = collection(db, 'projects');
+            let projectsQuery;
 
-    const isPrincipal = user.designation === 'Principal';
-    const isCro = user.role === 'CRO';
-    const isHod = user.designation === 'HOD';
+            const isPrincipal = user?.designation === 'Principal';
+            const isCro = user?.role === 'CRO';
+            const isHod = user?.designation === 'HOD';
 
-    if (isCro && user.faculty) {
-        projectsQuery = query(projectsCollection, where('faculty', '==', user.faculty));
-    } else if (isPrincipal && user.institute) {
-        projectsQuery = query(projectsCollection, where('institute', '==', user.institute));
-    } else if (isHod && user.department) {
-        projectsQuery = query(projectsCollection, where('departmentName', '==', user.department));
-    } else {
-        projectsQuery = query(projectsCollection);
+            let projectList: Project[] = [];
+
+            if (isCro && user.faculty) {
+                projectsQuery = query(projectsCollection, where('faculty', '==', user.faculty));
+            } else if (isHod && user.department) {
+                projectsQuery = query(projectsCollection, where('departmentName', '==', user.department));
+            } else if (isPrincipal && user.institute) {
+                const exactQuery = query(projectsCollection, where('institute', '==', user.institute));
+                let snapshot = await getDocs(exactQuery);
+                 if (snapshot.empty) {
+                    const allProjectsSnapshot = await getDocs(query(projectsCollection));
+                    projectList = allProjectsSnapshot.docs
+                        .map(doc => ({ ...doc.data(), id: doc.id } as Project))
+                        .filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
+                     const debugInfo = createDebugInfo(user, projectList);
+                     logDebugInfo(debugInfo, 'Analytics Fallback');
+                } else {
+                    projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                }
+                 setProjects(projectList);
+                 setLoading(false);
+                 return;
+            } else {
+                projectsQuery = query(projectsCollection);
+            }
+            
+            const snapshot = await getDocs(projectsQuery);
+            projectList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+            setProjects(projectList);
+        } catch (error) {
+            console.error("Error fetching project data:", error);
+        } finally {
+            setLoading(false);
+        }
     }
     
-    const unsubscribe = onSnapshot(projectsQuery, (snapshot) => {
-      const projectList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-      setProjects(projectList);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching project data in real-time:", error);
-      setLoading(false);
-    });
+    fetchProjects();
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
   }, [user]);
 
   // --- Data Processing ---

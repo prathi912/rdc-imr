@@ -8,7 +8,7 @@ import type { DateRange } from 'react-day-picker';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,6 +23,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
+
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
@@ -79,38 +81,67 @@ export default function AllProjectsPage() {
         console.error("Error fetching users:", error);
     });
 
-    const projectsCol = collection(db, 'projects');
-    const isSuperAdmin = user.role === 'Super-admin';
-    const isAdmin = user.role === 'admin';
-    const isCro = user.role === 'CRO';
-    const isPrincipal = user.designation === 'Principal';
-    const isHod = user.designation === 'HOD';
+    async function fetchProjects() {
+        try {
+            const projectsCol = collection(db, 'projects');
+            const isSuperAdmin = user?.role === 'Super-admin';
+            const isAdmin = user?.role === 'admin';
+            const isCro = user?.role === 'CRO';
+            const isPrincipal = user?.designation === 'Principal';
+            const isHod = user?.designation === 'HOD';
 
-    let q;
-    if (isSuperAdmin || isAdmin) {
-      q = query(projectsCol, orderBy('submissionDate', 'desc'));
-    } else if (isCro && user.faculty) {
-      q = query(projectsCol, where('faculty', '==', user.faculty), orderBy('submissionDate', 'desc'));
-    } else if (isPrincipal && user.institute) {
-      q = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
-    } else if (isHod && user.department) {
-      q = query(projectsCol, where('departmentName', '==', user.department), orderBy('submissionDate', 'desc'));
-    } else {
-      q = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
+            let projectList: Project[] = [];
+
+            if (isSuperAdmin || isAdmin) {
+                const q = query(projectsCol, orderBy('submissionDate', 'desc'));
+                const snapshot = await getDocs(q);
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            } else if (isCro && user.faculty) {
+                const q = query(projectsCol, where('faculty', '==', user.faculty), orderBy('submissionDate', 'desc'));
+                const snapshot = await getDocs(q);
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            } else if (isHod && user.department) {
+                const q = query(projectsCol, where('departmentName', '==', user.department), orderBy('submissionDate', 'desc'));
+                const snapshot = await getDocs(q);
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            } else if (isPrincipal && user.institute) {
+                // First, try an exact match.
+                const exactQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
+                let snapshot = await getDocs(exactQuery);
+
+                if (snapshot.empty) {
+                    // Fallback to client-side filtering if exact match yields no results
+                    const allProjectsSnapshot = await getDocs(query(projectsCol, orderBy('submissionDate', 'desc')));
+                    projectList = allProjectsSnapshot.docs
+                        .map(doc => ({ ...doc.data(), id: doc.id } as Project))
+                        .filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
+
+                    // Logging for debug purposes
+                    const allProjectInstitutes = allProjectsSnapshot.docs.map(d => d.data().institute);
+                    const debugInfo = createDebugInfo(user, projectList);
+                    logDebugInfo(debugInfo, 'All Projects Fallback');
+
+                } else {
+                    projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                }
+
+            } else {
+                const q = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
+                 const snapshot = await getDocs(q);
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            }
+            
+            setAllProjects(projectList);
+        } catch (error) {
+            console.error("Error fetching projects: ", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data.' });
+        } finally {
+            setLoading(false);
+        }
     }
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-      setAllProjects(projectList);
-      setLoading(false);
-    }, (error) => {
-      console.error("Error fetching projects in real-time: ", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data. Check permissions or network.' });
-      setLoading(false);
-    });
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
-  }, [user, toast]);
+    fetchProjects();
+}, [user, toast]);
   
   const isSuperAdmin = user?.role === 'Super-admin';
   const isAdmin = user?.role === 'admin';
