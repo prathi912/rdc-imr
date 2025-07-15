@@ -42,6 +42,13 @@ export function Combobox({
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState("")
 
+  const filteredOptions = React.useMemo(() => {
+    if (inputValue.length < 3) return [];
+    return options.filter(option =>
+      option.label.toLowerCase().includes(inputValue.toLowerCase())
+    );
+  }, [inputValue, options]);
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -66,15 +73,15 @@ export function Combobox({
             onValueChange={setInputValue}
           />
           <CommandList>
-            {inputValue.length < 4 ? (
+            {inputValue.length < 3 ? (
               <div className="py-6 text-center text-sm">
-                Please type at least 4 characters to see results.
+                Please type at least 3 characters to search.
               </div>
             ) : (
               <>
                 <CommandEmpty>{emptyPlaceholder}</CommandEmpty>
                 <CommandGroup>
-                  {options.map((option) => (
+                  {filteredOptions.map((option) => (
                     <CommandItem
                       key={option.value}
                       value={option.value}
