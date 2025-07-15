@@ -105,6 +105,15 @@ export default function ProjectDetailsPage() {
     }
   }, [projectId, sessionUser, getProjectAndUsers])
 
+  const backButtonHref = useMemo(() => {
+    if (!sessionUser) return '/dashboard/my-projects';
+    
+    const adminRoles = ['admin', 'CRO', 'Super-admin'];
+    const hasAdminView = adminRoles.includes(sessionUser.role) || sessionUser.designation === 'Principal' || sessionUser.designation === 'HOD';
+
+    return hasAdminView ? '/dashboard/all-projects' : '/dashboard/my-projects';
+  }, [sessionUser]);
+
   if (loading) {
     return (
       <div className="container mx-auto py-10">
@@ -126,7 +135,7 @@ export default function ProjectDetailsPage() {
         <PageHeader
           title="Project Not Found"
           description="The project you are looking for does not exist or you do not have permission to view it."
-          backButtonHref="/dashboard/my-projects"
+          backButtonHref={backButtonHref}
           backButtonText="Back to Projects"
         />
       </div>
@@ -138,7 +147,7 @@ export default function ProjectDetailsPage() {
       <PageHeader
         title="Project Details"
         description="View project details and manage its status."
-        backButtonHref="/dashboard/my-projects"
+        backButtonHref={backButtonHref}
         backButtonText="Back to Projects"
       >
         <ProjectSummary project={project} />
