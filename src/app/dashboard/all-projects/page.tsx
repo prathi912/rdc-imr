@@ -53,6 +53,7 @@ export default function AllProjectsPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [facultyFilter, setFacultyFilter] = useState('all');
 
   // State for export dialog
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -62,7 +63,12 @@ export default function AllProjectsPage() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      // For CROs, if they have a primary faculty, set it as the default filter
+      if (parsedUser.role === 'CRO' && parsedUser.faculty) {
+        setFacultyFilter(parsedUser.faculty);
+      }
     } else {
       setLoading(false);
     }
@@ -103,16 +109,7 @@ export default function AllProjectsPage() {
                 const croFaculties = user.faculties;
                 const q = query(projectsCol, where('faculty', 'in', croFaculties), orderBy('submissionDate', 'desc'));
                 const snapshot = await getDocs(q);
-                const fetchedProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-
-                // Sort to put primary faculty projects first
-                const primaryFaculty = user.faculty;
-                projectList = fetchedProjects.sort((a, b) => {
-                    if (a.faculty === primaryFaculty && b.faculty !== primaryFaculty) return -1;
-                    if (a.faculty !== primaryFaculty && b.faculty === primaryFaculty) return 1;
-                    return 0;
-                });
-
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
             } else if (isHod && user.department && user.institute) {
                 const q = query(
                     projectsCol, 
@@ -195,9 +192,13 @@ export default function AllProjectsPage() {
     pageDescription = `Browse all projects submitted from your department within ${user.institute}.`;
     exportFileName = `projects_${user.department.replace(/[ &]/g, '_')}`;
   } else if (isCro && user?.faculty) {
-    pageTitle = `Projects from ${user.faculty}`;
-    pageDescription = "Browse all projects submitted from your assigned faculties.";
-    exportFileName = `projects_${user.faculty.replace(/[ &]/g, '_')}`;
+      if (facultyFilter === 'all' || !facultyFilter) {
+          pageTitle = `Projects from All Your Faculties`;
+      } else {
+          pageTitle = `Projects from ${facultyFilter}`;
+      }
+      pageDescription = "Browse all projects submitted from your assigned faculties.";
+      exportFileName = `projects_${facultyFilter.replace(/[ &]/g, '_')}`;
   }
 
   const filteredProjects = useMemo(() => {
@@ -205,6 +206,9 @@ export default function AllProjectsPage() {
       .filter(project => {
         if (statusFilter !== 'all' && project.status !== statusFilter) {
           return false;
+        }
+        if (isCro && facultyFilter !== 'all' && project.faculty !== facultyFilter) {
+            return false;
         }
         if (searchTerm === '') {
           return true;
@@ -215,7 +219,7 @@ export default function AllProjectsPage() {
           project.pi.toLowerCase().includes(lowerCaseSearch)
         );
       });
-  }, [allProjects, searchTerm, statusFilter]);
+  }, [allProjects, searchTerm, statusFilter, facultyFilter, isCro]);
 
   const handleColumnSelectionChange = (columnId: string, checked: boolean) => {
     setSelectedExportColumns(prev => {
@@ -381,6 +385,19 @@ export default function AllProjectsPage() {
                 ))}
             </SelectContent>
         </Select>
+        {isCro && user && user.faculties && user.faculties.length > 1 && (
+             <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                <SelectTrigger className="w-[280px]">
+                    <SelectValue placeholder="Filter by faculty" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Assigned Faculties</SelectItem>
+                    {user.faculties.map(faculty => (
+                        <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        )}
       </div>
 
       <div className="mt-4">
