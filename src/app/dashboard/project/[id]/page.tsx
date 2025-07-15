@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useParams } from "next/navigation"
 import { doc, getDoc, collection, getDocs, query, where, limit } from "firebase/firestore"
 import { db } from "@/lib/config"
