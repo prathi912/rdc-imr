@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, ArrowUpDown } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ChevronDown } from "lucide-react";
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -19,6 +19,8 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuPortal,
+  DropdownMenuCheckboxItem,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -46,20 +48,32 @@ import { getDefaultModulesForRole } from '@/lib/modules';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const ROLES: User['role'][] = ['faculty', 'admin']; // Base roles for all admins
-const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin'; // Special role
-const PRIMARY_SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com'; // Primary Super-admin
-type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role'> | 'claimsCount';
+const ROLES: User['role'][] = ['faculty', 'admin', 'CRO'];
+const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin';
+const PRIMARY_SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
+type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role' | 'faculty'> | 'claimsCount';
+
+const faculties = [
+    "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
+    "Faculty of Computer Applications", "Faculty of Agriculture", "Faculty of Architecture & Planning",
+    "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
+    "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
+    "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
+    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
+    "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
+];
 
 function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!user) return null;
 
-    const renderDetail = (label: string, value?: string | number) => {
+    const renderDetail = (label: string, value?: string | number | string[]) => {
         if (!value && value !== 0) return null;
+        let displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+
         return (
             <div className="grid grid-cols-3 gap-2 py-1.5">
                 <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
-                <dd className="col-span-2">{value}</dd>
+                <dd className="col-span-2">{displayValue}</dd>
             </div>
         );
     };
@@ -85,7 +99,8 @@ function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null,
                       <h4 className="font-semibold text-base mb-2">Academic Details</h4>
                       {renderDetail("MIS ID", user.misId)}
                       {renderDetail("ORCID ID", user.orcidId)}
-                      {renderDetail("Faculty", user.faculty)}
+                      {renderDetail("Primary Faculty", user.faculty)}
+                      {renderDetail("Assigned Faculties", user.faculties)}
                       {renderDetail("Institute", user.institute)}
                       {renderDetail("Department", user.department)}
                     </div>
@@ -233,22 +248,19 @@ export default function ManageUsersPage() {
     }
   }, [fetchUsersAndClaims, toast]);
 
-
-  const handleRoleChange = useCallback(async (uid: string, newRole: User['role']) => {
+  const handleRoleChange = useCallback(async (uid: string, newRole: User['role'], extraData?: Record<string, any>) => {
     try {
       const userDocRef = doc(db, 'users', uid);
       
-      const newDesignation = newRole === 'Super-admin' ? 'Super-admin' : 'faculty';
+      const newDesignation = newRole === 'Super-admin' ? 'Super-admin' : (extraData?.designation || 'faculty');
       const defaultModules = getDefaultModulesForRole(newRole, newDesignation);
       
-      const updatePayload: { role: User['role'], allowedModules: string[], designation?: string } = {
+      const updatePayload: Partial<User> = {
         role: newRole,
         allowedModules: defaultModules,
+        designation: newDesignation,
+        ...extraData
       };
-
-      if (newRole === 'Super-admin') {
-          updatePayload.designation = newDesignation;
-      }
       
       await updateDoc(userDocRef, updatePayload);
       
@@ -326,8 +338,8 @@ export default function ManageUsersPage() {
                     </Button>
                   </TableHead>
                    <TableHead>
-                     <Button variant="ghost" onClick={() => requestSort('claimsCount')}>
-                        Claims <ArrowUpDown className="ml-2 h-4 w-4" />
+                     <Button variant="ghost" onClick={() => requestSort('faculty')}>
+                        Faculty <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -336,11 +348,8 @@ export default function ManageUsersPage() {
               <TableBody>
                 {sortedAndFilteredUsers.map((user) => {
                    const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
-                   const isCurrentUser = user.uid === currentUser?.uid;
-                   // The actions button should be disabled if:
-                   // 1. The user row is for the currently logged-in user.
-                   // 2. The user row is for the primary super admin, AND the currently logged-in user is NOT the primary super admin.
-                   const isActionsDisabled = isCurrentUser || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
+                   const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
+                   const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
 
                    return (
                     <TableRow key={user.uid}>
@@ -357,7 +366,7 @@ export default function ManageUsersPage() {
                       <TableCell>
                         <Badge variant={user.role === 'admin' || user.role === 'Super-admin' ? 'default' : 'secondary'}>{user.role}</Badge>
                       </TableCell>
-                       <TableCell className="font-medium text-center">{user.claimsCount}</TableCell>
+                       <TableCell className="hidden sm:table-cell">{user.faculty || 'N/A'}</TableCell>
                       <TableCell className="text-right">
                          <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -374,17 +383,43 @@ export default function ManageUsersPage() {
                                 <DropdownMenuPortal>
                                     <DropdownMenuSubContent>
                                         {availableRoles.map(role => (
-                                            <DropdownMenuItem 
-                                                key={role} 
-                                                onClick={() => handleRoleChange(user.uid, role)}
-                                                disabled={user.role === role}
-                                            >
-                                               {role.charAt(0).toUpperCase() + role.slice(1)}
-                                            </DropdownMenuItem>
+                                          <DropdownMenuItem 
+                                              key={role} 
+                                              onClick={() => handleRoleChange(user.uid, role)}
+                                              disabled={user.role === role}
+                                          >
+                                             {role.charAt(0).toUpperCase() + role.slice(1)}
+                                          </DropdownMenuItem>
                                         ))}
                                     </DropdownMenuSubContent>
                                 </DropdownMenuPortal>
                             </DropdownMenuSub>
+                            {isCurrentUserSuperAdmin && user.role === 'CRO' && (
+                                <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>Assign Faculties</DropdownMenuSubTrigger>
+                                    <DropdownMenuPortal>
+                                        <DropdownMenuSubContent>
+                                            <DropdownMenuLabel>Faculties</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            {faculties.map(faculty => (
+                                                <DropdownMenuCheckboxItem
+                                                    key={faculty}
+                                                    checked={user.faculties?.includes(faculty)}
+                                                    onCheckedChange={(checked) => {
+                                                        const currentFaculties = user.faculties || [];
+                                                        const newFaculties = checked
+                                                            ? [...currentFaculties, faculty]
+                                                            : currentFaculties.filter(f => f !== faculty);
+                                                        handleRoleChange(user.uid, user.role, { faculties: newFaculties });
+                                                    }}
+                                                >
+                                                    {faculty}
+                                                </DropdownMenuCheckboxItem>
+                                            ))}
+                                        </DropdownMenuSubContent>
+                                    </DropdownMenuPortal>
+                                </DropdownMenuSub>
+                            )}
                             <DropdownMenuItem className="text-destructive" onSelect={() => setUserToDelete(user)}>
                               Delete User
                             </DropdownMenuItem>
@@ -424,3 +459,4 @@ export default function ManageUsersPage() {
     </div>
   );
 }
+
