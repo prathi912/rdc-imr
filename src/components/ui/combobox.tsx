@@ -36,18 +36,11 @@ export function Combobox({
     onChange, 
     placeholder = "Select an option...",
     searchPlaceholder = "Search...",
-    emptyPlaceholder = "No results found.",
+    emptyPlaceholder = "No results found. If you feel this is a error, please drop a mail to helpdesk.rdc@paruluniversity.ac.in",
     disabled = false,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false)
   const [inputValue, setInputValue] = React.useState("")
-
-  const filteredOptions = React.useMemo(() => {
-    if (inputValue.length < 3) return [];
-    return options.filter(option =>
-      option.label.toLowerCase().includes(inputValue.toLowerCase())
-    );
-  }, [inputValue, options]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -75,13 +68,13 @@ export function Combobox({
           <CommandList>
             {inputValue.length < 3 ? (
               <div className="py-6 text-center text-sm">
-                Please type at least 3 characters to search.
+                Please type at least 3 characters to see results.
               </div>
             ) : (
               <>
                 <CommandEmpty>{emptyPlaceholder}</CommandEmpty>
                 <CommandGroup>
-                  {filteredOptions.map((option) => (
+                  {options.map((option) => (
                     <CommandItem
                       key={option.value}
                       value={option.value}
