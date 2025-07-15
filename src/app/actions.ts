@@ -763,7 +763,8 @@ export async function bulkUploadProjects(
           // Handle Excel serial date format
           submissionDate = excelDateToJSDate(project.sanction_date).toISOString()
         } else if (typeof project.sanction_date === "string") {
-          const parsedDate = new Date(project.sanction_date)
+          // Attempt to parse various string formats
+          const parsedDate = new Date(project.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'))
           if (!isNaN(parsedDate.getTime())) {
             submissionDate = parsedDate.toISOString()
           } else {

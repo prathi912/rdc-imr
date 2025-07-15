@@ -555,7 +555,7 @@ export default function SettingsPage() {
                     <Banknote />
                     <CardTitle>Salary Bank Account Details</CardTitle>
                 </div>
-                <CardDescription>This information is required for incentive claims and grant disbursal.</CardDescription>
+                <CardDescription>This information is required for grant disbursal. These details would be only visible to admin if your project is approved.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                  <FormField name="beneficiaryName" control={bankForm.control} render={({ field }) => ( <FormItem><FormLabel>Beneficiary Name</FormLabel><FormControl><Input placeholder="Name as per bank records" {...field} /></FormControl><FormMessage /></FormItem> )} />

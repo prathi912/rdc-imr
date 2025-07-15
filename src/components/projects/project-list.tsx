@@ -116,7 +116,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
           </TableHeader>
           <TableBody>
             {sortedProjects.map((project) => {
-              const meetingDate = project.meetingDetails?.date ? parseISO(project.meetingDetails.date) : null;
+              const displayDate = project.submissionDate;
              
               let actionButton;
               if (project.status === 'Draft') {
@@ -142,7 +142,7 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
                 <TableRow key={project.id}>
                   <TableCell className="font-medium">{project.title}</TableCell>
                   <TableCell className="hidden sm:table-cell">{project.pi}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{new Date(displayDate).toLocaleDateString()}</TableCell>
                   <TableCell className="hidden md:table-cell">
                     <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
                   </TableCell>
