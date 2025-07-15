@@ -66,7 +66,7 @@ const faculties = [
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
     "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
     "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
-    "Parul Sevashram Hospital", "RDC"
+    "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
 ];
 
 const institutes = [
@@ -114,6 +114,8 @@ const institutes = [
     "Rajkot Homoeopathic Medical College",
     "RDC",
     "School of Pharmacy",
+    "University Office", 
+    "Parul Aarogya Seva Mandal",
 ];
 
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"];

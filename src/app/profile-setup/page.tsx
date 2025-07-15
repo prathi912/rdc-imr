@@ -48,7 +48,7 @@ const faculties = [
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
     "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
     "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
-    "Parul Sevashram Hospital", "RDC"
+    "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
 ];
 
 const institutes = [
@@ -64,7 +64,7 @@ const institutes = [
     "Parul Institute of Pharmaceutical Education & Research", "Parul Institute of Pharmacy", "Parul Institute of Pharmacy & Research",
     "Parul Institute of Physiotherapy", "Parul Institute of Physiotherapy and Research", "Parul Institute of Social Work",
     "Parul Institute of Vocational Education", "Parul Medical Institute & Hospital", "Parul Polytechnic Institute", "Parul Institute of Public Health",
-    "Parul Sevashram Hospital", "Rajkot Homoeopathic Medical College", "RDC", "School of Pharmacy",
+    "Parul Sevashram Hospital", "Rajkot Homoeopathic Medical College", "RDC", "School of Pharmacy", "University Office", "Parul Aarogya Seva Mandal",
 ];
 
 const fileToDataUrl = (file: File): Promise<string> => {
