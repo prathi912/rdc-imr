@@ -48,8 +48,12 @@ export default function AnalyticsPage() {
 
     if (isCro && user.faculty) {
         projectsQuery = query(projectsCollection, where('faculty', '==', user.faculty));
-    } else if (isHod && user.department) {
-        projectsQuery = query(projectsCollection, where('departmentName', '==', user.department));
+    } else if (isHod && user.department && user.institute) {
+        projectsQuery = query(
+            projectsCollection, 
+            where('departmentName', '==', user.department), 
+            where('institute', '==', user.institute)
+        );
     } else if (isSpecialPitUser) {
         projectsQuery = query(projectsCollection, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']));
     }
@@ -171,7 +175,7 @@ export default function AnalyticsPage() {
       if (user?.role === 'CRO' && user.faculty) return `Analytics for ${user.faculty}`;
       if (user?.designation === 'Principal' && user.institute) return `Analytics for ${user.institute}`;
       if (user?.designation === 'Principal' && !user.institute) return 'Analytics (Principal - No Institute Set)';
-      if (user?.designation === 'HOD' && user.department) return `Analytics for ${user.department}`;
+      if (user?.designation === 'HOD' && user.department && user.institute) return `Analytics for ${user.department}, ${user.institute}`;
       return 'Analytics';
   }
 
@@ -281,3 +285,5 @@ export default function AnalyticsPage() {
     </div>
   );
 }
+
+    

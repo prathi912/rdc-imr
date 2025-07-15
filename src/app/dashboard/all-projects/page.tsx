@@ -102,8 +102,13 @@ export default function AllProjectsPage() {
                 const q = query(projectsCol, where('faculty', '==', user.faculty), orderBy('submissionDate', 'desc'));
                 const snapshot = await getDocs(q);
                 projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-            } else if (isHod && user.department) {
-                const q = query(projectsCol, where('departmentName', '==', user.department), orderBy('submissionDate', 'desc'));
+            } else if (isHod && user.department && user.institute) {
+                const q = query(
+                    projectsCol, 
+                    where('departmentName', '==', user.department), 
+                    where('institute', '==', user.institute),
+                    orderBy('submissionDate', 'desc')
+                );
                 const snapshot = await getDocs(q);
                 projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
             } else if (isSpecialPitUser) {
@@ -176,7 +181,7 @@ export default function AllProjectsPage() {
     exportFileName = 'principal_all_projects';
   } else if (isHod && user?.department) {
     pageTitle = `Projects from ${user.department}`;
-    pageDescription = "Browse all projects submitted from your department.";
+    pageDescription = `Browse all projects submitted from your department within ${user.institute}.`;
     exportFileName = `projects_${user.department.replace(/[ &]/g, '_')}`;
   } else if (isCro && user?.faculty) {
     pageTitle = `Projects from ${user.faculty}`;
@@ -385,3 +390,5 @@ export default function AllProjectsPage() {
     </div>
   );
 }
+
+    
