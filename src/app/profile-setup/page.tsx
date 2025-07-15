@@ -16,7 +16,7 @@ import { auth, db } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { uploadFileToServer, checkMisIdExists, fetchOrcidData } from '@/app/actions';
 import type { User } from '@/types';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -87,6 +87,7 @@ export default function ProfileSetupPage() {
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(false);
   const [misIdToFetch, setMisIdToFetch] = useState('');
+  const [userType, setUserType] = useState<'faculty' | 'CRO' | 'Institutional' | null>(null);
 
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
@@ -104,18 +105,22 @@ export default function ProfileSetupPage() {
     },
   });
 
-  const prefillData = useCallback(async (email: string, misId?: string) => {
+  const prefillData = useCallback(async (misId: string) => {
+      if (!misId) return;
       setIsPrefilling(true);
       try {
-          const searchParams = misId ? `misId=${misId}` : `email=${email}`;
-          const res = await fetch(`/api/get-staff-data?${searchParams}`);
+          const res = await fetch(`/api/get-staff-data?misId=${misId}`);
           const result = await res.json();
           if (result.success) {
             form.reset(result.data);
+            setUserType(result.data.type);
             toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+          } else {
+             toast({ variant: 'destructive', title: 'Not Found', description: "Could not find your details using that MIS ID. Please enter them manually." });
           }
       } catch (error) {
           console.error("Failed to fetch prefill data", error);
+          toast({ variant: 'destructive', title: 'Error', description: "Could not fetch your data. Please try again or enter manually." });
       } finally {
           setIsPrefilling(false);
       }
@@ -135,9 +140,14 @@ export default function ProfileSetupPage() {
           }
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
-          
-          if(appUser.misId) {
-             await prefillData(appUser.email, appUser.misId);
+
+          // Pre-fetch user type based on email to determine if MIS ID is needed.
+          const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email!}`);
+          const staffResult = await staffRes.json();
+          if (staffResult.success) {
+              setUserType(staffResult.data.type || 'faculty');
+          } else {
+              setUserType('faculty'); // Default to faculty if not found
           }
           
         } else {
@@ -151,7 +161,7 @@ export default function ProfileSetupPage() {
     });
 
     return () => unsubscribe();
-  }, [router, toast, prefillData]);
+  }, [router, toast]);
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -166,6 +176,13 @@ export default function ProfileSetupPage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
+      // MIS ID is mandatory for faculty/CRO types
+      if (userType !== 'Institutional' && (!data.misId || data.misId.trim() === '')) {
+         form.setError("misId", { type: "manual", message: "MIS ID is mandatory for your account type." });
+         setIsSubmitting(false);
+         return;
+      }
+      
       if (data.misId) {
         const misIdCheck = await checkMisIdExists(data.misId, user.uid);
         if (misIdCheck.exists) {
@@ -280,23 +297,25 @@ export default function ProfileSetupPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-               <div className="space-y-4 mb-6 p-4 border rounded-lg bg-muted/50">
-                  <Label>Fetch Details with MIS ID</Label>
+               {userType !== 'Institutional' && (
+                <div className="space-y-4 mb-6 p-4 border rounded-lg bg-muted/50">
+                  <Label>Fetch Details with MIS ID (Mandatory)</Label>
                    <div className="flex items-center gap-2">
                       <Input
                         placeholder="Enter your MIS ID"
                         value={misIdToFetch}
                         onChange={(e) => setMisIdToFetch(e.target.value)}
                       />
-                      <Button type="button" onClick={() => prefillData(user.email, misIdToFetch)} disabled={isPrefilling || !misIdToFetch}>
+                      <Button type="button" onClick={() => prefillData(misIdToFetch)} disabled={isPrefilling || !misIdToFetch}>
                         {isPrefilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                          <span className="ml-2 hidden sm:inline">Fetch My Details</span>
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        If your data is in the university system, this will pre-fill the form for you.
+                        Faculty and CROs must use their MIS ID to pre-fill the form.
                     </p>
                 </div>
+               )}
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <div className="flex flex-col items-center space-y-4 pt-4 pb-6">
@@ -324,9 +343,11 @@ export default function ProfileSetupPage() {
                   <FormField name="institute" control={form.control} render={({ field }) => (
                     <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                   )} />
-                  <FormField control={form.control} name="department" render={({ field }) => (
-                    <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
+                  {userType !== 'Institutional' && (
+                    <FormField control={form.control} name="department" render={({ field }) => (
+                      <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  )}
                   <FormField control={form.control} name="designation" render={({ field }) => (
                     <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
@@ -337,9 +358,11 @@ export default function ProfileSetupPage() {
                   <Separator />
                   <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
                   
-                  <FormField control={form.control} name="misId" render={({ field }) => (
-                    <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
-                  )} />
+                  {userType !== 'Institutional' && (
+                    <FormField control={form.control} name="misId" render={({ field }) => (
+                      <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                  )}
                    <FormField control={form.control} name="orcidId" render={({ field }) => (
                       <FormItem>
                           <FormLabel>ORCID iD</FormLabel>

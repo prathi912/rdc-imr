@@ -36,7 +36,6 @@ import { linkHistoricalData } from '@/app/actions';
 import { Eye, EyeOff } from 'lucide-react';
 
 const signupSchema = z.object({
-  misId: z.string().min(1, 'MIS ID is required.'),
   email: z
     .string()
     .email('Invalid email address.')
@@ -70,14 +69,13 @@ export default function SignupPage() {
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      misId: '',
       email: '',
       password: '',
       confirmPassword: '',
     },
   });
 
-  const processNewUser = async (firebaseUser: FirebaseUser, misId?: string) => {
+  const processNewUser = async (firebaseUser: FirebaseUser) => {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDocSnap = await getDoc(userDocRef);
 
@@ -91,9 +89,8 @@ export default function SignupPage() {
       return;
     }
     
-    // Fetch staff data using MIS ID first, then fallback to email.
-    const searchParams = misId ? `misId=${misId}` : `email=${firebaseUser.email!}`;
-    const staffRes = await fetch(`/api/get-staff-data?${searchParams}`);
+    // Fetch staff data using email. The user will be prompted for MIS ID on profile setup.
+    const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`);
     const staffResult = await staffRes.json();
     
     let userDataFromExcel: Partial<User> = {};
@@ -126,7 +123,7 @@ export default function SignupPage() {
       institute: userDataFromExcel.institute || null,
       department: userDataFromExcel.department || null,
       phoneNumber: userDataFromExcel.phoneNumber || null,
-      misId: misId || userDataFromExcel.misId || null,
+      misId: userDataFromExcel.misId || null,
       profileComplete,
       allowedModules: getDefaultModulesForRole(role, designation),
     };
@@ -173,7 +170,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      await processNewUser(userCredential.user, data.misId);
+      await processNewUser(userCredential.user);
     } catch (error: any) {
       console.error('Signup Error:', error);
       toast({
@@ -245,19 +242,6 @@ export default function SignupPage() {
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="misId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>MIS ID</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter your MIS ID" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="email"
