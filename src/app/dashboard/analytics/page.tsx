@@ -8,7 +8,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContain
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, or } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign } from 'lucide-react';
@@ -43,12 +43,17 @@ export default function AnalyticsPage() {
     const isPrincipal = user?.designation === 'Principal';
     const isCro = user?.role === 'CRO';
     const isHod = user?.designation === 'HOD';
+    const isSpecialPitUser = user?.email === 'pit@paruluniversity.ac.in';
+
 
     if (isCro && user.faculty) {
         projectsQuery = query(projectsCollection, where('faculty', '==', user.faculty));
     } else if (isHod && user.department) {
         projectsQuery = query(projectsCollection, where('departmentName', '==', user.department));
-    } else if (isPrincipal && user.institute) {
+    } else if (isSpecialPitUser) {
+        projectsQuery = query(projectsCollection, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']));
+    }
+    else if (isPrincipal && user.institute) {
         projectsQuery = query(projectsCollection, where('institute', '==', user.institute));
     } else {
         projectsQuery = query(projectsCollection);
@@ -108,7 +113,7 @@ export default function AnalyticsPage() {
     if (user?.role === 'CRO') {
         return { aggregationKey: 'institute', aggregationLabel: 'Institute' };
     }
-    if (user?.designation === 'Principal' || user?.designation === 'HOD') {
+    if (user?.designation === 'Principal' || user?.designation === 'HOD' || user?.email === 'pit@paruluniversity.ac.in') {
         return { aggregationKey: 'departmentName', aggregationLabel: 'Department' };
     }
     // Default for Admin/Super-admin
@@ -162,6 +167,7 @@ export default function AnalyticsPage() {
 
 
   const getPageTitle = () => {
+      if (user?.email === 'pit@paruluniversity.ac.in') return 'Analytics for Parul Institute of Technology';
       if (user?.role === 'CRO' && user.faculty) return `Analytics for ${user.faculty}`;
       if (user?.designation === 'Principal' && user.institute) return `Analytics for ${user.institute}`;
       if (user?.designation === 'Principal' && !user.institute) return 'Analytics (Principal - No Institute Set)';

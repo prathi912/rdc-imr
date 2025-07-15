@@ -71,6 +71,7 @@ const faculties = [
 
 const institutes = [
     "Parul Institute of Technology",
+    "Parul Institute of Technology-Diploma studies",
     "Ahmedabad Homoeopathic Medical College",
     "Ahmedabad Physiotherapy College",
     "College of Agriculture",

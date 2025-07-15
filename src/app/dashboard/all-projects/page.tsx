@@ -8,7 +8,7 @@ import type { DateRange } from 'react-day-picker';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, or } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -89,6 +89,8 @@ export default function AllProjectsPage() {
             const isCro = user?.role === 'CRO';
             const isPrincipal = user?.designation === 'Principal';
             const isHod = user?.designation === 'HOD';
+            const isSpecialPitUser = user?.email === 'pit@paruluniversity.ac.in';
+
 
             let projectList: Project[] = [];
 
@@ -104,7 +106,12 @@ export default function AllProjectsPage() {
                 const q = query(projectsCol, where('departmentName', '==', user.department), orderBy('submissionDate', 'desc'));
                 const snapshot = await getDocs(q);
                 projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-            } else if (isPrincipal && user.institute) {
+            } else if (isSpecialPitUser) {
+                 const q = query(projectsCol, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']), orderBy('submissionDate', 'desc'));
+                 const snapshot = await getDocs(q);
+                 projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            }
+            else if (isPrincipal && user.institute) {
                 // First, try an exact match.
                 const exactQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
                 let snapshot = await getDocs(exactQuery);
@@ -154,7 +161,12 @@ export default function AllProjectsPage() {
   let pageDescription = "Browse and manage all projects in the system.";
   let exportFileName = 'all_projects';
 
-  if (isPrincipal && user?.institute) {
+  if (user?.email === 'pit@paruluniversity.ac.in') {
+      pageTitle = `Projects from Parul Institute of Technology`;
+      pageDescription = "Browse all projects from Parul Institute of Technology and its Diploma studies wing.";
+      exportFileName = `projects_PIT_Combined`;
+  }
+  else if (isPrincipal && user?.institute) {
     pageTitle = `Projects from ${user.institute}`;
     pageDescription = "Browse all projects submitted from your institute.";
     exportFileName = `projects_${user.institute.replace(/[ &]/g, '_')}`;
