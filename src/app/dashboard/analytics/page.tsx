@@ -46,8 +46,8 @@ export default function AnalyticsPage() {
     const isSpecialPitUser = user?.email === 'pit@paruluniversity.ac.in';
 
 
-    if (isCro && user.faculty) {
-        projectsQuery = query(projectsCollection, where('faculty', '==', user.faculty));
+    if (isCro && user.faculties && user.faculties.length > 0) {
+        projectsQuery = query(projectsCollection, where('faculty', 'in', user.faculties));
     } else if (isHod && user.department && user.institute) {
         projectsQuery = query(
             projectsCollection, 
@@ -285,5 +285,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-
-    

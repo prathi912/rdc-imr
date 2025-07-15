@@ -14,7 +14,8 @@ export type User = {
   email: string;
   role: 'admin' | 'faculty' | 'CRO' | 'Super-admin';
   designation?: 'Principal' | 'HOD' | 'Super-admin' | 'faculty' | string;
-  faculty?: string;
+  faculties?: string[]; // A user can be associated with multiple faculties, especially CROs
+  faculty?: string; // Primary faculty
   institute?: string;
   department?: string | null;
   misId?: string;

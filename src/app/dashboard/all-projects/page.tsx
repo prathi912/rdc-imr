@@ -98,10 +98,21 @@ export default function AllProjectsPage() {
                 const q = query(projectsCol, orderBy('submissionDate', 'desc'));
                 const snapshot = await getDocs(q);
                 projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-            } else if (isCro && user.faculty) {
-                const q = query(projectsCol, where('faculty', '==', user.faculty), orderBy('submissionDate', 'desc'));
+            } else if (isCro && user.faculties && user.faculties.length > 0) {
+                // Fetch projects for all assigned faculties
+                const croFaculties = user.faculties;
+                const q = query(projectsCol, where('faculty', 'in', croFaculties), orderBy('submissionDate', 'desc'));
                 const snapshot = await getDocs(q);
-                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                const fetchedProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+
+                // Sort to put primary faculty projects first
+                const primaryFaculty = user.faculty;
+                projectList = fetchedProjects.sort((a, b) => {
+                    if (a.faculty === primaryFaculty && b.faculty !== primaryFaculty) return -1;
+                    if (a.faculty !== primaryFaculty && b.faculty === primaryFaculty) return 1;
+                    return 0;
+                });
+
             } else if (isHod && user.department && user.institute) {
                 const q = query(
                     projectsCol, 
@@ -185,7 +196,7 @@ export default function AllProjectsPage() {
     exportFileName = `projects_${user.department.replace(/[ &]/g, '_')}`;
   } else if (isCro && user?.faculty) {
     pageTitle = `Projects from ${user.faculty}`;
-    pageDescription = "Browse all projects submitted from your faculty.";
+    pageDescription = "Browse all projects submitted from your assigned faculties.";
     exportFileName = `projects_${user.faculty.replace(/[ &]/g, '_')}`;
   }
 
@@ -390,5 +401,3 @@ export default function AllProjectsPage() {
     </div>
   );
 }
-
-    
