@@ -65,7 +65,7 @@ const faculties = [
     "Faculty of IT & Computer Science", "Faculty of Agriculture", "Faculty of Architecture & Planning",
     "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
-    "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
+    "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
     "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
     "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
 ];

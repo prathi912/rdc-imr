@@ -13,6 +13,7 @@ import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign } from 'lucide-react';
 import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB"];
@@ -22,11 +23,16 @@ export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const [facultyFilter, setFacultyFilter] = useState('all');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        if (parsedUser.role === 'CRO' && parsedUser.faculties && parsedUser.faculties.length > 0) {
+            setFacultyFilter(parsedUser.faculties[0]);
+        }
     } else {
         setLoading(false);
     }
@@ -93,6 +99,14 @@ export default function AnalyticsPage() {
 
   }, [user]);
 
+  // --- Filtered Projects based on CRO selection ---
+  const filteredProjects = useMemo(() => {
+    if (user?.role === 'CRO' && facultyFilter !== 'all') {
+      return projects.filter(p => p.faculty === facultyFilter);
+    }
+    return projects;
+  }, [projects, user, facultyFilter]);
+
   // --- Data Processing ---
   const submissionsData = useMemo(() => {
     const last6Months = Array.from({ length: 6 }, (_, i) => {
@@ -101,13 +115,13 @@ export default function AnalyticsPage() {
     }).reverse();
 
     return last6Months.map(month => {
-      const count = projects.filter(p => {
+      const count = filteredProjects.filter(p => {
         const submissionDate = parseISO(p.submissionDate);
         return submissionDate >= month.start && submissionDate <= month.end;
       }).length;
       return { month: month.name, submissions: count };
     });
-  }, [projects]);
+  }, [filteredProjects]);
   
   const submissionsConfig = {
     submissions: { label: 'Submissions', color: 'hsl(var(--primary))' },
@@ -127,7 +141,7 @@ export default function AnalyticsPage() {
 
   const projectsByGroupData = useMemo(() => 
     Object.entries(
-      projects.reduce((acc, project) => {
+      filteredProjects.reduce((acc, project) => {
         const key = project[aggregationKey as keyof Project] as string | undefined;
         if (key) {
           acc[key] = (acc[key] || 0) + 1;
@@ -136,21 +150,21 @@ export default function AnalyticsPage() {
       }, {} as Record<string, number>)
     ).map(([group, count]) => ({ group, projects: count }))
     .sort((a, b) => b.projects - a.projects)
-  , [projects, aggregationKey]);
+  , [filteredProjects, aggregationKey]);
 
   const projectsByGroupConfig = {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },
   } satisfies ChartConfig;
 
   const statusDistributionData = useMemo(() => {
-    const statusCounts = projects.reduce((acc, project) => {
+    const statusCounts = filteredProjects.reduce((acc, project) => {
         const status = project.status || 'Unknown';
         acc[status] = (acc[status] || 0) + 1;
         return acc;
     }, {} as Record<string, number>);
 
     return Object.entries(statusCounts).map(([name, value]) => ({ name, value }));
-  }, [projects]);
+  }, [filteredProjects]);
 
   const statusDistributionConfig = useMemo(() => {
     const config: ChartConfig = {};
@@ -164,15 +178,19 @@ export default function AnalyticsPage() {
   }, [statusDistributionData]);
 
   const totalGrantAmount = useMemo(() => {
-    return projects.reduce((acc, project) => {
+    return filteredProjects.reduce((acc, project) => {
         return acc + (project.grant?.totalAmount || 0);
     }, 0);
-  }, [projects]);
+  }, [filteredProjects]);
 
+  const isCro = user?.role === 'CRO';
 
   const getPageTitle = () => {
+      if (isCro) {
+          if (facultyFilter === 'all') return `Analytics for All Your Faculties`;
+          return `Analytics for ${facultyFilter}`;
+      }
       if (user?.email === 'pit@paruluniversity.ac.in') return 'Analytics for Parul Institute of Technology';
-      if (user?.role === 'CRO' && user.faculty) return `Analytics for ${user.faculty}`;
       if (user?.designation === 'Principal' && user.institute) return `Analytics for ${user.institute}`;
       if (user?.designation === 'Principal' && !user.institute) return 'Analytics (Principal - No Institute Set)';
       if (user?.designation === 'HOD' && user.department && user.institute) return `Analytics for ${user.department}, ${user.institute}`;
@@ -203,7 +221,21 @@ export default function AnalyticsPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title={getPageTitle()} description={getPageDescription()} />
+      <PageHeader title={getPageTitle()} description={getPageDescription()}>
+          {isCro && user.faculties && user.faculties.length > 1 && (
+            <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                <SelectTrigger className="w-[280px]">
+                    <SelectValue placeholder="Filter by faculty" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Assigned Faculties</SelectItem>
+                    {user.faculties.map(faculty => (
+                        <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        )}
+      </PageHeader>
       <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <CardHeader>
