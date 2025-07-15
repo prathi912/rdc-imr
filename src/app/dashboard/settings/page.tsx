@@ -22,6 +22,7 @@ import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCreden
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Banknote, Bot, Loader2 } from 'lucide-react';
 import { CRO_EMAILS, PRINCIPAL_EMAILS } from '@/lib/constants';
+import { Combobox } from '@/components/ui/combobox';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -141,6 +142,8 @@ export default function SettingsPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [departmentSearch, setDepartmentSearch] = useState('');
 
   const isPrincipal = useMemo(() => user?.designation === 'Principal', [user]);
   const isCro = useMemo(() => user?.role === 'CRO', [user]);
@@ -220,6 +223,20 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    async function fetchDepartments() {
+      try {
+        const res = await fetch('/api/get-departments');
+        const result = await res.json();
+        if (result.success) {
+          setDepartments(result.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch departments", error);
+      }
+    }
+    fetchDepartments();
+  }, []);
 
   async function onProfileSubmit(data: ProfileFormValues) {
     if (!user) return;
@@ -413,6 +430,8 @@ export default function SettingsPage() {
     );
   }
 
+  const departmentOptions = departments.map(dept => ({ label: dept, value: dept }));
+
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Settings" description="Manage your account settings and preferences." />
@@ -461,9 +480,25 @@ export default function SettingsPage() {
                 <FormField name="institute" control={profileForm.control} render={({ field }) => (
                   <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
-                <FormField control={profileForm.control} name="department" render={({ field }) => (
-                  <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} disabled={isAcademicInfoLocked} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField
+                  control={profileForm.control}
+                  name="department"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Combobox
+                        options={departmentOptions}
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        placeholder="Select your department"
+                        searchPlaceholder="Search departments..."
+                        emptyPlaceholder="No department found."
+                        disabled={isAcademicInfoLocked}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField control={profileForm.control} name="designation" render={({ field }) => (
                   <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} disabled={isAcademicInfoLocked} /></FormControl><FormMessage /></FormItem>
                 )} />

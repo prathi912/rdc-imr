@@ -24,6 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { Bot, Loader2, Search } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
+import { Combobox } from '@/components/ui/combobox';
 
 const profileSetupSchema = z.object({
   faculty: z.string().min(1, 'Please select a faculty.'),
@@ -90,6 +91,7 @@ export default function ProfileSetupPage() {
   const [isPrefilling, setIsPrefilling] = useState(false);
   const [misIdToFetch, setMisIdToFetch] = useState('');
   const [userType, setUserType] = useState<'faculty' | 'CRO' | 'Institutional' | null>(null);
+  const [departments, setDepartments] = useState<string[]>([]);
 
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
@@ -164,6 +166,21 @@ export default function ProfileSetupPage() {
 
     return () => unsubscribe();
   }, [router, toast]);
+
+  useEffect(() => {
+    async function fetchDepartments() {
+      try {
+        const res = await fetch('/api/get-departments');
+        const result = await res.json();
+        if (result.success) {
+          setDepartments(result.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch departments", error);
+      }
+    }
+    fetchDepartments();
+  }, []);
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,6 +301,8 @@ export default function ProfileSetupPage() {
     )
   }
 
+  const departmentOptions = departments.map(dept => ({ label: dept, value: dept }));
+
   return (
     <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
       <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -346,9 +365,24 @@ export default function ProfileSetupPage() {
                     <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   {userType !== 'Institutional' && (
-                    <FormField control={form.control} name="department" render={({ field }) => (
-                      <FormItem><FormLabel>Department</FormLabel><FormControl><Input placeholder="e.g., Computer Science" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
+                     <FormField
+                      control={form.control}
+                      name="department"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <Combobox
+                            options={departmentOptions}
+                            value={field.value || ''}
+                            onChange={field.onChange}
+                            placeholder="Select your department"
+                            searchPlaceholder="Search departments..."
+                            emptyPlaceholder="No department found."
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
                   <FormField control={form.control} name="designation" render={({ field }) => (
                     <FormItem><FormLabel>Designation</FormLabel><FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl><FormMessage /></FormItem>
