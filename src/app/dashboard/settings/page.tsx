@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -61,7 +62,7 @@ type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>;
 
 const faculties = [
     "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
-    "Faculty of IT & Computer & Science", "Faculty of Agriculture", "Faculty of Architecture & Planning",
+    "Faculty of IT & Computer Science", "Faculty of Agriculture", "Faculty of Architecture & Planning",
     "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
     "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
