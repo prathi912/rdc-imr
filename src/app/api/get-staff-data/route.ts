@@ -27,9 +27,10 @@ interface StaffData {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
+  const misId = searchParams.get('misId');
 
-  if (!email) {
-    return NextResponse.json({ success: false, error: 'Email query parameter is required.' }, { status: 400 });
+  if (!email && !misId) {
+    return NextResponse.json({ success: false, error: 'Email or MIS ID query parameter is required.' }, { status: 400 });
   }
   
   // Construct the path to the file in the project's root directory.
@@ -47,8 +48,18 @@ export async function GET(request: NextRequest) {
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json<StaffData>(worksheet);
+    
+    let userRecord: StaffData | undefined;
 
-    const userRecord = jsonData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
+    if (misId) {
+        userRecord = jsonData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
+    }
+    
+    // Fallback to email if not found by MIS ID, or if MIS ID was not provided
+    if (!userRecord && email) {
+        userRecord = jsonData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
+    }
+
 
     if (userRecord) {
       const instituteName = userRecord.Type === 'Institutional' ? userRecord.Name : userRecord.Institute;

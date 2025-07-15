@@ -21,7 +21,7 @@ import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Bot, Loader2 } from 'lucide-react';
+import { Bot, Loader2, Search } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 
@@ -86,6 +86,7 @@ export default function ProfileSetupPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
   const [isPrefilling, setIsPrefilling] = useState(false);
+  const [misIdToFetch, setMisIdToFetch] = useState('');
 
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
@@ -103,11 +104,11 @@ export default function ProfileSetupPage() {
     },
   });
 
-  const prefillData = useCallback(async (appUser: User) => {
-      if (appUser.profileComplete) return;
+  const prefillData = useCallback(async (email: string, misId?: string) => {
       setIsPrefilling(true);
       try {
-          const res = await fetch(`/api/get-staff-data?email=${appUser.email}`);
+          const searchParams = misId ? `misId=${misId}` : `email=${email}`;
+          const res = await fetch(`/api/get-staff-data?${searchParams}`);
           const result = await res.json();
           if (result.success) {
             form.reset(result.data);
@@ -135,7 +136,10 @@ export default function ProfileSetupPage() {
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
           
-          await prefillData(appUser);
+          if(appUser.misId) {
+             await prefillData(appUser.email, appUser.misId);
+          }
+          
         } else {
           toast({ variant: 'destructive', title: 'Error', description: 'Could not find user profile.' });
           router.replace('/login');
@@ -202,11 +206,11 @@ export default function ProfileSetupPage() {
       // Sanitize data: Ensure optional fields that are empty strings are not sent as undefined
       for (const key in updateData) {
         if ((updateData as any)[key] === undefined) {
-          (updateData as any)[key] = '';
+          (updateData as any)[key] = null;
         }
       }
 
-      await updateDoc(userDocRef, updateData);
+      await updateDoc(userDocRef, updateData as any);
       
       const updatedUser = { ...user, ...updateData };
       localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -276,12 +280,23 @@ export default function ProfileSetupPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isPrefilling ? (
-                 <div className="flex items-center justify-center p-8 text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    <span>Attempting to pre-fill your data...</span>
+               <div className="space-y-4 mb-6 p-4 border rounded-lg bg-muted/50">
+                  <Label>Fetch Details with MIS ID</Label>
+                   <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Enter your MIS ID"
+                        value={misIdToFetch}
+                        onChange={(e) => setMisIdToFetch(e.target.value)}
+                      />
+                      <Button type="button" onClick={() => prefillData(user.email, misIdToFetch)} disabled={isPrefilling || !misIdToFetch}>
+                        {isPrefilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                         <span className="ml-2 hidden sm:inline">Fetch My Details</span>
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                        If your data is in the university system, this will pre-fill the form for you.
+                    </p>
                 </div>
-              ) : (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <div className="flex flex-col items-center space-y-4 pt-4 pb-6">
@@ -354,7 +369,6 @@ export default function ProfileSetupPage() {
                   </Button>
                 </form>
               </Form>
-              )}
             </CardContent>
           </Card>
         </div>
