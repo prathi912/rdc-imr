@@ -46,6 +46,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarPicker } from '../ui/calendar';
 import { Textarea } from '../ui/textarea';
+import { Separator } from '../ui/separator';
 
 
 interface EmrCalendarProps {
@@ -814,7 +815,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         return <Skeleton className="h-96 w-full" />;
     }
 
-    const upcomingCalls = calls.filter(c => !isAfter(new Date(), parseISO(c.interestDeadline)));
+    const upcomingCalls = calls.filter(c => !isAfter(new Date(), parseISO(c.applyDeadline)));
 
     return (
         <Card>
@@ -924,10 +925,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             {userHasRegistered && interestDetails?.pptUrl && (
                                                  <Button asChild size="sm" variant="outline"><a href={interestDetails.pptUrl} target="_blank" rel="noreferrer"><Eye className="h-4 w-4 mr-2"/>View PPT</a></Button>
                                             )}
-                                            {userHasRegistered && interestDetails && (
+                                            {userHasRegistered && (
                                                 <Button size="sm" variant="outline" onClick={() => { setSelectedInterest(interestDetails!); setSelectedCall(call); setIsUploadPptOpen(true); }}>
-                                                    {interestDetails.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                                                    {interestDetails.pptUrl ? 'Manage PPT' : 'Upload PPT'}
+                                                    {interestDetails?.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                                                    {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
                                                 </Button>
                                             )}
                                             {isAdmin && (
