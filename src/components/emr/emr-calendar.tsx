@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, createRef } from 'react';
 import * as z from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -414,15 +414,31 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const firstDay = startOfMonth(currentMonth);
     const lastDay = endOfMonth(currentMonth);
     const daysInMonth = eachDayOfInterval({ start: firstDay, end: lastDay });
-    const startingDayIndex = getDay(firstDay); // 0 = Sunday, 1 = Monday...
+    const startingDayIndex = getDay(firstDay);
+
+    const eventRefs = new Map<string, React.RefObject<HTMLDivElement>>();
+    calls.forEach(call => {
+        eventRefs.set(`deadline-${call.id}`, createRef());
+        if (call.meetingDetails?.date) {
+            eventRefs.set(`meeting-${call.id}`, createRef());
+        }
+    });
+
+    const handleDateClick = (dateStr: string) => {
+        const firstEventForDate = eventsByDate[dateStr]?.[0];
+        if (firstEventForDate) {
+            const eventId = firstEventForDate.type === 'meeting' ? `meeting-${firstEventForDate.call.id}` : `deadline-${firstEventForDate.call.id}`;
+            const ref = eventRefs.get(eventId);
+            ref?.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    };
+
 
     const eventsByDate = calls.reduce((acc, call) => {
-        // Add deadline event
         const deadlineDate = format(parseISO(call.interestDeadline), 'yyyy-MM-dd');
         if (!acc[deadlineDate]) acc[deadlineDate] = [];
         acc[deadlineDate].push({ type: 'deadline', call });
 
-        // Add meeting event if it exists
         if (call.meetingDetails?.date) {
             const meetingDate = format(parseISO(call.meetingDetails.date), 'yyyy-MM-dd');
             if (!acc[meetingDate]) acc[meetingDate] = [];
@@ -500,6 +516,8 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         return <Skeleton className="h-96 w-full" />;
     }
 
+    const upcomingCalls = calls.filter(c => !isAfter(new Date(), parseISO(c.interestDeadline)));
+
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -520,28 +538,23 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                 <div key={day} className="text-center font-semibold p-2 border-b border-r text-sm text-muted-foreground">{day}</div>
                             ))}
                             {Array.from({ length: startingDayIndex }).map((_, i) => (
-                                <div key={`empty-${i}`} className="border-b border-r min-h-[12rem]"></div>
+                                <div key={`empty-${i}`} className="border-b border-r min-h-[6rem]"></div>
                             ))}
                             {daysInMonth.map(day => {
                                 const dateStr = format(day, 'yyyy-MM-dd');
                                 const eventsOnDay = eventsByDate[dateStr] || [];
+                                const hasDeadline = eventsOnDay.some(e => e.type === 'deadline');
+                                const hasMeeting = eventsOnDay.some(e => e.type === 'meeting');
                                 return (
-                                    <div key={dateStr} className="min-h-[12rem] border-b border-r p-2 flex flex-col overflow-hidden">
+                                    <div 
+                                        key={dateStr} 
+                                        className={cn("min-h-[6rem] border-b border-r p-2 flex flex-col cursor-pointer hover:bg-muted/50 transition-colors", eventsOnDay.length > 0 ? "cursor-pointer" : "cursor-default")}
+                                        onClick={() => eventsOnDay.length > 0 && handleDateClick(dateStr)}
+                                    >
                                         <span className="font-semibold">{format(day, 'd')}</span>
-                                        <div className="flex-grow overflow-y-auto space-y-1 mt-1 text-xs">
-                                            {eventsOnDay.map((event, index) => {
-                                                const userHasRegistered = userInterests.some(i => i.callId === event.call.id);
-                                                return (
-                                                    <div key={`${event.call.id}-${index}`} className="p-1.5 rounded-md bg-muted/50 text-muted-foreground">
-                                                        <p className="font-semibold text-foreground truncate flex items-center gap-1.5">
-                                                          {event.type === 'meeting' && <Video className="h-3 w-3 text-primary" />}
-                                                          {event.call.title}
-                                                        </p>
-                                                        <p className="truncate">{event.call.agency}</p>
-                                                        {userHasRegistered && event.type === 'deadline' && <Badge variant="default" className="mt-1 w-full justify-center">Registered</Badge>}
-                                                    </div>
-                                                )
-                                            })}
+                                        <div className="flex-grow flex items-end justify-start gap-1 mt-1">
+                                            {hasDeadline && <div className="h-2 w-2 rounded-full bg-green-500" title="Registration Deadline"></div>}
+                                            {hasMeeting && <div className="h-2 w-2 rounded-full bg-blue-500" title="Meeting Scheduled"></div>}
                                         </div>
                                     </div>
                                 )
@@ -551,13 +564,14 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                     
                     <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                         <h4 className="font-semibold">All Upcoming Deadlines</h4>
-                        {calls.filter(c => !isAfter(new Date(), parseISO(c.interestDeadline))).map(call => {
+                        {upcomingCalls.length > 0 ? upcomingCalls.map(call => {
                             const userHasRegistered = userInterests.some(i => i.callId === call.id);
                             const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
                             const hasInterest = allInterests.some(i => i.callId === call.id);
+                            const callRef = eventRefs.get(`deadline-${call.id}`);
 
                             return (
-                                <div key={call.id} className="border p-4 rounded-lg flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                <div key={call.id} ref={callRef} className="border p-4 rounded-lg flex flex-col md:flex-row md:items-start justify-between gap-4">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             <h4 className="font-semibold">{call.title}</h4>
@@ -572,7 +586,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
                                         </div>
                                         {call.meetingDetails && (
-                                            <div className="mt-2 text-sm p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
+                                            <div ref={eventRefs.get(`meeting-${call.id}`)} className="mt-2 text-sm p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
                                                 <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Meeting Scheduled</p>
                                                 <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
                                                 <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
@@ -611,7 +625,11 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                     </div>
                                 </div>
                             )
-                        })}
+                        }) : (
+                             <div className="text-center py-10 text-muted-foreground">
+                                No upcoming deadlines.
+                            </div>
+                        )}
                     </div>
                 </div>
             </CardContent>
