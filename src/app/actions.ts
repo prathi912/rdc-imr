@@ -1367,6 +1367,12 @@ export async function scheduleEmrMeeting(
   meetingDetails: { date: string; venue: string; evaluatorUids: string[]; slots: { userId: string, time: string }[] },
 ) {
   try {
+    const { date, venue, evaluatorUids, slots } = meetingDetails;
+
+    if (!evaluatorUids || evaluatorUids.length === 0) {
+      return { success: false, error: "An evaluation committee must be assigned." };
+    }
+
     const callRef = adminDb.collection('fundingCalls').doc(callId);
     const callSnap = await callRef.get();
     if (!callSnap.exists) {
@@ -1376,14 +1382,14 @@ export async function scheduleEmrMeeting(
 
     await callRef.update({
       status: 'Meeting Scheduled',
-      meetingDetails: { date: meetingDetails.date, venue: meetingDetails.venue, assignedEvaluators: meetingDetails.evaluatorUids }
+      meetingDetails: { date, venue, assignedEvaluators: evaluatorUids }
     });
 
     const batch = adminDb.batch();
     const emailPromises = [];
 
     // Notify participants
-    for (const slot of meetingDetails.slots) {
+    for (const slot of slots) {
         if (!slot.time) continue;
 
         const interestQuery = await adminDb.collection('emrInterests').where('callId', '==', callId).where('userId', '==', slot.userId).limit(1).get();
@@ -1392,12 +1398,12 @@ export async function scheduleEmrMeeting(
         const interestDoc = interestQuery.docs[0];
         const interest = interestDoc.data() as EmrInterest;
 
-        const userSlotTime = parse(slot.time, 'HH:mm', new Date(meetingDetails.date));
+        const userSlotTime = parse(slot.time, 'HH:mm', new Date(date));
 
         // Update interest document with meeting slot
         batch.update(interestDoc.ref, {
             meetingSlot: {
-                date: meetingDetails.date,
+                date: date,
                 time: slot.time,
             }
         });
@@ -1422,7 +1428,7 @@ export async function scheduleEmrMeeting(
                 </p>
                 <p><strong style="color: #ffffff;">Date:</strong> ${format(userSlotTime, 'MMMM d, yyyy')}</p>
                 <p><strong style="color: #ffffff;">Your Time Slot:</strong> ${format(userSlotTime, 'h:mm a')}</p>
-                <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+                <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
                 <p style="color: #cccccc;">
                     Please prepare for your presentation.
                 </p>
@@ -1441,9 +1447,9 @@ export async function scheduleEmrMeeting(
     }
 
     // Notify evaluators
-    if (meetingDetails.evaluatorUids && meetingDetails.evaluatorUids.length > 0) {
+    if (evaluatorUids && evaluatorUids.length > 0) {
       const evaluatorDocs = await Promise.all(
-        meetingDetails.evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()),
+        evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()),
       );
 
       for (const evaluatorDoc of evaluatorDocs) {
@@ -1467,8 +1473,8 @@ export async function scheduleEmrMeeting(
                     <p style="color: #ffffff;">Dear Evaluator,</p>
                     <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
                     <p><strong style="color: #ffffff;">Call:</strong> ${call.title}</p>
-                    <p><strong style="color: #ffffff;">Date:</strong> ${format(new Date(meetingDetails.date.replace(/-/g, "/")), 'MMMM d, yyyy')}</p>
-                    <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+                    <p><strong style="color: #ffffff;">Date:</strong> ${format(new Date(date.replace(/-/g, "/")), 'MMMM d, yyyy')}</p>
+                    <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Portal.</p>
                 </div>
               `

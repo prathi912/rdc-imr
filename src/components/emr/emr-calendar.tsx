@@ -432,7 +432,7 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests, allUsers
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
-                    <DialogDescription>Set the date, venue, evaluators, and a time slot for each registered participant.</DialogDescription>
+                    <DialogDescription>Set the date, venue, assign an evaluation committee, and set a time slot for each participant.</DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <form id="schedule-meeting-form" onSubmit={form.handleSubmit(handleScheduleMeeting)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
@@ -582,12 +582,12 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
                     <DialogDescription>
                         {interest.pptUrl ? 'You can view, replace, or remove your uploaded presentation.' : `Please upload your presentation for the call: "${call.title}".`}
                         <br/>
-                        {deadlineMessage}
+                        {call.meetingDetails && deadlineMessage}
                         <br/>
                         <span className="font-semibold">The presentation file should be under 5MB.</span>
                     </DialogDescription>
                 </DialogHeader>
-                 {isDeadlinePast ? (
+                 {call.meetingDetails && isDeadlinePast ? (
                     <div className="text-center text-destructive font-semibold p-4">
                         The deadline to upload or modify your presentation has passed.
                         {interest.pptUrl && <Button asChild variant="link"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View Final Submission</a></Button>}
@@ -618,7 +618,7 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
                 )}
                 <DialogFooter className="justify-between">
                      <div>
-                        {interest.pptUrl && !isDeadlinePast && (
+                        {interest.pptUrl && !(call.meetingDetails && isDeadlinePast) && (
                             <Button variant="destructive" size="sm" onClick={() => setIsDeleteConfirmationOpen(true)} disabled={isSubmitting}>
                                 <Trash2 className="h-4 w-4 mr-2" /> Remove
                             </Button>
@@ -626,7 +626,7 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
                     </div>
                     <div className="flex gap-2">
                         <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                         {!isDeadlinePast && (
+                         {!(call.meetingDetails && isDeadlinePast) && (
                             <Button type="submit" form="upload-ppt-form" disabled={isSubmitting}>
                                 {isSubmitting ? "Saving..." : (interest.pptUrl ? 'Replace File' : 'Upload File')}
                             </Button>
