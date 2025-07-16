@@ -1,4 +1,5 @@
 
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -6,7 +7,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction } from "@/types"
+import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
@@ -1183,7 +1184,6 @@ export async function addTransaction(
     vendorName: string
     isGstRegistered: boolean
     gstNumber?: string
-    description: string
     invoiceFile?: File
   },
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
@@ -1324,5 +1324,40 @@ export async function updateUserTutorialStatus(uid: string): Promise<{ success: 
   } catch (error: any) {
     console.error("Error updating tutorial status:", error);
     return { success: false, error: "Failed to update tutorial status." };
+  }
+}
+
+export async function registerEmrInterest(callId: string, user: User): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!user || !user.uid || !user.faculty || !user.department) {
+      return { success: false, error: "User profile is incomplete. Please update your faculty and department in Settings." };
+    }
+    const interestRef = adminDb.collection('emrInterests').doc(`${callId}_${user.uid}`);
+    
+    // Check if interest already registered
+    const docSnap = await interestRef.get();
+    if (docSnap.exists) {
+        return { success: false, error: "You have already registered your interest for this call." };
+    }
+
+    const newInterest: EmrInterest = {
+        id: interestRef.id,
+        callId: callId,
+        userId: user.uid,
+        userName: user.name,
+        userEmail: user.email,
+        faculty: user.faculty,
+        department: user.department,
+        registeredAt: new Date().toISOString(),
+        submittedToAgency: false
+    };
+
+    await interestRef.set(newInterest);
+
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error registering EMR interest:", error);
+    return { success: false, error: error.message || "Failed to register interest." };
   }
 }

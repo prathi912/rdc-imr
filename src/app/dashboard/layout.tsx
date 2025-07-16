@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -21,6 +22,7 @@ import {
   Users,
   History,
   Building2,
+  Calendar,
 } from 'lucide-react';
 
 import {
@@ -225,6 +227,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
+             {user.allowedModules?.includes('emr-calendar') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/emr-calendar" tooltip="EMR Calendar" isActive={pathname === '/dashboard/emr-calendar'}>
+                  <Calendar />
+                  EMR Calendar
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+             )}
             {user.allowedModules?.includes('incentive-claim') && (
               <SidebarMenuItem>
                 <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>

@@ -1,4 +1,5 @@
 
+
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -256,4 +257,30 @@ export type IncentiveClaim = {
     apcAmountClaimed?: number;
     apcTotalAmount?: number;
     apcSelfDeclaration?: boolean;
+};
+
+export type FundingCall = {
+  id: string;
+  title: string;
+  agency: string;
+  description?: string;
+  applyDeadline: string; // ISO String
+  interestDeadline: string; // ISO String
+  callType: 'Fellowship' | 'Grant' | 'Collaboration' | 'Other';
+  detailsUrl?: string;
+  createdAt: string; // ISO String
+  createdBy: string; // UID of the admin who created it
+  status: 'Open' | 'Closed' | 'Meeting Scheduled';
+};
+
+export type EmrInterest = {
+    id: string; // Combination of callId and userId
+    callId: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    faculty: string;
+    department: string;
+    registeredAt: string; // ISO String
+    submittedToAgency: boolean;
 };

@@ -11,6 +11,7 @@ import type { User, Project } from '@/types';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, or } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
+import { EmrCalendar } from '../emr/emr-calendar';
 
 export function FacultyDashboard({ user }: { user: User }) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -105,9 +106,7 @@ export function FacultyDashboard({ user }: { user: User }) {
         </div>
       )}
       
-      {loading ? (
-        <Skeleton className="h-40 w-full" />
-      ) : upcomingMeetings.length > 0 && (
+      {upcomingMeetings.length > 0 && (
         <Card className="border-primary/40">
             <CardHeader>
                 <CardTitle>Upcoming IMR Evaluation Meeting</CardTitle>
@@ -129,7 +128,11 @@ export function FacultyDashboard({ user }: { user: User }) {
         </Card>
       )}
 
-      <div>
+      <div className="mt-4">
+        <EmrCalendar user={user} />
+      </div>
+
+      <div className="mt-4">
          <div className="mb-4 flex items-center justify-between">
             <h3 className="text-2xl font-bold tracking-tight">My Recent Projects</h3>
             <Link href="/dashboard/my-projects">
