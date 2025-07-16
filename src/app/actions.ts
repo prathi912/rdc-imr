@@ -1,3 +1,4 @@
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -5,7 +6,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall } from "@/types"
+import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
@@ -1182,6 +1183,7 @@ export async function addTransaction(
     vendorName: string
     isGstRegistered: boolean
     gstNumber?: string
+    description?: string
     invoiceFile?: File
   },
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
@@ -1227,7 +1229,7 @@ export async function addTransaction(
       vendorName: transactionData.vendorName,
       isGstRegistered: transactionData.isGstRegistered,
       gstNumber: transactionData.gstNumber,
-      description: transactionData.description,
+      description: transactionData.description || "",
       invoiceUrl: invoiceUrl,
     }
 
@@ -1360,7 +1362,10 @@ export async function registerEmrInterest(callId: string, user: User): Promise<{
   }
 }
 
-export async function scheduleEmrMeeting(callId: string, meetingDetails: { date: string; venue: string; slots: { userId: string, time: string }[] }) {
+export async function scheduleEmrMeeting(
+  callId: string,
+  meetingDetails: { date: string; venue: string; evaluatorUids: string[]; slots: { userId: string, time: string }[] },
+) {
   try {
     const callRef = adminDb.collection('fundingCalls').doc(callId);
     const callSnap = await callRef.get();
@@ -1371,12 +1376,13 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
 
     await callRef.update({
       status: 'Meeting Scheduled',
-      meetingDetails: { date: meetingDetails.date, venue: meetingDetails.venue }
+      meetingDetails: { date: meetingDetails.date, venue: meetingDetails.venue, assignedEvaluators: meetingDetails.evaluatorUids }
     });
 
     const batch = adminDb.batch();
     const emailPromises = [];
 
+    // Notify participants
     for (const slot of meetingDetails.slots) {
         if (!slot.time) continue;
 
@@ -1432,6 +1438,44 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
                 html: emailHtml
             }));
         }
+    }
+
+    // Notify evaluators
+    if (meetingDetails.evaluatorUids && meetingDetails.evaluatorUids.length > 0) {
+      const evaluatorDocs = await Promise.all(
+        meetingDetails.evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()),
+      );
+
+      for (const evaluatorDoc of evaluatorDocs) {
+        if (evaluatorDoc.exists) {
+          const evaluator = evaluatorDoc.data() as User;
+
+          const evaluatorNotificationRef = adminDb.collection("notifications").doc();
+          batch.set(evaluatorNotificationRef, {
+            uid: evaluator.uid,
+            title: `You've been assigned to an EMR evaluation for "${call.title}"`,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+          });
+
+          if (evaluator.email) {
+            emailPromises.push(sendEmail({
+              to: evaluator.email,
+              subject: `EMR Evaluation Assignment: ${call.title}`,
+              html: `
+                <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
+                    <p style="color: #ffffff;">Dear Evaluator,</p>
+                    <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
+                    <p><strong style="color: #ffffff;">Call:</strong> ${call.title}</p>
+                    <p><strong style="color: #ffffff;">Date:</strong> ${format(new Date(meetingDetails.date.replace(/-/g, "/")), 'MMMM d, yyyy')}</p>
+                    <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+                    <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Portal.</p>
+                </div>
+              `
+            }));
+          }
+        }
+      }
     }
 
     await batch.commit();
@@ -1498,13 +1542,21 @@ export async function removeEmrPpt(interestId: string): Promise<{ success: boole
             const url = new URL(interest.pptUrl);
             const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf('/o/') + 3));
             
-            await bucket.file(filePath).delete();
-            console.log(`Deleted file from Storage: ${filePath}`);
+            try {
+                await bucket.file(filePath).delete();
+                console.log(`Deleted file from Storage: ${filePath}`);
+            } catch(storageError: any) {
+                // If the file doesn't exist, we can ignore the error and proceed.
+                if (storageError.code !== 404) {
+                    throw storageError;
+                }
+                 console.warn(`Storage file not found during deletion, but proceeding: ${filePath}`);
+            }
         }
 
         await interestRef.update({
-            pptUrl: null,
-            pptSubmissionDate: null
+            pptUrl: adminDb.FieldValue.delete(),
+            pptSubmissionDate: adminDb.FieldValue.delete()
         });
 
         return { success: true };
@@ -1530,15 +1582,7 @@ export async function withdrawEmrInterest(interestId: string): Promise<{ success
 
         // If a presentation was uploaded, delete it from storage first.
         if (interest.pptUrl) {
-            const bucket = adminStorage.bucket();
-            try {
-                const url = new URL(interest.pptUrl);
-                const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf('/o/') + 3));
-                await bucket.file(filePath).delete();
-                console.log(`Deleted associated presentation from Storage: ${filePath}`);
-            } catch (storageError) {
-                console.error(`Failed to delete storage file ${interest.pptUrl} for interest ${interestId}. Continuing with Firestore deletion.`, storageError);
-            }
+            await removeEmrPpt(interest.id);
         }
         
         // Delete the interest document from Firestore.
@@ -1550,4 +1594,102 @@ export async function withdrawEmrInterest(interestId: string): Promise<{ success
         return { success: false, error: error.message || "Failed to withdraw interest." };
     }
 }
+
+export async function deleteEmrInterest(interestId: string, remarks: string, adminName: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!interestId) return { success: false, error: "Interest ID is required." };
+
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        const interestSnap = await interestRef.get();
+        if (!interestSnap.exists) return { success: false, error: "Interest registration not found." };
+        
+        const interest = interestSnap.data() as EmrInterest;
+        const callRef = adminDb.collection('fundingCalls').doc(interest.callId);
+        const callSnap = await callRef.get();
+        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'an EMR call';
+
+        // Withdraw interest to also handle file deletion
+        await withdrawEmrInterest(interestId);
+        
+        // Notify the user
+        const notification = {
+            uid: interest.userId,
+            title: `Your EMR registration for "${callTitle}" was removed.`,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+        };
+        await adminDb.collection("notifications").add(notification);
+
+        if (interest.userEmail) {
+            await sendEmail({
+                to: interest.userEmail,
+                subject: `Update on your EMR Interest for: ${callTitle}`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <p>Dear ${interest.userName},</p>
+                        <p>Your registration of interest for the EMR funding call, "<strong>${callTitle}</strong>," has been removed by the administration.</p>
+                        <div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 6px;">
+                            <h4 style="margin-top: 0;">Remarks from ${adminName}:</h4>
+                            <p>${remarks}</p>
+                        </div>
+                        <p>If you have any questions, please contact the RDC helpdesk.</p>
+                        <p>Thank you,</p>
+                        <p>Research & Development Cell - PU</p>
+                    </div>
+                `
+            });
+        }
+        
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error deleting EMR interest:", error);
+        return { success: false, error: error.message || "Failed to delete interest." };
+    }
+}
+
+export async function addEmrEvaluation(
+  interestId: string, 
+  evaluator: User, 
+  evaluationData: { recommendation: EmrEvaluation['recommendation']; comments: string }
+): Promise<{ success: boolean, error?: string }> {
+  try {
+    const evaluationRef = adminDb.collection('emrInterests').doc(interestId).collection('evaluations').doc(evaluator.uid);
+    
+    const newEvaluation: EmrEvaluation = {
+      evaluatorUid: evaluator.uid,
+      evaluatorName: evaluator.name,
+      evaluationDate: new Date().toISOString(),
+      ...evaluationData
+    };
+    
+    await evaluationRef.set(newEvaluation, { merge: true });
+
+    // Notify Super Admins
+    const interestSnap = await adminDb.collection('emrInterests').doc(interestId).get();
+    if(interestSnap.exists()) {
+      const interest = interestSnap.data() as EmrInterest;
+      const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
+      if (!superAdminUsersSnapshot.empty) {
+        const batch = adminDb.batch();
+        const notificationTitle = `EMR evaluation submitted for ${interest.userName} by ${evaluator.name}`;
+        superAdminUsersSnapshot.forEach((userDoc) => {
+          const notificationRef = adminDb.collection("notifications").doc();
+          batch.set(notificationRef, {
+            uid: userDoc.id,
+            title: notificationTitle,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+          });
+        });
+        await batch.commit();
+      }
+    }
+    
+    return { success: true };
+  } catch(error: any) {
+    console.error("Error adding EMR evaluation:", error);
+    return { success: false, error: error.message || 'Failed to submit evaluation.' };
+  }
+}
+
     

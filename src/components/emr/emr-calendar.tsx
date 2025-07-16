@@ -45,7 +45,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarPicker } from '../ui/calendar';
-import { Separator } from '../ui/separator';
 import { Textarea } from '../ui/textarea';
 
 
@@ -54,7 +53,7 @@ interface EmrCalendarProps {
 }
 
 type CalendarEvent = {
-  type: 'deadline' | 'meeting';
+  type: 'deadline' | 'meeting' | 'agencyDeadline';
   call: FundingCall;
 };
 
@@ -566,7 +565,7 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
     };
 
     let isDeadlinePast = false;
-    let deadlineMessage = "The deadline for submission will be set 2 days prior to the scheduled meeting date at 5:00 PM.";
+    let deadlineMessage = "Please upload your presentation before the deadline.";
     if(call.meetingDetails?.date) {
         const meetingDate = parseISO(call.meetingDetails.date);
         const uploadDeadline = setSeconds(setMinutes(setHours(subDays(meetingDate, 2), 17), 0), 0);
@@ -721,6 +720,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         const deadlineDate = format(parseISO(call.interestDeadline), 'yyyy-MM-dd');
         if (!acc[deadlineDate]) acc[deadlineDate] = [];
         acc[deadlineDate].push({ type: 'deadline', call });
+        
+        const agencyDeadlineDate = format(parseISO(call.applyDeadline), 'yyyy-MM-dd');
+        if (!acc[agencyDeadlineDate]) acc[agencyDeadlineDate] = [];
+        acc[agencyDeadlineDate].push({ type: 'agencyDeadline', call });
 
         if (call.meetingDetails?.date) {
             const meetingDate = format(parseISO(call.meetingDetails.date), 'yyyy-MM-dd');
@@ -840,6 +843,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                 const eventsOnDay = eventsByDate[dateStr] || [];
                                 const hasDeadline = eventsOnDay.some(e => e.type === 'deadline');
                                 const hasMeeting = eventsOnDay.some(e => e.type === 'meeting');
+                                const hasAgencyDeadline = eventsOnDay.some(e => e.type === 'agencyDeadline');
                                 return (
                                     <div 
                                         key={dateStr} 
@@ -848,8 +852,9 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                     >
                                         <span className="font-semibold">{format(day, 'd')}</span>
                                         <div className="flex-grow flex items-end justify-start gap-1 mt-1">
-                                            {hasDeadline && <div className="h-2 w-2 rounded-full bg-green-500" title="Registration Deadline"></div>}
+                                            {hasDeadline && <div className="h-2 w-2 rounded-full bg-green-500" title="Interest Registration Deadline"></div>}
                                             {hasMeeting && <div className="h-2 w-2 rounded-full bg-blue-500" title="Meeting Scheduled"></div>}
+                                            {hasAgencyDeadline && <div className="h-2 w-2 rounded-full bg-red-500" title="Agency Application Deadline"></div>}
                                         </div>
                                     </div>
                                 )
