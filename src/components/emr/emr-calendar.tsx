@@ -51,6 +51,11 @@ interface EmrCalendarProps {
   user: User;
 }
 
+type CalendarEvent = {
+  type: 'deadline' | 'meeting';
+  call: FundingCall;
+};
+
 const callSchema = z.object({
   title: z.string().min(5, 'Call title is required.'),
   agency: z.string().min(2, 'Funding agency is required.'),
@@ -411,12 +416,20 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const daysInMonth = eachDayOfInterval({ start: firstDay, end: lastDay });
     const startingDayIndex = getDay(firstDay); // 0 = Sunday, 1 = Monday...
 
-    const callsByDate = calls.reduce((acc, call) => {
-        const date = format(parseISO(call.interestDeadline), 'yyyy-MM-dd');
-        if (!acc[date]) acc[date] = [];
-        acc[date].push(call);
+    const eventsByDate = calls.reduce((acc, call) => {
+        // Add deadline event
+        const deadlineDate = format(parseISO(call.interestDeadline), 'yyyy-MM-dd');
+        if (!acc[deadlineDate]) acc[deadlineDate] = [];
+        acc[deadlineDate].push({ type: 'deadline', call });
+
+        // Add meeting event if it exists
+        if (call.meetingDetails?.date) {
+            const meetingDate = format(parseISO(call.meetingDetails.date), 'yyyy-MM-dd');
+            if (!acc[meetingDate]) acc[meetingDate] = [];
+            acc[meetingDate].push({ type: 'meeting', call });
+        }
         return acc;
-    }, {} as Record<string, FundingCall[]>);
+    }, {} as Record<string, CalendarEvent[]>);
 
 
     useEffect(() => {
@@ -511,19 +524,21 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                             ))}
                             {daysInMonth.map(day => {
                                 const dateStr = format(day, 'yyyy-MM-dd');
-                                const callsOnDay = callsByDate[dateStr] || [];
+                                const eventsOnDay = eventsByDate[dateStr] || [];
                                 return (
                                     <div key={dateStr} className="min-h-[12rem] border-b border-r p-2 flex flex-col overflow-hidden">
                                         <span className="font-semibold">{format(day, 'd')}</span>
                                         <div className="flex-grow overflow-y-auto space-y-1 mt-1 text-xs">
-                                            {callsOnDay.map(call => {
-                                                const userHasRegistered = userInterests.some(i => i.callId === call.id);
+                                            {eventsOnDay.map((event, index) => {
+                                                const userHasRegistered = userInterests.some(i => i.callId === event.call.id);
                                                 return (
-                                                    <div key={call.id} className="p-1.5 rounded-md bg-muted/50 text-muted-foreground">
-                                                        <p className="font-semibold text-foreground truncate">{call.title}</p>
-                                                        <p className="truncate">{call.agency}</p>
-                                                        {userHasRegistered && <Badge variant="default" className="mt-1 w-full justify-center">Registered</Badge>}
-                                                        {isSuperAdmin && <Button variant="ghost" size="sm" className="w-full mt-1 text-xs h-6" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>Edit</Button>}
+                                                    <div key={`${event.call.id}-${index}`} className="p-1.5 rounded-md bg-muted/50 text-muted-foreground">
+                                                        <p className="font-semibold text-foreground truncate flex items-center gap-1.5">
+                                                          {event.type === 'meeting' && <Video className="h-3 w-3 text-primary" />}
+                                                          {event.call.title}
+                                                        </p>
+                                                        <p className="truncate">{event.call.agency}</p>
+                                                        {userHasRegistered && event.type === 'deadline' && <Badge variant="default" className="mt-1 w-full justify-center">Registered</Badge>}
                                                     </div>
                                                 )
                                             })}
