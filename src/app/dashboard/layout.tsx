@@ -23,6 +23,7 @@ import {
   History,
   Building2,
   Calendar,
+  NotebookPen,
 } from 'lucide-react';
 
 import {
@@ -247,7 +248,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarMenuItem>
                 <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
                   <ClipboardCheck />
-                  Evaluation Queue
+                  IMR Evaluation Queue
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('emr-evaluations') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/emr-evaluations" tooltip="EMR Evaluations" isActive={pathname === '/dashboard/emr-evaluations'}>
+                  <NotebookPen />
+                  EMR Evaluations
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
@@ -255,7 +264,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarMenuItem>
                 <SidebarMenuButton href="/dashboard/my-evaluations" tooltip="My Evaluations" isActive={pathname === '/dashboard/my-evaluations'}>
                   <History />
-                  My Evaluations
+                  My IMR Evaluations
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}

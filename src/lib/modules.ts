@@ -8,8 +8,9 @@ export const ALL_MODULES = [
   { id: 'my-projects', label: 'My Projects' },
   { id: 'emr-calendar', label: 'EMR Calendar' },
   { id: 'incentive-claim', label: 'Incentive Claims' },
-  { id: 'evaluator-dashboard', label: 'Evaluation Queue' },
-  { id: 'my-evaluations', label: 'My Evaluations' },
+  { id: 'evaluator-dashboard', label: 'IMR Evaluation Queue' },
+  { id: 'my-evaluations', label: 'My IMR Evaluations' },
+  { id: 'emr-evaluations', label: 'EMR Evaluations' },
   { id: 'schedule-meeting', label: 'Schedule Meeting' },
   { id: 'pending-reviews', label: 'Pending Reviews' },
   { id: 'completed-reviews', label: 'Completed Reviews' },
@@ -30,7 +31,7 @@ const facultyCoreModules = ['new-submission', 'my-projects', 'incentive-claim'];
 const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'manage-incentive-claims'];
+const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'manage-incentive-claims', 'emr-evaluations'];
 const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'system-health', 'bulk-upload'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes'];
 
@@ -50,7 +51,7 @@ export function getDefaultModulesForRole(role: User['role'], designation?: User[
   }
   
   if (role === 'Evaluator') {
-    return [...coreModules, 'evaluator-dashboard', 'my-evaluations'];
+    return [...coreModules, 'evaluator-dashboard', 'my-evaluations', 'emr-evaluations'];
   }
   
   switch (role) {

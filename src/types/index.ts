@@ -274,6 +274,7 @@ export type FundingCall = {
   meetingDetails?: {
     date: string; // yyyy-MM-dd
     venue: string;
+    assignedEvaluators?: string[];
   };
 };
 
@@ -293,4 +294,12 @@ export type EmrInterest = {
     },
     pptUrl?: string;
     pptSubmissionDate?: string; // ISO String
+};
+
+export type EmrEvaluation = {
+  evaluatorUid: string;
+  evaluatorName: string;
+  evaluationDate: string; // ISO String
+  recommendation: 'Recommended' | 'Not Recommended' | 'Revision is needed';
+  comments: string;
 };
