@@ -1,4 +1,5 @@
 
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -58,7 +59,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
 
-    if (!projectSnap.exists) {
+    if (!projectSnap.exists()) {
       return { success: false, error: "Project not found." }
     }
     const project = projectSnap.data() as Project
@@ -134,7 +135,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
     const claimRef = adminDb.collection("incentiveClaims").doc(claimId)
     const claimSnap = await claimRef.get()
 
-    if (!claimSnap.exists) {
+    if (!claimSnap.exists()) {
       return { success: false, error: "Incentive claim not found." }
     }
     const claim = claimSnap.data() as IncentiveClaim
@@ -1431,3 +1432,34 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
   }
 }
 
+export async function uploadEmrPpt(interestId: string, pptDataUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId || !pptDataUrl) {
+      return { success: false, error: "Interest ID and file data are required." };
+    }
+    
+    const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    const interestSnap = await interestRef.get();
+    if (!interestSnap.exists) {
+        return { success: false, error: "Interest registration not found." };
+    }
+    const interest = interestSnap.data() as EmrInterest;
+
+    const path = `emr-presentations/${interest.callId}/${interest.userId}/${fileName}`;
+    const result = await uploadFileToServer(pptDataUrl, path);
+
+    if (!result.success || !result.url) {
+        throw new Error(result.error || "PPT upload failed.");
+    }
+    
+    await interestRef.update({
+      pptUrl: result.url,
+      pptSubmissionDate: new Date().toISOString()
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error uploading EMR presentation:", error);
+    return { success: false, error: error.message || "Failed to upload presentation." };
+  }
+}

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, createRef } from 'react';
@@ -36,10 +37,10 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter } from 'date-fns';
-import { registerEmrInterest, scheduleEmrMeeting } from '@/app/actions';
+import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
+import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt } from '@/app/actions';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
@@ -75,6 +76,11 @@ const scheduleMeetingSchema = z.object({
         time: z.string().min(1, "Time is required.")
     }))
 });
+
+const pptUploadSchema = z.object({
+    pptFile: z.any().refine((files) => files?.length > 0, "Presentation file is required.")
+});
+
 
 const TimeLeft = ({ deadline }: { deadline: string }) => {
     const [now, setNow] = useState(new Date());
@@ -396,6 +402,100 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests }: { call
     );
 }
 
+function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const form = useForm<z.infer<typeof pptUploadSchema>>({
+        resolver: zodResolver(pptUploadSchema),
+    });
+
+    const fileToDataUrl = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+            reader.readAsDataURL(file);
+        });
+    };
+    
+    const handleUpload = async (values: z.infer<typeof pptUploadSchema>) => {
+        setIsSubmitting(true);
+        try {
+            const file = values.pptFile[0];
+            const pptDataUrl = await fileToDataUrl(file);
+            const result = await uploadEmrPpt(interest.id, pptDataUrl, file.name);
+
+            if (result.success) {
+                toast({ title: "Success", description: "Your presentation has been uploaded." });
+                onOpenChange(false);
+            } else {
+                toast({ variant: "destructive", title: "Upload Failed", description: result.error });
+            }
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    if (!call.meetingDetails) return null;
+    
+    const meetingDate = parseISO(call.meetingDetails.date);
+    const uploadDeadline = setSeconds(setMinutes(setHours(subDays(meetingDate, 3), 17), 0), 0);
+    const isDeadlinePast = isAfter(new Date(), uploadDeadline);
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Upload Presentation</DialogTitle>
+                    <DialogDescription>
+                        Please upload your presentation for the call: "{call.title}".
+                        The deadline for submission is {format(uploadDeadline, "PPpp")}.
+                    </DialogDescription>
+                </DialogHeader>
+                 {isDeadlinePast ? (
+                    <div className="text-center text-destructive font-semibold p-4">
+                        The deadline to upload your presentation has passed.
+                    </div>
+                ) : (
+                <Form {...form}>
+                    <form id="upload-ppt-form" onSubmit={form.handleSubmit(handleUpload)} className="space-y-4 py-4">
+                        <FormField
+                            name="pptFile"
+                            control={form.control}
+                            render={({ field: { value, onChange, ...fieldProps } }) => (
+                                <FormItem>
+                                    <FormLabel>Presentation File</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            {...fieldProps}
+                                            type="file"
+                                            accept=".ppt, .pptx"
+                                            onChange={(e) => onChange(e.target.files)}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </form>
+                </Form>
+                )}
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                     {!isDeadlinePast && (
+                        <Button type="submit" form="upload-ppt-form" disabled={isSubmitting}>
+                            {isSubmitting ? "Uploading..." : "Upload File"}
+                        </Button>
+                    )}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export function EmrCalendar({ user }: EmrCalendarProps) {
     const { toast } = useToast();
@@ -406,7 +506,9 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const [loading, setLoading] = useState(true);
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+    const [isUploadPptOpen, setIsUploadPptOpen] = useState(false);
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
+    const [selectedInterest, setSelectedInterest] = useState<EmrInterest | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
     const isAdmin = user.role === 'Super-admin' || user.role === 'admin';
@@ -567,6 +669,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                         <h4 className="font-semibold">All Upcoming Deadlines</h4>
                         {upcomingCalls.length > 0 ? upcomingCalls.map(call => {
                             const userHasRegistered = userInterests.some(i => i.callId === call.id);
+                            const interestDetails = userInterests.find(i => i.callId === call.id);
                             const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
                             const hasInterest = allInterests.some(i => i.callId === call.id);
                             const callRef = eventRefs.get(`deadline-${call.id}`);
@@ -596,9 +699,18 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                     </div>
                                     <div className="flex-shrink-0 text-center md:text-right space-y-2">
                                         {userHasRegistered ? (
-                                            <div className="flex items-center gap-2 text-green-600 font-semibold p-2 bg-green-50 rounded-md dark:bg-green-900/20">
-                                                <CheckCircle className="h-5 w-5"/>
-                                                <span>Interest Registered</span>
+                                            <div className="flex flex-col items-center md:items-end gap-2 text-green-600 font-semibold">
+                                                <div className="flex items-center gap-2 p-2 bg-green-50 rounded-md dark:bg-green-900/20">
+                                                    <CheckCircle className="h-5 w-5"/>
+                                                    <span>Interest Registered</span>
+                                                </div>
+                                                {interestDetails?.pptUrl ? (
+                                                     <Button variant="link" asChild><Link href={interestDetails.pptUrl} target="_blank"><File className="h-4 w-4 mr-2" />View Presentation</Link></Button>
+                                                ) : call.meetingDetails?.date && (
+                                                     <Button size="sm" onClick={() => { setSelectedInterest(interestDetails!); setSelectedCall(call); setIsUploadPptOpen(true); }}>
+                                                        <Upload className="h-4 w-4 mr-2" />Upload Presentation
+                                                    </Button>
+                                                )}
                                             </div>
                                         ) : (
                                             <>
@@ -648,6 +760,20 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                     interests={allInterests}
                     isOpen={isScheduleDialogOpen}
                     onOpenChange={setIsScheduleDialogOpen}
+                />
+            )}
+            {selectedInterest && selectedCall && (
+                <UploadPptDialog
+                    interest={selectedInterest}
+                    call={selectedCall}
+                    isOpen={isUploadPptOpen}
+                    onOpenChange={(isOpen) => {
+                        setIsUploadPptOpen(isOpen);
+                        if (!isOpen) {
+                            setSelectedInterest(null);
+                            setSelectedCall(null);
+                        }
+                    }}
                 />
             )}
         </Card>

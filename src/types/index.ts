@@ -290,5 +290,7 @@ export type EmrInterest = {
     meetingSlot?: {
       date: string; // yyyy-MM-dd
       time: string; // HH:mm
-    }
+    },
+    pptUrl?: string;
+    pptSubmissionDate?: string; // ISO String
 };
