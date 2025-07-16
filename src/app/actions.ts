@@ -1697,5 +1697,3 @@ export async function addEmrEvaluation(
     return { success: false, error: error.message || 'Failed to submit evaluation.' };
   }
 }
-
-    
