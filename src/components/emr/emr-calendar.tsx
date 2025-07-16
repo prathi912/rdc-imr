@@ -9,7 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { db } from '@/lib/config';
 import { collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc, updateDoc, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -37,10 +37,10 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
-import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt } from '@/app/actions';
+import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt } from '@/app/actions';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
@@ -134,9 +134,9 @@ function RegistrationsDialog({ call, interests, allUsers }: RegistrationsDialogP
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Email</TableHead>
-                                    <TableHead>Institute</TableHead>
                                     <TableHead>Department</TableHead>
                                     <TableHead>Meeting Slot</TableHead>
+                                    <TableHead>Presentation</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -154,12 +154,18 @@ function RegistrationsDialog({ call, interests, allUsers }: RegistrationsDialogP
                                                 )}
                                             </TableCell>
                                             <TableCell>{interest.userEmail}</TableCell>
-                                            <TableCell>{interestedUser?.institute || interest.faculty}</TableCell>
                                             <TableCell>{interestedUser?.department || interest.department}</TableCell>
                                              <TableCell>
                                                 {interest.meetingSlot ? 
                                                     `${format(parseISO(interest.meetingSlot.date), 'MMM d')} at ${interest.meetingSlot.time}`
                                                     : 'Not Scheduled'}
+                                             </TableCell>
+                                             <TableCell>
+                                                 {interest.pptUrl ? (
+                                                     <Button asChild variant="link" className="p-0 h-auto">
+                                                         <a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View</a>
+                                                     </Button>
+                                                 ) : 'Not Submitted'}
                                              </TableCell>
                                         </TableRow>
                                     );
@@ -321,7 +327,7 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests }: { call
         resolver: zodResolver(scheduleMeetingSchema),
         defaultValues: {
             venue: "RDC Committee Room, PIMSR",
-            slots: interests.filter(i => i.callId === call.id).map(i => ({ userId: i.userId, time: '' }))
+            slots: interests.filter(i => i.callId === call.id).map(i => ({ userId: i.userId, time: i.meetingSlot?.time || '' }))
         },
     });
 
@@ -405,6 +411,7 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests }: { call
 function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
 
     const form = useForm<z.infer<typeof pptUploadSchema>>({
         resolver: zodResolver(pptUploadSchema),
@@ -439,6 +446,22 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: E
         }
     };
     
+    const handleDelete = async () => {
+        setIsSubmitting(true);
+        try {
+            const result = await removeEmrPpt(interest.id);
+            if (result.success) {
+                toast({ title: 'Presentation Removed' });
+                onOpenChange(false); // Close the dialog after successful deletion
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: result.error });
+            }
+        } finally {
+            setIsSubmitting(false);
+            setIsDeleteConfirmationOpen(false);
+        }
+    };
+
     if (!call.meetingDetails) return null;
     
     const meetingDate = parseISO(call.meetingDetails.date);
@@ -449,15 +472,16 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: E
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>Upload Presentation</DialogTitle>
+                    <DialogTitle>{interest.pptUrl ? 'Manage Presentation' : 'Upload Presentation'}</DialogTitle>
                     <DialogDescription>
-                        Please upload your presentation for the call: "{call.title}".
+                        {interest.pptUrl ? 'You can view, replace, or remove your uploaded presentation.' : `Please upload your presentation for the call: "${call.title}".`}
                         The deadline for submission is {format(uploadDeadline, "PPpp")}.
                     </DialogDescription>
                 </DialogHeader>
                  {isDeadlinePast ? (
                     <div className="text-center text-destructive font-semibold p-4">
-                        The deadline to upload your presentation has passed.
+                        The deadline to upload or modify your presentation has passed.
+                        {interest.pptUrl && <Button asChild variant="link"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View Final Submission</a></Button>}
                     </div>
                 ) : (
                 <Form {...form}>
@@ -467,7 +491,7 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: E
                             control={form.control}
                             render={({ field: { value, onChange, ...fieldProps } }) => (
                                 <FormItem>
-                                    <FormLabel>Presentation File</FormLabel>
+                                    <FormLabel>{interest.pptUrl ? 'Replace Presentation File' : 'Presentation File'}</FormLabel>
                                     <FormControl>
                                         <Input
                                             {...fieldProps}
@@ -483,14 +507,37 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: E
                     </form>
                 </Form>
                 )}
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                     {!isDeadlinePast && (
-                        <Button type="submit" form="upload-ppt-form" disabled={isSubmitting}>
-                            {isSubmitting ? "Uploading..." : "Upload File"}
-                        </Button>
-                    )}
+                <DialogFooter className="justify-between">
+                     <div>
+                        {interest.pptUrl && !isDeadlinePast && (
+                            <Button variant="destructive" size="sm" onClick={() => setIsDeleteConfirmationOpen(true)} disabled={isSubmitting}>
+                                <Trash2 className="h-4 w-4 mr-2" /> Remove
+                            </Button>
+                        )}
+                    </div>
+                    <div className="flex gap-2">
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                         {!isDeadlinePast && (
+                            <Button type="submit" form="upload-ppt-form" disabled={isSubmitting}>
+                                {isSubmitting ? "Saving..." : (interest.pptUrl ? 'Replace File' : 'Upload File')}
+                            </Button>
+                        )}
+                    </div>
                 </DialogFooter>
+                 <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>This will permanently remove your presentation from the server.</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>
+                                {isSubmitting ? "Deleting..." : "Confirm & Remove"}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </DialogContent>
         </Dialog>
     );
@@ -500,8 +547,8 @@ function ViewDescriptionDialog({ call }: { call: FundingCall }) {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant="secondary" size="sm">
-                    <NotebookText className="mr-2 h-4 w-4" /> View Description
+                <Button variant="outline" size="sm" className="h-auto py-1 px-2 text-xs">
+                    <NotebookText className="mr-2 h-3 w-3" /> View Description
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl">
@@ -510,7 +557,7 @@ function ViewDescriptionDialog({ call }: { call: FundingCall }) {
                     <DialogDescription>Full description for the funding call from {call.agency}.</DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[60vh] overflow-y-auto pr-4">
-                    <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: call.description || 'No description provided.' }} />
+                    <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: call.description || 'No description provided.' }} />
                 </div>
             </DialogContent>
         </Dialog>
@@ -696,71 +743,76 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                             const callRef = eventRefs.get(`deadline-${call.id}`);
 
                             return (
-                                <div key={call.id} ref={callRef} className="border p-4 rounded-lg flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <h4 className="font-semibold">{call.title}</h4>
-                                            <Badge variant="secondary">{call.callType}</Badge>
-                                            {getStatusBadge(call)}
-                                        </div>
-                                        <p className="text-sm text-muted-foreground">Agency: {call.agency}</p>
-                                        
-                                        <div className="flex flex-wrap gap-2 mt-2">
-                                            {call.description && <ViewDescriptionDialog call={call} />}
-                                            {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto"><Link href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Details</Link></Button>}
-                                        </div>
-
-                                        <div className="text-xs text-muted-foreground mt-2 space-y-1">
-                                            <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
-                                            <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
-                                        </div>
-                                        {call.meetingDetails && (
-                                            <div ref={eventRefs.get(`meeting-${call.id}`)} className="mt-2 text-sm p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
-                                                <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Meeting Scheduled</p>
-                                                <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
-                                                <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
+                                <div key={call.id} ref={callRef} className="border p-4 rounded-lg space-y-3">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1">
+                                            <h4 className="font-semibold text-base">{call.title}</h4>
+                                            <p className="text-sm text-muted-foreground">Agency: {call.agency}</p>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <Badge variant="secondary">{call.callType}</Badge>
+                                                {getStatusBadge(call)}
                                             </div>
-                                        )}
-                                    </div>
-                                    <div className="flex-shrink-0 text-center md:text-right space-y-2">
-                                        {userHasRegistered ? (
-                                            <div className="flex flex-col items-center md:items-end gap-2 text-green-600 font-semibold">
-                                                <div className="flex items-center gap-2 p-2 bg-green-50 rounded-md dark:bg-green-900/20">
+                                        </div>
+                                         <div className="flex flex-col items-end gap-2 text-sm">
+                                            {userHasRegistered ? (
+                                                <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 font-semibold">
                                                     <CheckCircle className="h-5 w-5"/>
                                                     <span>Interest Registered</span>
                                                 </div>
-                                                {interestDetails?.pptUrl ? (
-                                                     <Button variant="link" asChild><Link href={interestDetails.pptUrl} target="_blank"><File className="h-4 w-4 mr-2" />View Presentation</Link></Button>
-                                                ) : call.meetingDetails?.date && (
-                                                     <Button size="sm" onClick={() => { setSelectedInterest(interestDetails!); setSelectedCall(call); setIsUploadPptOpen(true); }}>
-                                                        <Upload className="h-4 w-4 mr-2" />Upload Presentation
+                                            ) : (
+                                                <>
+                                                    <Button onClick={() => handleRegisterInterest(call)} disabled={isInterestDeadlinePast}>
+                                                        Register Interest
                                                     </Button>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <Button onClick={() => handleRegisterInterest(call)} disabled={isInterestDeadlinePast}>
-                                                    Register Interest
-                                                </Button>
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    <TimeLeft deadline={call.interestDeadline} />
-                                                </p>
-                                            </>
-                                        )}
-                                        {isAdmin && (
-                                            <div className="flex flex-col items-center md:items-end gap-2 mt-2">
-                                                <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} />
-                                                {hasInterest && call.status !== 'Meeting Scheduled' && isSuperAdmin && (
-                                                    <Button size="sm" onClick={() => { setSelectedCall(call); setIsScheduleDialogOpen(true); }}>
-                                                        <Calendar className="mr-2 h-4 w-4" /> Schedule Meeting
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        )}
-                                        {isSuperAdmin && (
-                                            <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
-                                        )}
+                                                    <p className="text-xs text-muted-foreground"><TimeLeft deadline={call.interestDeadline} /></p>
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    {userHasRegistered && call.meetingDetails?.date && (
+                                        <div ref={eventRefs.get(`meeting-${call.id}`)} className="text-sm p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
+                                            <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Your Presentation Slot</p>
+                                            <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
+                                            {interestDetails?.meetingSlot?.time ? (
+                                                <p><strong>Your Time Slot:</strong> {interestDetails.meetingSlot.time}</p>
+                                            ) : <p>Your time slot is pending.</p>}
+                                            <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
+                                        </div>
+                                    )}
+
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <ViewDescriptionDialog call={call} />
+                                        {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
+                                    </div>
+                                    
+                                     <div className="flex items-center justify-between pt-3 border-t">
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                            <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
+                                            <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {userHasRegistered && interestDetails && (
+                                                <Button size="sm" variant="outline" onClick={() => { setSelectedInterest(interestDetails!); setSelectedCall(call); setIsUploadPptOpen(true); }}>
+                                                    {interestDetails.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                                                    {interestDetails.pptUrl ? 'Manage PPT' : 'Upload PPT'}
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <div className="flex items-center gap-2">
+                                                    <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} />
+                                                    {hasInterest && call.status !== 'Meeting Scheduled' && isSuperAdmin && (
+                                                        <Button size="sm" onClick={() => { setSelectedCall(call); setIsScheduleDialogOpen(true); }}>
+                                                            <Calendar className="mr-2 h-4 w-4" /> Schedule
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {isSuperAdmin && (
+                                                <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
+                                            )}
+                                        </div>
+                                     </div>
                                 </div>
                             )
                         }) : (
