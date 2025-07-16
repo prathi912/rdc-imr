@@ -13,6 +13,7 @@ import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
 import { format, addMinutes, parse, parseISO } from "date-fns"
+import * as z from 'zod';
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
@@ -1375,45 +1376,43 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
 
 export async function scheduleEmrMeeting(
   callId: string,
-  meetingDetails: { date: string; venue: string; evaluatorUids: string[]; slots: { userId: string, time: string }[] },
-  isBatch: boolean = false,
-  interestIds?: string[],
+  meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[] },
+  applicantUids: string[],
 ) {
   try {
-    const { date, venue, evaluatorUids, slots } = meetingDetails;
+    const { date, time, venue, evaluatorUids } = meetingDetails;
 
     if (!evaluatorUids || evaluatorUids.length === 0) {
       return { success: false, error: "An evaluation committee must be assigned." };
     }
-
+    
+    const callRef = adminDb.collection('fundingCalls').doc(callId);
+    const callSnap = await callRef.get();
+    if (!callSnap.exists) {
+      return { success: false, error: "Funding call not found." };
+    }
+    const call = callSnap.data() as FundingCall;
+    
     const batch = adminDb.batch();
     const emailPromises = [];
 
-    let callsToUpdate: { [callId: string]: FundingCall } = {};
+    const meetingTime = parse(time, 'HH:mm', parseISO(date));
 
-    for (const slot of slots) {
-      if (!slot.time) continue;
-      
-      const interestId = interestIds?.find(id => id.endsWith(slot.userId)) || `${callId}_${slot.userId}`;
-      const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    // Update meeting details on the call document itself
+    batch.update(callRef, {
+        status: 'Meeting Scheduled',
+        meetingDetails: { date, venue, assignedEvaluators: evaluatorUids }
+    });
+
+    for (const userId of applicantUids) {
+      const interestRef = adminDb.collection('emrInterests').doc(`${callId}_${userId}`);
       const interestDoc = await interestRef.get();
       if (!interestDoc.exists) continue;
       
       const interest = interestDoc.data() as EmrInterest;
-      
-      let call: FundingCall | undefined = callsToUpdate[interest.callId];
-      if (!call) {
-          const callRef = adminDb.collection('fundingCalls').doc(interest.callId);
-          const callSnap = await callRef.get();
-          if (!callSnap.exists) continue;
-          call = { id: callSnap.id, ...callSnap.data() } as FundingCall;
-          callsToUpdate[interest.callId] = call;
-      }
-
-      const userSlotTime = parse(slot.time, 'HH:mm', parseISO(date));
 
       batch.update(interestRef, {
-        meetingSlot: { date, time: slot.time },
+        meetingSlot: { date, time },
       });
 
       const notificationRef = adminDb.collection("notifications").doc();
@@ -1430,8 +1429,8 @@ export async function scheduleEmrMeeting(
               <p style="color: #e0e0e0;">
                   A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
               </p>
-              <p><strong style="color: #ffffff;">Date:</strong> ${format(userSlotTime, 'MMMM d, yyyy')}</p>
-              <p><strong style="color: #ffffff;">Your Time Slot:</strong> ${format(userSlotTime, 'h:mm a')}</p>
+              <p><strong style="color: #ffffff;">Date:</strong> ${format(meetingTime, 'MMMM d, yyyy')}</p>
+              <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
               <p style="color: #cccccc;">Please prepare for your presentation.</p>
           </div>
@@ -1447,15 +1446,6 @@ export async function scheduleEmrMeeting(
       }
     }
 
-    // Update status for all relevant calls
-    for (const callId in callsToUpdate) {
-        const callRef = adminDb.collection('fundingCalls').doc(callId);
-        batch.update(callRef, {
-            status: 'Meeting Scheduled',
-            meetingDetails: { date, venue, assignedEvaluators: evaluatorUids }
-        });
-    }
-
     // Notify evaluators once
     if (evaluatorUids && evaluatorUids.length > 0) {
       const evaluatorDocs = await Promise.all(
@@ -1469,7 +1459,7 @@ export async function scheduleEmrMeeting(
           const evaluatorNotificationRef = adminDb.collection("notifications").doc();
           batch.set(evaluatorNotificationRef, {
             uid: evaluator.uid,
-            title: `You've been assigned to an EMR evaluation meeting`,
+            title: `You've been assigned to an EMR evaluation meeting for "${call.title}"`,
             createdAt: new Date().toISOString(),
             isRead: false,
           });
@@ -1477,12 +1467,13 @@ export async function scheduleEmrMeeting(
           if (evaluator.email) {
             emailPromises.push(sendEmail({
               to: evaluator.email,
-              subject: `EMR Evaluation Assignment`,
+              subject: `EMR Evaluation Assignment: ${call.title}`,
               html: `
                 <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
                     <p style="color: #ffffff;">Dear Evaluator,</p>
                     <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
                     <p><strong style="color: #ffffff;">Date:</strong> ${format(parseISO(date), 'MMMM d, yyyy')}</p>
+                     <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
                     <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Portal.</p>
                 </div>

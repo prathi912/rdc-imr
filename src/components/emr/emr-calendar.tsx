@@ -81,17 +81,14 @@ const callSchema = z.object({
   attachments: z.any().optional(),
 });
 
-const batchScheduleSchema = z.object({
+const scheduleSchema = z.object({
     date: z.date({ required_error: 'A meeting date is required.' }),
+    time: z.string().min(1, "Time is required."),
     venue: z.string().min(3, 'Meeting venue is required.'),
     evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
-    slots: z.array(z.object({
-        interestId: z.string(),
-        callId: z.string(),
-        userId: z.string(),
-        time: z.string().min(1, "Time is required.")
-    }))
+    applicantUids: z.array(z.string()).min(1, 'Please select at least one applicant.'),
 });
+
 
 const deleteRegistrationSchema = z.object({
     remarks: z.string().min(10, "Please provide a reason for deleting the registration."),
@@ -121,15 +118,165 @@ const TimeLeft = ({ deadline }: { deadline: string }) => {
     return <span>{minutes} minute{minutes > 1 ? 's' : ''} left</span>;
 };
 
+interface ScheduleMeetingDialogProps {
+    call: FundingCall;
+    interests: EmrInterest[];
+    allUsers: User[];
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+}
+
+function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange }: ScheduleMeetingDialogProps) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const form = useForm<z.infer<typeof scheduleSchema>>({
+        resolver: zodResolver(scheduleSchema),
+        defaultValues: { venue: 'RDC Committee Room, PIMSR', evaluatorUids: [], applicantUids: [] },
+    });
+
+    const handleBatchSchedule = async (values: z.infer<typeof scheduleSchema>) => {
+        setIsSubmitting(true);
+        try {
+            const meetingDetails = {
+                date: format(values.date, 'yyyy-MM-dd'),
+                time: values.time,
+                venue: values.venue,
+                evaluatorUids: values.evaluatorUids,
+            };
+            const result = await scheduleEmrMeeting(call.id, meetingDetails, values.applicantUids);
+
+            if (result.success) {
+                toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
+                onOpenChange(false);
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: result.error });
+            }
+        } catch (error) {
+            console.error('Error scheduling batch meeting:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not schedule meeting.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    const usersWithInterest = interests.filter(i => i.callId === call.id);
+    const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !usersWithInterest.some(interest => interest.userId === u.uid));
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
+                    <DialogDescription>Select applicants and set the details for the evaluation meeting.</DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="schedule-form" onSubmit={form.handleSubmit(handleBatchSchedule)} className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
+                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                            <h4 className="font-semibold">Select Applicants</h4>
+                            <FormField
+                                control={form.control}
+                                name="applicantUids"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <div className="flex items-center space-x-2 p-2 border-b">
+                                            <Checkbox
+                                                checked={field.value?.length === usersWithInterest.length && usersWithInterest.length > 0}
+                                                onCheckedChange={(checked) => field.onChange(checked ? usersWithInterest.map(i => i.userId) : [])}
+                                            />
+                                            <FormLabel className="font-medium">Select All</FormLabel>
+                                        </div>
+                                        {usersWithInterest.map(interest => (
+                                            <FormField
+                                                key={interest.id}
+                                                control={form.control}
+                                                name="applicantUids"
+                                                render={({ field }) => (
+                                                    <FormItem className="flex items-center space-x-2 p-2 border-b">
+                                                        <FormControl>
+                                                            <Checkbox
+                                                                checked={field.value?.includes(interest.userId)}
+                                                                onCheckedChange={(checked) => {
+                                                                    return checked
+                                                                        ? field.onChange([...(field.value || []), interest.userId])
+                                                                        : field.onChange(field.value?.filter(id => id !== interest.userId));
+                                                                }}
+                                                            />
+                                                        </FormControl>
+                                                        <FormLabel className="font-normal w-full">{interest.userName}</FormLabel>
+                                                    </FormItem>
+                                                )}
+                                            />
+                                        ))}
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <div className="space-y-4">
+                             <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                             <FormField name="time" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                             <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                             <FormField
+                                control={form.control}
+                                name="evaluatorUids"
+                                render={({ field }) => (
+                                    <FormItem className="flex flex-col">
+                                    <FormLabel>Assign Evaluators</FormLabel>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between">
+                                            {field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}
+                                            <ChevronDown className="h-4 w-4 opacity-50" />
+                                        </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-[--radix-popover-trigger-width]">
+                                        <DropdownMenuLabel>Available Staff</DropdownMenuLabel>
+                                        <DropdownMenuSeparator />
+                                        {availableEvaluators.map((evaluator) => (
+                                            <DropdownMenuCheckboxItem
+                                            key={evaluator.uid}
+                                            checked={field.value?.includes(evaluator.uid)}
+                                            onCheckedChange={(checked) => {
+                                                return checked
+                                                ? field.onChange([...(field.value || []), evaluator.uid])
+                                                : field.onChange(field.value?.filter((id) => id !== evaluator.uid));
+                                            }}
+                                            >
+                                            {evaluator.name}
+                                            </DropdownMenuCheckboxItem>
+                                        ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                             />
+                        </div>
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="schedule-form" disabled={isSubmitting}>
+                      {isSubmitting ? 'Scheduling...' : 'Confirm & Schedule'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 interface RegistrationsDialogProps {
     call: FundingCall;
     interests: EmrInterest[];
     allUsers: User[];
     onOpenChange: (open: boolean) => void;
     user: User;
+    onScheduleClick: () => void;
 }
 
-function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: RegistrationsDialogProps) {
+function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user, onScheduleClick }: RegistrationsDialogProps) {
     const { toast } = useToast();
     const userMap = new Map(allUsers.map(u => [u.uid, u]));
     const registeredInterests = interests.filter(i => i.callId === call.id);
@@ -228,6 +375,17 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: 
                         </div>
                     )}
                 </div>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline">Close</Button>
+                    </DialogClose>
+                    {user.role === 'Super-admin' && registeredInterests.length > 0 && (
+                        <Button onClick={() => {onOpenChange(false); onScheduleClick();}}>
+                            <CalendarClock className="mr-2 h-4 w-4" />
+                            Schedule Meeting
+                        </Button>
+                    )}
+                </DialogFooter>
                  <AlertDialog open={!!interestToDelete} onOpenChange={() => setInterestToDelete(null)}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
@@ -394,183 +552,6 @@ function AddEditCallDialog({
   );
 }
 
-function BatchScheduleDialog({
-  calls,
-  interests,
-  allUsers,
-  isOpen,
-  onOpenChange,
-}: {
-  calls: FundingCall[];
-  interests: EmrInterest[];
-  allUsers: User[];
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
-  
-  const form = useForm<z.infer<typeof batchScheduleSchema>>({
-    resolver: zodResolver(batchScheduleSchema),
-    defaultValues: { venue: 'RDC Committee Room, PIMSR', evaluatorUids: [], slots: [] },
-  });
-
-  const { fields, replace } = useFieldArray({
-    control: form.control,
-    name: 'slots',
-  });
-
-  useEffect(() => {
-    const newSlots = selectedInterests.map(interestId => {
-      const interest = interests.find(i => i.id === interestId)!;
-      return { interestId: interest.id, callId: interest.callId, userId: interest.userId, time: '' };
-    });
-    replace(newSlots);
-  }, [selectedInterests, interests, replace]);
-
-  const handleBatchSchedule = async (values: z.infer<typeof batchScheduleSchema>) => {
-    setIsSubmitting(true);
-    try {
-        const result = await scheduleEmrMeeting(values.slots.map(s => s.callId)[0], { // Pass first callId as representative
-            date: format(values.date, 'yyyy-MM-dd'),
-            venue: values.venue,
-            evaluatorUids: values.evaluatorUids,
-            slots: values.slots.map(s => ({ userId: s.userId, time: s.time }))
-        }, true, values.slots.map(s => s.interestId)); // Pass true for batch mode and the list of interestIds
-
-        if (result.success) {
-            toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
-            onOpenChange(false);
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: result.error });
-        }
-    } catch (error) {
-        console.error('Error scheduling batch meeting:', error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not schedule meeting.' });
-    } finally {
-        setIsSubmitting(false);
-    }
-  };
-
-  const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !interests.some(interest => selectedInterests.includes(interest.id) && interest.userId === u.uid));
-  const unscheduledInterests = interests.filter(i => !i.meetingSlot);
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Schedule EMR Meeting Batch</DialogTitle>
-          <DialogDescription>Select multiple applicants and assign a common meeting date, venue, and committee.</DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form id="batch-schedule-form" onSubmit={form.handleSubmit(handleBatchSchedule)} className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
-            {/* Left side: Applicant Selection */}
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-              <h4 className="font-semibold">Select Applicants</h4>
-              {calls.map(call => {
-                const applicants = unscheduledInterests.filter(i => i.callId === call.id);
-                if (applicants.length === 0) return null;
-                return (
-                  <div key={call.id} className="space-y-2">
-                    <Label className="font-medium text-muted-foreground">{call.title}</Label>
-                    {applicants.map(interest => (
-                      <div key={interest.id} className="flex items-center space-x-2 p-2 border rounded-md">
-                        <Checkbox
-                          id={`interest-${interest.id}`}
-                          checked={selectedInterests.includes(interest.id)}
-                          onCheckedChange={(checked) => {
-                            setSelectedInterests(prev => 
-                              checked ? [...prev, interest.id] : prev.filter(id => id !== interest.id)
-                            );
-                          }}
-                        />
-                        <Label htmlFor={`interest-${interest.id}`} className="font-normal w-full">{interest.userName}</Label>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Right side: Scheduling Form */}
-            <div className="space-y-4">
-              <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
-              <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-              <FormField
-                  control={form.control}
-                  name="evaluatorUids"
-                  render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                      <FormLabel>Assign Evaluators</FormLabel>
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="w-full justify-between">
-                              {field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}
-                              <ChevronDown className="h-4 w-4 opacity-50" />
-                          </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-[--radix-popover-trigger-width]">
-                          <DropdownMenuLabel>Available Staff</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          {availableEvaluators.map((evaluator) => (
-                              <DropdownMenuCheckboxItem
-                              key={evaluator.uid}
-                              checked={field.value?.includes(evaluator.uid)}
-                              onCheckedChange={(checked) => {
-                                  return checked
-                                  ? field.onChange([...(field.value || []), evaluator.uid])
-                                  : field.onChange(field.value?.filter((id) => id !== evaluator.uid));
-                              }}
-                              >
-                              {evaluator.name}
-                              </DropdownMenuCheckboxItem>
-                          ))}
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                      <FormMessage />
-                      </FormItem>
-                  )}
-                  />
-              <Separator />
-              <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-2">
-                  <h4 className="font-semibold">Assign Time Slots</h4>
-                  {fields.map((field, index) => {
-                    const userOfInterest = interests.find(u => u.id === field.interestId);
-                    return (
-                      <FormField
-                          key={field.id}
-                          control={form.control}
-                          name={`slots.${index}.time`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <div className="grid grid-cols-3 items-center gap-4">
-                                  <Label htmlFor={field.name} className="text-right text-sm">{userOfInterest?.userName}</Label>
-                                  <FormControl className="col-span-2">
-                                      <Input type="time" {...field} />
-                                  </FormControl>
-                              </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                      />
-                    );
-                  })}
-              </div>
-            </div>
-          </form>
-        </Form>
-        <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button type="submit" form="batch-schedule-form" disabled={isSubmitting || selectedInterests.length === 0}>
-              {isSubmitting ? 'Scheduling...' : `Schedule Batch (${selectedInterests.length})`}
-            </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function ViewDescriptionDialog({ call }: { call: FundingCall }) {
     return (
         <Dialog>
@@ -604,7 +585,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
-    const [isBatchScheduleOpen, setIsBatchScheduleOpen] = useState(false);
 
     const isAdmin = user.role === 'Super-admin' || user.role === 'admin';
     const isSuperAdmin = user.role === 'Super-admin';
@@ -728,7 +708,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                 </div>
                 {isSuperAdmin && (
                     <div className="flex items-center gap-2">
-                         <Button onClick={() => setIsBatchScheduleOpen(true)}><CalendarClock className="mr-2 h-4 w-4" /> Schedule Batch</Button>
                          <Button onClick={() => { setSelectedCall(null); setIsAddEditDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Add New Call</Button>
                     </div>
                 )}
@@ -793,7 +772,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Your Presentation Slot</p>
                                             <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
                                             {interestDetails?.meetingSlot?.time ? (
-                                                <p><strong>Your Time Slot:</strong> {interestDetails.meetingSlot.time}</p>
+                                                <p><strong>Time:</strong> {interestDetails.meetingSlot.time}</p>
                                             ) : <p>Your time slot is pending.</p>}
                                             <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
                                         </div>
@@ -807,7 +786,14 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
                                                 <div className="flex items-center gap-2">
-                                                    <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} user={user} onOpenChange={setIsRegistrationsOpen} />
+                                                    <RegistrationsDialog 
+                                                        call={call} 
+                                                        interests={allInterests} 
+                                                        allUsers={allUsers} 
+                                                        user={user} 
+                                                        onOpenChange={setIsRegistrationsOpen}
+                                                        onScheduleClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true)}} 
+                                                    />
                                                 </div>
                                             )}
                                             {isSuperAdmin && (
@@ -839,13 +825,15 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                         existingCall={selectedCall}
                         user={user}
                     />
-                    <BatchScheduleDialog
-                        isOpen={isBatchScheduleOpen}
-                        onOpenChange={setIsBatchScheduleOpen}
-                        calls={calls}
-                        interests={allInterests}
-                        allUsers={allUsers}
-                    />
+                    {selectedCall && (
+                        <ScheduleMeetingDialog
+                            isOpen={isScheduleDialogOpen}
+                            onOpenChange={setIsScheduleDialogOpen}
+                            call={selectedCall}
+                            interests={allInterests}
+                            allUsers={allUsers}
+                        />
+                    )}
                 </>
             )}
         </Card>
