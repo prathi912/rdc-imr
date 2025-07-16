@@ -59,7 +59,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
 
-    if (!projectSnap.exists()) {
+    if (!projectSnap.exists) {
       return { success: false, error: "Project not found." }
     }
     const project = projectSnap.data() as Project
@@ -136,7 +136,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
     const claimRef = adminDb.collection("incentiveClaims").doc(claimId)
     const claimSnap = await claimRef.get()
 
-    if (!claimSnap.exists()) {
+    if (!claimSnap.exists) {
       return { success: false, error: "Incentive claim not found." }
     }
     const claim = claimSnap.data() as IncentiveClaim
@@ -1092,7 +1092,7 @@ export async function updateProjectEvaluators(
     }
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
-    if (!projectSnap.exists() || !projectSnap.data()?.meetingDetails) {
+    if (!projectSnap.exists || !projectSnap.data()?.meetingDetails) {
       return { success: false, error: "Project or its meeting details not found." }
     }
     await projectRef.update({
@@ -1354,7 +1354,8 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
         faculty: user.faculty,
         department: user.department,
         registeredAt: new Date().toISOString(),
-        submittedToAgency: false
+        submittedToAgency: false,
+        status: 'Registered',
     };
 
     if (coPis && coPis.length > 0) {
@@ -1624,7 +1625,7 @@ export async function deleteEmrInterest(interestId: string, remarks: string, adm
         const interest = interestSnap.data() as EmrInterest;
         const callRef = adminDb.collection('fundingCalls').doc(interest.callId);
         const callSnap = await callRef.get();
-        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'an EMR call';
+        const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : 'an EMR call';
 
         // Withdraw interest to also handle file deletion
         await withdrawEmrInterest(interestId);
@@ -1685,7 +1686,7 @@ export async function addEmrEvaluation(
 
     // Notify Super Admins
     const interestSnap = await adminDb.collection('emrInterests').doc(interestId).get();
-    if(interestSnap.exists()) {
+    if(interestSnap.exists) {
       const interest = interestSnap.data() as EmrInterest;
       const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
       if (!superAdminUsersSnapshot.empty) {
@@ -1789,4 +1790,82 @@ export async function createFundingCall(
         console.error("Error creating funding call:", error);
         return { success: false, error: error.message || "Failed to create funding call." };
     }
+}
+
+export async function updateEmrStatus(
+    interestId: string, 
+    status: EmrInterest['status'],
+    adminRemarks?: string,
+): Promise<{ success: boolean, error?: string }> {
+    try {
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        const updateData: Partial<EmrInterest> = { status };
+        if (adminRemarks) {
+            updateData.adminRemarks = adminRemarks;
+        }
+        await interestRef.update(updateData);
+
+        // Notify user
+        const interestSnap = await interestRef.get();
+        if (interestSnap.exists) {
+            const interest = interestSnap.data() as EmrInterest;
+            const notification = {
+                uid: interest.userId,
+                title: `Your EMR application status has been updated to: ${status}`,
+                createdAt: new Date().toISOString(),
+                isRead: false,
+            };
+            await adminDb.collection("notifications").add(notification);
+            
+            if (interest.userEmail) {
+                 await sendEmail({
+                    to: interest.userEmail,
+                    subject: `Update on your EMR Application`,
+                    html: `
+                        <p>Dear ${interest.userName},</p>
+                        <p>The status of your EMR application has been updated to <strong>${status}</strong>.</p>
+                        ${adminRemarks ? `<p><strong>Admin Remarks:</strong> ${adminRemarks}</p>` : ''}
+                        <p>Please check the portal for more details.</p>
+                    `,
+                    from: 'default'
+                });
+            }
+        }
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error updating EMR status:", error);
+        return { success: false, error: error.message || 'Failed to update status.' };
+    }
+}
+
+
+export async function uploadRevisedEmrPpt(interestId: string, pptDataUrl: string, originalFileName: string, userName: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId || !pptDataUrl) {
+      return { success: false, error: "Interest ID and file data are required." };
+    }
+    
+    const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    
+    // Standardize the filename
+    const fileExtension = path.extname(originalFileName);
+    const standardizedName = `${userName.replace(/\s+/g, '_')}_revised_${new Date().getTime()}${fileExtension}`;
+
+    const filePath = `emr-presentations/${path.dirname(interestId)}/${standardizedName}`;
+    const result = await uploadFileToServer(pptDataUrl, filePath);
+
+    if (!result.success || !result.url) {
+        throw new Error(result.error || "Revised PPT upload failed.");
+    }
+    
+    await interestRef.update({
+      revisedPptUrl: result.url,
+      status: 'Revision Submitted',
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error uploading revised EMR presentation:", error);
+    return { success: false, error: error.message || "Failed to upload presentation." };
+  }
 }

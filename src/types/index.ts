@@ -295,6 +295,9 @@ export type EmrInterest = {
     pptSubmissionDate?: string; // ISO String
     coPiUids?: string[];
     coPiNames?: string[];
+    status: 'Registered' | 'Revision Submitted' | 'Recommended' | 'Not Recommended' | 'Revision Needed';
+    adminRemarks?: string;
+    revisedPptUrl?: string;
 };
 
 export type EmrEvaluation = {
