@@ -1,8 +1,9 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { User, IncentiveClaim, Project } from '@/types';
+import type { User, IncentiveClaim, Project, EmrInterest } from '@/types';
 import { getResearchDomain } from '@/app/actions';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +22,7 @@ function ProfileDetail({ label, value }: { label: string; value?: string }) {
     );
 }
 
-export function ProfileClient({ user, claims, projects }: { user: User; claims: IncentiveClaim[]; projects: Project[] }) {
+export function ProfileClient({ user, projects, emrInterests }: { user: User; projects: Project[], emrInterests: EmrInterest[] }) {
     const [domain, setDomain] = useState<string | null>(null);
     const [loadingDomain, setLoadingDomain] = useState(false);
 
@@ -99,8 +100,8 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
             <div className="lg:col-span-3">
                 <Tabs defaultValue="projects" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="projects">Projects ({projects.length})</TabsTrigger>
-                        <TabsTrigger value="claims">Incentive Claims ({claims.length})</TabsTrigger>
+                        <TabsTrigger value="projects">IMR Projects ({projects.length})</TabsTrigger>
+                        <TabsTrigger value="emr">EMR Interests ({emrInterests.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="projects">
                         <div className="space-y-4 mt-4">
@@ -120,23 +121,24 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
                                     </CardContent>
                                 </Card>
                             )) : (
-                                <Card><CardContent className="p-6 text-center text-muted-foreground">No projects found.</CardContent></Card>
+                                <Card><CardContent className="p-6 text-center text-muted-foreground">No intramural research projects found.</CardContent></Card>
                             )}
                         </div>
                     </TabsContent>
-                    <TabsContent value="claims">
+                    <TabsContent value="emr">
                         <div className="space-y-4 mt-4">
-                             {claims.length > 0 ? claims.map(claim => (
-                                <Card key={claim.id}>
+                             {emrInterests.length > 0 ? emrInterests.map(interest => (
+                                <Card key={interest.id}>
                                     <CardContent className="p-4">
-                                        <p className="font-semibold">{claim.paperTitle}</p>
-                                        {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
-                                        <p className="text-sm text-muted-foreground">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
-                                        <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'} className="mt-2">{claim.status}</Badge>
+                                        <p className="font-semibold">{interest.callId}</p>
+                                        <p className="text-sm text-muted-foreground">Registered on: {new Date(interest.registeredAt).toLocaleDateString()}</p>
+                                        {interest.meetingSlot && (
+                                            <Badge variant="secondary" className="mt-2">Meeting: {new Date(interest.meetingSlot.date).toLocaleDateString()} at {interest.meetingSlot.time}</Badge>
+                                        )}
                                     </CardContent>
                                 </Card>
                             )) : (
-                                <Card><CardContent className="p-6 text-center text-muted-foreground">No incentive claims found.</CardContent></Card>
+                                <Card><CardContent className="p-6 text-center text-muted-foreground">No registered EMR interests found.</CardContent></Card>
                             )}
                         </div>
                     </TabsContent>
@@ -145,3 +147,5 @@ export function ProfileClient({ user, claims, projects }: { user: User; claims: 
         </div>
     );
 }
+
+    

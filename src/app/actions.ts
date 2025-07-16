@@ -1477,3 +1477,39 @@ export async function uploadEmrPpt(interestId: string, pptDataUrl: string, fileN
     return { success: false, error: error.message || "Failed to upload presentation." };
   }
 }
+
+export async function removeEmrPpt(interestId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!interestId) {
+            return { success: false, error: "Interest ID is required." };
+        }
+
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        const interestSnap = await interestRef.get();
+        if (!interestSnap.exists) {
+            return { success: false, error: "Interest registration not found." };
+        }
+        const interest = interestSnap.data() as EmrInterest;
+
+        if (interest.pptUrl) {
+            const bucket = adminStorage.bucket();
+            const url = new URL(interest.pptUrl);
+            const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf('/o/') + 3));
+            
+            await bucket.file(filePath).delete();
+            console.log(`Deleted file from Storage: ${filePath}`);
+        }
+
+        await interestRef.update({
+            pptUrl: null,
+            pptSubmissionDate: null
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error removing EMR presentation:", error);
+        return { success: false, error: error.message || "Failed to remove presentation." };
+    }
+}
+
+    
