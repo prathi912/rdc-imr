@@ -45,6 +45,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarPicker } from '../ui/calendar';
+import { Separator } from '../ui/separator';
 
 
 interface EmrCalendarProps {
@@ -548,7 +549,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                 return (
                                     <div 
                                         key={dateStr} 
-                                        className={cn("min-h-[6rem] border-b border-r p-2 flex flex-col cursor-pointer hover:bg-muted/50 transition-colors", eventsOnDay.length > 0 ? "cursor-pointer" : "cursor-default")}
+                                        className={cn("min-h-[6rem] border-b border-r p-2 flex flex-col hover:bg-muted/50 transition-colors", eventsOnDay.length > 0 ? "cursor-pointer" : "cursor-default")}
                                         onClick={() => eventsOnDay.length > 0 && handleDateClick(dateStr)}
                                     >
                                         <span className="font-semibold">{format(day, 'd')}</span>
