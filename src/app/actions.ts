@@ -7,7 +7,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest } from "@/types"
+import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
@@ -1359,5 +1359,61 @@ export async function registerEmrInterest(callId: string, user: User): Promise<{
   } catch (error: any) {
     console.error("Error registering EMR interest:", error);
     return { success: false, error: error.message || "Failed to register interest." };
+  }
+}
+
+export async function scheduleEmrMeeting(callId: string, meetingDetails: { date: string; time: string; venue: string }) {
+  try {
+    const callRef = adminDb.collection('fundingCalls').doc(callId);
+    const callSnap = await callRef.get();
+    if (!callSnap.exists) {
+      return { success: false, error: "Funding call not found." };
+    }
+    const call = callSnap.data() as FundingCall;
+
+    await callRef.update({
+      status: 'Meeting Scheduled',
+      meetingDetails: meetingDetails
+    });
+
+    const interestsSnapshot = await adminDb.collection('emrInterests').where('callId', '==', callId).get();
+    const interestedUsers = interestsSnapshot.docs.map(doc => doc.data() as EmrInterest);
+
+    const emailPromises = interestedUsers.map(interest => {
+      const emailHtml = `
+        <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width: 300px; height: auto;" />
+          </div>
+          <p style="color: #ffffff;">Dear ${interest.userName},</p>
+          <p style="color: #e0e0e0;">
+            A meeting has been scheduled for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>", which you registered interest for.
+          </p>
+          <p><strong style="color: #ffffff;">Date:</strong> ${format(new Date(meetingDetails.date), 'MMMM d, yyyy')}</p>
+          <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
+          <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+          <p style="color: #cccccc;">
+            Please prepare for your presentation.
+          </p>
+          <p style="color:#b0bec5;">Thank you,</p>
+          <p style="color:#b0bec5;">Research & Development Cell - PU</p>
+        </div>
+      `;
+      if (interest.userEmail) {
+        return sendEmail({
+          to: interest.userEmail,
+          subject: `EMR Meeting Scheduled: ${call.title}`,
+          html: emailHtml
+        });
+      }
+      return Promise.resolve();
+    });
+
+    await Promise.all(emailPromises);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error scheduling EMR meeting:", error);
+    return { success: false, error: error.message || "Failed to schedule EMR meeting." };
   }
 }

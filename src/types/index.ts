@@ -1,5 +1,4 @@
 
-
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -271,6 +270,11 @@ export type FundingCall = {
   createdAt: string; // ISO String
   createdBy: string; // UID of the admin who created it
   status: 'Open' | 'Closed' | 'Meeting Scheduled';
+  meetingDetails?: {
+    date: string;
+    time: string;
+    venue: string;
+  };
 };
 
 export type EmrInterest = {

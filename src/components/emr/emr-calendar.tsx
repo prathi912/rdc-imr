@@ -36,10 +36,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths } from 'date-fns';
-import { registerEmrInterest } from '@/app/actions';
+import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter } from 'date-fns';
+import { registerEmrInterest, scheduleEmrMeeting } from '@/app/actions';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
@@ -61,6 +61,12 @@ const callSchema = z.object({
   detailsUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
 });
 
+const scheduleMeetingSchema = z.object({
+    date: z.date({ required_error: 'A meeting date is required.' }),
+    time: z.string().min(1, 'Meeting time is required.'),
+    venue: z.string().min(3, 'Meeting venue is required.'),
+});
+
 const TimeLeft = ({ deadline }: { deadline: string }) => {
     const [now, setNow] = useState(new Date());
 
@@ -70,7 +76,7 @@ const TimeLeft = ({ deadline }: { deadline: string }) => {
     }, []);
 
     const deadLineDate = parseISO(deadline);
-    if (deadLineDate < now) {
+    if (isAfter(now, deadLineDate)) {
         return <span className="text-destructive font-semibold">Registration Closed</span>;
     }
 
@@ -286,6 +292,59 @@ function AddEditCallDialog({
   );
 }
 
+function ScheduleMeetingDialog({ call, onOpenChange, isOpen }: { call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const form = useForm<z.infer<typeof scheduleMeetingSchema>>({
+        resolver: zodResolver(scheduleMeetingSchema),
+        defaultValues: { venue: "RDC Committee Room, PIMSR" },
+    });
+
+    const handleScheduleMeeting = async (values: z.infer<typeof scheduleMeetingSchema>) => {
+        setIsSubmitting(true);
+        try {
+            const result = await scheduleEmrMeeting(call.id, {
+                date: format(values.date, 'yyyy-MM-dd'),
+                time: values.time,
+                venue: values.venue,
+            });
+            if (result.success) {
+                toast({ title: 'Success', description: 'Meeting scheduled and participants notified.' });
+                onOpenChange(false);
+            } else {
+                toast({ variant: 'destructive', title: 'Error', description: result.error });
+            }
+        } catch (error) {
+            console.error('Error scheduling meeting:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not schedule meeting.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
+                    <DialogDescription>Set a meeting date and time for all interested faculties.</DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="schedule-meeting-form" onSubmit={form.handleSubmit(handleScheduleMeeting)} className="space-y-4 py-4">
+                         <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                         <FormField name="time" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                         <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="schedule-meeting-form" disabled={isSubmitting}>{isSubmitting ? 'Scheduling...' : 'Schedule & Notify'}</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export function EmrCalendar({ user }: EmrCalendarProps) {
     const { toast } = useToast();
@@ -295,6 +354,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+    const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
@@ -353,14 +413,30 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     }, [toast, user.uid, isAdmin]);
 
 
-    const handleRegisterInterest = async (callId: string) => {
-        const result = await registerEmrInterest(callId, user);
+    const handleRegisterInterest = async (call: FundingCall) => {
+        if (isAfter(new Date(), parseISO(call.interestDeadline))) {
+            toast({ variant: 'destructive', title: 'Registration Closed', description: 'The deadline to register interest has passed.' });
+            return;
+        }
+        const result = await registerEmrInterest(call.id, user);
         if (result.success) {
             toast({ title: 'Interest Registered!', description: 'Your interest has been successfully recorded.' });
         } else {
             toast({ variant: 'destructive', title: 'Registration Failed', description: result.error });
         }
     };
+    
+    const getStatusBadge = (call: FundingCall) => {
+        const now = new Date();
+        if (call.status === 'Meeting Scheduled') {
+            return <Badge variant="default">Meeting Scheduled</Badge>;
+        }
+        if (isAfter(now, parseISO(call.interestDeadline))) {
+            return <Badge variant="secondary">Closed</Badge>;
+        }
+        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-200 dark:border-green-700">Open</Badge>;
+    }
+
 
     if (loading) {
         return <Skeleton className="h-96 w-full" />;
@@ -400,7 +476,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                 <p className="font-semibold text-foreground truncate">{call.title}</p>
                                                 <p className="truncate">{call.agency}</p>
                                                 {userHasRegistered && <Badge variant="default" className="mt-1 w-full justify-center">Registered</Badge>}
-                                                {isAdmin && <Button variant="ghost" size="sm" className="w-full mt-1 text-xs h-6" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>Edit</Button>}
+                                                {isSuperAdmin && <Button variant="ghost" size="sm" className="w-full mt-1 text-xs h-6" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>Edit</Button>}
                                             </div>
                                         )
                                     })}
@@ -412,15 +488,18 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                 
                  <div className="mt-8 space-y-4">
                     <h4 className="font-semibold">All Upcoming Deadlines</h4>
-                     {calls.filter(c => new Date(c.interestDeadline) >= new Date()).map(call => {
+                     {calls.filter(c => !isAfter(new Date(), parseISO(c.interestDeadline))).map(call => {
                          const userHasRegistered = userInterests.some(i => i.callId === call.id);
-                         const isInterestDeadlinePast = new Date(call.interestDeadline) < new Date();
+                         const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
+                         const hasInterest = allInterests.some(i => i.callId === call.id);
+
                          return (
                             <div key={call.id} className="border p-4 rounded-lg flex flex-col md:flex-row md:items-start justify-between gap-4">
                                 <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
+                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                                         <h4 className="font-semibold">{call.title}</h4>
                                         <Badge variant="secondary">{call.callType}</Badge>
+                                        {getStatusBadge(call)}
                                     </div>
                                     <p className="text-sm text-muted-foreground">Agency: {call.agency}</p>
                                     <p className="text-sm mt-2">{call.description}</p>
@@ -429,6 +508,14 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
                                         <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
                                     </div>
+                                    {call.meetingDetails && (
+                                        <div className="mt-2 text-sm p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
+                                            <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Meeting Scheduled</p>
+                                            <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
+                                            <p><strong>Time:</strong> {call.meetingDetails.time}</p>
+                                            <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex-shrink-0 text-center md:text-right space-y-2">
                                     {userHasRegistered ? (
@@ -438,7 +525,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                     ) : (
                                         <>
-                                            <Button onClick={() => handleRegisterInterest(call.id)} disabled={isSuperAdmin || isInterestDeadlinePast}>
+                                            <Button onClick={() => handleRegisterInterest(call)} disabled={isSuperAdmin || isInterestDeadlinePast}>
                                                 Register Interest
                                             </Button>
                                             <p className="text-xs text-muted-foreground mt-1">
@@ -447,7 +534,14 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </>
                                     )}
                                     {isAdmin && (
-                                        <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} />
+                                        <div className="flex flex-col items-center md:items-end gap-2 mt-2">
+                                            <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} />
+                                            {hasInterest && call.status !== 'Meeting Scheduled' && isSuperAdmin && (
+                                                <Button size="sm" onClick={() => { setSelectedCall(call); setIsScheduleDialogOpen(true); }}>
+                                                    <Calendar className="mr-2 h-4 w-4" /> Schedule Meeting
+                                                </Button>
+                                            )}
+                                        </div>
                                     )}
                                     {isSuperAdmin && (
                                         <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
@@ -465,6 +559,13 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                     onOpenChange={setIsAddEditDialogOpen}
                     existingCall={selectedCall}
                     user={user}
+                />
+            )}
+            {selectedCall && isSuperAdmin && (
+                <ScheduleMeetingDialog
+                    call={selectedCall}
+                    isOpen={isScheduleDialogOpen}
+                    onOpenChange={setIsScheduleDialogOpen}
                 />
             )}
         </Card>
