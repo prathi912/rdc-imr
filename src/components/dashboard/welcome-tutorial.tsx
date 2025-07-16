@@ -25,9 +25,9 @@ import {
   Users,
   CalendarClock,
   ShieldCheck,
-  ArrowRight,
-  ArrowLeft,
-  GraduationCap,
+  Settings,
+  Bell,
+  GraduationCap
 } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 
@@ -38,6 +38,11 @@ interface WelcomeTutorialProps {
 const tutorialSteps = {
   faculty: [
     {
+      icon: Settings,
+      title: 'First Step: Complete Your Profile',
+      description: "Welcome! Before you begin, please go to 'Settings' from the sidebar. It's crucial to complete your academic profile and add your bank account details, as this is required for any grant or incentive payments.",
+    },
+    {
       icon: FilePlus2,
       title: 'Submit New Projects',
       description: "Click 'New Submission' in the sidebar to start a multi-step form to apply for IMR project funding. You can save your progress as a draft anytime.",
@@ -45,19 +50,24 @@ const tutorialSteps = {
     {
       icon: Book,
       title: 'Track Your Projects',
-      description: "The 'My Projects' page lists all projects you are associated with. Monitor their status from submission to completion.",
+      description: "The 'My Projects' page lists all projects you are associated with. Click any project to view its detailed status, see feedback if revisions are needed, and manage grant funds if awarded.",
     },
     {
       icon: Award,
       title: 'Claim Incentives',
       description: "Use the 'Incentive Claims' module to apply for incentives for your publications, patents, and conference presentations.",
     },
+     {
+      icon: Bell,
+      title: 'Stay Notified',
+      description: "Keep an eye on the 'Notifications' tab. You'll receive important updates here about your project status, meeting schedules, and more.",
+    },
   ],
   Evaluator: [
     {
       icon: ClipboardCheck,
       title: 'Your Evaluation Queue',
-      description: "The 'Evaluation Queue' page shows all projects currently assigned to you for review. You can only evaluate projects on the day of the scheduled meeting.",
+      description: "The 'Evaluation Queue' page shows all projects currently assigned to you for review. Important: You can only evaluate projects on the day of the scheduled meeting.",
     },
     {
       icon: FileCheck2,
@@ -96,15 +106,15 @@ const tutorialSteps = {
     {
       icon: FileCheck2,
       title: 'Oversee Faculty Projects',
-      description: "The 'All Projects' page is filtered to show all projects from your assigned faculties. Use the dropdown to switch between faculties.",
+      description: "Your 'All Projects' and 'Analytics' pages are automatically filtered to show data from your assigned faculties. Use the dropdown filter on these pages to switch between faculties.",
     },
     {
-      icon: LineChart,
-      title: 'Faculty Analytics',
-      description: "The 'Analytics' dashboard provides a high-level view of research trends within your assigned faculties.",
+      icon: Award,
+      title: 'Manage Claims',
+      description: "You can also review and manage all incentive claims submitted by faculty within your assigned faculties from the 'Manage Claims' module.",
     },
     {
-      icon: Users,
+      icon: GraduationCap,
       title: 'Get Started',
       description: 'Explore your dashboard to see these features in action. You can always refer to the SOP document for more details.',
     },
@@ -147,12 +157,17 @@ const tutorialSteps = {
      {
       icon: FileCheck2,
       title: 'Complete Oversight',
-      description: "You have access to all projects, users, and claims across the entire university.",
+      description: "You have access to all projects, users, and claims across the entire university. Your dashboards provide a global view of all activities.",
     },
     {
       icon: ShieldCheck,
       title: 'Manage Modules',
       description: "Use 'Module Management' to dynamically grant or revoke access to any feature for any user, allowing for fine-grained permission control.",
+    },
+     {
+      icon: Users,
+      title: 'Manage Users & Roles',
+      description: "You have the highest level of control in 'Manage Users', including the ability to assign users to the CRO role and manage their faculty assignments.",
     },
     {
       icon: LineChart,
@@ -188,6 +203,7 @@ export function WelcomeTutorial({ user }: WelcomeTutorialProps) {
     if (user.role === 'admin') return 'admin';
     if (user.role === 'CRO') return 'CRO';
     if (user.role === 'Super-admin') return 'Super-admin';
+    if (user.role === 'Evaluator') return 'Evaluator';
     return 'faculty'; // Default fallback
   }
 
