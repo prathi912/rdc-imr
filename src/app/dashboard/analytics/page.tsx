@@ -9,7 +9,7 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, onSnapshot, or } from 'firebase/firestore';
-import { format, subMonths, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth, parseISO, getYear } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign } from 'lucide-react';
 import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
@@ -24,6 +24,9 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
+  const [timeRange, setTimeRange] = useState<string>('last6months');
+  const [availableYears, setAvailableYears] = useState<string[]>([]);
+
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -108,20 +111,44 @@ export default function AnalyticsPage() {
   }, [projects, user, facultyFilter]);
 
   // --- Data Processing ---
-  const submissionsData = useMemo(() => {
-    const last6Months = Array.from({ length: 6 }, (_, i) => {
-      const d = subMonths(new Date(), i);
-      return { name: format(d, 'MMM'), start: startOfMonth(d), end: endOfMonth(d) };
-    }).reverse();
-
-    return last6Months.map(month => {
-      const count = filteredProjects.filter(p => {
-        const submissionDate = parseISO(p.submissionDate);
-        return submissionDate >= month.start && submissionDate <= month.end;
-      }).length;
-      return { month: month.name, submissions: count };
-    });
+  
+  useEffect(() => {
+    if (filteredProjects.length > 0) {
+      const years = new Set(
+        filteredProjects.map(p => getYear(parseISO(p.submissionDate)))
+      );
+      setAvailableYears(Array.from(years).sort((a,b) => b-a).map(String));
+    }
   }, [filteredProjects]);
+
+  const submissionsData = useMemo(() => {
+    if (timeRange === 'last6months') {
+        const last6Months = Array.from({ length: 6 }, (_, i) => {
+        const d = subMonths(new Date(), i);
+        return { name: format(d, 'MMM'), start: startOfMonth(d), end: endOfMonth(d) };
+        }).reverse();
+
+        return last6Months.map(month => {
+        const count = filteredProjects.filter(p => {
+            const submissionDate = parseISO(p.submissionDate);
+            return submissionDate >= month.start && submissionDate <= month.end;
+        }).length;
+        return { month: month.name, submissions: count };
+        });
+    }
+
+    // Handle year selection
+    const year = parseInt(timeRange, 10);
+    const months = Array.from({ length: 12 }, (_, i) => format(new Date(year, i, 1), 'MMM'));
+    return months.map((monthName, monthIndex) => {
+        const count = filteredProjects.filter(p => {
+            const submissionDate = parseISO(p.submissionDate);
+            return getYear(submissionDate) === year && submissionDate.getMonth() === monthIndex;
+        }).length;
+        return { month: monthName, submissions: count };
+    });
+    
+  }, [filteredProjects, timeRange]);
   
   const submissionsConfig = {
     submissions: { label: 'Submissions', color: 'hsl(var(--primary))' },
@@ -273,8 +300,27 @@ export default function AnalyticsPage() {
       <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Submissions Over Time</CardTitle>
-            <CardDescription>Monthly project submissions for the last 6 months.</CardDescription>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle>Submissions Over Time</CardTitle>
+                <CardDescription>
+                  {timeRange === 'last6months'
+                    ? 'Monthly project submissions for the last 6 months.'
+                    : `Monthly project submissions for ${timeRange}.`}
+                </CardDescription>
+              </div>
+              <Select value={timeRange} onValueChange={setTimeRange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Select time range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="last6months">Last 6 Months</SelectItem>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={year}>{year}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
