@@ -1375,54 +1375,68 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
       status: 'Meeting Scheduled',
       meetingDetails: { date: meetingDetails.date, venue: meetingDetails.venue }
     });
-    
-    const emailPromises = meetingDetails.slots.map(async (slot) => {
-      if (!slot.time) return Promise.resolve(); // Skip if no time is assigned
 
-      const interestQuery = await adminDb.collection('emrInterests').where('callId', '==', callId).where('userId', '==', slot.userId).limit(1).get();
-      if (interestQuery.empty) return Promise.resolve();
+    const batch = adminDb.batch();
+    const emailPromises = [];
 
-      const interestDoc = interestQuery.docs[0];
-      const interest = interestDoc.data() as EmrInterest;
+    for (const slot of meetingDetails.slots) {
+        if (!slot.time) continue;
 
-      const userSlotTime = parse(slot.time, 'HH:mm', new Date(meetingDetails.date));
-      
-      await interestDoc.ref.update({
-        meetingSlot: {
-            date: meetingDetails.date,
-            time: slot.time,
-        }
-      });
-      
-      const emailHtml = `
-        <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
-          <div style="text-align: center; margin-bottom: 20px;">
-            <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width: 300px; height: auto;" />
-          </div>
-          <p style="color: #ffffff;">Dear ${interest.userName},</p>
-          <p style="color: #e0e0e0;">
-            A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
-          </p>
-          <p><strong style="color: #ffffff;">Date:</strong> ${format(userSlotTime, 'MMMM d, yyyy')}</p>
-          <p><strong style="color: #ffffff;">Your Time Slot:</strong> ${format(userSlotTime, 'h:mm a')}</p>
-          <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
-          <p style="color: #cccccc;">
-            Please prepare for your presentation.
-          </p>
-          <p style="color:#b0bec5;">Thank you,</p>
-          <p style="color:#b0bec5;">Research & Development Cell - PU</p>
-        </div>
-      `;
-      if (interest.userEmail) {
-        return sendEmail({
-          to: interest.userEmail,
-          subject: `Your EMR Presentation Slot for: ${call.title}`,
-          html: emailHtml
+        const interestQuery = await adminDb.collection('emrInterests').where('callId', '==', callId).where('userId', '==', slot.userId).limit(1).get();
+        if (interestQuery.empty) continue;
+
+        const interestDoc = interestQuery.docs[0];
+        const interest = interestDoc.data() as EmrInterest;
+
+        const userSlotTime = parse(slot.time, 'HH:mm', new Date(meetingDetails.date));
+
+        // Update interest document with meeting slot
+        batch.update(interestDoc.ref, {
+            meetingSlot: {
+                date: meetingDetails.date,
+                time: slot.time,
+            }
         });
-      }
-      return Promise.resolve();
-    });
 
+        // Add in-app notification to the batch
+        const notificationRef = adminDb.collection("notifications").doc();
+        batch.set(notificationRef, {
+            uid: interest.userId,
+            title: `Your EMR Presentation for "${call.title}" has been scheduled.`,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+        });
+        
+        const emailHtml = `
+            <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width: 300px; height: auto;" />
+                </div>
+                <p style="color: #ffffff;">Dear ${interest.userName},</p>
+                <p style="color: #e0e0e0;">
+                    A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
+                </p>
+                <p><strong style="color: #ffffff;">Date:</strong> ${format(userSlotTime, 'MMMM d, yyyy')}</p>
+                <p><strong style="color: #ffffff;">Your Time Slot:</strong> ${format(userSlotTime, 'h:mm a')}</p>
+                <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+                <p style="color: #cccccc;">
+                    Please prepare for your presentation.
+                </p>
+                <p style="color:#b0bec5;">Thank you,</p>
+                <p style="color:#b0bec5;">Research & Development Cell - PU</p>
+            </div>
+        `;
+        
+        if (interest.userEmail) {
+            emailPromises.push(sendEmail({
+                to: interest.userEmail,
+                subject: `Your EMR Presentation Slot for: ${call.title}`,
+                html: emailHtml
+            }));
+        }
+    }
+
+    await batch.commit();
     await Promise.all(emailPromises);
 
     return { success: true };

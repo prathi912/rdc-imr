@@ -37,7 +37,7 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
 import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt } from '@/app/actions';
@@ -496,6 +496,27 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: E
     );
 }
 
+function ViewDescriptionDialog({ call }: { call: FundingCall }) {
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="secondary" size="sm">
+                    <NotebookText className="mr-2 h-4 w-4" /> View Description
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>{call.title}</DialogTitle>
+                    <DialogDescription>Full description for the funding call from {call.agency}.</DialogDescription>
+                </DialogHeader>
+                <div className="max-h-[60vh] overflow-y-auto pr-4">
+                    <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: call.description || 'No description provided.' }} />
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export function EmrCalendar({ user }: EmrCalendarProps) {
     const { toast } = useToast();
@@ -683,8 +704,12 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             {getStatusBadge(call)}
                                         </div>
                                         <p className="text-sm text-muted-foreground">Agency: {call.agency}</p>
-                                        {call.description && <div className="text-sm mt-2 prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: call.description }} />}
-                                        {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto mt-1"><Link href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Details</Link></Button>}
+                                        
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {call.description && <ViewDescriptionDialog call={call} />}
+                                            {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto"><Link href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Details</Link></Button>}
+                                        </div>
+
                                         <div className="text-xs text-muted-foreground mt-2 space-y-1">
                                             <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
                                             <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
