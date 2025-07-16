@@ -890,6 +890,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                     <span>Interest Registered</span>
                                                 </div>
                                             ) : (
+                                                !isSuperAdmin &&
                                                 <>
                                                     <Button onClick={() => handleRegisterInterest(call)} disabled={isInterestDeadlinePast}>
                                                         Register Interest
@@ -921,9 +922,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                 <Button variant="destructive" size="sm" onClick={() => { setSelectedInterest(interestDetails!); setIsWithdrawConfirmationOpen(true);}}>
                                                     Withdraw
                                                 </Button>
-                                            )}
-                                            {userHasRegistered && interestDetails?.pptUrl && (
-                                                 <Button asChild size="sm" variant="outline"><a href={interestDetails.pptUrl} target="_blank" rel="noreferrer"><Eye className="h-4 w-4 mr-2"/>View PPT</a></Button>
                                             )}
                                             {userHasRegistered && (
                                                 <Button size="sm" variant="outline" onClick={() => { setSelectedInterest(interestDetails!); setSelectedCall(call); setIsUploadPptOpen(true); }}>
