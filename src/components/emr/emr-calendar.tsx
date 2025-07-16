@@ -500,102 +500,105 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                 )}
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-7 border-t border-l">
-                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                        <div key={day} className="text-center font-semibold p-2 border-b border-r text-sm text-muted-foreground">{day}</div>
-                    ))}
-                    {Array.from({ length: startingDayIndex }).map((_, i) => (
-                        <div key={`empty-${i}`} className="border-b border-r"></div>
-                    ))}
-                    {daysInMonth.map(day => {
-                        const dateStr = format(day, 'yyyy-MM-dd');
-                        const callsOnDay = callsByDate[dateStr] || [];
-                        return (
-                            <div key={dateStr} className="h-48 border-b border-r p-2 flex flex-col overflow-hidden">
-                                <span className="font-semibold">{format(day, 'd')}</span>
-                                <div className="flex-grow overflow-y-auto space-y-1 mt-1 text-xs">
-                                    {callsOnDay.map(call => {
-                                        const userHasRegistered = userInterests.some(i => i.callId === call.id);
-                                        return (
-                                            <div key={call.id} className="p-1.5 rounded-md bg-muted/50 text-muted-foreground">
-                                                <p className="font-semibold text-foreground truncate">{call.title}</p>
-                                                <p className="truncate">{call.agency}</p>
-                                                {userHasRegistered && <Badge variant="default" className="mt-1 w-full justify-center">Registered</Badge>}
-                                                {isSuperAdmin && <Button variant="ghost" size="sm" className="w-full mt-1 text-xs h-6" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>Edit</Button>}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div>
+                        <div className="grid grid-cols-7 border-t border-l">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                <div key={day} className="text-center font-semibold p-2 border-b border-r text-sm text-muted-foreground">{day}</div>
+                            ))}
+                            {Array.from({ length: startingDayIndex }).map((_, i) => (
+                                <div key={`empty-${i}`} className="border-b border-r min-h-[12rem]"></div>
+                            ))}
+                            {daysInMonth.map(day => {
+                                const dateStr = format(day, 'yyyy-MM-dd');
+                                const callsOnDay = callsByDate[dateStr] || [];
+                                return (
+                                    <div key={dateStr} className="min-h-[12rem] border-b border-r p-2 flex flex-col overflow-hidden">
+                                        <span className="font-semibold">{format(day, 'd')}</span>
+                                        <div className="flex-grow overflow-y-auto space-y-1 mt-1 text-xs">
+                                            {callsOnDay.map(call => {
+                                                const userHasRegistered = userInterests.some(i => i.callId === call.id);
+                                                return (
+                                                    <div key={call.id} className="p-1.5 rounded-md bg-muted/50 text-muted-foreground">
+                                                        <p className="font-semibold text-foreground truncate">{call.title}</p>
+                                                        <p className="truncate">{call.agency}</p>
+                                                        {userHasRegistered && <Badge variant="default" className="mt-1 w-full justify-center">Registered</Badge>}
+                                                        {isSuperAdmin && <Button variant="ghost" size="sm" className="w-full mt-1 text-xs h-6" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>Edit</Button>}
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                        <h4 className="font-semibold">All Upcoming Deadlines</h4>
+                        {calls.filter(c => !isAfter(new Date(), parseISO(c.interestDeadline))).map(call => {
+                            const userHasRegistered = userInterests.some(i => i.callId === call.id);
+                            const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
+                            const hasInterest = allInterests.some(i => i.callId === call.id);
+
+                            return (
+                                <div key={call.id} className="border p-4 rounded-lg flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                            <h4 className="font-semibold">{call.title}</h4>
+                                            <Badge variant="secondary">{call.callType}</Badge>
+                                            {getStatusBadge(call)}
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">Agency: {call.agency}</p>
+                                        <p className="text-sm mt-2">{call.description}</p>
+                                        {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto mt-1"><Link href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Details</Link></Button>}
+                                        <div className="text-xs text-muted-foreground mt-2 space-y-1">
+                                            <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
+                                            <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
+                                        </div>
+                                        {call.meetingDetails && (
+                                            <div className="mt-2 text-sm p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
+                                                <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Meeting Scheduled</p>
+                                                <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
+                                                <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
                                             </div>
-                                        )
-                                    })}
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-                
-                 <div className="mt-8 space-y-4">
-                    <h4 className="font-semibold">All Upcoming Deadlines</h4>
-                     {calls.filter(c => !isAfter(new Date(), parseISO(c.interestDeadline))).map(call => {
-                         const userHasRegistered = userInterests.some(i => i.callId === call.id);
-                         const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
-                         const hasInterest = allInterests.some(i => i.callId === call.id);
-
-                         return (
-                            <div key={call.id} className="border p-4 rounded-lg flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                        <h4 className="font-semibold">{call.title}</h4>
-                                        <Badge variant="secondary">{call.callType}</Badge>
-                                        {getStatusBadge(call)}
+                                        )}
                                     </div>
-                                    <p className="text-sm text-muted-foreground">Agency: {call.agency}</p>
-                                    <p className="text-sm mt-2">{call.description}</p>
-                                    {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto mt-1"><Link href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Details</Link></Button>}
-                                     <div className="text-xs text-muted-foreground mt-2 space-y-1">
-                                        <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
-                                        <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
-                                    </div>
-                                    {call.meetingDetails && (
-                                        <div className="mt-2 text-sm p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
-                                            <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Meeting Scheduled</p>
-                                            <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
-                                            <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex-shrink-0 text-center md:text-right space-y-2">
-                                    {userHasRegistered ? (
-                                        <div className="flex items-center gap-2 text-green-600 font-semibold p-2 bg-green-50 rounded-md dark:bg-green-900/20">
-                                            <CheckCircle className="h-5 w-5"/>
-                                            <span>Interest Registered</span>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <Button onClick={() => handleRegisterInterest(call)} disabled={isInterestDeadlinePast}>
-                                                Register Interest
-                                            </Button>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                <TimeLeft deadline={call.interestDeadline} />
-                                            </p>
-                                        </>
-                                    )}
-                                    {isAdmin && (
-                                        <div className="flex flex-col items-center md:items-end gap-2 mt-2">
-                                            <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} />
-                                            {hasInterest && call.status !== 'Meeting Scheduled' && isSuperAdmin && (
-                                                <Button size="sm" onClick={() => { setSelectedCall(call); setIsScheduleDialogOpen(true); }}>
-                                                    <Calendar className="mr-2 h-4 w-4" /> Schedule Meeting
+                                    <div className="flex-shrink-0 text-center md:text-right space-y-2">
+                                        {userHasRegistered ? (
+                                            <div className="flex items-center gap-2 text-green-600 font-semibold p-2 bg-green-50 rounded-md dark:bg-green-900/20">
+                                                <CheckCircle className="h-5 w-5"/>
+                                                <span>Interest Registered</span>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <Button onClick={() => handleRegisterInterest(call)} disabled={isInterestDeadlinePast}>
+                                                    Register Interest
                                                 </Button>
-                                            )}
-                                        </div>
-                                    )}
-                                    {isSuperAdmin && (
-                                        <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
-                                    )}
+                                                <p className="text-xs text-muted-foreground mt-1">
+                                                    <TimeLeft deadline={call.interestDeadline} />
+                                                </p>
+                                            </>
+                                        )}
+                                        {isAdmin && (
+                                            <div className="flex flex-col items-center md:items-end gap-2 mt-2">
+                                                <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} />
+                                                {hasInterest && call.status !== 'Meeting Scheduled' && isSuperAdmin && (
+                                                    <Button size="sm" onClick={() => { setSelectedCall(call); setIsScheduleDialogOpen(true); }}>
+                                                        <Calendar className="mr-2 h-4 w-4" /> Schedule Meeting
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        )}
+                                        {isSuperAdmin && (
+                                            <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        )
-                    })}
+                            )
+                        })}
+                    </div>
                 </div>
-
             </CardContent>
             {isSuperAdmin && (
                 <AddEditCallDialog
