@@ -1332,7 +1332,7 @@ export async function updateUserTutorialStatus(uid: string): Promise<{ success: 
   }
 }
 
-export async function registerEmrInterest(callId: string, user: User): Promise<{ success: boolean; error?: string }> {
+export async function registerEmrInterest(callId: string, user: User, coPis?: { uid: string, name: string }[]): Promise<{ success: boolean; error?: string }> {
   try {
     if (!user || !user.uid || !user.faculty || !user.department) {
       return { success: false, error: "User profile is incomplete. Please update your faculty and department in Settings." };
@@ -1356,6 +1356,11 @@ export async function registerEmrInterest(callId: string, user: User): Promise<{
         registeredAt: new Date().toISOString(),
         submittedToAgency: false
     };
+
+    if (coPis && coPis.length > 0) {
+      newInterest.coPiUids = coPis.map(p => p.uid);
+      newInterest.coPiNames = coPis.map(p => p.name);
+    }
 
     await interestRef.set(newInterest);
 
@@ -1707,16 +1712,7 @@ export async function addEmrEvaluation(
 }
 
 export async function createFundingCall(
-    callData: {
-        title: string,
-        agency: string,
-        description?: string,
-        callType: 'Fellowship' | 'Grant' | 'Collaboration' | 'Other',
-        applyDeadline: Date,
-        interestDeadline: Date,
-        detailsUrl?: string,
-        attachments?: FileList
-    }
+    callData: z.infer<any> // Using any because the zod schema is on the client
 ): Promise<{ success: boolean, error?: string }> {
     try {
         const callId = adminDb.collection('fundingCalls').doc().id;
@@ -1737,9 +1733,13 @@ export async function createFundingCall(
         }
 
         const newCall: Omit<FundingCall, 'id'> = {
-            ...callData,
+            title: callData.title,
+            agency: callData.agency,
+            description: callData.description,
+            callType: callData.callType,
             applyDeadline: callData.applyDeadline.toISOString(),
             interestDeadline: callData.interestDeadline.toISOString(),
+            detailsUrl: callData.detailsUrl,
             attachments: attachmentUrls,
             createdAt: new Date().toISOString(),
             createdBy: 'Super-admin', // This should be dynamic in a real app
@@ -1748,8 +1748,13 @@ export async function createFundingCall(
         
         await adminDb.collection('fundingCalls').doc(callId).set(newCall);
 
-        const allStaffEmail = process.env.ALL_STAFF_EMAIL || 'paaruluniversityallstaff@paruluniversity.ac.in';
+        const allStaffEmail = process.env.ALL_STAFF_EMAIL;
         
+        if (!allStaffEmail) {
+            console.warn("ALL_STAFF_EMAIL not set, skipping announcement email.");
+            return { success: true };
+        }
+
         const attachmentLinks = attachmentUrls.map(att => `<li><a href="${att.url}">${att.name}</a></li>`).join('');
 
         const emailHtml = `

@@ -293,6 +293,8 @@ export type EmrInterest = {
     },
     pptUrl?: string;
     pptSubmissionDate?: string; // ISO String
+    coPiUids?: string[];
+    coPiNames?: string[];
 };
 
 export type EmrEvaluation = {
