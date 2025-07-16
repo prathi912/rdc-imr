@@ -40,7 +40,7 @@ const tutorialSteps = {
     {
       icon: Settings,
       title: 'First Step: Complete Your Profile',
-      description: "Welcome! Before you begin, please go to 'Settings' from the sidebar. It's crucial to complete your academic profile and add your bank account details, as this is required for any grant or incentive payments.",
+      description: "Welcome! Before you begin, please go to 'Settings' from the sidebar. It's crucial to complete your academic profile and add your bank account details, as this is required for any grant payments.",
     },
     {
       icon: FilePlus2,
@@ -52,15 +52,10 @@ const tutorialSteps = {
       title: 'Track Your Projects',
       description: "The 'My Projects' page lists all projects you are associated with. Click any project to view its detailed status, see feedback if revisions are needed, and manage grant funds if awarded.",
     },
-    {
-      icon: Award,
-      title: 'Claim Incentives',
-      description: "Use the 'Incentive Claims' module to apply for incentives for your publications, patents, and conference presentations.",
-    },
      {
       icon: Bell,
       title: 'Stay Notified',
-      description: "Keep an eye on the 'Notifications' tab. You'll receive important updates here about your project status, meeting schedules, and more.",
+      description: "Keep an eye on the 'Notifications' tab. You'll receive important updates via mail too, here about your project status, meeting schedules, and more.",
     },
   ],
   Evaluator: [
