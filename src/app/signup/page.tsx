@@ -126,6 +126,7 @@ export default function SignupPage() {
       misId: userDataFromExcel.misId || null,
       profileComplete,
       allowedModules: getDefaultModulesForRole(role, designation),
+      hasCompletedTutorial: false,
     };
 
     if (firebaseUser.photoURL) {

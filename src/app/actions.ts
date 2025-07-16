@@ -1312,3 +1312,17 @@ export async function updateCoInvestigators(
     return { success: false, error: "Failed to update Co-PIs." }
   }
 }
+
+export async function updateUserTutorialStatus(uid: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!uid) {
+      return { success: false, error: "User ID is required." };
+    }
+    const userRef = adminDb.collection("users").doc(uid);
+    await userRef.update({ hasCompletedTutorial: true });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating tutorial status:", error);
+    return { success: false, error: "Failed to update tutorial status." };
+  }
+}

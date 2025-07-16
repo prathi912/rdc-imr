@@ -28,6 +28,7 @@ export type User = {
   photoURL?: string;
   allowedModules?: string[];
   bankDetails?: UserBankDetails;
+  hasCompletedTutorial?: boolean;
 };
 
 export type BankDetails = {
