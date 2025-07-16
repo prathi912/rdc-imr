@@ -6,7 +6,7 @@ import * as z from 'zod';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { db } from '@/lib/config';
-import { collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc, updateDoc, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
@@ -39,7 +47,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
-import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest, deleteEmrInterest } from '@/app/actions';
+import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest, deleteEmrInterest, createFundingCall } from '@/app/actions';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
@@ -66,6 +74,7 @@ const callSchema = z.object({
   applyDeadline: z.date({ required_error: 'Application deadline is required.'}),
   interestDeadline: z.date({ required_error: 'Interest registration deadline is required.'}),
   detailsUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+  attachments: z.any().optional(),
 });
 
 const scheduleMeetingSchema = z.object({
@@ -283,6 +292,7 @@ function AddEditCallDialog({
         detailsUrl: '',
         interestDeadline: undefined,
         applyDeadline: undefined,
+        attachments: undefined,
       });
     }
   }, [existingCall, form]);
@@ -290,32 +300,27 @@ function AddEditCallDialog({
   const handleSaveCall = async (values: z.infer<typeof callSchema>) => {
     setIsSubmitting(true);
     try {
-      const interestDeadline = new Date(values.interestDeadline);
-      interestDeadline.setHours(17, 0, 0, 0); // Set time to 5:00 PM
-
-      const callData = {
-        ...values,
-        interestDeadline: interestDeadline.toISOString(),
-        applyDeadline: values.applyDeadline.toISOString(),
-      };
-
-      if (existingCall) {
-        const callRef = doc(db, 'fundingCalls', existingCall.id);
-        await updateDoc(callRef, callData);
-        toast({ title: 'Success', description: 'Funding call has been updated.' });
-      } else {
-        await addDoc(collection(db, 'fundingCalls'), {
-          ...callData,
-          createdAt: new Date().toISOString(),
-          createdBy: user.uid,
-          status: 'Open',
-        });
-        toast({ title: 'Success', description: 'Funding call has been added.' });
-      }
-      onOpenChange(false);
-    } catch (error) {
+        if (existingCall) {
+            // Update logic - this is a simplified version. A real app might need a separate action.
+            const callRef = doc(db, 'fundingCalls', existingCall.id);
+            await updateDoc(callRef, {
+                ...values,
+                interestDeadline: values.interestDeadline.toISOString(),
+                applyDeadline: values.applyDeadline.toISOString(),
+            });
+            toast({ title: 'Success', description: 'Funding call has been updated.' });
+        } else {
+            const result = await createFundingCall(values);
+            if (result.success) {
+                toast({ title: 'Success', description: 'Funding call has been added and announced.' });
+            } else {
+                throw new Error(result.error);
+            }
+        }
+        onOpenChange(false);
+    } catch (error: any) {
       console.error('Error saving funding call:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not save funding call.' });
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not save funding call.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -354,6 +359,7 @@ function AddEditCallDialog({
                <FormField name="applyDeadline" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Agency Application Deadline</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
             </div>
              <FormField name="detailsUrl" control={form.control} render={({ field }) => ( <FormItem><FormLabel>URL for Full Details</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem> )} />
+             <FormField name="attachments" control={form.control} render={({ field: { onChange, value, ...rest }}) => ( <FormItem><FormLabel>Attachments (Optional)</FormLabel><FormControl><Input type="file" multiple onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem> )} />
           </form>
         </Form>
         <DialogFooter className="justify-between">
@@ -433,7 +439,7 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests, allUsers
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
-                    <DialogDescription>Set the date, venue, assign an evaluation committee, and set a time slot for each participant.</DialogDescription>
+                    <DialogDescription>Set the date, venue, assign an evaluation committee, and set a time slot for each participant. This is a mandatory step.</DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <form id="schedule-meeting-form" onSubmit={form.handleSubmit(handleScheduleMeeting)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
@@ -618,7 +624,8 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
                 </Form>
                 )}
                 <DialogFooter className="justify-between">
-                     <div>
+                     <div className="flex gap-2">
+                        {interest.pptUrl && <Button asChild variant="secondary"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4 mr-2" />View PPT</a></Button>}
                         {interest.pptUrl && !(call.meetingDetails && isDeadlinePast) && (
                             <Button variant="destructive" size="sm" onClick={() => setIsDeleteConfirmationOpen(true)} disabled={isSubmitting}>
                                 <Trash2 className="h-4 w-4 mr-2" /> Remove
