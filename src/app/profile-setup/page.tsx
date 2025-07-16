@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -31,7 +30,7 @@ const profileSetupSchema = z.object({
   institute: z.string().min(1, 'Please select an institute.'),
   department: z.string().optional(),
   designation: z.string().min(2, 'Designation is required.'),
-  misId: z.string().min(1, 'MIS ID is required.'),
+  misId: z.string().optional(),
   orcidId: z.string().optional(),
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),
@@ -195,13 +194,6 @@ export default function ProfileSetupPage() {
     if (!user) return;
     setIsSubmitting(true);
     try {
-      // MIS ID is mandatory for faculty/CRO types
-      if (userType !== 'Institutional' && (!data.misId || data.misId.trim() === '')) {
-         form.setError("misId", { type: "manual", message: "MIS ID is mandatory for your account type." });
-         setIsSubmitting(false);
-         return;
-      }
-      
       if (data.misId) {
         const misIdCheck = await checkMisIdExists(data.misId, user.uid);
         if (misIdCheck.exists) {
@@ -320,7 +312,7 @@ export default function ProfileSetupPage() {
             <CardContent>
                {userType !== 'Institutional' && (
                 <div className="space-y-4 mb-6 p-4 border rounded-lg bg-muted/50">
-                  <Label>Fetch Details with MIS ID (Mandatory)</Label>
+                  <Label>Fetch Details with MIS ID (Optional)</Label>
                    <div className="flex items-center gap-2">
                       <Input
                         placeholder="Enter your MIS ID"
@@ -333,7 +325,7 @@ export default function ProfileSetupPage() {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                        Faculty and CROs must use their MIS ID to pre-fill the form.
+                        If your details are in our system, this will pre-fill the form for you.
                     </p>
                 </div>
                )}
@@ -396,7 +388,7 @@ export default function ProfileSetupPage() {
                   
                   {userType !== 'Institutional' && (
                     <FormField control={form.control} name="misId" render={({ field }) => (
-                      <FormItem><FormLabel>MIS ID</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
+                      <FormItem><FormLabel>MIS ID (Optional)</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
                   )}
                    <FormField control={form.control} name="orcidId" render={({ field }) => (
