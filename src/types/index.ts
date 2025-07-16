@@ -1,5 +1,3 @@
-
-
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -268,6 +266,7 @@ export type FundingCall = {
   interestDeadline: string; // ISO String
   callType: 'Fellowship' | 'Grant' | 'Collaboration' | 'Other';
   detailsUrl?: string;
+  attachments?: { name: string; url: string }[];
   createdAt: string; // ISO String
   createdBy: string; // UID of the admin who created it
   status: 'Open' | 'Closed' | 'Meeting Scheduled';
