@@ -42,6 +42,7 @@ import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO } from 'date-fns';
 import { registerEmrInterest } from '@/app/actions';
 import Link from 'next/link';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 interface EmrCalendarProps {
   user: User;
@@ -80,14 +81,83 @@ const TimeLeft = ({ deadline }: { deadline: string }) => {
     return <span>{minutes} minute{minutes > 1 ? 's' : ''} left</span>;
 };
 
+interface RegistrationsDialogProps {
+    call: FundingCall;
+    interests: EmrInterest[];
+    allUsers: User[];
+}
+
+function RegistrationsDialog({ call, interests, allUsers }: RegistrationsDialogProps) {
+    const userMap = new Map(allUsers.map(u => [u.uid, u]));
+    const registeredInterests = interests.filter(i => i.callId === call.id);
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="mt-2"><Users className="mr-2 h-4 w-4" /> View Registrations ({registeredInterests.length})</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-4xl">
+                <DialogHeader>
+                    <DialogTitle>Registered Interest for: {call.title}</DialogTitle>
+                    <DialogDescription>
+                        The following users have registered their interest for this funding call.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="max-h-[60vh] overflow-y-auto">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Institute</TableHead>
+                                <TableHead>Department</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {registeredInterests.map(interest => {
+                                const interestedUser = userMap.get(interest.userId);
+                                return (
+                                    <TableRow key={interest.id}>
+                                        <TableCell className="font-medium">
+                                            {interestedUser?.misId ? (
+                                                <Link href={`/profile/${interestedUser.misId}`} target="_blank" className="text-primary hover:underline">
+                                                    {interest.userName}
+                                                </Link>
+                                            ) : (
+                                                interest.userName
+                                            )}
+                                        </TableCell>
+                                        <TableCell>{interest.userEmail}</TableCell>
+                                        <TableCell>{interestedUser?.institute || interest.faculty}</TableCell>
+                                        <TableCell>{interestedUser?.department || interest.department}</TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                    {registeredInterests.length === 0 && (
+                        <div className="text-center p-8 text-muted-foreground">
+                            No users have registered for this call yet.
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 export function EmrCalendar({ user }: EmrCalendarProps) {
     const { toast } = useToast();
     const [calls, setCalls] = useState<FundingCall[]>([]);
-    const [interests, setInterests] = useState<EmrInterest[]>([]);
+    const [userInterests, setUserInterests] = useState<EmrInterest[]>([]);
+    const [allInterests, setAllInterests] = useState<EmrInterest[]>([]);
+    const [allUsers, setAllUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const isAdmin = user.role === 'Super-admin' || user.role === 'admin';
+    const isSuperAdmin = user.role === 'Super-admin';
 
     const form = useForm<z.infer<typeof callSchema>>({
         resolver: zodResolver(callSchema),
@@ -101,28 +171,55 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     });
 
     useEffect(() => {
-        const q = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const callsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-            setCalls(callsData);
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching funding calls:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch funding calls.' });
-            setLoading(false);
-        });
-        return () => unsubscribe();
-    }, [toast]);
+        const fetchAllData = async () => {
+            setLoading(true);
+            try {
+                // Fetch all users for profile linking
+                if (isAdmin) {
+                    const usersQuery = query(collection(db, 'users'));
+                    const usersSnapshot = await getDocs(usersQuery);
+                    setAllUsers(usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User)));
+                }
 
-    useEffect(() => {
-        if (!user) return;
-        const q = query(collection(db, 'emrInterests'), where('userId', '==', user.uid));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const interestsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
-            setInterests(interestsData);
-        });
-        return () => unsubscribe();
-    }, [user]);
+                // Listen for funding calls
+                const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
+                const unsubscribeCalls = onSnapshot(callsQuery, (snapshot) => {
+                    setCalls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)));
+                });
+
+                // Listen for user's own interests
+                const userInterestsQuery = query(collection(db, 'emrInterests'), where('userId', '==', user.uid));
+                const unsubscribeUserInterests = onSnapshot(userInterestsQuery, (snapshot) => {
+                    setUserInterests(snapshot.docs.map(doc => doc.data() as EmrInterest));
+                });
+
+                // Listen for all interests if admin
+                let unsubscribeAllInterests = () => {};
+                if (isAdmin) {
+                    const allInterestsQuery = query(collection(db, 'emrInterests'));
+                    unsubscribeAllInterests = onSnapshot(allInterestsQuery, (snapshot) => {
+                        setAllInterests(snapshot.docs.map(doc => doc.data() as EmrInterest));
+                    });
+                }
+                
+                setLoading(false);
+                return () => {
+                    unsubscribeCalls();
+                    unsubscribeUserInterests();
+                    unsubscribeAllInterests();
+                };
+
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch EMR data.' });
+                setLoading(false);
+            }
+        };
+
+        fetchAllData();
+
+    }, [toast, user.uid, isAdmin]);
+
 
     const handleAddCall = async (values: z.infer<typeof callSchema>) => {
         setIsSubmitting(true);
@@ -204,7 +301,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                 ) : (
                     <div className="space-y-4">
                         {calls.map(call => {
-                             const userInterest = interests.find(i => i.callId === call.id);
+                             const userHasRegistered = userInterests.some(i => i.callId === call.id);
                              const isInterestDeadlinePast = new Date(call.interestDeadline) < new Date();
                              
                             return (
@@ -223,7 +320,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                     </div>
                                     <div className="flex-shrink-0 text-center md:text-right">
-                                        {userInterest ? (
+                                        {userHasRegistered ? (
                                             <div className="flex items-center gap-2 text-green-600 font-semibold">
                                                 <CheckCircle className="h-5 w-5"/>
                                                 <span>Interest Registered</span>
@@ -235,11 +332,16 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             </div>
                                         ) : (
                                             <>
-                                                <Button onClick={() => handleRegisterInterest(call.id)}>Register Interest</Button>
+                                                <Button onClick={() => handleRegisterInterest(call.id)} disabled={isSuperAdmin}>
+                                                    Register Interest
+                                                </Button>
                                                 <p className="text-xs text-muted-foreground mt-1">
                                                     <TimeLeft deadline={call.interestDeadline} />
                                                 </p>
                                             </>
+                                        )}
+                                        {isAdmin && (
+                                            <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} />
                                         )}
                                     </div>
                                 </div>
@@ -251,3 +353,4 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         </Card>
     );
 }
+
