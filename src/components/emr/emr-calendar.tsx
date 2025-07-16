@@ -44,10 +44,10 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown, MessageSquareWarning, Pencil } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
-import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest, deleteEmrInterest, createFundingCall } from '@/app/actions';
+import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest, deleteEmrInterest, createFundingCall, findUserByMisId, uploadRevisedEmrPpt } from '@/app/actions';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
@@ -55,6 +55,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarPicker } from '../ui/calendar';
 import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
+import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 
 
 interface EmrCalendarProps {
@@ -75,6 +76,10 @@ const callSchema = z.object({
   interestDeadline: z.date({ required_error: 'Interest registration deadline is required.'}),
   detailsUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   attachments: z.any().optional(),
+});
+
+const registerInterestSchema = z.object({
+  coPis: z.array(z.object({ uid: z.string(), name: z.string() })).optional(),
 });
 
 const scheduleMeetingSchema = z.object({
@@ -173,6 +178,7 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: 
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Department</TableHead>
+                                    <TableHead>Co-PIs</TableHead>
                                     <TableHead>Meeting Slot</TableHead>
                                     <TableHead>Presentation</TableHead>
                                     {user.role === 'Super-admin' && <TableHead className="text-right">Actions</TableHead>}
@@ -193,6 +199,7 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: 
                                                 )}
                                             </TableCell>
                                             <TableCell>{interestedUser?.department || interest.department}</TableCell>
+                                            <TableCell>{interest.coPiNames?.join(', ') || 'None'}</TableCell>
                                              <TableCell>
                                                 {interest.meetingSlot ? 
                                                     `${format(parseISO(interest.meetingSlot.date), 'MMM d')} at ${interest.meetingSlot.time}`
@@ -394,12 +401,14 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests, allUsers
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     
+    const usersWithInterest = interests.filter(i => i.callId === call.id);
+
     const form = useForm<z.infer<typeof scheduleMeetingSchema>>({
         resolver: zodResolver(scheduleMeetingSchema),
         defaultValues: {
             venue: "RDC Committee Room, PIMSR",
             evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
-            slots: interests.filter(i => i.callId === call.id).map(i => ({ userId: i.userId, time: i.meetingSlot?.time || '' }))
+            slots: usersWithInterest.map(i => ({ userId: i.userId, time: i.meetingSlot?.time || '' }))
         },
     });
 
@@ -430,9 +439,9 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests, allUsers
             setIsSubmitting(false);
         }
     };
+    
+    const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !interests.some(interest => interest.callId === call.id && interest.userId === u.uid));
 
-    const usersWithInterest = interests.filter(i => i.callId === call.id);
-    const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role));
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -517,7 +526,7 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests, allUsers
     );
 }
 
-function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; user: User; }) {
+function UploadPptDialog({ interest, call, onOpenChange, isOpen, user, isRevision = false }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; user: User; isRevision?: boolean; }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
@@ -540,7 +549,13 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
         try {
             const file = values.pptFile[0];
             const pptDataUrl = await fileToDataUrl(file);
-            const result = await uploadEmrPpt(interest.id, pptDataUrl, file.name, user.name);
+            
+            let result;
+            if (isRevision) {
+                result = await uploadRevisedEmrPpt(interest.id, pptDataUrl, file.name, user.name);
+            } else {
+                result = await uploadEmrPpt(interest.id, pptDataUrl, file.name, user.name);
+            }
 
             if (result.success) {
                 toast({ title: "Success", description: "Your presentation has been uploaded." });
@@ -573,7 +588,7 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
 
     let isDeadlinePast = false;
     let deadlineMessage = "Please upload your presentation before the deadline.";
-    if(call.meetingDetails?.date) {
+    if(call.meetingDetails?.date && !isRevision) {
         const meetingDate = parseISO(call.meetingDetails.date);
         const uploadDeadline = setSeconds(setMinutes(setHours(subDays(meetingDate, 2), 17), 0), 0);
         isDeadlinePast = isAfter(new Date(), uploadDeadline);
@@ -585,16 +600,16 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{interest.pptUrl ? 'Manage Presentation' : 'Upload Presentation'}</DialogTitle>
+                    <DialogTitle>{isRevision ? 'Upload Revised Presentation' : (interest.pptUrl ? 'Manage Presentation' : 'Upload Presentation')}</DialogTitle>
                     <DialogDescription>
-                        {interest.pptUrl ? 'You can view, replace, or remove your uploaded presentation.' : `Please upload your presentation for the call: "${call.title}".`}
+                        {interest.pptUrl && !isRevision ? 'You can view, replace, or remove your uploaded presentation.' : `Please upload your presentation for the call: "${call.title}".`}
                         <br/>
-                        {call.meetingDetails && deadlineMessage}
+                        {!isRevision && call.meetingDetails && deadlineMessage}
                         <br/>
                         <span className="font-semibold">The presentation file should be under 5MB.</span>
                     </DialogDescription>
                 </DialogHeader>
-                 {call.meetingDetails && isDeadlinePast ? (
+                 {call.meetingDetails && isDeadlinePast && !isRevision ? (
                     <div className="text-center text-destructive font-semibold p-4">
                         The deadline to upload or modify your presentation has passed.
                         {interest.pptUrl && <Button asChild variant="link"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View Final Submission</a></Button>}
@@ -625,8 +640,8 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
                 )}
                 <DialogFooter className="justify-between">
                      <div className="flex gap-2">
-                        {interest.pptUrl && <Button asChild variant="secondary"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4 mr-2" />View PPT</a></Button>}
-                        {interest.pptUrl && !(call.meetingDetails && isDeadlinePast) && (
+                        {interest.pptUrl && !isRevision && <Button asChild variant="secondary"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4 mr-2" />View PPT</a></Button>}
+                        {interest.pptUrl && !(call.meetingDetails && isDeadlinePast) && !isRevision && (
                             <Button variant="destructive" size="sm" onClick={() => setIsDeleteConfirmationOpen(true)} disabled={isSubmitting}>
                                 <Trash2 className="h-4 w-4 mr-2" /> Remove
                             </Button>
@@ -634,9 +649,9 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { inter
                     </div>
                     <div className="flex gap-2">
                         <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                         {!(call.meetingDetails && isDeadlinePast) && (
+                         {!(call.meetingDetails && isDeadlinePast && !isRevision) && (
                             <Button type="submit" form="upload-ppt-form" disabled={isSubmitting}>
-                                {isSubmitting ? "Saving..." : (interest.pptUrl ? 'Replace File' : 'Upload File')}
+                                {isSubmitting ? "Saving..." : (isRevision ? 'Submit Revision' : (interest.pptUrl ? 'Replace File' : 'Upload File'))}
                             </Button>
                         )}
                     </div>
@@ -681,6 +696,115 @@ function ViewDescriptionDialog({ call }: { call: FundingCall }) {
     );
 }
 
+function RegisterInterestDialog({ call, user, isOpen, onOpenChange }: { call: FundingCall; user: User; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+    const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null);
+    const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+
+    const form = useForm<z.infer<typeof registerInterestSchema>>({
+        resolver: zodResolver(registerInterestSchema),
+    });
+
+    const handleRegister = async () => {
+        setIsSubmitting(true);
+        try {
+            const result = await registerEmrInterest(call.id, user, coPiList);
+            if (result.success) {
+                toast({ title: 'Interest Registered!', description: 'Your interest has been successfully recorded.' });
+                onOpenChange(false);
+            } else {
+                toast({ variant: 'destructive', title: 'Registration Failed', description: result.error });
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSearchCoPi = async () => {
+        if (!coPiSearchTerm) return;
+        setIsSearching(true);
+        setFoundCoPi(null);
+        try {
+            const result = await findUserByMisId(coPiSearchTerm);
+            if (result.success && result.user) {
+                setFoundCoPi(result.user);
+            } else {
+                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleAddCoPi = () => {
+        if (foundCoPi && !coPiList.some(coPi => coPi.uid === foundCoPi.uid)) {
+            if (user && foundCoPi.uid === user.uid) {
+                toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
+                return;
+            }
+            setCoPiList([...coPiList, foundCoPi]);
+        }
+        setFoundCoPi(null);
+        setCoPiSearchTerm('');
+    };
+
+    const handleRemoveCoPi = (uidToRemove: string) => {
+        setCoPiList(coPiList.filter(coPi => coPi.uid !== uidToRemove));
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Register Interest for: {call.title}</DialogTitle>
+                    <DialogDescription>Confirm your interest and add any Co-Principal Investigators (Co-PIs) to your team.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Search & Add Co-PI by MIS ID (Optional)</Label>
+                        <div className="flex items-center gap-2">
+                            <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
+                            <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
+                                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+                            </Button>
+                        </div>
+                        {foundCoPi && (
+                            <div className="flex items-center justify-between p-2 border rounded-md">
+                                <p>{foundCoPi.name}</p>
+                                <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
+                            </div>
+                        )}
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Current Co-PI(s)</Label>
+                        {coPiList.length > 0 ? (
+                            coPiList.map((coPi) => (
+                                <div key={coPi.uid} className="flex items-center justify-between p-2 bg-secondary rounded-md">
+                                    <p className="text-sm font-medium">{coPi.name}</p>
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>Remove</Button>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-sm text-muted-foreground">No Co-PIs added.</p>
+                        )}
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleRegister} disabled={isSubmitting}>
+                        {isSubmitting ? 'Registering...' : 'Confirm Registration'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export function EmrCalendar({ user }: EmrCalendarProps) {
     const { toast } = useToast();
@@ -692,6 +816,8 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
     const [isUploadPptOpen, setIsUploadPptOpen] = useState(false);
+    const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
+    const [isRegisterInterestOpen, setIsRegisterInterestOpen] = useState(false);
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
     const [selectedInterest, setSelectedInterest] = useState<EmrInterest | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -779,20 +905,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         };
         fetchAllData();
     }, [toast, user.uid, isAdmin]);
-
-
-    const handleRegisterInterest = async (call: FundingCall) => {
-        if (isAfter(new Date(), parseISO(call.interestDeadline))) {
-            toast({ variant: 'destructive', title: 'Registration Closed', description: 'The deadline to register interest has passed.' });
-            return;
-        }
-        const result = await registerEmrInterest(call.id, user);
-        if (result.success) {
-            toast({ title: 'Interest Registered!', description: 'Your interest has been successfully recorded.' });
-        } else {
-            toast({ variant: 'destructive', title: 'Registration Failed', description: result.error });
-        }
-    };
     
     const handleWithdrawInterest = async () => {
         if (!selectedInterest) return;
@@ -899,7 +1011,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             ) : (
                                                 !isSuperAdmin &&
                                                 <>
-                                                    <Button onClick={() => handleRegisterInterest(call)} disabled={isInterestDeadlinePast}>
+                                                    <Button onClick={() => { setSelectedCall(call); setIsRegisterInterestOpen(true); }} disabled={isInterestDeadlinePast}>
                                                         Register Interest
                                                     </Button>
                                                     <p className="text-xs text-muted-foreground"><TimeLeft deadline={call.interestDeadline} /></p>
@@ -908,6 +1020,20 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                     </div>
                                     
+                                    {userHasRegistered && interestDetails?.status === 'Revision Needed' && (
+                                        <Alert variant="destructive">
+                                            <MessageSquareWarning className="h-4 w-4" />
+                                            <AlertTitle>Revision Required</AlertTitle>
+                                            <AlertDescription>
+                                                The committee has requested a revision. Please review the comments and submit an updated presentation.
+                                                <p className="font-semibold mt-2">Admin Remarks: {interestDetails.adminRemarks}</p>
+                                                <Button size="sm" className="mt-2" onClick={() => { setSelectedInterest(interestDetails); setSelectedCall(call); setIsRevisionUploadOpen(true); }}>
+                                                    <Pencil className="h-4 w-4 mr-2"/> Submit Revised PPT
+                                                </Button>
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+
                                     {userHasRegistered && call.meetingDetails?.date && (
                                         <div ref={eventRefs.get(`meeting-${call.id}`)} className="text-sm p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
                                             <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Your Presentation Slot</p>
@@ -930,7 +1056,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                     Withdraw
                                                 </Button>
                                             )}
-                                            {userHasRegistered && (
+                                            {userHasRegistered && interestDetails?.status !== 'Revision Needed' && (
                                                 <Button size="sm" variant="outline" onClick={() => { setSelectedInterest(interestDetails!); setSelectedCall(call); setIsUploadPptOpen(true); }}>
                                                     {interestDetails?.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
                                                     {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
@@ -975,6 +1101,14 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                     user={user}
                 />
             )}
+            {selectedCall && user && (
+                <RegisterInterestDialog 
+                    call={selectedCall}
+                    user={user}
+                    isOpen={isRegisterInterestOpen}
+                    onOpenChange={setIsRegisterInterestOpen}
+                />
+            )}
             {selectedCall && isSuperAdmin && (
                 <ScheduleMeetingDialog
                     call={selectedCall}
@@ -985,19 +1119,35 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                 />
             )}
             {selectedInterest && selectedCall && (
-                <UploadPptDialog
-                    interest={selectedInterest}
-                    call={selectedCall}
-                    isOpen={isUploadPptOpen}
-                    onOpenChange={(isOpen) => {
-                        setIsUploadPptOpen(isOpen);
-                        if (!isOpen) {
-                            setSelectedInterest(null);
-                            setSelectedCall(null);
-                        }
-                    }}
-                    user={user}
-                />
+                <>
+                    <UploadPptDialog
+                        interest={selectedInterest}
+                        call={selectedCall}
+                        isOpen={isUploadPptOpen}
+                        onOpenChange={(isOpen) => {
+                            setIsUploadPptOpen(isOpen);
+                            if (!isOpen) {
+                                setSelectedInterest(null);
+                                setSelectedCall(null);
+                            }
+                        }}
+                        user={user}
+                    />
+                    <UploadPptDialog
+                        interest={selectedInterest}
+                        call={selectedCall}
+                        isOpen={isRevisionUploadOpen}
+                        onOpenChange={(isOpen) => {
+                            setIsRevisionUploadOpen(isOpen);
+                            if (!isOpen) {
+                                setSelectedInterest(null);
+                                setSelectedCall(null);
+                            }
+                        }}
+                        user={user}
+                        isRevision={true}
+                    />
+                </>
             )}
             <AlertDialog open={isWithdrawConfirmationOpen} onOpenChange={setIsWithdrawConfirmationOpen}>
                 <AlertDialogContent>
