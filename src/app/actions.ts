@@ -6,6 +6,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
+import { FieldValue } from 'firebase-admin/firestore';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
@@ -1567,8 +1568,8 @@ export async function removeEmrPpt(interestId: string): Promise<{ success: boole
         }
 
         await interestRef.update({
-            pptUrl: adminDb.FieldValue.delete(),
-            pptSubmissionDate: adminDb.FieldValue.delete()
+            pptUrl: FieldValue.delete(),
+            pptSubmissionDate: FieldValue.delete()
         });
 
         return { success: true };
