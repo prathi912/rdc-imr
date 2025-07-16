@@ -124,7 +124,30 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     extensions: [
       StarterKit,
       Underline,
-      Image,
+      Image.configure({
+        HTMLAttributes: {
+          class: 'inline-block',
+        },
+      }).extend({
+        parseHTML() {
+          return [
+            {
+              tag: 'img[src]',
+              getAttrs: (dom) => {
+                const element = dom as HTMLElement;
+                // Ignore Google emoji images
+                if (element.classList.contains('goomoji')) {
+                  return false;
+                }
+                if (element.getAttribute('data-emoji-char')) {
+                   return false;
+                }
+                return {};
+              },
+            },
+          ];
+        },
+      }),
       Link.configure({
         openOnClick: false,
         autolink: true,
