@@ -119,6 +119,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
         to: project.pi_email,
         subject: `Project Status Update: ${project.title}`,
         html: emailHtml,
+        from: 'default'
       })
     }
 
@@ -190,6 +191,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
                     <p style="color:#b0bec5;">Research & Development Cell - PU</p>
                   </div>
                 `,
+        from: 'default'
       })
     }
 
@@ -264,6 +266,7 @@ export async function scheduleMeeting(
           <p style="color:#b0bec5;">Research & Development Cell - PU</p>
             </div>
           `,
+          from: 'default'
         })
       }
     }
@@ -319,6 +322,7 @@ export async function scheduleMeeting(
                     <p style="color:#b0bec5;">Research & Development Cell - PU</p>
                 </div>
               `,
+              from: 'default'
             })
           }
         }
@@ -1441,7 +1445,8 @@ export async function scheduleEmrMeeting(
             emailPromises.push(sendEmail({
                 to: interest.userEmail,
                 subject: `Your EMR Presentation Slot for: ${call.title}`,
-                html: emailHtml
+                html: emailHtml,
+                from: 'default'
             }));
         }
     }
@@ -1477,7 +1482,8 @@ export async function scheduleEmrMeeting(
                     <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Portal.</p>
                 </div>
-              `
+              `,
+              from: 'default'
             }));
           }
         }
@@ -1642,7 +1648,8 @@ export async function deleteEmrInterest(interestId: string, remarks: string, adm
                         <p>Thank you,</p>
                         <p>Research & Development Cell - PU</p>
                     </div>
-                `
+                `,
+                from: 'default'
             });
         }
         
@@ -1696,4 +1703,84 @@ export async function addEmrEvaluation(
     console.error("Error adding EMR evaluation:", error);
     return { success: false, error: error.message || 'Failed to submit evaluation.' };
   }
+}
+
+export async function createFundingCall(
+    callData: {
+        title: string,
+        agency: string,
+        description?: string,
+        callType: 'Fellowship' | 'Grant' | 'Collaboration' | 'Other',
+        applyDeadline: Date,
+        interestDeadline: Date,
+        detailsUrl?: string,
+        attachments?: FileList
+    }
+): Promise<{ success: boolean, error?: string }> {
+    try {
+        const callId = adminDb.collection('fundingCalls').doc().id;
+        const attachmentUrls: { name: string, url: string }[] = [];
+
+        if (callData.attachments && callData.attachments.length > 0) {
+            for (let i = 0; i < callData.attachments.length; i++) {
+                const file = callData.attachments[i];
+                const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`;
+                const path = `emr-attachments/${callId}/${file.name}`;
+                const result = await uploadFileToServer(dataUrl, path);
+                if (result.success && result.url) {
+                    attachmentUrls.push({ name: file.name, url: result.url });
+                } else {
+                    throw new Error(`Failed to upload attachment: ${file.name}`);
+                }
+            }
+        }
+
+        const newCall: Omit<FundingCall, 'id'> = {
+            ...callData,
+            applyDeadline: callData.applyDeadline.toISOString(),
+            interestDeadline: callData.interestDeadline.toISOString(),
+            attachments: attachmentUrls,
+            createdAt: new Date().toISOString(),
+            createdBy: 'Super-admin', // This should be dynamic in a real app
+            status: 'Open',
+        };
+        
+        await adminDb.collection('fundingCalls').doc(callId).set(newCall);
+
+        const allStaffEmail = process.env.ALL_STAFF_EMAIL || 'paaruluniversityallstaff@paruluniversity.ac.in';
+        
+        const attachmentLinks = attachmentUrls.map(att => `<li><a href="${att.url}">${att.name}</a></li>`).join('');
+
+        const emailHtml = `
+            <div style="font-family: Arial, sans-serif; padding: 20px;">
+                <h2 style="color: #2c5364;">New Funding Opportunity: ${newCall.title}</h2>
+                <p>A new funding call from <strong>${newCall.agency}</strong> has been posted on the PU Research Portal.</p>
+                <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
+                    <p><strong>Type:</strong> ${newCall.callType}</p>
+                    <p><strong>Description:</strong></p>
+                    <div>${newCall.description || 'No description provided.'}</div>
+                    <p><strong>Register Interest By:</strong> ${format(parse(newCall.interestDeadline, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), 'PPp')}</p>
+                    <p><strong>Agency Deadline:</strong> ${format(parse(newCall.applyDeadline, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), 'PP')}</p>
+                    ${attachmentLinks ? `<p><strong>Attachments:</strong><ul>${attachmentLinks}</ul></p>` : ''}
+                </div>
+                <p style="margin-top: 20px;">
+                    <a href="${newCall.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+                        View Full Details on the Portal
+                    </a>
+                </p>
+            </div>
+        `;
+
+        await sendEmail({
+            to: allStaffEmail,
+            subject: `New Funding Call: ${newCall.title}`,
+            html: emailHtml,
+            from: 'rdc'
+        });
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error creating funding call:", error);
+        return { success: false, error: error.message || "Failed to create funding call." };
+    }
 }
