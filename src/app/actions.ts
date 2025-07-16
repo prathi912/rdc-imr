@@ -1,5 +1,3 @@
-
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -1516,4 +1514,40 @@ export async function removeEmrPpt(interestId: string): Promise<{ success: boole
     }
 }
 
+export async function withdrawEmrInterest(interestId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        if (!interestId) {
+            return { success: false, error: "Interest ID is required." };
+        }
+
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        const interestSnap = await interestRef.get();
+
+        if (!interestSnap.exists) {
+            return { success: false, error: "Interest registration not found." };
+        }
+        const interest = interestSnap.data() as EmrInterest;
+
+        // If a presentation was uploaded, delete it from storage first.
+        if (interest.pptUrl) {
+            const bucket = adminStorage.bucket();
+            try {
+                const url = new URL(interest.pptUrl);
+                const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf('/o/') + 3));
+                await bucket.file(filePath).delete();
+                console.log(`Deleted associated presentation from Storage: ${filePath}`);
+            } catch (storageError) {
+                console.error(`Failed to delete storage file ${interest.pptUrl} for interest ${interestId}. Continuing with Firestore deletion.`, storageError);
+            }
+        }
+        
+        // Delete the interest document from Firestore.
+        await interestRef.delete();
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error withdrawing EMR interest:", error);
+        return { success: false, error: error.message || "Failed to withdraw interest." };
+    }
+}
     

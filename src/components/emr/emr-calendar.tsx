@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect, useCallback, createRef } from 'react';
@@ -40,7 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
-import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt } from '@/app/actions';
+import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest } from '@/app/actions';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
@@ -578,6 +576,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
     const [selectedInterest, setSelectedInterest] = useState<EmrInterest | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [isWithdrawConfirmationOpen, setIsWithdrawConfirmationOpen] = useState(false);
 
     const isAdmin = user.role === 'Super-admin' || user.role === 'admin';
     const isSuperAdmin = user.role === 'Super-admin';
@@ -669,6 +668,18 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         } else {
             toast({ variant: 'destructive', title: 'Registration Failed', description: result.error });
         }
+    };
+    
+    const handleWithdrawInterest = async () => {
+        if (!selectedInterest) return;
+        const result = await withdrawEmrInterest(selectedInterest.id);
+        if (result.success) {
+            toast({ title: 'Interest Withdrawn', description: 'You have successfully withdrawn your interest.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Withdrawal Failed', description: result.error });
+        }
+        setIsWithdrawConfirmationOpen(false);
+        setSelectedInterest(null);
     };
     
     const getStatusBadge = (call: FundingCall) => {
@@ -787,6 +798,11 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                             {userHasRegistered && call.status === 'Open' && (
+                                                <Button variant="destructive" size="sm" onClick={() => { setSelectedInterest(interestDetails!); setIsWithdrawConfirmationOpen(true);}}>
+                                                    Withdraw
+                                                </Button>
+                                            )}
                                             {userHasRegistered && interestDetails?.pptUrl && (
                                                  <Button asChild size="sm" variant="outline"><a href={interestDetails.pptUrl} target="_blank" rel="noreferrer"><Eye className="h-4 w-4 mr-2"/>View PPT</a></Button>
                                             )}
@@ -858,7 +874,20 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                     user={user}
                 />
             )}
+            <AlertDialog open={isWithdrawConfirmationOpen} onOpenChange={setIsWithdrawConfirmationOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will withdraw your interest from the call. Any uploaded presentation will also be deleted. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setSelectedInterest(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleWithdrawInterest} className="bg-destructive hover:bg-destructive/90">Confirm Withdrawal</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }
-
