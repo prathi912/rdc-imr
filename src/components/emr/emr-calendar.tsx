@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -63,7 +62,8 @@ const callSchema = z.object({
 
 const scheduleMeetingSchema = z.object({
     date: z.date({ required_error: 'A meeting date is required.' }),
-    time: z.string().min(1, 'Meeting time is required.'),
+    startTime: z.string().min(1, 'A start time is required.'),
+    slotDuration: z.coerce.number().min(5, "Duration must be at least 5 minutes.").default(15),
     venue: z.string().min(3, 'Meeting venue is required.'),
 });
 
@@ -121,6 +121,7 @@ function RegistrationsDialog({ call, interests, allUsers }: RegistrationsDialogP
                                     <TableHead>Email</TableHead>
                                     <TableHead>Institute</TableHead>
                                     <TableHead>Department</TableHead>
+                                    <TableHead>Meeting Slot</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -140,6 +141,11 @@ function RegistrationsDialog({ call, interests, allUsers }: RegistrationsDialogP
                                             <TableCell>{interest.userEmail}</TableCell>
                                             <TableCell>{interestedUser?.institute || interest.faculty}</TableCell>
                                             <TableCell>{interestedUser?.department || interest.department}</TableCell>
+                                             <TableCell>
+                                                {interest.meetingSlot ? 
+                                                    `${format(parseISO(interest.meetingSlot.date), 'MMM d')} at ${interest.meetingSlot.time}`
+                                                    : 'Not Scheduled'}
+                                             </TableCell>
                                         </TableRow>
                                     );
                                 })}
@@ -297,7 +303,7 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen }: { call: FundingCa
     const [isSubmitting, setIsSubmitting] = useState(false);
     const form = useForm<z.infer<typeof scheduleMeetingSchema>>({
         resolver: zodResolver(scheduleMeetingSchema),
-        defaultValues: { venue: "RDC Committee Room, PIMSR" },
+        defaultValues: { venue: "RDC Committee Room, PIMSR", slotDuration: 15 },
     });
 
     const handleScheduleMeeting = async (values: z.infer<typeof scheduleMeetingSchema>) => {
@@ -305,11 +311,12 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen }: { call: FundingCa
         try {
             const result = await scheduleEmrMeeting(call.id, {
                 date: format(values.date, 'yyyy-MM-dd'),
-                time: values.time,
+                startTime: values.startTime,
+                slotDuration: values.slotDuration,
                 venue: values.venue,
             });
             if (result.success) {
-                toast({ title: 'Success', description: 'Meeting scheduled and participants notified.' });
+                toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
                 onOpenChange(false);
             } else {
                 toast({ variant: 'destructive', title: 'Error', description: result.error });
@@ -327,12 +334,15 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen }: { call: FundingCa
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
-                    <DialogDescription>Set a meeting date and time for all interested faculties.</DialogDescription>
+                    <DialogDescription>Set the date, start time, and duration for presentation slots.</DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <form id="schedule-meeting-form" onSubmit={form.handleSubmit(handleScheduleMeeting)} className="space-y-4 py-4">
                          <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
-                         <FormField name="time" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                         <div className="grid grid-cols-2 gap-4">
+                            <FormField name="startTime" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Start Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField name="slotDuration" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Slot Duration (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                         </div>
                          <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                     </form>
                 </Form>
@@ -512,7 +522,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         <div className="mt-2 text-sm p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
                                             <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Meeting Scheduled</p>
                                             <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
-                                            <p><strong>Time:</strong> {call.meetingDetails.time}</p>
                                             <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
                                         </div>
                                     )}

@@ -271,8 +271,7 @@ export type FundingCall = {
   createdBy: string; // UID of the admin who created it
   status: 'Open' | 'Closed' | 'Meeting Scheduled';
   meetingDetails?: {
-    date: string;
-    time: string;
+    date: string; // yyyy-MM-dd
     venue: string;
   };
 };
@@ -287,4 +286,8 @@ export type EmrInterest = {
     department: string;
     registeredAt: string; // ISO String
     submittedToAgency: boolean;
+    meetingSlot?: {
+      date: string; // yyyy-MM-dd
+      time: string; // HH:mm
+    }
 };

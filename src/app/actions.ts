@@ -1,5 +1,3 @@
-
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -12,7 +10,7 @@ import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
-import { format } from "date-fns"
+import { format, addMinutes } from "date-fns"
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
@@ -1362,7 +1360,7 @@ export async function registerEmrInterest(callId: string, user: User): Promise<{
   }
 }
 
-export async function scheduleEmrMeeting(callId: string, meetingDetails: { date: string; time: string; venue: string }) {
+export async function scheduleEmrMeeting(callId: string, meetingDetails: { date: string; startTime: string; slotDuration: number; venue: string }) {
   try {
     const callRef = adminDb.collection('fundingCalls').doc(callId);
     const callSnap = await callRef.get();
@@ -1373,13 +1371,25 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
 
     await callRef.update({
       status: 'Meeting Scheduled',
-      meetingDetails: meetingDetails
+      meetingDetails: { date: meetingDetails.date, venue: meetingDetails.venue }
     });
 
     const interestsSnapshot = await adminDb.collection('emrInterests').where('callId', '==', callId).get();
     const interestedUsers = interestsSnapshot.docs.map(doc => doc.data() as EmrInterest);
-
-    const emailPromises = interestedUsers.map(interest => {
+    
+    let currentSlotTime = new Date(`${meetingDetails.date}T${meetingDetails.startTime}`);
+    
+    const emailPromises = interestedUsers.map(async (interest, index) => {
+      const userSlotTime = addMinutes(currentSlotTime, index * meetingDetails.slotDuration);
+      
+      const interestRef = adminDb.collection('emrInterests').doc(interest.id);
+      await interestRef.update({
+        meetingSlot: {
+            date: format(userSlotTime, 'yyyy-MM-dd'),
+            time: format(userSlotTime, 'HH:mm'),
+        }
+      });
+      
       const emailHtml = `
         <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
           <div style="text-align: center; margin-bottom: 20px;">
@@ -1387,10 +1397,10 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
           </div>
           <p style="color: #ffffff;">Dear ${interest.userName},</p>
           <p style="color: #e0e0e0;">
-            A meeting has been scheduled for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>", which you registered interest for.
+            A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
           </p>
-          <p><strong style="color: #ffffff;">Date:</strong> ${format(new Date(meetingDetails.date), 'MMMM d, yyyy')}</p>
-          <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
+          <p><strong style="color: #ffffff;">Date:</strong> ${format(userSlotTime, 'MMMM d, yyyy')}</p>
+          <p><strong style="color: #ffffff;">Your Time Slot:</strong> ${format(userSlotTime, 'h:mm a')}</p>
           <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
           <p style="color: #cccccc;">
             Please prepare for your presentation.
@@ -1402,7 +1412,7 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
       if (interest.userEmail) {
         return sendEmail({
           to: interest.userEmail,
-          subject: `EMR Meeting Scheduled: ${call.title}`,
+          subject: `Your EMR Presentation Slot for: ${call.title}`,
           html: emailHtml
         });
       }
