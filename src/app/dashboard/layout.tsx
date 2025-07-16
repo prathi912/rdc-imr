@@ -21,7 +21,6 @@ import {
   Users,
   History,
   Building2,
-  Globe,
 } from 'lucide-react';
 
 import {
@@ -226,14 +225,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
-             {user.allowedModules?.includes('emr-projects') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/emr-projects" tooltip="EMR Projects" isActive={pathname.startsWith('/dashboard/emr-projects')}>
-                  <Globe />
-                  EMR Projects
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
             {user.allowedModules?.includes('incentive-claim') && (
               <SidebarMenuItem>
                 <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>
@@ -303,6 +294,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <SidebarMenuButton href="/dashboard/manage-users" tooltip="Manage Users" isActive={pathname === '/dashboard/manage-users'}>
                   <Users />
                   Manage Users
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+             {user.allowedModules?.includes('manage-institutes') && (
+              <SidebarMenuItem>
+                <SidebarMenuButton href="/dashboard/manage-institutes" tooltip="Manage Institutes" isActive={pathname === '/dashboard/manage-institutes'}>
+                  <Building2 />
+                  Manage Institutes
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}

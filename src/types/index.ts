@@ -118,34 +118,6 @@ export type Project = {
   sdgGoals?: string[];
 };
 
-export type EmrProject = {
-  id: string;
-  pi_uid: string;
-  pi_name: string;
-  pi_email: string;
-  title: string;
-  fundingAgency: string;
-  callName?: string;
-  presentationUrl: string;
-  estimatedBudget: number;
-  deadlineToApply?: string; // ISO String from a linked call
-  submissionDate: string; // ISO String, when the faculty submits to the portal
-  status: 'Pending Approval' | 'Approved for Submission' | 'Rejected' | 'Requires Revision' | 'Submitted to Funding Agency';
-  committeeComments?: string;
-};
-
-export type FundingCall = {
-  id: string;
-  title: string;
-  fundingAgency: string;
-  deadline: string; // ISO String
-  detailsUrl?: string;
-  callType: 'Fellowship' | 'Grant' | 'Collaboration' | 'Other';
-  addedBy: string; // UID of admin
-  createdAt: string; // ISO String
-};
-
-
 export type Notification = {
   id: string;
   uid: string; // The user this notification is for

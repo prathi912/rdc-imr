@@ -24,12 +24,12 @@ export const ALL_MODULES = [
   { id: 'settings', label: 'Settings' },
 ];
 
-const coreModules = ['dashboard', 'notifications', 'settings', 'emr-projects'];
-const facultyCoreModules = ['new-submission', 'my-projects'];
+const coreModules = ['dashboard', 'notifications', 'settings'];
+const facultyCoreModules = ['new-submission', 'my-projects', 'incentive-claim'];
 const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects'];
+const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'manage-incentive-claims'];
 const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'system-health', 'bulk-upload'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes'];
 
