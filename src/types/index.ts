@@ -1,4 +1,5 @@
 
+
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
