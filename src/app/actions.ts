@@ -12,7 +12,7 @@ import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
-import { format, addMinutes, parse } from "date-fns"
+import { format, addMinutes, parse, parseISO } from "date-fns"
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
@@ -1376,6 +1376,8 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
 export async function scheduleEmrMeeting(
   callId: string,
   meetingDetails: { date: string; venue: string; evaluatorUids: string[]; slots: { userId: string, time: string }[] },
+  isBatch: boolean = false,
+  interestIds?: string[],
 ) {
   try {
     const { date, venue, evaluatorUids, slots } = meetingDetails;
@@ -1384,81 +1386,77 @@ export async function scheduleEmrMeeting(
       return { success: false, error: "An evaluation committee must be assigned." };
     }
 
-    const callRef = adminDb.collection('fundingCalls').doc(callId);
-    const callSnap = await callRef.get();
-    if (!callSnap.exists) {
-      return { success: false, error: "Funding call not found." };
-    }
-    const call = callSnap.data() as FundingCall;
-
-    await callRef.update({
-      status: 'Meeting Scheduled',
-      meetingDetails: { date, venue, assignedEvaluators: evaluatorUids }
-    });
-
     const batch = adminDb.batch();
     const emailPromises = [];
 
-    // Notify participants
+    let callsToUpdate: { [callId: string]: FundingCall } = {};
+
     for (const slot of slots) {
-        if (!slot.time) continue;
+      if (!slot.time) continue;
+      
+      const interestId = interestIds?.find(id => id.endsWith(slot.userId)) || `${callId}_${slot.userId}`;
+      const interestRef = adminDb.collection('emrInterests').doc(interestId);
+      const interestDoc = await interestRef.get();
+      if (!interestDoc.exists) continue;
+      
+      const interest = interestDoc.data() as EmrInterest;
+      
+      let call: FundingCall | undefined = callsToUpdate[interest.callId];
+      if (!call) {
+          const callRef = adminDb.collection('fundingCalls').doc(interest.callId);
+          const callSnap = await callRef.get();
+          if (!callSnap.exists) continue;
+          call = { id: callSnap.id, ...callSnap.data() } as FundingCall;
+          callsToUpdate[interest.callId] = call;
+      }
 
-        const interestQuery = await adminDb.collection('emrInterests').where('callId', '==', callId).where('userId', '==', slot.userId).limit(1).get();
-        if (interestQuery.empty) continue;
+      const userSlotTime = parse(slot.time, 'HH:mm', parseISO(date));
 
-        const interestDoc = interestQuery.docs[0];
-        const interest = interestDoc.data() as EmrInterest;
+      batch.update(interestRef, {
+        meetingSlot: { date, time: slot.time },
+      });
 
-        const userSlotTime = parse(slot.time, 'HH:mm', new Date(date));
-
-        // Update interest document with meeting slot
-        batch.update(interestDoc.ref, {
-            meetingSlot: {
-                date: date,
-                time: slot.time,
-            }
-        });
-
-        // Add in-app notification to the batch
-        const notificationRef = adminDb.collection("notifications").doc();
-        batch.set(notificationRef, {
-            uid: interest.userId,
-            title: `Your EMR Presentation for "${call.title}" has been scheduled.`,
-            createdAt: new Date().toISOString(),
-            isRead: false,
-        });
-        
-        const emailHtml = `
-            <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
-                <div style="text-align: center; margin-bottom: 20px;">
-                    <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width: 300px; height: auto;" />
-                </div>
-                <p style="color: #ffffff;">Dear ${interest.userName},</p>
-                <p style="color: #e0e0e0;">
-                    A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
-                </p>
-                <p><strong style="color: #ffffff;">Date:</strong> ${format(userSlotTime, 'MMMM d, yyyy')}</p>
-                <p><strong style="color: #ffffff;">Your Time Slot:</strong> ${format(userSlotTime, 'h:mm a')}</p>
-                <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
-                <p style="color: #cccccc;">
-                    Please prepare for your presentation.
-                </p>
-                <p style="color:#b0bec5;">Thank you,</p>
-                <p style="color:#b0bec5;">Research & Development Cell - PU</p>
-            </div>
-        `;
-        
-        if (interest.userEmail) {
-            emailPromises.push(sendEmail({
-                to: interest.userEmail,
-                subject: `Your EMR Presentation Slot for: ${call.title}`,
-                html: emailHtml,
-                from: 'default'
-            }));
-        }
+      const notificationRef = adminDb.collection("notifications").doc();
+      batch.set(notificationRef, {
+        uid: interest.userId,
+        title: `Your EMR Presentation for "${call.title}" has been scheduled.`,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      });
+      
+      const emailHtml = `
+          <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
+              <p style="color: #ffffff;">Dear ${interest.userName},</p>
+              <p style="color: #e0e0e0;">
+                  A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
+              </p>
+              <p><strong style="color: #ffffff;">Date:</strong> ${format(userSlotTime, 'MMMM d, yyyy')}</p>
+              <p><strong style="color: #ffffff;">Your Time Slot:</strong> ${format(userSlotTime, 'h:mm a')}</p>
+              <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
+              <p style="color: #cccccc;">Please prepare for your presentation.</p>
+          </div>
+      `;
+      
+      if (interest.userEmail) {
+          emailPromises.push(sendEmail({
+              to: interest.userEmail,
+              subject: `Your EMR Presentation Slot for: ${call.title}`,
+              html: emailHtml,
+              from: 'default'
+          }));
+      }
     }
 
-    // Notify evaluators
+    // Update status for all relevant calls
+    for (const callId in callsToUpdate) {
+        const callRef = adminDb.collection('fundingCalls').doc(callId);
+        batch.update(callRef, {
+            status: 'Meeting Scheduled',
+            meetingDetails: { date, venue, assignedEvaluators: evaluatorUids }
+        });
+    }
+
+    // Notify evaluators once
     if (evaluatorUids && evaluatorUids.length > 0) {
       const evaluatorDocs = await Promise.all(
         evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()),
@@ -1471,7 +1469,7 @@ export async function scheduleEmrMeeting(
           const evaluatorNotificationRef = adminDb.collection("notifications").doc();
           batch.set(evaluatorNotificationRef, {
             uid: evaluator.uid,
-            title: `You've been assigned to an EMR evaluation for "${call.title}"`,
+            title: `You've been assigned to an EMR evaluation meeting`,
             createdAt: new Date().toISOString(),
             isRead: false,
           });
@@ -1479,13 +1477,12 @@ export async function scheduleEmrMeeting(
           if (evaluator.email) {
             emailPromises.push(sendEmail({
               to: evaluator.email,
-              subject: `EMR Evaluation Assignment: ${call.title}`,
+              subject: `EMR Evaluation Assignment`,
               html: `
                 <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
                     <p style="color: #ffffff;">Dear Evaluator,</p>
                     <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
-                    <p><strong style="color: #ffffff;">Call:</strong> ${call.title}</p>
-                    <p><strong style="color: #ffffff;">Date:</strong> ${format(new Date(date.replace(/-/g, "/")), 'MMMM d, yyyy')}</p>
+                    <p><strong style="color: #ffffff;">Date:</strong> ${format(parseISO(date), 'MMMM d, yyyy')}</p>
                     <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Portal.</p>
                 </div>
@@ -1506,6 +1503,7 @@ export async function scheduleEmrMeeting(
     return { success: false, error: error.message || "Failed to schedule EMR meeting." };
   }
 }
+
 
 export async function uploadEmrPpt(interestId: string, pptDataUrl: string, originalFileName: string, userName: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -1766,8 +1764,8 @@ export async function createFundingCall(
                     <p><strong>Type:</strong> ${newCall.callType}</p>
                     <p><strong>Description:</strong></p>
                     <div>${newCall.description || 'No description provided.'}</div>
-                    <p><strong>Register Interest By:</strong> ${format(parse(newCall.interestDeadline, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), 'PPp')}</p>
-                    <p><strong>Agency Deadline:</strong> ${format(parse(newCall.applyDeadline, "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", new Date()), 'PP')}</p>
+                    <p><strong>Register Interest By:</strong> ${format(parseISO(newCall.interestDeadline), 'PPp')}</p>
+                    <p><strong>Agency Deadline:</strong> ${format(parseISO(newCall.applyDeadline), 'PP')}</p>
                     ${attachmentLinks ? `<p><strong>Attachments:</strong><ul>${attachmentLinks}</ul></p>` : ''}
                 </div>
                 <p style="margin-top: 20px;">

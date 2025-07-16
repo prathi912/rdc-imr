@@ -44,10 +44,10 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown, MessageSquareWarning, Pencil } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown, MessageSquareWarning, Pencil, CalendarClock } from 'lucide-react';
 import type { FundingCall, User, EmrInterest, EmrEvaluation } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
-import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest, deleteEmrInterest, createFundingCall, findUserByMisId, uploadRevisedEmrPpt, updateEmrStatus } from '@/app/actions';
+import { uploadFileToServer, deleteEmrInterest, createFundingCall, findUserByMisId, uploadRevisedEmrPpt, updateEmrStatus, scheduleEmrMeeting } from '@/app/actions';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
@@ -57,6 +57,8 @@ import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
 import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import { Label } from '../ui/label';
+import { EmrActions } from './emr-actions';
+import { Checkbox } from '../ui/checkbox';
 
 
 interface EmrCalendarProps {
@@ -79,22 +81,16 @@ const callSchema = z.object({
   attachments: z.any().optional(),
 });
 
-const registerInterestSchema = z.object({
-  coPis: z.array(z.object({ uid: z.string(), name: z.string() })).optional(),
-});
-
-const scheduleMeetingSchema = z.object({
+const batchScheduleSchema = z.object({
     date: z.date({ required_error: 'A meeting date is required.' }),
     venue: z.string().min(3, 'Meeting venue is required.'),
     evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
     slots: z.array(z.object({
+        interestId: z.string(),
+        callId: z.string(),
         userId: z.string(),
         time: z.string().min(1, "Time is required.")
     }))
-});
-
-const pptUploadSchema = z.object({
-    pptFile: z.any().refine((files) => files?.length > 0, "Presentation file is required.")
 });
 
 const deleteRegistrationSchema = z.object({
@@ -398,282 +394,181 @@ function AddEditCallDialog({
   );
 }
 
-function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests, allUsers }: { call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; interests: EmrInterest[], allUsers: User[] }) {
-    const { toast } = useToast();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    
-    const usersWithInterest = interests.filter(i => i.callId === call.id);
+function BatchScheduleDialog({
+  calls,
+  interests,
+  allUsers,
+  isOpen,
+  onOpenChange,
+}: {
+  calls: FundingCall[];
+  interests: EmrInterest[];
+  allUsers: User[];
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  
+  const form = useForm<z.infer<typeof batchScheduleSchema>>({
+    resolver: zodResolver(batchScheduleSchema),
+    defaultValues: { venue: 'RDC Committee Room, PIMSR', evaluatorUids: [], slots: [] },
+  });
 
-    const form = useForm<z.infer<typeof scheduleMeetingSchema>>({
-        resolver: zodResolver(scheduleMeetingSchema),
-        defaultValues: {
-            venue: "RDC Committee Room, PIMSR",
-            evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
-            slots: usersWithInterest.map(i => ({ userId: i.userId, time: i.meetingSlot?.time || '' }))
-        },
+  const { fields, replace } = useFieldArray({
+    control: form.control,
+    name: 'slots',
+  });
+
+  useEffect(() => {
+    const newSlots = selectedInterests.map(interestId => {
+      const interest = interests.find(i => i.id === interestId)!;
+      return { interestId: interest.id, callId: interest.callId, userId: interest.userId, time: '' };
     });
+    replace(newSlots);
+  }, [selectedInterests, interests, replace]);
 
-    const { fields } = useFieldArray({
-        control: form.control,
-        name: "slots",
-    });
+  const handleBatchSchedule = async (values: z.infer<typeof batchScheduleSchema>) => {
+    setIsSubmitting(true);
+    try {
+        const result = await scheduleEmrMeeting(values.slots.map(s => s.callId)[0], { // Pass first callId as representative
+            date: format(values.date, 'yyyy-MM-dd'),
+            venue: values.venue,
+            evaluatorUids: values.evaluatorUids,
+            slots: values.slots.map(s => ({ userId: s.userId, time: s.time }))
+        }, true, values.slots.map(s => s.interestId)); // Pass true for batch mode and the list of interestIds
 
-    const handleScheduleMeeting = async (values: z.infer<typeof scheduleMeetingSchema>) => {
-        setIsSubmitting(true);
-        try {
-            const result = await scheduleEmrMeeting(call.id, {
-                date: format(values.date, 'yyyy-MM-dd'),
-                venue: values.venue,
-                evaluatorUids: values.evaluatorUids,
-                slots: values.slots
-            });
-            if (result.success) {
-                toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
-                onOpenChange(false);
-            } else {
-                toast({ variant: 'destructive', title: 'Error', description: result.error });
-            }
-        } catch (error) {
-            console.error('Error scheduling meeting:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not schedule meeting.' });
-        } finally {
-            setIsSubmitting(false);
+        if (result.success) {
+            toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
+            onOpenChange(false);
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error });
         }
-    };
-    
-    const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !interests.some(interest => interest.callId === call.id && interest.userId === u.uid));
-
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
-                    <DialogDescription>Set the date, venue, assign an evaluation committee, and set a time slot for each participant. This is a mandatory step.</DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                    <form id="schedule-meeting-form" onSubmit={form.handleSubmit(handleScheduleMeeting)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
-                         <div className="grid grid-cols-2 gap-4">
-                            <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
-                            <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                         </div>
-                         <FormField
-                            control={form.control}
-                            name="evaluatorUids"
-                            render={({ field }) => (
-                                <FormItem className="flex flex-col">
-                                <FormLabel>Assign Evaluators</FormLabel>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="w-full justify-between">
-                                        {field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}
-                                        <ChevronDown className="h-4 w-4 opacity-50" />
-                                    </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-[--radix-popover-trigger-width]">
-                                    <DropdownMenuLabel>Available Staff</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    {availableEvaluators.map((evaluator) => (
-                                        <DropdownMenuCheckboxItem
-                                        key={evaluator.uid}
-                                        checked={field.value?.includes(evaluator.uid)}
-                                        onCheckedChange={(checked) => {
-                                            return checked
-                                            ? field.onChange([...(field.value || []), evaluator.uid])
-                                            : field.onChange(field.value?.filter((id) => id !== evaluator.uid));
-                                        }}
-                                        >
-                                        {evaluator.name}
-                                        </DropdownMenuCheckboxItem>
-                                    ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                            />
-                         <Separator />
-                         <div className="space-y-4">
-                             {fields.map((field, index) => {
-                                const userOfInterest = usersWithInterest.find(u => u.userId === field.userId);
-                                return (
-                                <FormField
-                                    key={field.id}
-                                    control={form.control}
-                                    name={`slots.${index}.time`}
-                                    render={({ field }) => (
-                                    <FormItem>
-                                        <div className="grid grid-cols-3 items-center gap-4">
-                                            <FormLabel className="text-right">{userOfInterest?.userName}</FormLabel>
-                                            <FormControl className="col-span-2">
-                                                <Input type="time" {...field} />
-                                            </FormControl>
-                                        </div>
-                                        <FormMessage />
-                                    </FormItem>
-                                    )}
-                                />
-                                )
-                            })}
-                         </div>
-                    </form>
-                </Form>
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button type="submit" form="schedule-meeting-form" disabled={isSubmitting}>{isSubmitting ? 'Scheduling...' : 'Schedule & Notify'}</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function UploadPptDialog({ interest, call, onOpenChange, isOpen, user, isRevision = false }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; user: User; isRevision?: boolean; }) {
-    const { toast } = useToast();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
-
-    const form = useForm<z.infer<typeof pptUploadSchema>>({
-        resolver: zodResolver(pptUploadSchema),
-    });
-
-    const fileToDataUrl = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = error => reject(error);
-            reader.readAsDataURL(file);
-        });
-    };
-    
-    const handleUpload = async (values: z.infer<typeof pptUploadSchema>) => {
-        setIsSubmitting(true);
-        try {
-            const file = values.pptFile[0];
-            const pptDataUrl = await fileToDataUrl(file);
-            
-            let result;
-            if (isRevision) {
-                result = await uploadRevisedEmrPpt(interest.id, pptDataUrl, file.name, user.name);
-            } else {
-                result = await uploadEmrPpt(interest.id, pptDataUrl, file.name, user.name);
-            }
-
-            if (result.success) {
-                toast({ title: "Success", description: "Your presentation has been uploaded." });
-                onOpenChange(false);
-            } else {
-                toast({ variant: "destructive", title: "Upload Failed", description: result.error });
-            }
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-    
-    const handleDelete = async () => {
-        setIsSubmitting(true);
-        try {
-            const result = await removeEmrPpt(interest.id);
-            if (result.success) {
-                toast({ title: 'Presentation Removed' });
-                onOpenChange(false); // Close the dialog after successful deletion
-            } else {
-                toast({ variant: 'destructive', title: 'Error', description: result.error });
-            }
-        } finally {
-            setIsSubmitting(false);
-            setIsDeleteConfirmationOpen(false);
-        }
-    };
-
-    let isDeadlinePast = false;
-    let deadlineMessage = "Please upload your presentation before the deadline.";
-    if(call.meetingDetails?.date && !isRevision) {
-        const meetingDate = parseISO(call.meetingDetails.date);
-        const uploadDeadline = setSeconds(setMinutes(setHours(subDays(meetingDate, 2), 17), 0), 0);
-        isDeadlinePast = isAfter(new Date(), uploadDeadline);
-        deadlineMessage = `The deadline for submission is ${format(uploadDeadline, "PPpp")}.`;
+    } catch (error) {
+        console.error('Error scheduling batch meeting:', error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not schedule meeting.' });
+    } finally {
+        setIsSubmitting(false);
     }
+  };
 
+  const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !interests.some(interest => selectedInterests.includes(interest.id) && interest.userId === u.uid));
+  const unscheduledInterests = interests.filter(i => !i.meetingSlot);
 
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{isRevision ? 'Upload Revised Presentation' : (interest.pptUrl ? 'Manage Presentation' : 'Upload Presentation')}</DialogTitle>
-                    <DialogDescription>
-                        {interest.pptUrl && !isRevision ? 'You can view, replace, or remove your uploaded presentation.' : `Please upload your presentation for the call: "${call.title}".`}
-                        <br/>
-                        {!isRevision && call.meetingDetails && deadlineMessage}
-                        <br/>
-                        <span className="font-semibold">The presentation file should be under 5MB.</span>
-                    </DialogDescription>
-                </DialogHeader>
-                 {call.meetingDetails && isDeadlinePast && !isRevision ? (
-                    <div className="text-center text-destructive font-semibold p-4">
-                        The deadline to upload or modify your presentation has passed.
-                        {interest.pptUrl && <Button asChild variant="link"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View Final Submission</a></Button>}
-                    </div>
-                ) : (
-                <Form {...form}>
-                    <form id="upload-ppt-form" onSubmit={form.handleSubmit(handleUpload)} className="space-y-4 py-4">
-                        <FormField
-                            name="pptFile"
-                            control={form.control}
-                            render={({ field: { value, onChange, ...fieldProps } }) => (
-                                <FormItem>
-                                    <FormLabel>{interest.pptUrl ? 'Replace Presentation File' : 'Presentation File'}</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...fieldProps}
-                                            type="file"
-                                            accept=".ppt, .pptx"
-                                            onChange={(e) => onChange(e.target.files)}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Schedule EMR Meeting Batch</DialogTitle>
+          <DialogDescription>Select multiple applicants and assign a common meeting date, venue, and committee.</DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form id="batch-schedule-form" onSubmit={form.handleSubmit(handleBatchSchedule)} className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
+            {/* Left side: Applicant Selection */}
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+              <h4 className="font-semibold">Select Applicants</h4>
+              {calls.map(call => {
+                const applicants = unscheduledInterests.filter(i => i.callId === call.id);
+                if (applicants.length === 0) return null;
+                return (
+                  <div key={call.id} className="space-y-2">
+                    <Label className="font-medium text-muted-foreground">{call.title}</Label>
+                    {applicants.map(interest => (
+                      <div key={interest.id} className="flex items-center space-x-2 p-2 border rounded-md">
+                        <Checkbox
+                          id={`interest-${interest.id}`}
+                          checked={selectedInterests.includes(interest.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedInterests(prev => 
+                              checked ? [...prev, interest.id] : prev.filter(id => id !== interest.id)
+                            );
+                          }}
                         />
-                    </form>
-                </Form>
-                )}
-                <DialogFooter className="justify-between">
-                     <div className="flex gap-2">
-                        {interest.pptUrl && !isRevision && <Button asChild variant="secondary"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4 mr-2" />View PPT</a></Button>}
-                        {interest.pptUrl && !(call.meetingDetails && isDeadlinePast) && !isRevision && (
-                            <Button variant="destructive" size="sm" onClick={() => setIsDeleteConfirmationOpen(true)} disabled={isSubmitting}>
-                                <Trash2 className="h-4 w-4 mr-2" /> Remove
-                            </Button>
-                        )}
-                    </div>
-                    <div className="flex gap-2">
-                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                         {!(call.meetingDetails && isDeadlinePast && !isRevision) && (
-                            <Button type="submit" form="upload-ppt-form" disabled={isSubmitting}>
-                                {isSubmitting ? "Saving..." : (isRevision ? 'Submit Revision' : (interest.pptUrl ? 'Replace File' : 'Upload File'))}
-                            </Button>
-                        )}
-                    </div>
-                </DialogFooter>
-                 <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>This will permanently remove your presentation from the server.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>
-                                {isSubmitting ? "Deleting..." : "Confirm & Remove"}
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </DialogContent>
-        </Dialog>
-    );
+                        <Label htmlFor={`interest-${interest.id}`} className="font-normal w-full">{interest.userName}</Label>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Right side: Scheduling Form */}
+            <div className="space-y-4">
+              <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+              <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+              <FormField
+                  control={form.control}
+                  name="evaluatorUids"
+                  render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                      <FormLabel>Assign Evaluators</FormLabel>
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                              {field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}
+                              <ChevronDown className="h-4 w-4 opacity-50" />
+                          </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-[--radix-popover-trigger-width]">
+                          <DropdownMenuLabel>Available Staff</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          {availableEvaluators.map((evaluator) => (
+                              <DropdownMenuCheckboxItem
+                              key={evaluator.uid}
+                              checked={field.value?.includes(evaluator.uid)}
+                              onCheckedChange={(checked) => {
+                                  return checked
+                                  ? field.onChange([...(field.value || []), evaluator.uid])
+                                  : field.onChange(field.value?.filter((id) => id !== evaluator.uid));
+                              }}
+                              >
+                              {evaluator.name}
+                              </DropdownMenuCheckboxItem>
+                          ))}
+                          </DropdownMenuContent>
+                      </DropdownMenu>
+                      <FormMessage />
+                      </FormItem>
+                  )}
+                  />
+              <Separator />
+              <div className="space-y-2 max-h-[30vh] overflow-y-auto pr-2">
+                  <h4 className="font-semibold">Assign Time Slots</h4>
+                  {fields.map((field, index) => {
+                    const userOfInterest = interests.find(u => u.id === field.interestId);
+                    return (
+                      <FormField
+                          key={field.id}
+                          control={form.control}
+                          name={`slots.${index}.time`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <div className="grid grid-cols-3 items-center gap-4">
+                                  <Label htmlFor={field.name} className="text-right text-sm">{userOfInterest?.userName}</Label>
+                                  <FormControl className="col-span-2">
+                                      <Input type="time" {...field} />
+                                  </FormControl>
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                      />
+                    );
+                  })}
+              </div>
+            </div>
+          </form>
+        </Form>
+        <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button type="submit" form="batch-schedule-form" disabled={isSubmitting || selectedInterests.length === 0}>
+              {isSubmitting ? 'Scheduling...' : `Schedule Batch (${selectedInterests.length})`}
+            </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function ViewDescriptionDialog({ call }: { call: FundingCall }) {
@@ -697,116 +592,6 @@ function ViewDescriptionDialog({ call }: { call: FundingCall }) {
     );
 }
 
-function RegisterInterestDialog({ call, user, isOpen, onOpenChange }: { call: FundingCall; user: User; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
-    const { toast } = useToast();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-    const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null);
-    const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([]);
-    const [isSearching, setIsSearching] = useState(false);
-
-    const form = useForm<z.infer<typeof registerInterestSchema>>({
-        resolver: zodResolver(registerInterestSchema),
-    });
-
-    const handleRegister = async () => {
-        setIsSubmitting(true);
-        try {
-            const result = await registerEmrInterest(call.id, user, coPiList);
-            if (result.success) {
-                toast({ title: 'Interest Registered!', description: 'Your interest has been successfully recorded.' });
-                onOpenChange(false);
-            } else {
-                toast({ variant: 'destructive', title: 'Registration Failed', description: result.error });
-            }
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleSearchCoPi = async () => {
-        if (!coPiSearchTerm) return;
-        setIsSearching(true);
-        setFoundCoPi(null);
-        try {
-            const result = await findUserByMisId(coPiSearchTerm);
-            if (result.success && result.user) {
-                setFoundCoPi(result.user);
-            } else {
-                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
-            }
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
-        } finally {
-            setIsSearching(false);
-        }
-    };
-
-    const handleAddCoPi = () => {
-        if (foundCoPi && !coPiList.some(coPi => coPi.uid === foundCoPi.uid)) {
-            if (user && foundCoPi.uid === user.uid) {
-                toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
-                return;
-            }
-            setCoPiList([...coPiList, foundCoPi]);
-        }
-        setFoundCoPi(null);
-        setCoPiSearchTerm('');
-    };
-
-    const handleRemoveCoPi = (uidToRemove: string) => {
-        setCoPiList(coPiList.filter(coPi => coPi.uid !== uidToRemove));
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Register Interest for: {call.title}</DialogTitle>
-                    <DialogDescription>Confirm your interest and add any Co-Principal Investigators (Co-PIs) to your team.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label>Search & Add Co-PI by MIS ID (Optional)</Label>
-                        <div className="flex items-center gap-2">
-                            <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
-                            <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
-                                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
-                            </Button>
-                        </div>
-                        {foundCoPi && (
-                            <div className="flex items-center justify-between p-2 border rounded-md">
-                                <p>{foundCoPi.name}</p>
-                                <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
-                            </div>
-                        )}
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Current Co-PI(s)</Label>
-                        {coPiList.length > 0 ? (
-                            coPiList.map((coPi) => (
-                                <div key={coPi.uid} className="flex items-center justify-between p-2 bg-secondary rounded-md">
-                                    <p className="text-sm font-medium">{coPi.name}</p>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>Remove</Button>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-muted-foreground">No Co-PIs added.</p>
-                        )}
-                    </div>
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleRegister} disabled={isSubmitting}>
-                        {isSubmitting ? 'Registering...' : 'Confirm Registration'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-
 export function EmrCalendar({ user }: EmrCalendarProps) {
     const { toast } = useToast();
     const [calls, setCalls] = useState<FundingCall[]>([]);
@@ -816,14 +601,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const [loading, setLoading] = useState(true);
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
-    const [isUploadPptOpen, setIsUploadPptOpen] = useState(false);
-    const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
-    const [isRegisterInterestOpen, setIsRegisterInterestOpen] = useState(false);
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
-    const [selectedInterest, setSelectedInterest] = useState<EmrInterest | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [isWithdrawConfirmationOpen, setIsWithdrawConfirmationOpen] = useState(false);
     const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
+    const [isBatchScheduleOpen, setIsBatchScheduleOpen] = useState(false);
 
     const isAdmin = user.role === 'Super-admin' || user.role === 'admin';
     const isSuperAdmin = user.role === 'Super-admin';
@@ -869,55 +650,55 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     }, {} as Record<string, CalendarEvent[]>);
 
 
-    useEffect(() => {
-        const fetchAllData = async () => {
-            setLoading(true);
-            try {
-                if (isAdmin) {
-                    const usersQuery = query(collection(db, 'users'));
-                    const usersSnapshot = await getDocs(usersQuery);
-                    setAllUsers(usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User)));
-                }
-
-                const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
-                onSnapshot(callsQuery, (snapshot) => {
-                    setCalls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)));
-                });
-
-                const userInterestsQuery = query(collection(db, 'emrInterests'), where('userId', '==', user.uid));
-                onSnapshot(userInterestsQuery, (snapshot) => {
-                    setUserInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest})));
-                });
-
-                if (isAdmin) {
-                    const allInterestsQuery = query(collection(db, 'emrInterests'));
-                    onSnapshot(allInterestsQuery, (snapshot) => {
-                        setAllInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest})));
-                    });
-                }
-                
-                setLoading(false);
-
-            } catch (error) {
-                console.error("Error fetching data:", error);
-                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch EMR data.' });
-                setLoading(false);
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        try {
+            if (isAdmin) {
+                const usersQuery = query(collection(db, 'users'));
+                const usersSnapshot = await getDocs(usersQuery);
+                setAllUsers(usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User)));
             }
-        };
-        fetchAllData();
-    }, [toast, user.uid, isAdmin]);
-    
-    const handleWithdrawInterest = async () => {
-        if (!selectedInterest) return;
-        const result = await withdrawEmrInterest(selectedInterest.id);
-        if (result.success) {
-            toast({ title: 'Interest Withdrawn', description: 'You have successfully withdrawn your interest.' });
-        } else {
-            toast({ variant: 'destructive', title: 'Withdrawal Failed', description: result.error });
+
+            const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
+            const unsubscribeCalls = onSnapshot(callsQuery, (snapshot) => {
+                setCalls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)));
+            });
+
+            const userInterestsQuery = query(collection(db, 'emrInterests'), where('userId', '==', user.uid));
+            const unsubscribeUserInterests = onSnapshot(userInterestsQuery, (snapshot) => {
+                setUserInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest})));
+            });
+
+            let unsubscribeAllInterests = () => {};
+            if (isAdmin) {
+                const allInterestsQuery = query(collection(db, 'emrInterests'));
+                unsubscribeAllInterests = onSnapshot(allInterestsQuery, (snapshot) => {
+                    setAllInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest})));
+                });
+            }
+            
+            setLoading(false);
+
+            return () => {
+                unsubscribeCalls();
+                unsubscribeUserInterests();
+                unsubscribeAllInterests();
+            }
+
+        } catch (error) {
+            console.error("Error fetching data:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch EMR data.' });
+            setLoading(false);
         }
-        setIsWithdrawConfirmationOpen(false);
-        setSelectedInterest(null);
-    };
+    }, [toast, user.uid, isAdmin]);
+
+    useEffect(() => {
+        const unsubscribe = fetchData();
+        return () => {
+             unsubscribe.then(fn => fn && fn());
+        }
+    }, [fetchData]);
+    
     
     const getStatusBadge = (call: FundingCall) => {
         const now = new Date();
@@ -946,7 +727,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                     <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight className="h-4 w-4" /></Button>
                 </div>
                 {isSuperAdmin && (
-                    <Button onClick={() => { setSelectedCall(null); setIsAddEditDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Add New Call</Button>
+                    <div className="flex items-center gap-2">
+                         <Button onClick={() => setIsBatchScheduleOpen(true)}><CalendarClock className="mr-2 h-4 w-4" /> Schedule Batch</Button>
+                         <Button onClick={() => { setSelectedCall(null); setIsAddEditDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Add New Call</Button>
+                    </div>
                 )}
             </CardHeader>
             <CardContent>
@@ -986,9 +770,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                     <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                         <h4 className="font-semibold">All Upcoming Deadlines</h4>
                         {upcomingCalls.length > 0 ? upcomingCalls.map(call => {
-                            const userHasRegistered = userInterests.some(i => i.callId === call.id);
                             const interestDetails = userInterests.find(i => i.callId === call.id);
-                            const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
                             const hasInterest = allInterests.some(i => i.callId === call.id);
                             const callRef = eventRefs.get(`deadline-${call.id}`);
 
@@ -1003,39 +785,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                 {getStatusBadge(call)}
                                             </div>
                                         </div>
-                                         <div className="flex flex-col items-end gap-2 text-sm">
-                                            {userHasRegistered ? (
-                                                <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 font-semibold">
-                                                    <CheckCircle className="h-5 w-5"/>
-                                                    <span>Interest Registered</span>
-                                                </div>
-                                            ) : (
-                                                !isSuperAdmin &&
-                                                <>
-                                                    <Button onClick={() => { setSelectedCall(call); setIsRegisterInterestOpen(true); }} disabled={isInterestDeadlinePast}>
-                                                        Register Interest
-                                                    </Button>
-                                                    <p className="text-xs text-muted-foreground"><TimeLeft deadline={call.interestDeadline} /></p>
-                                                </>
-                                            )}
-                                        </div>
+                                         <EmrActions user={user} call={call} interestDetails={interestDetails} onActionComplete={fetchData} />
                                     </div>
                                     
-                                    {userHasRegistered && interestDetails?.status === 'Revision Needed' && (
-                                        <Alert variant="destructive">
-                                            <MessageSquareWarning className="h-4 w-4" />
-                                            <AlertTitle>Revision Required</AlertTitle>
-                                            <AlertDescription>
-                                                The committee has requested a revision. Please review the comments and submit an updated presentation.
-                                                <p className="font-semibold mt-2">Admin Remarks: {interestDetails.adminRemarks}</p>
-                                                <Button size="sm" className="mt-2" onClick={() => { setSelectedInterest(interestDetails); setSelectedCall(call); setIsRevisionUploadOpen(true); }}>
-                                                    <Pencil className="h-4 w-4 mr-2"/> Submit Revised PPT
-                                                </Button>
-                                            </AlertDescription>
-                                        </Alert>
-                                    )}
-
-                                    {userHasRegistered && call.meetingDetails?.date && (
+                                    {interestDetails && call.meetingDetails?.date && (
                                         <div ref={eventRefs.get(`meeting-${call.id}`)} className="text-sm p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
                                             <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Your Presentation Slot</p>
                                             <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
@@ -1052,25 +805,9 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                             {userHasRegistered && call.status === 'Open' && (
-                                                <Button variant="destructive" size="sm" onClick={() => { setSelectedInterest(interestDetails!); setIsWithdrawConfirmationOpen(true);}}>
-                                                    Withdraw
-                                                </Button>
-                                            )}
-                                            {userHasRegistered && interestDetails?.status !== 'Revision Needed' && (
-                                                <Button size="sm" variant="outline" onClick={() => { setSelectedInterest(interestDetails!); setSelectedCall(call); setIsUploadPptOpen(true); }}>
-                                                    {interestDetails?.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                                                    {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
-                                                </Button>
-                                            )}
                                             {isAdmin && (
                                                 <div className="flex items-center gap-2">
                                                     <RegistrationsDialog call={call} interests={allInterests} allUsers={allUsers} user={user} onOpenChange={setIsRegistrationsOpen} />
-                                                    {hasInterest && call.status !== 'Meeting Scheduled' && isSuperAdmin && (
-                                                        <Button size="sm" onClick={() => { setSelectedCall(call); setIsScheduleDialogOpen(true); }}>
-                                                            <Calendar className="mr-2 h-4 w-4" /> Schedule
-                                                        </Button>
-                                                    )}
                                                 </div>
                                             )}
                                             {isSuperAdmin && (
@@ -1095,75 +832,22 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                 </div>
             </CardContent>
             {isSuperAdmin && (
-                <AddEditCallDialog
-                    isOpen={isAddEditDialogOpen}
-                    onOpenChange={setIsAddEditDialogOpen}
-                    existingCall={selectedCall}
-                    user={user}
-                />
-            )}
-            {selectedCall && user && (
-                <RegisterInterestDialog 
-                    call={selectedCall}
-                    user={user}
-                    isOpen={isRegisterInterestOpen}
-                    onOpenChange={setIsRegisterInterestOpen}
-                />
-            )}
-            {selectedCall && isSuperAdmin && (
-                <ScheduleMeetingDialog
-                    call={selectedCall}
-                    interests={allInterests}
-                    allUsers={allUsers}
-                    isOpen={isScheduleDialogOpen}
-                    onOpenChange={setIsScheduleDialogOpen}
-                />
-            )}
-            {selectedInterest && selectedCall && (
                 <>
-                    <UploadPptDialog
-                        interest={selectedInterest}
-                        call={selectedCall}
-                        isOpen={isUploadPptOpen}
-                        onOpenChange={(isOpen) => {
-                            setIsUploadPptOpen(isOpen);
-                            if (!isOpen) {
-                                setSelectedInterest(null);
-                                setSelectedCall(null);
-                            }
-                        }}
+                    <AddEditCallDialog
+                        isOpen={isAddEditDialogOpen}
+                        onOpenChange={setIsAddEditDialogOpen}
+                        existingCall={selectedCall}
                         user={user}
                     />
-                    <UploadPptDialog
-                        interest={selectedInterest}
-                        call={selectedCall}
-                        isOpen={isRevisionUploadOpen}
-                        onOpenChange={(isOpen) => {
-                            setIsRevisionUploadOpen(isOpen);
-                            if (!isOpen) {
-                                setSelectedInterest(null);
-                                setSelectedCall(null);
-                            }
-                        }}
-                        user={user}
-                        isRevision={true}
+                    <BatchScheduleDialog
+                        isOpen={isBatchScheduleOpen}
+                        onOpenChange={setIsBatchScheduleOpen}
+                        calls={calls}
+                        interests={allInterests}
+                        allUsers={allUsers}
                     />
                 </>
             )}
-            <AlertDialog open={isWithdrawConfirmationOpen} onOpenChange={setIsWithdrawConfirmationOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will withdraw your interest from the call. Any uploaded presentation will also be deleted. This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setSelectedInterest(null)}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleWithdrawInterest} className="bg-destructive hover:bg-destructive/90">Confirm Withdrawal</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </Card>
     );
 }
