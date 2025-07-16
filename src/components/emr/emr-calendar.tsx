@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import * as z from 'zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { db } from '@/lib/config';
 import { collection, query, orderBy, onSnapshot, addDoc, doc, deleteDoc, updateDoc, where, getDocs } from 'firebase/firestore';
@@ -62,9 +63,11 @@ const callSchema = z.object({
 
 const scheduleMeetingSchema = z.object({
     date: z.date({ required_error: 'A meeting date is required.' }),
-    startTime: z.string().min(1, 'A start time is required.'),
-    slotDuration: z.coerce.number().min(5, "Duration must be at least 5 minutes.").default(15),
     venue: z.string().min(3, 'Meeting venue is required.'),
+    slots: z.array(z.object({
+        userId: z.string(),
+        time: z.string().min(1, "Time is required.")
+    }))
 });
 
 const TimeLeft = ({ deadline }: { deadline: string }) => {
@@ -298,12 +301,21 @@ function AddEditCallDialog({
   );
 }
 
-function ScheduleMeetingDialog({ call, onOpenChange, isOpen }: { call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
+function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests }: { call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; interests: EmrInterest[] }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
+    
     const form = useForm<z.infer<typeof scheduleMeetingSchema>>({
         resolver: zodResolver(scheduleMeetingSchema),
-        defaultValues: { venue: "RDC Committee Room, PIMSR", slotDuration: 15 },
+        defaultValues: {
+            venue: "RDC Committee Room, PIMSR",
+            slots: interests.filter(i => i.callId === call.id).map(i => ({ userId: i.userId, time: '' }))
+        },
+    });
+
+    const { fields } = useFieldArray({
+        control: form.control,
+        name: "slots",
     });
 
     const handleScheduleMeeting = async (values: z.infer<typeof scheduleMeetingSchema>) => {
@@ -311,9 +323,8 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen }: { call: FundingCa
         try {
             const result = await scheduleEmrMeeting(call.id, {
                 date: format(values.date, 'yyyy-MM-dd'),
-                startTime: values.startTime,
-                slotDuration: values.slotDuration,
                 venue: values.venue,
+                slots: values.slots
             });
             if (result.success) {
                 toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
@@ -329,21 +340,45 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen }: { call: FundingCa
         }
     };
 
+    const usersWithInterest = interests.filter(i => i.callId === call.id);
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
-                    <DialogDescription>Set the date, start time, and duration for presentation slots.</DialogDescription>
+                    <DialogDescription>Set the date, venue, and a time slot for each registered participant.</DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
-                    <form id="schedule-meeting-form" onSubmit={form.handleSubmit(handleScheduleMeeting)} className="space-y-4 py-4">
-                         <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                    <form id="schedule-meeting-form" onSubmit={form.handleSubmit(handleScheduleMeeting)} className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-4">
                          <div className="grid grid-cols-2 gap-4">
-                            <FormField name="startTime" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Start Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField name="slotDuration" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Slot Duration (min)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                            <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                          </div>
-                         <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                         <Separator />
+                         <div className="space-y-4">
+                             {fields.map((field, index) => {
+                                const userOfInterest = usersWithInterest.find(u => u.userId === field.userId);
+                                return (
+                                <FormField
+                                    key={field.id}
+                                    control={form.control}
+                                    name={`slots.${index}.time`}
+                                    render={({ field }) => (
+                                    <FormItem>
+                                        <div className="grid grid-cols-3 items-center gap-4">
+                                            <FormLabel className="text-right">{userOfInterest?.userName}</FormLabel>
+                                            <FormControl className="col-span-2">
+                                                <Input type="time" {...field} />
+                                            </FormControl>
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
+                                    )}
+                                />
+                                )
+                            })}
+                         </div>
                     </form>
                 </Form>
                 <DialogFooter>
@@ -534,7 +569,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                     ) : (
                                         <>
-                                            <Button onClick={() => handleRegisterInterest(call)} disabled={isSuperAdmin || isInterestDeadlinePast}>
+                                            <Button onClick={() => handleRegisterInterest(call)} disabled={isInterestDeadlinePast}>
                                                 Register Interest
                                             </Button>
                                             <p className="text-xs text-muted-foreground mt-1">
@@ -573,6 +608,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
             {selectedCall && isSuperAdmin && (
                 <ScheduleMeetingDialog
                     call={selectedCall}
+                    interests={allInterests}
                     isOpen={isScheduleDialogOpen}
                     onOpenChange={setIsScheduleDialogOpen}
                 />

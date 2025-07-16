@@ -1,3 +1,4 @@
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -10,7 +11,7 @@ import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
-import { format, addMinutes } from "date-fns"
+import { format, addMinutes, parse } from "date-fns"
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
@@ -1360,7 +1361,7 @@ export async function registerEmrInterest(callId: string, user: User): Promise<{
   }
 }
 
-export async function scheduleEmrMeeting(callId: string, meetingDetails: { date: string; startTime: string; slotDuration: number; venue: string }) {
+export async function scheduleEmrMeeting(callId: string, meetingDetails: { date: string; venue: string; slots: { userId: string, time: string }[] }) {
   try {
     const callRef = adminDb.collection('fundingCalls').doc(callId);
     const callSnap = await callRef.get();
@@ -1373,20 +1374,22 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
       status: 'Meeting Scheduled',
       meetingDetails: { date: meetingDetails.date, venue: meetingDetails.venue }
     });
+    
+    const emailPromises = meetingDetails.slots.map(async (slot) => {
+      if (!slot.time) return Promise.resolve(); // Skip if no time is assigned
 
-    const interestsSnapshot = await adminDb.collection('emrInterests').where('callId', '==', callId).get();
-    const interestedUsers = interestsSnapshot.docs.map(doc => doc.data() as EmrInterest);
-    
-    let currentSlotTime = new Date(`${meetingDetails.date}T${meetingDetails.startTime}`);
-    
-    const emailPromises = interestedUsers.map(async (interest, index) => {
-      const userSlotTime = addMinutes(currentSlotTime, index * meetingDetails.slotDuration);
+      const interestQuery = await adminDb.collection('emrInterests').where('callId', '==', callId).where('userId', '==', slot.userId).limit(1).get();
+      if (interestQuery.empty) return Promise.resolve();
+
+      const interestDoc = interestQuery.docs[0];
+      const interest = interestDoc.data() as EmrInterest;
+
+      const userSlotTime = parse(slot.time, 'HH:mm', new Date(meetingDetails.date));
       
-      const interestRef = adminDb.collection('emrInterests').doc(interest.id);
-      await interestRef.update({
+      await interestDoc.ref.update({
         meetingSlot: {
-            date: format(userSlotTime, 'yyyy-MM-dd'),
-            time: format(userSlotTime, 'HH:mm'),
+            date: meetingDetails.date,
+            time: slot.time,
         }
       });
       
@@ -1427,3 +1430,4 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
     return { success: false, error: error.message || "Failed to schedule EMR meeting." };
   }
 }
+
