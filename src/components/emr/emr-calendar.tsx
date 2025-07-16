@@ -37,7 +37,7 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
 import { registerEmrInterest, scheduleEmrMeeting, uploadEmrPpt, removeEmrPpt } from '@/app/actions';
@@ -408,7 +408,7 @@ function ScheduleMeetingDialog({ call, onOpenChange, isOpen, interests }: { call
     );
 }
 
-function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
+function UploadPptDialog({ interest, call, onOpenChange, isOpen, user }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; user: User; }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
@@ -431,7 +431,7 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen }: { interest: E
         try {
             const file = values.pptFile[0];
             const pptDataUrl = await fileToDataUrl(file);
-            const result = await uploadEmrPpt(interest.id, pptDataUrl, file.name);
+            const result = await uploadEmrPpt(interest.id, pptDataUrl, file.name, user.name);
 
             if (result.success) {
                 toast({ title: "Success", description: "Your presentation has been uploaded." });
@@ -769,7 +769,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             )}
                                         </div>
                                     </div>
-
+                                    
                                     {userHasRegistered && call.meetingDetails?.date && (
                                         <div ref={eventRefs.get(`meeting-${call.id}`)} className="text-sm p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
                                             <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Your Presentation Slot</p>
@@ -781,17 +781,15 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                     )}
 
-                                    <div className="flex items-center gap-2 text-xs">
-                                        <ViewDescriptionDialog call={call} />
-                                        {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
-                                    </div>
-                                    
-                                     <div className="flex items-center justify-between pt-3 border-t">
+                                    <div className="flex items-center justify-between pt-3 border-t">
                                         <div className="text-xs text-muted-foreground space-y-1">
                                             <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
                                             <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {userHasRegistered && interestDetails?.pptUrl && (
+                                                 <Button asChild size="sm" variant="outline"><a href={interestDetails.pptUrl} target="_blank" rel="noreferrer"><Eye className="h-4 w-4 mr-2"/>View PPT</a></Button>
+                                            )}
                                             {userHasRegistered && interestDetails && (
                                                 <Button size="sm" variant="outline" onClick={() => { setSelectedInterest(interestDetails!); setSelectedCall(call); setIsUploadPptOpen(true); }}>
                                                     {interestDetails.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
@@ -813,6 +811,12 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             )}
                                         </div>
                                      </div>
+
+                                    <div className="flex items-center gap-2 text-xs">
+                                        <ViewDescriptionDialog call={call} />
+                                        {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
+                                    </div>
+
                                 </div>
                             )
                         }) : (
@@ -851,8 +855,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                             setSelectedCall(null);
                         }
                     }}
+                    user={user}
                 />
             )}
         </Card>
     );
 }
+

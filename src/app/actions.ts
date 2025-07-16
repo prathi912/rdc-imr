@@ -1446,7 +1446,7 @@ export async function scheduleEmrMeeting(callId: string, meetingDetails: { date:
   }
 }
 
-export async function uploadEmrPpt(interestId: string, pptDataUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
+export async function uploadEmrPpt(interestId: string, pptDataUrl: string, originalFileName: string, userName: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId || !pptDataUrl) {
       return { success: false, error: "Interest ID and file data are required." };
@@ -1458,9 +1458,13 @@ export async function uploadEmrPpt(interestId: string, pptDataUrl: string, fileN
         return { success: false, error: "Interest registration not found." };
     }
     const interest = interestSnap.data() as EmrInterest;
+    
+    // Standardize the filename
+    const fileExtension = path.extname(originalFileName);
+    const standardizedName = `${userName.replace(/\s+/g, '_')}_${interest.callId}${fileExtension}`;
 
-    const path = `emr-presentations/${interest.callId}/${interest.userId}/${fileName}`;
-    const result = await uploadFileToServer(pptDataUrl, path);
+    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`;
+    const result = await uploadFileToServer(pptDataUrl, filePath);
 
     if (!result.success || !result.url) {
         throw new Error(result.error || "PPT upload failed.");
