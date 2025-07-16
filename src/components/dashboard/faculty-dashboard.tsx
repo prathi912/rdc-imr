@@ -6,51 +6,69 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProjectList } from '@/components/projects/project-list';
-import { FilePlus2, CheckCircle, Clock, ArrowRight, BookOpenCheck } from 'lucide-react';
-import type { User, Project } from '@/types';
+import { FilePlus2, CheckCircle, Clock, ArrowRight, BookOpenCheck, Video } from 'lucide-react';
+import type { User, Project, EmrInterest, FundingCall } from '@/types';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, or } from 'firebase/firestore';
 import { Skeleton } from '../ui/skeleton';
 import { EmrCalendar } from '../emr/emr-calendar';
+import { EmrActions } from '../emr/emr-actions';
 
 export function FacultyDashboard({ user }: { user: User }) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [emrInterests, setEmrInterests] = useState<EmrInterest[]>([]);
+  const [fundingCalls, setFundingCalls] = useState<FundingCall[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchAllData = async () => {
       if (!user) return;
       setLoading(true);
       try {
+        // Fetch IMR Projects
         const projectsRef = collection(db, 'projects');
-        const q = query(
+        const projectsQuery = query(
           projectsRef,
           or(
             where('pi_uid', '==', user.uid),
-            where('pi_email', '==', user.email)
+            where('coPiUids', 'array-contains', user.uid)
           )
         );
-        const querySnapshot = await getDocs(q);
         
-        const projectIds = new Set<string>();
-        const userProjects = querySnapshot.docs.reduce((acc, doc) => {
-            if (!projectIds.has(doc.id)) {
-                projectIds.add(doc.id);
-                acc.push({ id: doc.id, ...doc.data() } as Project);
-            }
-            return acc;
-        }, [] as Project[]);
+        // Fetch EMR Interests for the user
+        const interestsRef = collection(db, 'emrInterests');
+        const interestsQuery = query(interestsRef, where('userId', '==', user.uid));
+        
+        // Fetch all funding calls to map titles
+        const callsRef = collection(db, 'fundingCalls');
+        const callsQuery = query(callsRef);
 
+        const [projectsSnapshot, interestsSnapshot, callsSnapshot] = await Promise.all([
+            getDocs(projectsQuery),
+            getDocs(interestsQuery),
+            getDocs(callsQuery)
+        ]);
+
+        const userProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         setProjects(userProjects);
+        
+        const userInterests = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+        setEmrInterests(userInterests);
+
+        const allCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+        setFundingCalls(allCalls);
+
       } catch (error) {
-        console.error("Failed to fetch faculty projects", error);
+        console.error("Failed to fetch dashboard data", error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProjects();
+    fetchAllData();
   }, [user]);
+  
+  const getCallById = (callId: string) => fundingCalls.find(c => c.id === callId);
 
   const activeStatuses = ['Recommended', 'In Progress', 'Pending Completion Approval', 'Sanctioned', 'SANCTIONED'];
   const activeProjects = projects.filter(p => activeStatuses.includes(p.status)).length;
@@ -63,9 +81,9 @@ export function FacultyDashboard({ user }: { user: User }) {
 
 
   const statCards = [
-    { title: 'Active Projects', value: activeProjects.toString(), icon: BookOpenCheck },
-    { title: 'Pending Approval', value: pendingApproval.toString(), icon: Clock },
-    { title: 'Completed Projects', value: completedProjects.toString(), icon: CheckCircle },
+    { title: 'Active IMR Projects', value: activeProjects.toString(), icon: BookOpenCheck },
+    { title: 'IMR Pending Approval', value: pendingApproval.toString(), icon: Clock },
+    { title: 'IMR Completed', value: completedProjects.toString(), icon: CheckCircle },
   ];
 
   const recentProjects = projects
@@ -79,7 +97,7 @@ export function FacultyDashboard({ user }: { user: User }) {
         <Link href="/dashboard/new-submission">
           <Button>
             <FilePlus2 className="mr-2 h-4 w-4" />
-            New Submission
+            New IMR Submission
           </Button>
         </Link>
       </div>
@@ -109,16 +127,16 @@ export function FacultyDashboard({ user }: { user: User }) {
       {upcomingMeetings.length > 0 && (
         <Card className="border-primary/40">
             <CardHeader>
-                <CardTitle>Upcoming IMR Evaluation Meeting</CardTitle>
+                <CardTitle className="flex items-center gap-2"><Video className="h-5 w-5"/> Upcoming IMR Evaluation Meeting</CardTitle>
                 <CardDescription>Details for your scheduled project presentation.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 {upcomingMeetings.map(p => (
                     p.meetingDetails &&
-                    <div key={p.id} className="p-3 border rounded-lg">
+                    <div key={p.id} className="p-3 border rounded-lg bg-background">
                         <p className="font-semibold">{p.title}</p>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm mt-2 text-muted-foreground">
-                            <span><strong>Date:</strong> {new Date(p.meetingDetails.date).toLocaleDateString()}</span>
+                            <span><strong>Date:</strong> {new Date(p.meetingDetails.date.replace(/-/g, '/')).toLocaleDateString()}</span>
                             <span><strong>Time:</strong> {p.meetingDetails.time}</span>
                             <span><strong>Venue:</strong> {p.meetingDetails.venue}</span>
                         </div>
@@ -127,14 +145,43 @@ export function FacultyDashboard({ user }: { user: User }) {
             </CardContent>
         </Card>
       )}
+      
+      {emrInterests.length > 0 && (
+        <Card>
+            <CardHeader>
+                <CardTitle>My EMR Applications</CardTitle>
+                <CardDescription>A summary of your registered interests in external funding calls.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="space-y-4">
+                    {emrInterests.map(interest => {
+                        const call = getCallById(interest.callId);
+                        if (!call) return null;
+                        return (
+                            <div key={interest.id} className="p-3 border rounded-lg bg-background">
+                                <p className="font-semibold">{call.title}</p>
+                                <p className="text-sm text-muted-foreground">Registered on: {new Date(interest.registeredAt).toLocaleDateString()}</p>
+                                <div className="mt-2">
+                                     <EmrActions user={user} call={call} interestDetails={interest} onActionComplete={async () => {
+                                        // A simple re-fetch, could be optimized later
+                                        const interestsRef = collection(db, 'emrInterests');
+                                        const interestsQuery = query(interestsRef, where('userId', '==', user.uid));
+                                        const interestsSnapshot = await getDocs(interestsQuery);
+                                        const updatedInterests = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest}));
+                                        setEmrInterests(updatedInterests);
+                                     }} />
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </CardContent>
+        </Card>
+      )}
 
       <div className="mt-4">
-        <EmrCalendar user={user} />
-      </div>
-
-      <div className="mt-4">
-         <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-2xl font-bold tracking-tight">My Recent Projects</h3>
+        <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-2xl font-bold tracking-tight">My Recent IMR Projects</h3>
             <Link href="/dashboard/my-projects">
               <Button variant="ghost">
                 View All
@@ -147,6 +194,19 @@ export function FacultyDashboard({ user }: { user: User }) {
         ) : (
           <ProjectList projects={recentProjects} userRole="faculty" />
         )}
+      </div>
+
+       <div className="mt-4">
+        <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-2xl font-bold tracking-tight">EMR Funding Calendar</h3>
+            <Link href="/dashboard/emr-calendar">
+              <Button variant="ghost">
+                View Full Calendar
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+        </div>
+        {loading ? <Skeleton className="h-96 w-full" /> : <EmrCalendar user={user} />}
       </div>
     </div>
   );

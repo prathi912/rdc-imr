@@ -1,4 +1,5 @@
 
+
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -281,6 +282,7 @@ export type FundingCall = {
 export type EmrInterest = {
     id: string; // Combination of callId and userId
     callId: string;
+    callTitle?: string; // For convenience
     userId: string;
     userName: string;
     userEmail: string;
