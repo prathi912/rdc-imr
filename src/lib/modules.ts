@@ -5,6 +5,7 @@ export const ALL_MODULES = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'new-submission', label: 'New Submission' },
   { id: 'my-projects', label: 'My Projects' },
+  { id: 'emr-projects', label: 'EMR Projects' },
   { id: 'incentive-claim', label: 'Incentive Claims' },
   { id: 'evaluator-dashboard', label: 'Evaluation Queue' },
   { id: 'my-evaluations', label: 'My Evaluations' },
@@ -23,7 +24,7 @@ export const ALL_MODULES = [
   { id: 'settings', label: 'Settings' },
 ];
 
-const coreModules = ['dashboard', 'notifications', 'settings'];
+const coreModules = ['dashboard', 'notifications', 'settings', 'emr-projects'];
 const facultyCoreModules = ['new-submission', 'my-projects'];
 const hierarchyCoreModules = ['analytics'];
 

@@ -226,12 +226,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
-             <SidebarMenuItem>
+             {user.allowedModules?.includes('emr-projects') && (
+              <SidebarMenuItem>
                 <SidebarMenuButton href="/dashboard/emr-projects" tooltip="EMR Projects" isActive={pathname.startsWith('/dashboard/emr-projects')}>
                   <Globe />
                   EMR Projects
                 </SidebarMenuButton>
               </SidebarMenuItem>
+            )}
             {user.allowedModules?.includes('incentive-claim') && (
               <SidebarMenuItem>
                 <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>
