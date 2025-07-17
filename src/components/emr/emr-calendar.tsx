@@ -1,16 +1,14 @@
 
-
-
 'use client';
 
 import { useState, useEffect, useCallback, createRef } from 'react';
 import * as z from 'zod';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { db } from '@/lib/config';
 import { collection, query, orderBy, onSnapshot, doc, deleteDoc, updateDoc, where, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -381,7 +379,7 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user, on
                     <DialogClose asChild>
                         <Button variant="outline">Close</Button>
                     </DialogClose>
-                    {user.role === 'Super-admin' && registeredInterests.length > 0 && (
+                    {user.role === 'Super-admin' && registeredInterests.length > 0 && call.status !== 'Meeting Scheduled' && (
                         <Button onClick={() => {onOpenChange(false); onScheduleClick();}}>
                             <CalendarClock className="mr-2 h-4 w-4" />
                             Schedule Meeting

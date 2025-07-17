@@ -30,11 +30,11 @@ import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { registerEmrInterest, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest, findUserByMisId } from '@/app/actions';
+import { registerEmrInterest, withdrawEmrInterest, findUserByMisId } from '@/app/actions';
 import { isAfter, parseISO } from 'date-fns';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { UploadPptDialog } from './emr-calendar';
+import { UploadPptDialog } from './upload-ppt-dialog';
 
 
 interface EmrActionsProps {
