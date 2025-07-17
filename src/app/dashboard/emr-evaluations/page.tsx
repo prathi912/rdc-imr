@@ -93,6 +93,7 @@ function EvaluationDetailsDialog({ interest, call }: { interest: EmrInterestWith
                         <DropdownMenuContent>
                             <DropdownMenuItem onClick={() => setStatusToUpdate('Recommended')}>Recommended</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setStatusToUpdate('Endorsement Pending')}>Recommended (Endorsement Pending)</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setStatusToUpdate('Endorsement Signed')}>Endorsement Signed</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setStatusToUpdate('Not Recommended')}>Not Recommended</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setStatusToUpdate('Revision Needed')}>Revision is Needed</DropdownMenuItem>
                         </DropdownMenuContent>
