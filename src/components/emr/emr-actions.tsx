@@ -5,7 +5,6 @@ import { useState } from 'react';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { db } from '@/lib/config';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,13 +26,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
-import { CheckCircle, Loader2, MessageSquareWarning, Pencil, Replace, Trash2, Upload, Eye } from 'lucide-react';
+import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { registerEmrInterest, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest, uploadRevisedEmrPpt, findUserByMisId } from '@/app/actions';
-import { isAfter, parseISO, subDays, setHours, setMinutes, setSeconds, format } from 'date-fns';
+import { registerEmrInterest, uploadEmrPpt, removeEmrPpt, withdrawEmrInterest, findUserByMisId } from '@/app/actions';
+import { isAfter, parseISO } from 'date-fns';
 import { Label } from '../ui/label';
 
 interface EmrActionsProps {
@@ -61,7 +59,7 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
-function UploadPptDialog({ interest, call, onOpenChange, isOpen, user, onUploadSuccess, isRevision = false }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; user: User; onUploadSuccess: () => void, isRevision?: boolean; }) {
+export function UploadPptDialog({ interest, call, onOpenChange, isOpen, user, onUploadSuccess }: { interest: EmrInterest; call: FundingCall; isOpen: boolean; onOpenChange: (open: boolean) => void; user: User; onUploadSuccess: () => void; }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDeleteConfirmationOpen, setIsDeleteConfirmationOpen] = useState(false);
@@ -75,13 +73,7 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user, onUploadS
         try {
             const file = values.pptFile[0];
             const pptDataUrl = await fileToDataUrl(file);
-            
-            let result;
-            if (isRevision) {
-                result = await uploadRevisedEmrPpt(interest.id, pptDataUrl, file.name, user.name);
-            } else {
-                result = await uploadEmrPpt(interest.id, pptDataUrl, file.name, user.name);
-            }
+            const result = await uploadEmrPpt(interest.id, pptDataUrl, file.name, user.name);
 
             if (result.success) {
                 toast({ title: "Success", description: "Your presentation has been uploaded." });
@@ -114,73 +106,31 @@ function UploadPptDialog({ interest, call, onOpenChange, isOpen, user, onUploadS
         }
     };
 
-    let isDeadlinePast = false;
-    let deadlineMessage = "Please upload your presentation before the deadline.";
-    if(call.meetingDetails?.date && !isRevision) {
-        const meetingDate = parseISO(call.meetingDetails.date);
-        const uploadDeadline = setSeconds(setMinutes(setHours(subDays(meetingDate, 2), 17), 0), 0);
-        isDeadlinePast = isAfter(new Date(), uploadDeadline);
-        deadlineMessage = `The deadline for submission is ${format(uploadDeadline, "PPpp")}.`;
-    }
-
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{isRevision ? 'Upload Revised Presentation' : (interest.pptUrl ? 'Manage Presentation' : 'Upload Presentation')}</DialogTitle>
+                    <DialogTitle>{interest.pptUrl ? 'Manage Presentation' : 'Upload Presentation'}</DialogTitle>
                     <DialogDescription>
-                        {interest.pptUrl && !isRevision ? 'You can view, replace, or remove your uploaded presentation.' : `Please upload your presentation for the call: "${call.title}".`}
-                        <br/>
-                        {!isRevision && call.meetingDetails && deadlineMessage}
-                        <br/>
-                        <span className="font-semibold">The presentation file should be under 5MB.</span>
+                        {interest.pptUrl ? 'You can view, replace, or remove your uploaded presentation.' : `Please upload your presentation for the call: "${call.title}".`}
                     </DialogDescription>
                 </DialogHeader>
-                 {call.meetingDetails && isDeadlinePast && !isRevision ? (
-                    <div className="text-center text-destructive font-semibold p-4">
-                        The deadline to upload or modify your presentation has passed.
-                        {interest.pptUrl && <Button asChild variant="link"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View Final Submission</a></Button>}
-                    </div>
-                ) : (
                 <Form {...form}>
                     <form id="upload-ppt-form" onSubmit={form.handleSubmit(handleUpload)} className="space-y-4 py-4">
-                        <FormField
-                            name="pptFile"
-                            control={form.control}
-                            render={({ field: { value, onChange, ...fieldProps } }) => (
-                                <FormItem>
-                                    <FormLabel>{interest.pptUrl ? 'Replace Presentation File' : 'Presentation File'}</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            {...fieldProps}
-                                            type="file"
-                                            accept=".ppt, .pptx"
-                                            onChange={(e) => onChange(e.target.files)}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                       <Input type="file" accept=".ppt, .pptx" {...form.register("pptFile")} />
+                       {form.formState.errors.pptFile && <p className="text-sm text-destructive">{form.formState.errors.pptFile.message as string}</p>}
                     </form>
                 </Form>
-                )}
                 <DialogFooter className="justify-between">
                      <div className="flex gap-2">
-                        {interest.pptUrl && !isRevision && <Button asChild variant="secondary"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4 mr-2" />View PPT</a></Button>}
-                        {interest.pptUrl && !(call.meetingDetails && isDeadlinePast) && !isRevision && (
-                            <Button variant="destructive" size="sm" onClick={() => setIsDeleteConfirmationOpen(true)} disabled={isSubmitting}>
-                                <Trash2 className="h-4 w-4 mr-2" /> Remove
-                            </Button>
-                        )}
+                        {interest.pptUrl && <Button asChild variant="secondary"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><Eye className="h-4 w-4 mr-2" />View PPT</a></Button>}
+                        {interest.pptUrl && <Button variant="destructive" size="sm" onClick={() => setIsDeleteConfirmationOpen(true)} disabled={isSubmitting}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button>}
                     </div>
                     <div className="flex gap-2">
                         <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                         {!(call.meetingDetails && isDeadlinePast && !isRevision) && (
-                            <Button type="submit" form="upload-ppt-form" disabled={isSubmitting}>
-                                {isSubmitting ? "Saving..." : (isRevision ? 'Submit Revision' : (interest.pptUrl ? 'Replace File' : 'Upload File'))}
-                            </Button>
-                        )}
+                        <Button type="submit" form="upload-ppt-form" disabled={isSubmitting}>
+                            {isSubmitting ? "Saving..." : (interest.pptUrl ? 'Replace File' : 'Upload File')}
+                        </Button>
                     </div>
                 </DialogFooter>
                  <AlertDialog open={isDeleteConfirmationOpen} onOpenChange={setIsDeleteConfirmationOpen}>
@@ -314,77 +264,15 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
 
 export function EmrActions({ user, call, interestDetails, onActionComplete, isDashboardView = false }: EmrActionsProps) {
     const [isRegisterInterestOpen, setIsRegisterInterestOpen] = useState(false);
-    const [isUploadPptOpen, setIsUploadPptOpen] = useState(false);
-    const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
-    const [isWithdrawConfirmationOpen, setIsWithdrawConfirmationOpen] = useState(false);
-    const { toast } = useToast();
-
-    const handleWithdrawInterest = async () => {
-        if (!interestDetails) return;
-        const result = await withdrawEmrInterest(interestDetails.id);
-        if (result.success) {
-            toast({ title: 'Interest Withdrawn' });
-            onActionComplete();
-        } else {
-            toast({ variant: 'destructive', title: 'Withdrawal Failed', description: result.error });
-        }
-        setIsWithdrawConfirmationOpen(false);
-    };
-
+    
     if (!user) return null;
 
     const isSuperAdmin = user.role === 'Super-admin';
     const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
 
     if (interestDetails) {
-        // User has registered interest. Logic for dashboard view.
-        if (isDashboardView) {
-             return (
-                <div className="flex flex-col items-start gap-2">
-                    {interestDetails.status === 'Revision Needed' ? (
-                        <Alert variant="destructive">
-                            <MessageSquareWarning className="h-4 w-4" />
-                            <AlertTitle>Revision Required</AlertTitle>
-                            <AlertDescription>
-                                The committee has requested a revision. Please review the comments and submit an updated presentation.
-                                <p className="font-semibold mt-2">Admin Remarks: {interestDetails.adminRemarks}</p>
-                                <Button size="sm" className="mt-2" onClick={() => setIsRevisionUploadOpen(true)}>
-                                    <Pencil className="h-4 w-4 mr-2"/> Submit Revised PPT
-                                </Button>
-                            </AlertDescription>
-                        </Alert>
-                    ) : (
-                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 text-sm font-semibold">
-                                <CheckCircle className="h-4 w-4"/>
-                                <span>Interest Registered</span>
-                            </div>
-                            {call.status === 'Open' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
-                            <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
-                                {interestDetails?.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                                {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
-                            </Button>
-                        </div>
-                    )}
-                     {isUploadPptOpen && <UploadPptDialog isOpen={isUploadPptOpen} onOpenChange={setIsUploadPptOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} />}
-                     {isRevisionUploadOpen && <UploadPptDialog isOpen={isRevisionUploadOpen} onOpenChange={setIsRevisionUploadOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} isRevision={true} />}
-                     <AlertDialog open={isWithdrawConfirmationOpen} onOpenChange={setIsWithdrawConfirmationOpen}>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>This will withdraw your interest from the call. Any uploaded presentation will also be deleted. This action cannot be undone.</AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleWithdrawInterest} className="bg-destructive hover:bg-destructive/90">Confirm Withdrawal</AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                </div>
-             )
-        }
-        
-        // Default view for EMR Calendar page
+        if (isDashboardView) return null;
+
         return (
              <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 font-semibold">
                 <CheckCircle className="h-5 w-5"/>
@@ -393,7 +281,6 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
         )
     }
 
-    // User has not registered interest
     if (isSuperAdmin || isInterestDeadlinePast) return null;
 
     return (
