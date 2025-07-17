@@ -41,6 +41,7 @@ interface EmrActionsProps {
   call: FundingCall;
   interestDetails: EmrInterest | undefined;
   onActionComplete: () => void;
+  isDashboardView?: boolean;
 }
 
 const pptUploadSchema = z.object({
@@ -311,7 +312,7 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
     );
 }
 
-export function EmrActions({ user, call, interestDetails, onActionComplete }: EmrActionsProps) {
+export function EmrActions({ user, call, interestDetails, onActionComplete, isDashboardView = false }: EmrActionsProps) {
     const [isRegisterInterestOpen, setIsRegisterInterestOpen] = useState(false);
     const [isUploadPptOpen, setIsUploadPptOpen] = useState(false);
     const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
@@ -336,50 +337,58 @@ export function EmrActions({ user, call, interestDetails, onActionComplete }: Em
     const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
 
     if (interestDetails) {
-        // User has registered interest
-        return (
-            <div className="flex flex-col items-start gap-2">
-                {interestDetails.status === 'Revision Needed' ? (
-                     <Alert variant="destructive">
-                        <MessageSquareWarning className="h-4 w-4" />
-                        <AlertTitle>Revision Required</AlertTitle>
-                        <AlertDescription>
-                            The committee has requested a revision. Please review the comments and submit an updated presentation.
-                            <p className="font-semibold mt-2">Admin Remarks: {interestDetails.adminRemarks}</p>
-                            <Button size="sm" className="mt-2" onClick={() => setIsRevisionUploadOpen(true)}>
-                                <Pencil className="h-4 w-4 mr-2"/> Submit Revised PPT
+        // User has registered interest. Logic for dashboard view.
+        if (isDashboardView) {
+             return (
+                <div className="flex flex-col items-start gap-2">
+                    {interestDetails.status === 'Revision Needed' ? (
+                        <Alert variant="destructive">
+                            <MessageSquareWarning className="h-4 w-4" />
+                            <AlertTitle>Revision Required</AlertTitle>
+                            <AlertDescription>
+                                The committee has requested a revision. Please review the comments and submit an updated presentation.
+                                <p className="font-semibold mt-2">Admin Remarks: {interestDetails.adminRemarks}</p>
+                                <Button size="sm" className="mt-2" onClick={() => setIsRevisionUploadOpen(true)}>
+                                    <Pencil className="h-4 w-4 mr-2"/> Submit Revised PPT
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
+                    ) : (
+                         <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 text-sm font-semibold">
+                                <CheckCircle className="h-4 w-4"/>
+                                <span>Interest Registered</span>
+                            </div>
+                            {call.status === 'Open' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
+                            <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
+                                {interestDetails?.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                                {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
                             </Button>
-                        </AlertDescription>
-                    </Alert>
-                ) : (
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 font-semibold">
-                            <CheckCircle className="h-5 w-5"/>
-                            <span>Interest Registered</span>
                         </div>
-                        {call.status === 'Open' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
-                        <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
-                            {interestDetails?.pptUrl ? <Replace className="h-4 w-4 mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                            {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
-                        </Button>
-                    </div>
-                )}
-                {isUploadPptOpen && <UploadPptDialog isOpen={isUploadPptOpen} onOpenChange={setIsUploadPptOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} />}
-                {isRevisionUploadOpen && <UploadPptDialog isOpen={isRevisionUploadOpen} onOpenChange={setIsRevisionUploadOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} isRevision={true} />}
-                <AlertDialog open={isWithdrawConfirmationOpen} onOpenChange={setIsWithdrawConfirmationOpen}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This will withdraw your interest from the call. Any uploaded presentation will also be deleted. This action cannot be undone.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleWithdrawInterest} className="bg-destructive hover:bg-destructive/90">Confirm Withdrawal</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                    )}
+                     {isUploadPptOpen && <UploadPptDialog isOpen={isUploadPptOpen} onOpenChange={setIsUploadPptOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} />}
+                     {isRevisionUploadOpen && <UploadPptDialog isOpen={isRevisionUploadOpen} onOpenChange={setIsRevisionUploadOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} isRevision={true} />}
+                     <AlertDialog open={isWithdrawConfirmationOpen} onOpenChange={setIsWithdrawConfirmationOpen}>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>This will withdraw your interest from the call. Any uploaded presentation will also be deleted. This action cannot be undone.</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleWithdrawInterest} className="bg-destructive hover:bg-destructive/90">Confirm Withdrawal</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+             )
+        }
+        
+        // Default view for EMR Calendar page
+        return (
+             <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 font-semibold">
+                <CheckCircle className="h-5 w-5"/>
+                <span>Interest Registered</span>
             </div>
         )
     }

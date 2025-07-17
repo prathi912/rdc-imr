@@ -20,52 +20,53 @@ export function FacultyDashboard({ user }: { user: User }) {
   const [fundingCalls, setFundingCalls] = useState<FundingCall[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const fetchData = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      // Fetch IMR Projects
+      const projectsRef = collection(db, 'projects');
+      const projectsQuery = query(
+        projectsRef,
+        or(
+          where('pi_uid', '==', user.uid),
+          where('coPiUids', 'array-contains', user.uid)
+        )
+      );
+      
+      // Fetch EMR Interests for the user
+      const interestsRef = collection(db, 'emrInterests');
+      const interestsQuery = query(interestsRef, where('userId', '==', user.uid));
+      
+      // Fetch all funding calls to map titles
+      const callsRef = collection(db, 'fundingCalls');
+      const callsQuery = query(callsRef);
+
+      const [projectsSnapshot, interestsSnapshot, callsSnapshot] = await Promise.all([
+          getDocs(projectsQuery),
+          getDocs(interestsSnapshot),
+          getDocs(callsQuery)
+      ]);
+
+      const userProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      setProjects(userProjects);
+      
+      const userInterests = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+      setEmrInterests(userInterests);
+
+      const allCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+      setFundingCalls(allCalls);
+
+    } catch (error) {
+      console.error("Failed to fetch dashboard data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchAllData = async () => {
-      if (!user) return;
-      setLoading(true);
-      try {
-        // Fetch IMR Projects
-        const projectsRef = collection(db, 'projects');
-        const projectsQuery = query(
-          projectsRef,
-          or(
-            where('pi_uid', '==', user.uid),
-            where('coPiUids', 'array-contains', user.uid)
-          )
-        );
-        
-        // Fetch EMR Interests for the user
-        const interestsRef = collection(db, 'emrInterests');
-        const interestsQuery = query(interestsRef, where('userId', '==', user.uid));
-        
-        // Fetch all funding calls to map titles
-        const callsRef = collection(db, 'fundingCalls');
-        const callsQuery = query(callsRef);
-
-        const [projectsSnapshot, interestsSnapshot, callsSnapshot] = await Promise.all([
-            getDocs(projectsQuery),
-            getDocs(interestsQuery),
-            getDocs(callsQuery)
-        ]);
-
-        const userProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-        setProjects(userProjects);
-        
-        const userInterests = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
-        setEmrInterests(userInterests);
-
-        const allCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-        setFundingCalls(allCalls);
-
-      } catch (error) {
-        console.error("Failed to fetch dashboard data", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAllData();
+    fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
   
   const getCallById = (callId: string) => fundingCalls.find(c => c.id === callId);
@@ -138,14 +139,7 @@ export function FacultyDashboard({ user }: { user: User }) {
                                 <p className="font-semibold">{interest.callTitle || call.title}</p>
                                 <p className="text-sm text-muted-foreground">Registered on: {new Date(interest.registeredAt).toLocaleDateString()}</p>
                                 <div className="mt-2">
-                                     <EmrActions user={user} call={call} interestDetails={interest} onActionComplete={async () => {
-                                        // A simple re-fetch, could be optimized later
-                                        const interestsRef = collection(db, 'emrInterests');
-                                        const interestsQuery = query(interestsRef, where('userId', '==', user.uid));
-                                        const interestsSnapshot = await getDocs(interestsQuery);
-                                        const updatedInterests = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest}));
-                                        setEmrInterests(updatedInterests);
-                                     }} />
+                                     <EmrActions user={user} call={call} interestDetails={interest} onActionComplete={fetchData} isDashboardView={true} />
                                 </div>
                             </div>
                         )
