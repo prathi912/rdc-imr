@@ -45,7 +45,7 @@ export function FacultyDashboard({ user }: { user: User }) {
 
       const [projectsSnapshot, interestsSnapshot, callsSnapshot] = await Promise.all([
           getDocs(projectsQuery),
-          getDocs(interestsSnapshot),
+          getDocs(interestsQuery),
           getDocs(callsQuery)
       ]);
 
