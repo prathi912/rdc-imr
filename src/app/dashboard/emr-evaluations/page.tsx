@@ -129,23 +129,41 @@ export default function EmrEvaluationsPage() {
         setLoading(true);
 
         try {
-            const callsQuery = query(collection(db, 'fundingCalls'), where('status', '==', 'Meeting Scheduled'));
-            const callsSnapshot = await getDocs(callsQuery);
-            const callsData = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-            setCalls(callsData);
-            
+            // Step 1: Fetch all relevant interests first.
             let interestsQuery;
             if (user.role === 'Super-admin' || user.role === 'admin') {
                 interestsQuery = query(collection(db, 'emrInterests'));
             } else {
-                 const relevantCallIds = callsData.filter(call => call.meetingDetails?.assignedEvaluators?.includes(user.uid)).map(call => call.id);
-                if (relevantCallIds.length === 0) { setInterests([]); setLoading(false); return; }
+                // For evaluators, we still need to find which calls they are assigned to first.
+                const callsWithMyUidQuery = query(collection(db, 'fundingCalls'), where('meetingDetails.assignedEvaluators', 'array-contains', user.uid));
+                const callsSnapshot = await getDocs(callsWithMyUidQuery);
+                const relevantCallIds = callsSnapshot.docs.map(doc => doc.id);
+
+                if (relevantCallIds.length === 0) {
+                    setInterests([]);
+                    setCalls([]);
+                    setLoading(false);
+                    return;
+                }
                 interestsQuery = query(collection(db, 'emrInterests'), where('callId', 'in', relevantCallIds));
             }
-            
+
             const interestsSnapshot = await getDocs(interestsQuery);
             const interestsData = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+
+            // Step 2: From the interests, get the unique set of call IDs.
+            const uniqueCallIds = [...new Set(interestsData.map(i => i.callId))];
+
+            // Step 3: Fetch only the funding calls that are actually needed.
+            let callsData: FundingCall[] = [];
+            if (uniqueCallIds.length > 0) {
+                const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', uniqueCallIds));
+                const callsSnapshot = await getDocs(callsQuery);
+                callsData = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+            }
+            setCalls(callsData);
             
+            // Step 4: Fetch user details for all applicants
             const allUserIds = [...new Set(interestsData.map(i => i.userId))];
             const usersMap = new Map<string, User>();
             if (allUserIds.length > 0) {
@@ -154,22 +172,30 @@ export default function EmrEvaluationsPage() {
               usersSnapshot.forEach(doc => usersMap.set(doc.id, { uid: doc.id, ...doc.data()} as User));
             }
 
+            // Step 5: Combine all data
             const interestsWithDetails = await Promise.all(
-              interestsData.map(async interest => {
-                const evaluationsCol = collection(db, 'emrInterests', interest.id, 'evaluations');
-                const evaluationsSnapshot = await getDocs(evaluationsCol);
-                const evaluations = evaluationsSnapshot.docs.map(doc => doc.data() as EmrEvaluation);
-                const userDetails = usersMap.get(interest.userId) || null;
-                return { ...interest, evaluations, userDetails };
-              })
+              interestsData
+                .filter(interest => {
+                    const call = callsData.find(c => c.id === interest.callId);
+                    return call && call.meetingDetails?.assignedEvaluators;
+                })
+                .map(async interest => {
+                    const evaluationsCol = collection(db, 'emrInterests', interest.id, 'evaluations');
+                    const evaluationsSnapshot = await getDocs(evaluationsCol);
+                    const evaluations = evaluationsSnapshot.docs.map(doc => doc.data() as EmrEvaluation);
+                    const userDetails = usersMap.get(interest.userId) || null;
+                    return { ...interest, evaluations, userDetails };
+                })
             );
-
+            
             if (user.role !== 'Super-admin' && user.role !== 'admin') {
-                setInterests(interestsWithDetails.filter(interest => {
+                 setInterests(interestsWithDetails.filter(interest => {
                     const call = callsData.find(c => c.id === interest.callId);
                     return call?.meetingDetails?.assignedEvaluators?.includes(user.uid);
                 }));
-            } else { setInterests(interestsWithDetails); }
+            } else {
+                setInterests(interestsWithDetails);
+            }
 
         } catch (error) {
             console.error("Error fetching EMR evaluation data:", error);
