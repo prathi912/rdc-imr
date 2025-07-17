@@ -1705,7 +1705,7 @@ export async function createFundingCall(
 ): Promise<{ success: boolean, error?: string }> {
     try {
         const callId = adminDb.collection('fundingCalls').doc().id;
-        const attachmentUrls: { name: string, url: string }[] = [];
+        const attachments: { name: string; url: string }[] = [];
 
         if (callData.attachments && callData.attachments.length > 0) {
             for (let i = 0; i < callData.attachments.length; i++) {
@@ -1714,7 +1714,7 @@ export async function createFundingCall(
                 const path = `emr-attachments/${callId}/${file.name}`;
                 const result = await uploadFileToServer(dataUrl, path);
                 if (result.success && result.url) {
-                    attachmentUrls.push({ name: file.name, url: result.url });
+                    attachments.push({ name: file.name, url: result.url });
                 } else {
                     throw new Error(`Failed to upload attachment: ${file.name}`);
                 }
@@ -1729,7 +1729,7 @@ export async function createFundingCall(
             applyDeadline: callData.applyDeadline.toISOString(),
             interestDeadline: callData.interestDeadline.toISOString(),
             detailsUrl: callData.detailsUrl,
-            attachments: attachmentUrls,
+            attachments: attachments,
             createdAt: new Date().toISOString(),
             createdBy: 'Super-admin',
             status: 'Open',
@@ -1745,7 +1745,7 @@ export async function createFundingCall(
                 return { success: false, error: "Email could not be sent. The ALL_STAFF_EMAIL address is not configured on the server. Please add it to the .env file." };
             }
 
-            const attachmentLinks = attachmentUrls.map(att => `<li><a href="${att.url}">${att.name}</a></li>`).join('');
+            const emailAttachments = attachments.map(att => ({ filename: att.name, path: att.url }));
 
             const emailHtml = `
                 <div style="font-family: Arial, sans-serif; padding: 20px;">
@@ -1757,8 +1757,8 @@ export async function createFundingCall(
                         <div>${newCall.description || 'No description provided.'}</div>
                         <p><strong>Register Interest By:</strong> ${format(parseISO(newCall.interestDeadline), 'PPp')}</p>
                         <p><strong>Agency Deadline:</strong> ${format(parseISO(newCall.applyDeadline), 'PP')}</p>
-                        ${attachmentLinks ? `<p><strong>Attachments:</strong><ul>${attachmentLinks}</ul></p>` : ''}
                     </div>
+                    <p style="margin-top: 20px;">Please find the relevant documents attached to this email.</p>
                     <p style="margin-top: 20px;">
                         <a href="${newCall.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
                             View Full Details on the Portal
@@ -1771,7 +1771,8 @@ export async function createFundingCall(
                 to: allStaffEmail,
                 subject: `New Funding Call: ${newCall.title}`,
                 html: emailHtml,
-                from: 'rdc'
+                from: 'rdc',
+                attachments: emailAttachments
             });
         }
 
