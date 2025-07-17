@@ -446,11 +446,13 @@ function AddEditCallDialog({
   onOpenChange,
   existingCall,
   user,
+  onActionComplete,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   existingCall?: FundingCall | null;
   user: User;
+  onActionComplete: () => void;
 }) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -466,6 +468,7 @@ function AddEditCallDialog({
         ...existingCall,
         interestDeadline: parseISO(existingCall.interestDeadline),
         applyDeadline: parseISO(existingCall.applyDeadline),
+        notifyAllStaff: existingCall.isAnnounced,
       });
     } else {
       form.reset({
@@ -486,7 +489,7 @@ function AddEditCallDialog({
     setIsSubmitting(true);
     try {
         if (existingCall) {
-            // Update logic - this is a simplified version. A real app might need a separate action.
+            // Update logic
             const callRef = doc(db, 'fundingCalls', existingCall.id);
             await updateDoc(callRef, {
                 ...values,
@@ -495,13 +498,14 @@ function AddEditCallDialog({
             });
             toast({ title: 'Success', description: 'Funding call has been updated.' });
         } else {
+            // Create logic
             const result = await createFundingCall(values);
-            if (result.success) {
-                toast({ title: 'Success', description: 'Funding call has been added.' });
-            } else {
+            if (!result.success) {
                 throw new Error(result.error);
             }
+            toast({ title: 'Success', description: 'Funding call has been added.' });
         }
+        onActionComplete();
         onOpenChange(false);
     } catch (error: any) {
       console.error('Error saving funding call:', error);
@@ -516,6 +520,7 @@ function AddEditCallDialog({
     try {
         await deleteDoc(doc(db, 'fundingCalls', existingCall.id));
         toast({ title: 'Success', description: 'Funding call deleted.' });
+        onActionComplete();
         onOpenChange(false);
     } catch (error) {
         console.error('Error deleting funding call:', error);
@@ -545,26 +550,28 @@ function AddEditCallDialog({
             </div>
              <FormField name="detailsUrl" control={form.control} render={({ field }) => ( <FormItem><FormLabel>URL for Full Details</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem> )} />
              <FormField name="attachments" control={form.control} render={({ field: { onChange, value, ...rest }}) => ( <FormItem><FormLabel>Attachments (Optional)</FormLabel><FormControl><Input type="file" multiple onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem> )} />
-              <FormField
-                control={form.control}
-                name="notifyAllStaff"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                    <div className="space-y-0.5">
-                      <FormLabel>Notify All Staff</FormLabel>
-                      <FormDescription>
-                        Send an email announcement about this new call to all staff members.
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
+              {!existingCall && (
+                 <FormField
+                  control={form.control}
+                  name="notifyAllStaff"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>Notify All Staff</FormLabel>
+                        <FormDescription>
+                          Send an email announcement about this new call to all staff members.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              )}
           </form>
         </Form>
         <DialogFooter className="justify-between">
@@ -857,9 +864,11 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                         {isSuperAdmin && (
                                             <div className="flex items-center gap-2">
-                                                <Button size="sm" variant="outline" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
-                                                    <Send className="mr-2 h-4 w-4" /> Announce
-                                                </Button>
+                                                {!call.isAnnounced && (
+                                                    <Button size="sm" variant="outline" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
+                                                        <Send className="mr-2 h-4 w-4" /> Announce
+                                                    </Button>
+                                                )}
                                                 {registeredCount > 0 && call.status !== 'Meeting Scheduled' && (
                                                     <Button size="sm" onClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true);}}>
                                                         <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
@@ -886,6 +895,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                         onOpenChange={setIsAddEditDialogOpen}
                         existingCall={selectedCall}
                         user={user}
+                        onActionComplete={fetchData}
                     />
                     {selectedCall && (
                         <>

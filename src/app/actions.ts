@@ -1,4 +1,5 @@
 
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -1733,6 +1734,7 @@ export async function createFundingCall(
             createdAt: new Date().toISOString(),
             createdBy: 'Super-admin',
             status: 'Open',
+            isAnnounced: callData.notifyAllStaff,
         };
         
         await adminDb.collection('fundingCalls').doc(callId).set(newCall);
@@ -1771,7 +1773,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
         <p>A new funding call from <strong>${call.agency}</strong> has been posted on the PU Research Portal.</p>
         <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
           
-          <div>${call.description || 'No description provided.'}</div>
+          <div class="prose prose-sm">${call.description || 'No description provided.'}</div>
           <p><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>
           <p><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), 'PP')}</p>
         </div>
@@ -1791,6 +1793,9 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
       from: 'rdc',
       attachments: emailAttachments
     });
+    
+    // Mark the call as announced
+    await callRef.update({ isAnnounced: true });
 
     return { success: true };
   } catch (error: any) {
@@ -1976,4 +1981,5 @@ export async function submitToAgency(
         return { success: false, error: "Failed to log submission to agency." };
     }
 }
+
 

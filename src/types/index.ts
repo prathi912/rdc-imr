@@ -278,6 +278,7 @@ export type FundingCall = {
     venue: string;
     assignedEvaluators?: string[];
   };
+  isAnnounced?: boolean;
 };
 
 export type EmrInterest = {
