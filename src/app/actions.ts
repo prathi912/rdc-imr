@@ -1742,7 +1742,7 @@ export async function createFundingCall(
             
             if (!allStaffEmail) {
                 console.warn("ALL_STAFF_EMAIL not set, skipping announcement email.");
-                return { success: true };
+                return { success: false, error: "Email could not be sent. The ALL_STAFF_EMAIL address is not configured on the server. Please add it to the .env file." };
             }
 
             const attachmentLinks = attachmentUrls.map(att => `<li><a href="${att.url}">${att.name}</a></li>`).join('');
@@ -1799,7 +1799,6 @@ export async function updateEmrStatus(
         updateData.endorsementSignedAt = new Date().toISOString();
     }
     if (status === 'Submitted to Agency') {
-        updateData.submittedToAgency = true;
         updateData.submittedToAgencyAt = new Date().toISOString();
     }
 
@@ -1915,4 +1914,48 @@ export async function saveSidebarOrder(uid: string, order: string[]): Promise<{ 
     console.error('Error saving sidebar order:', error);
     return { success: false, error: error.message || 'Failed to save sidebar order.' };
   }
+}
+
+export async function uploadEndorsementForm(interestId: string, endorsementUrl: string): Promise<{ success: boolean, error?: string }> {
+    try {
+        if (!interestId || !endorsementUrl) {
+            return { success: false, error: "Interest ID and endorsement form URL are required." };
+        }
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        await interestRef.update({
+            endorsementFormUrl: endorsementUrl,
+            status: 'Endorsement Submitted',
+        });
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error submitting endorsement form:", error);
+        return { success: false, error: "Failed to submit endorsement form." };
+    }
+}
+
+
+export async function submitToAgency(
+  interestId: string, 
+  referenceNumber: string, 
+  acknowledgementUrl?: string
+): Promise<{ success: boolean, error?: string }> {
+    try {
+        if (!interestId || !referenceNumber) {
+            return { success: false, error: "Interest ID and reference number are required." };
+        }
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        const updateData: { [key: string]: any } = {
+            agencyReferenceNumber: referenceNumber,
+            status: 'Submitted to Agency',
+            submittedToAgencyAt: new Date().toISOString(),
+        };
+        if (acknowledgementUrl) {
+            updateData.agencyAcknowledgementUrl = acknowledgementUrl;
+        }
+        await interestRef.update(updateData);
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error submitting to agency:", error);
+        return { success: false, error: "Failed to log submission to agency." };
+    }
 }
