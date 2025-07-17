@@ -44,7 +44,7 @@ import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown, MessageSquareWarning, Pencil, CalendarClock } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown, MessageSquareWarning, Pencil, CalendarClock, Download } from 'lucide-react';
 import type { FundingCall, User, EmrInterest, EmrEvaluation } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
 import { uploadFileToServer, deleteEmrInterest, createFundingCall, findUserByMisId, uploadRevisedEmrPpt, updateEmrStatus, scheduleEmrMeeting } from '@/app/actions';
@@ -59,6 +59,7 @@ import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
 import { Label } from '../ui/label';
 import { EmrActions } from './emr-actions';
 import { Checkbox } from '../ui/checkbox';
+import * as XLSX from 'xlsx';
 
 
 interface EmrCalendarProps {
@@ -235,13 +236,13 @@ function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange
                                         <DropdownMenuSeparator />
                                         {availableEvaluators.map((evaluator) => (
                                             <DropdownMenuCheckboxItem
-                                            key={evaluator.uid}
-                                            checked={field.value?.includes(evaluator.uid)}
-                                            onCheckedChange={(checked) => {
-                                                return checked
-                                                ? field.onChange([...(field.value || []), evaluator.uid])
-                                                : field.onChange(field.value?.filter((id) => id !== evaluator.uid));
-                                            }}
+                                                key={evaluator.uid}
+                                                checked={field.value?.includes(evaluator.uid)}
+                                                onCheckedChange={(checked) => {
+                                                    return checked
+                                                    ? field.onChange([...(field.value || []), evaluator.uid])
+                                                    : field.onChange(field.value?.filter((id) => id !== evaluator.uid));
+                                                }}
                                             >
                                             {evaluator.name}
                                             </DropdownMenuCheckboxItem>
@@ -272,10 +273,11 @@ interface RegistrationsDialogProps {
     interests: EmrInterest[];
     allUsers: User[];
     onOpenChange: (open: boolean) => void;
+    onActionComplete: () => void;
     user: User;
 }
 
-function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: RegistrationsDialogProps) {
+function RegistrationsDialog({ call, interests, allUsers, onOpenChange, onActionComplete, user }: RegistrationsDialogProps) {
     const { toast } = useToast();
     const userMap = new Map(allUsers.map(u => [u.uid, u]));
     const registeredInterests = interests.filter(i => i.callId === call.id);
@@ -294,6 +296,7 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: 
             if (result.success) {
                 toast({ title: "Registration Deleted", description: "The user has been notified." });
                 setInterestToDelete(null);
+                onActionComplete();
             } else {
                 toast({ variant: 'destructive', title: "Error", description: result.error });
             }
@@ -302,6 +305,25 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: 
         }
     };
     
+    const handleExport = () => {
+        const dataToExport = registeredInterests.map(interest => {
+            const interestedUser = userMap.get(interest.userId);
+            return {
+                'PI Name': interest.userName,
+                'PI Email': interest.userEmail,
+                'PI Department': interestedUser?.department || interest.department,
+                'Co-PIs': interest.coPiNames?.join(', ') || 'None',
+                'Meeting Slot': interest.meetingSlot ? `${format(parseISO(interest.meetingSlot.date), 'MMM d')} at ${interest.meetingSlot.time}` : 'Not Scheduled',
+                'Presentation URL': interest.pptUrl || 'Not Submitted'
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Registrations');
+        XLSX.writeFile(workbook, `registrations_${call.title.replace(/\s+/g, '_')}.xlsx`);
+    };
+
     return (
         <Dialog onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
@@ -320,6 +342,7 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: 
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>PI</TableHead>
+                                    <TableHead>Email</TableHead>
                                     <TableHead>Co-PI(s)</TableHead>
                                     <TableHead>Department</TableHead>
                                     <TableHead>Meeting Slot</TableHead>
@@ -341,6 +364,7 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: 
                                                     interest.userName
                                                 )}
                                             </TableCell>
+                                            <TableCell>{interest.userEmail}</TableCell>
                                             <TableCell>{interest.coPiNames?.join(', ') || 'None'}</TableCell>
                                             <TableCell>{interestedUser?.department || interest.department}</TableCell>
                                              <TableCell>
@@ -374,7 +398,12 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: 
                         </div>
                     )}
                 </div>
-                <DialogFooter>
+                <DialogFooter className="justify-between">
+                    {user.role === 'Super-admin' && (
+                        <Button variant="outline" onClick={handleExport} disabled={registeredInterests.length === 0}>
+                            <Download className="mr-2 h-4 w-4" /> Export XLSX
+                        </Button>
+                    )}
                     <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
                 </DialogFooter>
                  <AlertDialog open={!!interestToDelete} onOpenChange={() => setInterestToDelete(null)}>
@@ -772,6 +801,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                         allUsers={allUsers} 
                                                         user={user} 
                                                         onOpenChange={setIsRegistrationsOpen}
+                                                        onActionComplete={fetchData}
                                                     />
                                                 </div>
                                             )}
