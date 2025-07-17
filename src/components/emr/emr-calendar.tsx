@@ -39,7 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -56,7 +56,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarPicker } from '../ui/calendar';
 import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
-import { Alert, AlertTitle } from '../ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Label } from '../ui/label';
 import { EmrActions } from './emr-actions';
 import { Checkbox } from '../ui/checkbox';
@@ -136,8 +136,24 @@ function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange
 
     const form = useForm<z.infer<typeof scheduleSchema>>({
         resolver: zodResolver(scheduleSchema),
-        defaultValues: { venue: 'RDC Committee Room, PIMSR', evaluatorUids: [], applicantUids: [] },
+        defaultValues: {
+            venue: 'RDC Committee Room, PIMSR',
+            evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
+            applicantUids: [],
+            date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
+            time: call.meetingDetails?.time || '',
+        },
     });
+
+    useEffect(() => {
+        form.reset({
+            venue: 'RDC Committee Room, PIMSR',
+            evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
+            applicantUids: [],
+            date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
+            time: call.meetingDetails?.time || '',
+        });
+    }, [call, form]);
 
     const handleBatchSchedule = async (values: z.infer<typeof scheduleSchema>) => {
         setIsSubmitting(true);
@@ -165,7 +181,8 @@ function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange
         }
     };
     
-    const usersWithInterest = interests.filter(i => i.callId === call.id);
+    // Show only users who are interested in THIS call and DO NOT have a meeting slot yet
+    const usersWithInterest = interests.filter(i => i.callId === call.id && !i.meetingSlot);
     const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !usersWithInterest.some(interest => interest.userId === u.uid));
 
     return (
@@ -558,9 +575,9 @@ function AddEditCallDialog({
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
                         <FormLabel>Notify All Staff</FormLabel>
-                        <FormDescription>
+                        <AlertDescription>
                           Send an email announcement about this new call to all staff members.
-                        </FormDescription>
+                        </AlertDescription>
                       </div>
                       <FormControl>
                         <Checkbox
@@ -822,6 +839,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                             const interestDetails = userInterests.find(i => i.callId === call.id);
                             const callRef = eventRefs.get(`deadline-${call.id}`);
                             const registeredCount = allInterests.filter(i => i.callId === call.id).length;
+                             const allApplicantsScheduled = registeredCount > 0 && allInterests.filter(i => i.callId === call.id).every(i => !!i.meetingSlot);
 
                             return (
                                 <div key={call.id} ref={callRef} className="border p-4 rounded-lg space-y-3">
@@ -869,7 +887,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                         <Send className="mr-2 h-4 w-4" /> Announce
                                                     </Button>
                                                 )}
-                                                {registeredCount > 0 && call.status !== 'Meeting Scheduled' && (
+                                                {registeredCount > 0 && !allApplicantsScheduled && (
                                                     <Button size="sm" onClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true);}}>
                                                         <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
                                                     </Button>
