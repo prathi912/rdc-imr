@@ -38,7 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -816,18 +816,12 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
-                                                <RegistrationsDialog 
-                                                    call={call} 
-                                                    interests={allInterests} 
-                                                    allUsers={allUsers}
-                                                    isOpen={isRegistrationsOpen && selectedCall?.id === call.id}
-                                                    onOpenChange={(open) => {
-                                                        setIsRegistrationsOpen(open);
-                                                        if (open) setSelectedCall(call); else setSelectedCall(null);
-                                                    }}
-                                                    onActionComplete={fetchData}
-                                                    user={user}
-                                                />
+                                                <Button
+                                                    variant="ghost" size="sm"
+                                                    onClick={() => { setSelectedCall(call); setIsRegistrationsOpen(true); }}
+                                                >
+                                                    <Users className="h-4 w-4 mr-1"/> View Registrations ({registeredCount})
+                                                </Button>
                                             )}
                                             {isSuperAdmin && (
                                                 <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
@@ -866,14 +860,25 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                         user={user}
                     />
                     {selectedCall && (
-                        <ScheduleMeetingDialog
+                        <>
+                         <ScheduleMeetingDialog
                             isOpen={isScheduleDialogOpen}
                             onOpenChange={setIsScheduleDialogOpen}
                             onActionComplete={fetchData}
                             call={selectedCall}
                             interests={allInterests}
                             allUsers={allUsers}
+                         />
+                         <RegistrationsDialog 
+                            call={selectedCall} 
+                            interests={allInterests} 
+                            allUsers={allUsers}
+                            isOpen={isRegistrationsOpen}
+                            onOpenChange={setIsRegistrationsOpen}
+                            onActionComplete={fetchData}
+                            user={user}
                         />
+                        </>
                     )}
                 </>
             )}
