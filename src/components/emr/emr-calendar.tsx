@@ -273,10 +273,9 @@ interface RegistrationsDialogProps {
     allUsers: User[];
     onOpenChange: (open: boolean) => void;
     user: User;
-    onScheduleClick: () => void;
 }
 
-function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user, onScheduleClick }: RegistrationsDialogProps) {
+function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user }: RegistrationsDialogProps) {
     const { toast } = useToast();
     const userMap = new Map(allUsers.map(u => [u.uid, u]));
     const registeredInterests = interests.filter(i => i.callId === call.id);
@@ -376,15 +375,7 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user, on
                     )}
                 </div>
                 <DialogFooter>
-                    <DialogClose asChild>
-                        <Button variant="outline">Close</Button>
-                    </DialogClose>
-                    {user.role === 'Super-admin' && registeredInterests.length > 0 && call.status !== 'Meeting Scheduled' && (
-                        <Button onClick={() => {onOpenChange(false); onScheduleClick();}}>
-                            <CalendarClock className="mr-2 h-4 w-4" />
-                            Schedule Meeting
-                        </Button>
-                    )}
+                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
                 </DialogFooter>
                  <AlertDialog open={!!interestToDelete} onOpenChange={() => setInterestToDelete(null)}>
                     <AlertDialogContent>
@@ -751,6 +742,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                         {upcomingCalls.length > 0 ? upcomingCalls.map(call => {
                             const interestDetails = userInterests.find(i => i.callId === call.id);
                             const callRef = eventRefs.get(`deadline-${call.id}`);
+                            const registeredCount = allInterests.filter(i => i.callId === call.id).length;
 
                             return (
                                 <div key={call.id} ref={callRef} className="border p-4 rounded-lg space-y-3">
@@ -780,7 +772,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                         allUsers={allUsers} 
                                                         user={user} 
                                                         onOpenChange={setIsRegistrationsOpen}
-                                                        onScheduleClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true)}} 
                                                     />
                                                 </div>
                                             )}
@@ -790,9 +781,16 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                      </div>
 
-                                    <div className="flex items-center gap-2 text-xs">
-                                        <ViewDescriptionDialog call={call} />
-                                        {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <ViewDescriptionDialog call={call} />
+                                            {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
+                                        </div>
+                                        {isSuperAdmin && registeredCount > 0 && call.status !== 'Meeting Scheduled' && (
+                                             <Button size="sm" onClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true);}}>
+                                                <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
+                                            </Button>
+                                        )}
                                     </div>
 
                                 </div>
