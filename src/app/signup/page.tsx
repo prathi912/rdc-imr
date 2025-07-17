@@ -32,7 +32,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
-import { linkHistoricalData } from '@/app/actions';
+import { linkHistoricalData, notifySuperAdminsOnNewUser } from '@/app/actions';
 import { Eye, EyeOff } from 'lucide-react';
 
 const signupSchema = z.object({
@@ -97,6 +97,7 @@ export default function SignupPage() {
     let role: User['role'] = 'faculty';
     let designation: User['designation'] = 'faculty';
     let profileComplete = false;
+    let notifyRole: string | null = null;
 
     if (staffResult.success) {
         userDataFromExcel = staffResult.data;
@@ -106,10 +107,12 @@ export default function SignupPage() {
             role = 'CRO';
             designation = 'CRO';
             profileComplete = true;
+            notifyRole = 'CRO';
         } else if (userType === 'Institutional') {
             role = 'faculty';
             designation = 'Principal';
             profileComplete = true;
+            notifyRole = 'Principal';
         }
     }
     
@@ -135,6 +138,10 @@ export default function SignupPage() {
     
     await setDoc(userDocRef, user);
 
+    if (notifyRole) {
+      await notifySuperAdminsOnNewUser(user.name, notifyRole);
+    }
+    
     // Back-fill pi_uid for migrated projects using a server action
     try {
       const result = await linkHistoricalData(user);

@@ -3,13 +3,13 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Book, CheckCircle, Clock, Users, XCircle, FileCheck2 } from 'lucide-react';
+import { Book, CheckCircle, Clock, Users, FileCheck2, FolderOpen, Calendar } from 'lucide-react';
 import { ProjectList } from '@/components/projects/project-list';
 import Link from 'next/link';
 import { Button } from '../ui/button';
 import { ArrowRight } from 'lucide-react';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where,getCountFromServer } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '../ui/skeleton';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
@@ -17,22 +17,20 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 
 interface DashboardStats {
-  totalProjects: number;
+  totalImrProjects: number;
+  totalEmrProjects: number;
   pendingReviews: number;
-  approvedProjects: number;
-  rejectedProjects: number;
   completedProjects: number;
   totalUsers: number;
 }
 
 export function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats>({
-    totalProjects: 0,
+    totalImrProjects: 0,
+    totalEmrProjects: 0,
     pendingReviews: 0,
-    approvedProjects: 0,
-    totalUsers: 0,
-    rejectedProjects: 0,
     completedProjects: 0,
+    totalUsers: 0,
   });
   const [recentProjects, setRecentProjects] = useState<Project[]>([]);
   const [chartData, setChartData] = useState<{ group: string, projects: number }[]>([]);
@@ -68,6 +66,7 @@ export function AdminDashboard() {
         try {
             const projectsRef = collection(db, "projects");
             const usersRef = collection(db, "users");
+            const emrInterestsRef = collection(db, "emrInterests");
             
             const isPrincipal = user.designation === 'Principal';
             const isHod = user.designation === 'HOD';
@@ -103,16 +102,18 @@ export function AdminDashboard() {
                 allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
             }
             
-            const usersSnapshot = await getDocs(usersRef);
+            const [usersSnapshot, emrSnapshot] = await Promise.all([
+              getDocs(usersRef),
+              getCountFromServer(emrInterestsRef)
+            ]);
 
-            const totalProjects = allProjects.length;
+            const totalImrProjects = allProjects.length;
+            const totalEmrProjects = emrSnapshot.data().count;
             const pendingReviews = allProjects.filter(p => p.status === 'Submitted' || p.status === 'Under Review' || p.status === 'Pending Completion Approval').length;
-            const approvedProjects = allProjects.filter(p => p.status === 'Recommended').length;
-            const rejectedProjects = allProjects.filter(p => p.status === 'Not Recommended').length;
             const completedProjects = allProjects.filter(p => p.status === 'Completed').length;
             const totalUsers = usersSnapshot.size;
 
-            setStats({ totalProjects, pendingReviews, approvedProjects, rejectedProjects, completedProjects, totalUsers });
+            setStats({ totalImrProjects, totalEmrProjects, pendingReviews, completedProjects, totalUsers });
 
             const sortedProjects = allProjects
                 .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
@@ -155,11 +156,10 @@ export function AdminDashboard() {
   };
 
   const statCards = [
-    { title: 'Total Projects', value: stats.totalProjects.toString(), icon: Book, loading: loading },
+    { title: 'Total IMR Projects', value: stats.totalImrProjects.toString(), icon: FolderOpen, loading: loading },
+    { title: 'Total EMR Projects', value: stats.totalEmrProjects.toString(), icon: Calendar, loading: loading },
     { title: 'Pending Reviews', value: stats.pendingReviews.toString(), icon: Clock, loading: loading },
-    { title: 'Recommended', value: stats.approvedProjects.toString(), icon: CheckCircle, loading: loading },
-    { title: 'Not Recommended', value: stats.rejectedProjects.toString(), icon: XCircle, loading: loading },
-    { title: 'Completed', value: stats.completedProjects.toString(), icon: FileCheck2, loading: loading },
+    { title: 'Completed Projects', value: stats.completedProjects.toString(), icon: FileCheck2, loading: loading },
     ...(isPrincipal || isHod ? [] : [{ title: 'Total Users', value: stats.totalUsers.toString(), icon: Users, loading: loading }]),
   ];
 

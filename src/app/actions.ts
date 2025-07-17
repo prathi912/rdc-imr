@@ -1858,3 +1858,32 @@ export async function uploadRevisedEmrPpt(interestId: string, pptDataUrl: string
     return { success: false, error: error.message || "Failed to upload presentation." };
   }
 }
+
+export async function notifySuperAdminsOnNewUser(userName: string, role: string) {
+  try {
+    const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
+    if (superAdminUsersSnapshot.empty) {
+      console.log("No Super-admin users found to notify.");
+      return { success: true, message: "No Super-admins to notify." };
+    }
+
+    const batch = adminDb.batch();
+    const notificationTitle = `New ${role.toUpperCase()} joined: ${userName}`;
+
+    superAdminUsersSnapshot.forEach((userDoc) => {
+      const notificationRef = adminDb.collection("notifications").doc();
+      batch.set(notificationRef, {
+        uid: userDoc.id,
+        title: notificationTitle,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      });
+    });
+
+    await batch.commit();
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error notifying Super-admins about new user:", error);
+    return { success: false, error: error.message || "Failed to notify Super-admins." };
+  }
+}
