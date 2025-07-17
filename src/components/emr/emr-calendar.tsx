@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, createRef } from 'react';
@@ -320,9 +321,9 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user, on
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Name</TableHead>
+                                    <TableHead>PI</TableHead>
+                                    <TableHead>Co-PI(s)</TableHead>
                                     <TableHead>Department</TableHead>
-                                    <TableHead>Co-PIs</TableHead>
                                     <TableHead>Meeting Slot</TableHead>
                                     <TableHead>Presentation</TableHead>
                                     {user.role === 'Super-admin' && <TableHead className="text-right">Actions</TableHead>}
@@ -342,8 +343,8 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, user, on
                                                     interest.userName
                                                 )}
                                             </TableCell>
-                                            <TableCell>{interestedUser?.department || interest.department}</TableCell>
                                             <TableCell>{interest.coPiNames?.join(', ') || 'None'}</TableCell>
+                                            <TableCell>{interestedUser?.department || interest.department}</TableCell>
                                              <TableCell>
                                                 {interest.meetingSlot ? 
                                                     `${format(parseISO(interest.meetingSlot.date), 'MMM d')} at ${interest.meetingSlot.time}`
