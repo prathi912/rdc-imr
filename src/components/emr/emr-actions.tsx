@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState } from 'react';
@@ -28,14 +29,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock } from 'lucide-react';
+import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { registerEmrInterest, withdrawEmrInterest, findUserByMisId } from '@/app/actions';
+import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm } from '@/app/actions';
 import { isAfter, parseISO } from 'date-fns';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { UploadPptDialog } from './upload-ppt-dialog';
 import { format } from 'date-fns';
+import { Badge } from '../ui/badge';
 
 
 interface EmrActionsProps {
@@ -50,6 +52,51 @@ const registerInterestSchema = z.object({
   coPis: z.array(z.object({ uid: z.string(), name: z.string() })).optional(),
 });
 
+function EndorsementUploadDialog({ interest, onUploadSuccess, isOpen, onOpenChange }: { interest: EmrInterest; onUploadSuccess: () => void; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
+    const [endorsementFile, setEndorsementFile] = useState<File | null>(null);
+    const [isUploading, setIsUploading] = useState(false);
+    const { toast } = useToast();
+
+    const handleUpload = async () => {
+        if (!endorsementFile) return;
+        setIsUploading(true);
+        try {
+            const dataUrl = `data:${endorsementFile.type};base64,${Buffer.from(await endorsementFile.arrayBuffer()).toString('base64')}`;
+            const result = await uploadEndorsementForm(interest.id, dataUrl);
+            if (result.success) {
+                toast({ title: 'Success', description: 'Endorsement form submitted.' });
+                onUploadSuccess();
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+             toast({ variant: 'destructive', title: 'Upload Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsUploading(false);
+        }
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Upload Endorsement Form</DialogTitle>
+                    <DialogDescription>Please upload the signed endorsement form in Word format (.doc, .docx).</DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Input type="file" accept=".doc,.docx" onChange={(e) => setEndorsementFile(e.target.files?.[0] || null)} />
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleUpload} disabled={isUploading || !endorsementFile}>
+                        {isUploading ? 'Uploading...' : 'Upload Form'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSuccess }: { call: FundingCall; user: User; isOpen: boolean; onOpenChange: (open: boolean) => void; onRegisterSuccess: () => void; }) {
     const { toast } = useToast();
@@ -166,6 +213,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
     const [isUploadPptOpen, setIsUploadPptOpen] = useState(false);
     const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
     const [isWithdrawConfirmationOpen, setIsWithdrawConfirmationOpen] = useState(false);
+    const [isEndorsementUploadOpen, setIsEndorsementUploadOpen] = useState(false);
     const { toast } = useToast();
 
     if (!user) return null;
@@ -190,6 +238,12 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
         if (isDashboardView) {
             return (
                 <div className="flex flex-col items-start gap-2">
+                    <div className="w-full flex justify-between items-center mb-2">
+                        <Badge variant={interestDetails.status === 'Recommended' || interestDetails.status === 'Endorsement Pending' ? 'default' : 'secondary'}>
+                            Status: {interestDetails.status}
+                        </Badge>
+                    </div>
+
                     {interestDetails.meetingSlot && (
                         <div className="w-full p-3 rounded-lg border-l-4 border-primary bg-primary/10 mb-2">
                             <div className="flex items-center gap-2 font-semibold">
@@ -217,18 +271,34 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                         </Alert>
                     ) : (
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 text-sm font-semibold">
-                                <CheckCircle className="h-4 w-4"/>
-                                <span>Interest Registered</span>
-                            </div>
-                            {call.status === 'Open' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
-                            <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
-                                {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
-                            </Button>
+                            {interestDetails.status === 'Registered' && (
+                                <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 text-sm font-semibold">
+                                    <CheckCircle className="h-4 w-4"/>
+                                    <span>Interest Registered</span>
+                                </div>
+                            )}
+
+                            {call.status === 'Open' && interestDetails.status === 'Registered' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
+                            
+                            {interestDetails.status !== 'Endorsement Pending' && (
+                                <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
+                                    {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
+                                </Button>
+                            )}
+                            
+                            {interestDetails.status === 'Endorsement Pending' && (
+                                <Button size="sm" onClick={() => setIsEndorsementUploadOpen(true)}>
+                                    <FileUp className="h-4 w-4 mr-2" />
+                                    Upload Endorsement Form
+                                </Button>
+                            )}
+
                         </div>
                     )}
                     {isUploadPptOpen && <UploadPptDialog isOpen={isUploadPptOpen} onOpenChange={setIsUploadPptOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} />}
                     {isRevisionUploadOpen && <UploadPptDialog isOpen={isRevisionUploadOpen} onOpenChange={setIsRevisionUploadOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} isRevision={true} />}
+                    {isEndorsementUploadOpen && <EndorsementUploadDialog isOpen={isEndorsementUploadOpen} onOpenChange={setIsEndorsementUploadOpen} interest={interestDetails} onUploadSuccess={onActionComplete} />}
+
                     <AlertDialog open={isWithdrawConfirmationOpen} onOpenChange={setIsWithdrawConfirmationOpen}>
                         <AlertDialogContent>
                             <AlertDialogHeader>
