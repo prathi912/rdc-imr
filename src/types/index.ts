@@ -289,18 +289,22 @@ export type EmrInterest = {
     faculty: string;
     department: string;
     registeredAt: string; // ISO String
-    submittedToAgency: boolean;
-    meetingSlot?: {
-      date: string; // yyyy-MM-dd
-      time: string; // HH:mm
-    },
     pptUrl?: string;
     pptSubmissionDate?: string; // ISO String
     coPiUids?: string[];
     coPiNames?: string[];
-    status: 'Registered' | 'Revision Submitted' | 'Recommended' | 'Not Recommended' | 'Revision Needed';
+    status: 'Registered' | 'Revision Submitted' | 'Recommended' | 'Not Recommended' | 'Revision Needed' | 'Endorsement Pending' | 'Endorsement Submitted' | 'Endorsement Signed' | 'Submitted to Agency';
     adminRemarks?: string;
     revisedPptUrl?: string;
+    meetingSlot?: {
+      date: string; // yyyy-MM-dd
+      time: string; // HH:mm
+    },
+    endorsementFormUrl?: string;
+    endorsementSignedAt?: string;
+    agencyReferenceNumber?: string;
+    agencyAcknowledgementUrl?: string;
+    submittedToAgencyAt?: string;
 };
 
 export type EmrEvaluation = {

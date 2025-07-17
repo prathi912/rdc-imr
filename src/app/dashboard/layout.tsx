@@ -24,6 +24,7 @@ import {
   Building2,
   Calendar,
   NotebookPen,
+  Send,
 } from 'lucide-react';
 
 import {
@@ -299,6 +300,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   All Projects
                 </SidebarMenuButton>
               </SidebarMenuItem>
+            )}
+            {user.allowedModules?.includes('emr-logs') && (
+                <SidebarMenuItem>
+                    <SidebarMenuButton href="/dashboard/emr-logs" tooltip="EMR Logs" isActive={pathname === '/dashboard/emr-logs'}>
+                        <Send />
+                        EMR Logs
+                    </SidebarMenuButton>
+                </SidebarMenuItem>
             )}
             {user.allowedModules?.includes('analytics') && (
               <SidebarMenuItem>
