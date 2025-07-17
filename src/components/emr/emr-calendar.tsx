@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, createRef } from 'react';
@@ -55,7 +56,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar as CalendarPicker } from '../ui/calendar';
 import { Textarea } from '../ui/textarea';
 import { Separator } from '../ui/separator';
-import { Alert, AlertTitle, AlertDescription } from '../ui/alert';
+import { Alert, AlertTitle } from '../ui/alert';
 import { Label } from '../ui/label';
 import { EmrActions } from './emr-actions';
 import { Checkbox } from '../ui/checkbox';
@@ -473,7 +474,7 @@ function AddEditCallDialog({
         description: '',
         callType: 'Grant',
         detailsUrl: '',
-        interestDeadline: undefined,
+        interestDeadline: setMinutes(setHours(new Date(), 17), 0),
         applyDeadline: undefined,
         attachments: undefined,
         notifyAllStaff: true,

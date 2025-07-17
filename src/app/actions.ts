@@ -1770,8 +1770,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
         <h2 style="color: #2c5364;">New Funding Opportunity: ${call.title}</h2>
         <p>A new funding call from <strong>${call.agency}</strong> has been posted on the PU Research Portal.</p>
         <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
-          <p><strong>Type:</strong> ${call.callType}</p>
-          <p><strong>Description:</strong></p>
+          
           <div>${call.description || 'No description provided.'}</div>
           <p><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>
           <p><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), 'PP')}</p>
