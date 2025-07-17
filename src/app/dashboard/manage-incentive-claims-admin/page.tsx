@@ -40,7 +40,7 @@ const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', '
 type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
 
-function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null }) {
     const { toast } = useToast();
     const [isPrinting, setIsPrinting] = useState(false);
 
@@ -80,7 +80,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
         }
     };
 
-    const renderDetail = (label: string, value?: string | number | boolean) => {
+    const renderDetail = (label: string, value?: string | number | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         let displayValue = String(value);
         if (typeof value === 'boolean') {
@@ -110,6 +110,8 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
         </div>
       );
     }
+
+    const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -286,10 +288,10 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Total Authors", claim.totalAuthors)}
                     
-                    {claim.bankDetails && (
+                    {canViewBankDetails && claim.bankDetails && (
                         <>
                             <hr className="my-2" />
-                            <h4 className="font-semibold text-base mt-2">Bank Account Details</h4>
+                            <h4 className="font-semibold text-base mt-2">Bank Account Details (Visible to Admins only)</h4>
                             {renderDetail("Beneficiary Name", claim.bankDetails.beneficiaryName)}
                             {renderDetail("Account Number", claim.bankDetails.accountNumber)}
                             {renderDetail("Bank Name", claim.bankDetails.bankName)}
@@ -597,7 +599,7 @@ export default function ManageIncentiveClaimsPage() {
             </Card>
         </Tabs>
       </div>
-      <ClaimDetailsDialog claim={selectedClaim} open={!!selectedClaim} onOpenChange={() => setSelectedClaim(null)} />
+      <ClaimDetailsDialog claim={selectedClaim} open={!!selectedClaim} onOpenChange={() => setSelectedClaim(null)} currentUser={currentUser}/>
     </div>
   );
 }

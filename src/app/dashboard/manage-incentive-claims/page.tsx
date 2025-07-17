@@ -40,7 +40,7 @@ const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', '
 type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
 
-function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void }) {
+function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null }) {
     const { toast } = useToast();
     const [isPrinting, setIsPrinting] = useState(false);
 
@@ -80,7 +80,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
         }
     };
 
-    const renderDetail = (label: string, value?: string | number | boolean) => {
+    const renderDetail = (label: string, value?: string | number | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         let displayValue = String(value);
         if (typeof value === 'boolean') {
@@ -110,6 +110,8 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
         </div>
       );
     }
+
+    const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -286,10 +288,10 @@ function ClaimDetailsDialog({ claim, open, onOpenChange }: { claim: IncentiveCla
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Total Authors", claim.totalAuthors)}
                     
-                    {claim.bankDetails && (
+                    {canViewBankDetails && claim.bankDetails && (
                         <>
                             <hr className="my-2" />
-                            <h4 className="font-semibold text-base mt-2">Bank Account Details</h4>
+                            <h4 className="font-semibold text-base mt-2">Bank Account Details (Visible to Admins only)</h4>
                             {renderDetail("Beneficiary Name", claim.bankDetails.beneficiaryName)}
                             {renderDetail("Account Number", claim.bankDetails.accountNumber)}
                             {renderDetail("Bank Name", claim.bankDetails.bankName)}
@@ -328,7 +330,7 @@ export default function ManageIncentiveClaimsPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser) as User;
-      if (parsedUser.role !== 'Super-admin' && parsedUser.role !== 'CRO') {
+      if (parsedUser.role !== 'Super-admin' && parsedUser.role !== 'admin' && parsedUser.role !== 'CRO') {
         toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
         router.replace('/dashboard');
         return;
@@ -351,10 +353,10 @@ export default function ManageIncentiveClaimsPage() {
 
       const claimsCollection = collection(db, 'incentiveClaims');
       let q;
-      if (currentUser.role === 'Super-admin') {
+      if (currentUser.role === 'Super-admin' || currentUser.role === 'admin') {
           q = query(claimsCollection, orderBy('submissionDate', 'desc'));
       } else if (currentUser.role === 'CRO') {
-          q = query(claimsCollection, where('faculty', '==', currentUser.faculty), orderBy('submissionDate', 'desc'));
+          q = query(claimsCollection, where('faculty', 'in', currentUser.faculties || []), orderBy('submissionDate', 'desc'));
       } else {
           setAllClaims([]);
           setLoading(false);
@@ -538,11 +540,11 @@ export default function ManageIncentiveClaimsPage() {
   );
 
   const pageTitle = currentUser?.role === 'CRO' 
-    ? `Incentive Claims from ${currentUser.faculty}`
+    ? `Incentive Claims from Your Faculties`
     : "Manage Incentive Claims";
 
   const pageDescription = currentUser?.role === 'CRO' 
-    ? `Review claims submitted from your faculty.` 
+    ? `Review claims submitted from your assigned faculties.` 
     : "Review and manage all submitted incentive claims.";
 
   return (
@@ -597,7 +599,7 @@ export default function ManageIncentiveClaimsPage() {
             </Card>
         </Tabs>
       </div>
-      <ClaimDetailsDialog claim={selectedClaim} open={!!selectedClaim} onOpenChange={() => setSelectedClaim(null)} />
+      <ClaimDetailsDialog claim={selectedClaim} open={!!selectedClaim} onOpenChange={() => setSelectedClaim(null)} currentUser={currentUser} />
     </div>
   );
 }
