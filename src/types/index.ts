@@ -30,6 +30,7 @@ export type User = {
   allowedModules?: string[];
   bankDetails?: UserBankDetails;
   hasCompletedTutorial?: boolean;
+  sidebarOrder?: string[];
 };
 
 export type BankDetails = {

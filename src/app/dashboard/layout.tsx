@@ -2,8 +2,25 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
 import {
   Award,
   Bell,
@@ -25,6 +42,8 @@ import {
   Calendar,
   NotebookPen,
   Send,
+  GripVertical,
+  Save,
 } from 'lucide-react';
 
 import {
@@ -43,19 +62,97 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Logo } from '@/components/logo';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { auth, db } from '@/lib/config';
 import { signOut, onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
 import { getDefaultModulesForRole } from '@/lib/modules';
+import { saveSidebarOrder } from '@/app/actions';
+
+interface NavItem {
+  id: string;
+  href: string;
+  tooltip: string;
+  icon: React.ElementType;
+  label: string;
+  badge?: number;
+  condition?: boolean;
+}
+
+const SortableSidebarMenuItem = ({ item }: { item: NavItem }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const pathname = usePathname();
+  const isActive = item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href);
+
+  return (
+    <SidebarMenuItem ref={setNodeRef} style={style} {...attributes}>
+      <SidebarMenuButton href={item.href} tooltip={item.tooltip} isActive={isActive}>
+        <div {...listeners} className="cursor-grab p-1 -ml-1">
+          <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+        </div>
+        <item.icon />
+        <span>{item.label}</span>
+        {item.badge !== undefined && item.badge > 0 && (
+          <span className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-medium text-destructive-foreground">
+            {item.badge}
+          </span>
+        )}
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+};
+
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [menuItems, setMenuItems] = useState<NavItem[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
+
+  const isRearrangeEnabled = user?.role === 'Super-admin' || user?.role === 'admin' || user?.role === 'CRO';
+  
+  const allNavItems = useMemo((): NavItem[] => [
+    { id: 'dashboard', href: '/dashboard', tooltip: 'Dashboard', icon: Home, label: 'Dashboard', condition: true },
+    { id: 'new-submission', href: '/dashboard/new-submission', tooltip: 'New Submission', icon: FilePlus2, label: 'New Submission' },
+    { id: 'my-projects', href: '/dashboard/my-projects', tooltip: 'My Projects', icon: Book, label: 'My Projects' },
+    { id: 'emr-calendar', href: '/dashboard/emr-calendar', tooltip: 'EMR Calendar', icon: Calendar, label: 'EMR Calendar' },
+    { id: 'incentive-claim', href: '/dashboard/incentive-claim', tooltip: 'Incentive Claims', icon: Award, label: 'Incentive Claims' },
+    { id: 'evaluator-dashboard', href: '/dashboard/evaluator-dashboard', tooltip: 'Evaluation Queue', icon: ClipboardCheck, label: 'IMR Evaluation Queue' },
+    { id: 'emr-evaluations', href: '/dashboard/emr-evaluations', tooltip: 'EMR Evaluations', icon: NotebookPen, label: 'EMR Evaluations' },
+    { id: 'my-evaluations', href: '/dashboard/my-evaluations', tooltip: 'My Evaluations', icon: History, label: 'My IMR Evaluations' },
+    { id: 'schedule-meeting', href: '/dashboard/schedule-meeting', tooltip: 'Schedule Meeting', icon: CalendarClock, label: 'Schedule Meeting' },
+    { id: 'pending-reviews', href: '/dashboard/pending-reviews', tooltip: 'Pending Reviews', icon: GanttChartSquare, label: 'Pending Reviews' },
+    { id: 'completed-reviews', href: '/dashboard/completed-reviews', tooltip: 'Completed Reviews', icon: FileCheck2, label: 'Completed Reviews' },
+    { id: 'all-projects', href: '/dashboard/all-projects', tooltip: 'All Projects', icon: Book, label: 'All Projects' },
+    { id: 'emr-logs', href: '/dashboard/emr-logs', tooltip: 'EMR Logs', icon: Send, label: 'EMR Logs' },
+    { id: 'analytics', href: '/dashboard/analytics', tooltip: 'Analytics', icon: LineChart, label: 'Analytics' },
+    { id: 'manage-users', href: '/dashboard/manage-users', tooltip: 'Manage Users', icon: Users, label: 'Manage Users' },
+    { id: 'manage-institutes', href: '/dashboard/manage-institutes', tooltip: 'Manage Institutes', icon: Building2, label: 'Manage Institutes' },
+    { id: 'manage-incentive-claims', href: '/dashboard/manage-incentive-claims', tooltip: 'Manage Incentive Claims', icon: Award, label: 'Manage Claims' },
+    { id: 'bulk-upload', href: '/dashboard/bulk-upload', tooltip: 'Bulk Upload', icon: Upload, label: 'Bulk Upload' },
+    { id: 'module-management', href: '/dashboard/module-management', tooltip: 'Module Management', icon: ShieldCheck, label: 'Module Management' },
+    { id: 'system-health', href: '/dashboard/system-health', tooltip: 'System Health', icon: Server, label: 'System Health' },
+    { id: 'notifications', href: '/dashboard/notifications', tooltip: 'Notifications', icon: Bell, label: 'Notifications', badge: unreadCount, condition: true },
+    { id: 'settings', href: '/dashboard/settings', tooltip: 'Settings', icon: Settings, label: 'Settings', condition: true },
+  ], [unreadCount]);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined;
@@ -118,6 +215,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (user) {
+        const filtered = allNavItems.filter(item => item.condition || user.allowedModules?.includes(item.id));
+        const sorted = user.sidebarOrder 
+            ? filtered.sort((a, b) => user.sidebarOrder!.indexOf(a.id) - user.sidebarOrder!.indexOf(b.id))
+            : filtered;
+        
+        setMenuItems(sorted);
+    }
+  }, [user, allNavItems]);
+
+
+  useEffect(() => {
+    if (user) {
       const q = query(
         collection(db, 'notifications'),
         where('uid', '==', user.uid)
@@ -168,6 +277,40 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (lastSegment === 'dashboard') return 'Dashboard';
       return lastSegment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setMenuItems((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+      setIsDirty(true);
+    }
+  }
+
+  const handleSaveOrder = async () => {
+    if (!user) return;
+    setIsSaving(true);
+    const newOrder = menuItems.map(item => item.id);
+    const result = await saveSidebarOrder(user.uid, newOrder);
+    if (result.success) {
+      toast({ title: "Success", description: "Your sidebar layout has been saved." });
+      setIsDirty(false);
+    } else {
+      toast({ variant: 'destructive', title: "Error", description: result.error });
+    }
+    setIsSaving(false);
+  };
 
   if (loading || !user) {
     return (
@@ -206,184 +349,38 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Logo />
         </SidebarHeader>
         <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard" tooltip="Dashboard" isActive={pathname === '/dashboard'}>
-                <Home />
-                Dashboard
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-             {user.allowedModules?.includes('new-submission') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/new-submission" tooltip="New Submission" isActive={pathname === '/dashboard/new-submission'}>
-                  <FilePlus2 />
-                  New Submission
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-             )}
-            {user.allowedModules?.includes('my-projects') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/my-projects" tooltip="My Projects" isActive={pathname === '/dashboard/my-projects'}>
-                  <Book />
-                  My Projects
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-             {user.allowedModules?.includes('emr-calendar') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/emr-calendar" tooltip="EMR Calendar" isActive={pathname === '/dashboard/emr-calendar'}>
-                  <Calendar />
-                  EMR Calendar
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-             )}
-            {user.allowedModules?.includes('incentive-claim') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/incentive-claim" tooltip="Incentive Claims" isActive={pathname.startsWith('/dashboard/incentive-claim')}>
-                  <Award />
-                  Incentive Claims
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('evaluator-dashboard') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/evaluator-dashboard" tooltip="Evaluation Queue" isActive={pathname === '/dashboard/evaluator-dashboard'}>
-                  <ClipboardCheck />
-                  IMR Evaluation Queue
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('emr-evaluations') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/emr-evaluations" tooltip="EMR Evaluations" isActive={pathname === '/dashboard/emr-evaluations'}>
-                  <NotebookPen />
-                  EMR Evaluations
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('my-evaluations') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/my-evaluations" tooltip="My Evaluations" isActive={pathname === '/dashboard/my-evaluations'}>
-                  <History />
-                  My IMR Evaluations
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('schedule-meeting') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/schedule-meeting" tooltip="Schedule Meeting" isActive={pathname === '/dashboard/schedule-meeting'}>
-                  <CalendarClock />
-                  Schedule Meeting
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('pending-reviews') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/pending-reviews" tooltip="Pending Reviews" isActive={pathname === '/dashboard/pending-reviews'}>
-                  <GanttChartSquare />
-                  Pending Reviews
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('completed-reviews') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/completed-reviews" tooltip="Completed Reviews" isActive={pathname === '/dashboard/completed-reviews'}>
-                  <FileCheck2 />
-                  Completed Reviews
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('all-projects') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/all-projects" tooltip="All Projects" isActive={pathname === '/dashboard/all-projects'}>
-                  <Book />
-                  All Projects
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('emr-logs') && (
-                <SidebarMenuItem>
-                    <SidebarMenuButton href="/dashboard/emr-logs" tooltip="EMR Logs" isActive={pathname === '/dashboard/emr-logs'}>
-                        <Send />
-                        EMR Logs
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('analytics') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/analytics" tooltip="Analytics" isActive={pathname === '/dashboard/analytics'}>
-                  <LineChart />
-                  Analytics
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('manage-users') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/manage-users" tooltip="Manage Users" isActive={pathname === '/dashboard/manage-users'}>
-                  <Users />
-                  Manage Users
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-             {user.allowedModules?.includes('manage-institutes') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/manage-institutes" tooltip="Manage Institutes" isActive={pathname === '/dashboard/manage-institutes'}>
-                  <Building2 />
-                  Manage Institutes
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('manage-incentive-claims') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/manage-incentive-claims" tooltip="Manage Incentive Claims" isActive={pathname.startsWith('/dashboard/manage-incentive-claims')}>
-                  <Award />
-                  Manage Claims
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('bulk-upload') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/bulk-upload" tooltip="Bulk Upload" isActive={pathname === '/dashboard/bulk-upload'}>
-                  <Upload />
-                  Bulk Upload
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('module-management') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/module-management" tooltip="Module Management" isActive={pathname === '/dashboard/module-management'}>
-                  <ShieldCheck />
-                  Module Management
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            {user.allowedModules?.includes('system-health') && (
-              <SidebarMenuItem>
-                <SidebarMenuButton href="/dashboard/system-health" tooltip="System Health" isActive={pathname === '/dashboard/system-health'}>
-                  <Server />
-                  System Health
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            )}
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/notifications" tooltip="Notifications" isActive={pathname === '/dashboard/notifications'}>
-                <Bell />
-                <span>Notifications</span>
-                {unreadCount > 0 && (
-                  <span className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-medium text-destructive-foreground">
-                    {unreadCount}
-                  </span>
-                )}
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/settings" tooltip="Settings" isActive={pathname === '/dashboard/settings'}>
-                <Settings />
-                Settings
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
+           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={menuItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
+              <SidebarMenu>
+                {menuItems.map((item) => (
+                  isRearrangeEnabled ? (
+                    <SortableSidebarMenuItem key={item.id} item={item} />
+                  ) : (
+                    <SidebarMenuItem key={item.id}>
+                      <SidebarMenuButton href={item.href} tooltip={item.tooltip} isActive={item.href === '/dashboard' ? pathname === item.href : pathname.startsWith(item.href)}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                         {item.badge !== undefined && item.badge > 0 && (
+                          <span className="ml-auto inline-flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-medium text-destructive-foreground">
+                            {item.badge}
+                          </span>
+                        )}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )
+                ))}
+              </SidebarMenu>
+            </SortableContext>
+          </DndContext>
         </SidebarContent>
+        {isRearrangeEnabled && isDirty && (
+          <SidebarHeader>
+            <Button onClick={handleSaveOrder} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save Order
+            </Button>
+          </SidebarHeader>
+        )}
       </Sidebar>
       <SidebarInset>
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-background/90 px-4 backdrop-blur-md sm:px-6">

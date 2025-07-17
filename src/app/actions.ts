@@ -6,7 +6,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, doc, updateDoc } from 'firebase-admin/firestore';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
@@ -1786,45 +1786,59 @@ export async function updateEmrStatus(
     status: EmrInterest['status'],
     adminRemarks?: string,
 ): Promise<{ success: boolean, error?: string }> {
-    try {
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const updateData: Partial<EmrInterest> = { status };
-        if (adminRemarks) {
-            updateData.adminRemarks = adminRemarks;
-        }
-        await interestRef.update(updateData);
+  try {
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const updateData: { [key: string]: any } = { status }
 
-        // Notify user
-        const interestSnap = await interestRef.get();
-        if (interestSnap.exists) {
-            const interest = interestSnap.data() as EmrInterest;
-            const notification = {
-                uid: interest.userId,
-                title: `Your EMR application status has been updated to: ${status}`,
-                createdAt: new Date().toISOString(),
-                isRead: false,
-            };
-            await adminDb.collection("notifications").add(notification);
-            
-            if (interest.userEmail) {
-                 await sendEmail({
-                    to: interest.userEmail,
-                    subject: `Update on your EMR Application`,
-                    html: `
-                        <p>Dear ${interest.userName},</p>
-                        <p>The status of your EMR application has been updated to <strong>${status}</strong>.</p>
-                        ${adminRemarks ? `<p><strong>Admin Remarks:</strong> ${adminRemarks}</p>` : ''}
-                        <p>Please check the portal for more details.</p>
-                    `,
-                    from: 'default'
-                });
-            }
-        }
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error updating EMR status:", error);
-        return { success: false, error: error.message || 'Failed to update status.' };
+    if (adminRemarks) {
+      updateData.adminRemarks = adminRemarks
     }
+    
+    if (status === 'Endorsement Signed') {
+        updateData.endorsementSignedAt = new Date().toISOString();
+    }
+    if (status === 'Submitted to Agency') {
+        updateData.submittedToAgency = true;
+        updateData.submittedToAgencyAt = new Date().toISOString();
+    }
+
+
+    await interestRef.update(updateData)
+
+    // Notify user
+    const interestSnap = await interestRef.get()
+    if (interestSnap.exists) {
+      const interest = interestSnap.data() as EmrInterest
+      const notification = {
+        uid: interest.userId,
+        title: `Your EMR application status has been updated to: ${status}`,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      }
+      await adminDb.collection("notifications").add(notification)
+
+      if (interest.userEmail) {
+        let emailHtml = `<p>Dear ${interest.userName},</p><p>The status of your EMR application has been updated to <strong>${status}</strong>.</p>${adminRemarks ? `<p><strong>Admin Remarks:</strong> ${adminRemarks}</p>` : ""}`
+        
+        if (status === 'Endorsement Signed') {
+            emailHtml += `<p>Your endorsement letter has been signed and is ready for collection from the RDC office.</p>`
+        }
+        
+        emailHtml += `<p>Please check the portal for more details.</p>`
+
+        await sendEmail({
+          to: interest.userEmail,
+          subject: `Update on your EMR Application`,
+          html: emailHtml,
+          from: "default",
+        })
+      }
+    }
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error updating EMR status:", error)
+    return { success: false, error: error.message || "Failed to update status." }
+  }
 }
 
 
@@ -1885,5 +1899,19 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
   } catch (error: any) {
     console.error("Error notifying Super-admins about new user:", error);
     return { success: false, error: error.message || "Failed to notify Super-admins." };
+  }
+}
+
+export async function saveSidebarOrder(uid: string, order: string[]): Promise<{ success: boolean, error?: string }> {
+  try {
+    if (!uid || !Array.isArray(order)) {
+      return { success: false, error: 'Invalid user ID or order provided.' };
+    }
+    const userRef = adminDb.collection('users').doc(uid);
+    await userRef.update({ sidebarOrder: order });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error saving sidebar order:', error);
+    return { success: false, error: error.message || 'Failed to save sidebar order.' };
   }
 }
