@@ -94,7 +94,7 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         }
     };
 
-    const deadline = subDays(parseISO(call.meetingDetails?.date || new Date()), 3);
+    const deadline = subDays(parseISO(call.meetingDetails?.date || new Date().toISOString()), 3);
     const deadlineWithTime = setSeconds(setMinutes(setHours(deadline, 17), 0), 0);
     const isDeadlinePast = isAfter(new Date(), deadlineWithTime);
 
