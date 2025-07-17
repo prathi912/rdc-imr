@@ -1,5 +1,6 @@
 
 
+
 'use client';
 
 import { useState, useEffect, useCallback, createRef } from 'react';
@@ -751,7 +752,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                         <h4 className="font-semibold">All Upcoming Deadlines</h4>
                         {upcomingCalls.length > 0 ? upcomingCalls.map(call => {
                             const interestDetails = userInterests.find(i => i.callId === call.id);
-                            const hasInterest = allInterests.some(i => i.callId === call.id);
                             const callRef = eventRefs.get(`deadline-${call.id}`);
 
                             return (
@@ -768,17 +768,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                          <EmrActions user={user} call={call} interestDetails={interestDetails} onActionComplete={fetchData} />
                                     </div>
                                     
-                                    {interestDetails && call.meetingDetails?.date && (
-                                        <div ref={eventRefs.get(`meeting-${call.id}`)} className="text-sm p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-md">
-                                            <p className="font-semibold text-blue-800 dark:text-blue-200 flex items-center gap-2"><Video className="h-4 w-4"/>Your Presentation Slot</p>
-                                            <p><strong>Date:</strong> {format(parseISO(call.meetingDetails.date), 'PP')}</p>
-                                            {interestDetails?.meetingSlot?.time ? (
-                                                <p><strong>Time:</strong> {interestDetails.meetingSlot.time}</p>
-                                            ) : <p>Your time slot is pending.</p>}
-                                            <p><strong>Venue:</strong> {call.meetingDetails.venue}</p>
-                                        </div>
-                                    )}
-
                                     <div className="flex items-center justify-between pt-3 border-t">
                                         <div className="text-xs text-muted-foreground space-y-1">
                                             <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
