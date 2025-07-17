@@ -575,9 +575,9 @@ function AddEditCallDialog({
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                       <div className="space-y-0.5">
                         <FormLabel>Notify All Staff</FormLabel>
-                        <AlertDescription>
+                        <FormDescription>
                           Send an email announcement about this new call to all staff members.
-                        </AlertDescription>
+                        </FormDescription>
                       </div>
                       <FormControl>
                         <Checkbox
@@ -786,175 +786,202 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const upcomingCalls = calls.filter(c => !isAfter(new Date(), parseISO(c.applyDeadline)));
 
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-                    <h3 className="text-xl font-semibold text-center w-48">{format(currentMonth, 'MMMM yyyy')}</h3>
-                    <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight className="h-4 w-4" /></Button>
-                </div>
-                {isSuperAdmin && (
-                    <div className="flex items-center gap-2">
-                         <Button onClick={() => { setSelectedCall(null); setIsAddEditDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Add New Call</Button>
-                    </div>
-                )}
-            </CardHeader>
-            <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div>
-                        <div className="grid grid-cols-7 border-t border-l">
-                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                <div key={day} className="text-center font-semibold p-2 border-b border-r text-sm text-muted-foreground">{day}</div>
-                            ))}
-                            {Array.from({ length: startingDayIndex }).map((_, i) => (
-                                <div key={`empty-${i}`} className="border-b border-r min-h-[6rem]"></div>
-                            ))}
-                            {daysInMonth.map(day => {
-                                const dateStr = format(day, 'yyyy-MM-dd');
-                                const eventsOnDay = eventsByDate[dateStr] || [];
-                                const hasDeadline = eventsOnDay.some(e => e.type === 'deadline');
-                                const hasMeeting = eventsOnDay.some(e => e.type === 'meeting');
-                                const hasAgencyDeadline = eventsOnDay.some(e => e.type === 'agencyDeadline');
+        <div className="space-y-8">
+            {userInterests.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>My EMR Applications</CardTitle>
+                        <CardDescription>A summary of your registered interests in external funding calls.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {userInterests.map(interest => {
+                                const call = calls.find(c => c.id === interest.callId);
+                                if (!call) return null;
                                 return (
-                                    <div 
-                                        key={dateStr} 
-                                        className={cn("min-h-[6rem] border-b border-r p-2 flex flex-col hover:bg-muted/50 transition-colors", eventsOnDay.length > 0 ? "cursor-pointer" : "cursor-default")}
-                                        onClick={() => eventsOnDay.length > 0 && handleDateClick(dateStr)}
-                                    >
-                                        <span className="font-semibold">{format(day, 'd')}</span>
-                                        <div className="flex-grow flex items-end justify-start gap-1 mt-1">
-                                            {hasDeadline && <div className="h-2 w-2 rounded-full bg-green-500" title="Interest Registration Deadline"></div>}
-                                            {hasMeeting && <div className="h-2 w-2 rounded-full bg-blue-500" title="Meeting Scheduled"></div>}
-                                            {hasAgencyDeadline && <div className="h-2 w-2 rounded-full bg-red-500" title="Agency Application Deadline"></div>}
+                                    <div key={interest.id} className="p-3 border rounded-lg bg-background">
+                                        <p className="font-semibold">{interest.callTitle || call.title}</p>
+                                        <p className="text-sm text-muted-foreground">Registered on: {new Date(interest.registeredAt).toLocaleDateString()}</p>
+                                        <div className="mt-2">
+                                           <EmrActions user={user} call={call} interestDetails={interest} onActionComplete={fetchData} isDashboardView={true} />
                                         </div>
                                     </div>
                                 )
                             })}
                         </div>
-                    </div>
-                    
-                    <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                        <h4 className="font-semibold">All Upcoming Deadlines</h4>
-                        {upcomingCalls.length > 0 ? upcomingCalls.map(call => {
-                            const interestDetails = userInterests.find(i => i.callId === call.id);
-                            const callRef = eventRefs.get(`deadline-${call.id}`);
-                            const registeredCount = allInterests.filter(i => i.callId === call.id).length;
-                             const allApplicantsScheduled = registeredCount > 0 && allInterests.filter(i => i.callId === call.id).every(i => !!i.meetingSlot);
-
-                            return (
-                                <div key={call.id} ref={callRef} className="border p-4 rounded-lg space-y-3">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1">
-                                            <h4 className="font-semibold text-base">{call.title}</h4>
-                                            <p className="text-sm text-muted-foreground">Agency: {call.agency}</p>
-                                            <div className="flex items-center gap-2 mt-2">
-                                                <Badge variant="secondary">{call.callType}</Badge>
-                                                {getStatusBadge(call)}
-                                            </div>
-                                        </div>
-                                         <EmrActions user={user} call={call} interestDetails={interestDetails} onActionComplete={fetchData} />
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between pt-3 border-t">
-                                        <div className="text-xs text-muted-foreground space-y-1">
-                                            <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
-                                            <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {isAdmin && (
-                                                <Button
-                                                    variant="ghost" size="sm"
-                                                    onClick={() => { setSelectedCall(call); setIsRegistrationsOpen(true); }}
-                                                >
-                                                    <Users className="h-4 w-4 mr-1"/> View Registrations ({registeredCount})
-                                                </Button>
-                                            )}
-                                            {isSuperAdmin && (
-                                                <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
-                                            )}
-                                        </div>
-                                     </div>
-
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-xs">
-                                            <ViewDescriptionDialog call={call} />
-                                            {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
-                                        </div>
-                                        {isSuperAdmin && (
-                                            <div className="flex items-center gap-2">
-                                                {!call.isAnnounced && (
-                                                    <Button size="sm" variant="outline" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
-                                                        <Send className="mr-2 h-4 w-4" /> Announce
-                                                    </Button>
-                                                )}
-                                                {registeredCount > 0 && !allApplicantsScheduled && (
-                                                    <Button size="sm" onClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true);}}>
-                                                        <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                </div>
-                            )
-                        }) : (
-                             <div className="text-center py-10 text-muted-foreground">
-                                No upcoming deadlines.
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </CardContent>
-            {isSuperAdmin && (
-                <>
-                    <AddEditCallDialog
-                        isOpen={isAddEditDialogOpen}
-                        onOpenChange={setIsAddEditDialogOpen}
-                        existingCall={selectedCall}
-                        user={user}
-                        onActionComplete={fetchData}
-                    />
-                    {selectedCall && (
-                        <>
-                         <ScheduleMeetingDialog
-                            isOpen={isScheduleDialogOpen}
-                            onOpenChange={setIsScheduleDialogOpen}
-                            onActionComplete={fetchData}
-                            call={selectedCall}
-                            interests={allInterests}
-                            allUsers={allUsers}
-                         />
-                         <RegistrationsDialog 
-                            call={selectedCall} 
-                            interests={allInterests} 
-                            allUsers={allUsers}
-                            isOpen={isRegistrationsOpen}
-                            onOpenChange={setIsRegistrationsOpen}
-                            onActionComplete={fetchData}
-                            user={user}
-                        />
-                         <AlertDialog open={isAnnounceDialogOpen} onOpenChange={setIsAnnounceDialogOpen}>
-                           <AlertDialogContent>
-                             <AlertDialogHeader>
-                               <AlertDialogTitle>Announce Funding Call?</AlertDialogTitle>
-                               <AlertDialogDescription>
-                                 This will send an email notification to all staff members about the call for "{selectedCall.title}". This action cannot be undone. Are you sure?
-                               </AlertDialogDescription>
-                             </AlertDialogHeader>
-                             <AlertDialogFooter>
-                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                               <AlertDialogAction onClick={handleAnnounceCall} disabled={isAnnouncing}>
-                                 {isAnnouncing && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                                 Confirm & Announce
-                               </AlertDialogAction>
-                             </AlertDialogFooter>
-                           </AlertDialogContent>
-                         </AlertDialog>
-                        </>
-                    )}
-                </>
+                    </CardContent>
+                </Card>
             )}
-        </Card>
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}><ChevronLeft className="h-4 w-4" /></Button>
+                        <h3 className="text-xl font-semibold text-center w-48">{format(currentMonth, 'MMMM yyyy')}</h3>
+                        <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}><ChevronRight className="h-4 w-4" /></Button>
+                    </div>
+                    {isSuperAdmin && (
+                        <div className="flex items-center gap-2">
+                             <Button onClick={() => { setSelectedCall(null); setIsAddEditDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" /> Add New Call</Button>
+                        </div>
+                    )}
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div>
+                            <div className="grid grid-cols-7 border-t border-l">
+                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                    <div key={day} className="text-center font-semibold p-2 border-b border-r text-sm text-muted-foreground">{day}</div>
+                                ))}
+                                {Array.from({ length: startingDayIndex }).map((_, i) => (
+                                    <div key={`empty-${i}`} className="border-b border-r min-h-[6rem]"></div>
+                                ))}
+                                {daysInMonth.map(day => {
+                                    const dateStr = format(day, 'yyyy-MM-dd');
+                                    const eventsOnDay = eventsByDate[dateStr] || [];
+                                    const hasDeadline = eventsOnDay.some(e => e.type === 'deadline');
+                                    const hasMeeting = eventsOnDay.some(e => e.type === 'meeting');
+                                    const hasAgencyDeadline = eventsOnDay.some(e => e.type === 'agencyDeadline');
+                                    return (
+                                        <div 
+                                            key={dateStr} 
+                                            className={cn("min-h-[6rem] border-b border-r p-2 flex flex-col hover:bg-muted/50 transition-colors", eventsOnDay.length > 0 ? "cursor-pointer" : "cursor-default")}
+                                            onClick={() => eventsOnDay.length > 0 && handleDateClick(dateStr)}
+                                        >
+                                            <span className="font-semibold">{format(day, 'd')}</span>
+                                            <div className="flex-grow flex items-end justify-start gap-1 mt-1">
+                                                {hasDeadline && <div className="h-2 w-2 rounded-full bg-green-500" title="Interest Registration Deadline"></div>}
+                                                {hasMeeting && <div className="h-2 w-2 rounded-full bg-blue-500" title="Meeting Scheduled"></div>}
+                                                {hasAgencyDeadline && <div className="h-2 w-2 rounded-full bg-red-500" title="Agency Application Deadline"></div>}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                            <h4 className="font-semibold">All Upcoming Deadlines</h4>
+                            {upcomingCalls.length > 0 ? upcomingCalls.map(call => {
+                                const interestDetails = userInterests.find(i => i.callId === call.id);
+                                const callRef = eventRefs.get(`deadline-${call.id}`);
+                                const registeredCount = allInterests.filter(i => i.callId === call.id).length;
+                                const allApplicantsScheduled = registeredCount > 0 && allInterests.filter(i => i.callId === call.id && !!i.meetingSlot).length === registeredCount;
+
+                                return (
+                                    <div key={call.id} ref={callRef} className="border p-4 rounded-lg space-y-3">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                <h4 className="font-semibold text-base">{call.title}</h4>
+                                                <p className="text-sm text-muted-foreground">Agency: {call.agency}</p>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <Badge variant="secondary">{call.callType}</Badge>
+                                                    {getStatusBadge(call)}
+                                                </div>
+                                            </div>
+                                             <EmrActions user={user} call={call} interestDetails={interestDetails} onActionComplete={fetchData} />
+                                        </div>
+                                        
+                                        <div className="flex items-center justify-between pt-3 border-t">
+                                            <div className="text-xs text-muted-foreground space-y-1">
+                                                <p>Interest Deadline: <span className="font-medium text-foreground">{format(parseISO(call.interestDeadline), 'PPp')}</span></p>
+                                                <p>Application Deadline: <span className="font-medium text-foreground">{format(parseISO(call.applyDeadline), 'PP')}</span></p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {isAdmin && (
+                                                    <Button
+                                                        variant="ghost" size="sm"
+                                                        onClick={() => { setSelectedCall(call); setIsRegistrationsOpen(true); }}
+                                                    >
+                                                        <Users className="h-4 w-4 mr-1"/> View Registrations ({registeredCount})
+                                                    </Button>
+                                                )}
+                                                {isSuperAdmin && (
+                                                    <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
+                                                )}
+                                            </div>
+                                         </div>
+
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <ViewDescriptionDialog call={call} />
+                                                {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
+                                            </div>
+                                            {isSuperAdmin && (
+                                                <div className="flex items-center gap-2">
+                                                    {!call.isAnnounced && (
+                                                        <Button size="sm" variant="outline" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
+                                                            <Send className="mr-2 h-4 w-4" /> Announce
+                                                        </Button>
+                                                    )}
+                                                    {registeredCount > 0 && !allApplicantsScheduled && (
+                                                        <Button size="sm" onClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true);}}>
+                                                            <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                    </div>
+                                )
+                            }) : (
+                                 <div className="text-center py-10 text-muted-foreground">
+                                    No upcoming deadlines.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </CardContent>
+                {isSuperAdmin && (
+                    <>
+                        <AddEditCallDialog
+                            isOpen={isAddEditDialogOpen}
+                            onOpenChange={setIsAddEditDialogOpen}
+                            existingCall={selectedCall}
+                            user={user}
+                            onActionComplete={fetchData}
+                        />
+                        {selectedCall && (
+                            <>
+                             <ScheduleMeetingDialog
+                                isOpen={isScheduleDialogOpen}
+                                onOpenChange={setIsScheduleDialogOpen}
+                                onActionComplete={fetchData}
+                                call={selectedCall}
+                                interests={allInterests}
+                                allUsers={allUsers}
+                             />
+                             <RegistrationsDialog 
+                                call={selectedCall} 
+                                interests={allInterests} 
+                                allUsers={allUsers}
+                                isOpen={isRegistrationsOpen}
+                                onOpenChange={setIsRegistrationsOpen}
+                                onActionComplete={fetchData}
+                                user={user}
+                            />
+                             <AlertDialog open={isAnnounceDialogOpen} onOpenChange={setIsAnnounceDialogOpen}>
+                               <AlertDialogContent>
+                                 <AlertDialogHeader>
+                                   <AlertDialogTitle>Announce Funding Call?</AlertDialogTitle>
+                                   <AlertDialogDescription>
+                                     This will send an email notification to all staff members about the call for "{selectedCall.title}". This action cannot be undone. Are you sure?
+                                   </AlertDialogDescription>
+                                 </AlertDialogHeader>
+                                 <AlertDialogFooter>
+                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                   <AlertDialogAction onClick={handleAnnounceCall} disabled={isAnnouncing}>
+                                     {isAnnouncing && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                     Confirm & Announce
+                                   </AlertDialogAction>
+                                 </AlertDialogFooter>
+                               </AlertDialogContent>
+                             </AlertDialog>
+                            </>
+                        )}
+                    </>
+                )}
+            </Card>
+        </div>
     );
 }
