@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp } from 'lucide-react';
+import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm, uploadFileToServer } from '@/app/actions';
 import { isAfter, parseISO } from 'date-fns';
@@ -243,8 +243,9 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
     const isSuperAdmin = user.role === 'Super-admin';
     const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
     
-    const showEndorsementUpload = interestDetails?.status === 'Recommended' || interestDetails?.status === 'Endorsement Pending';
-
+    const endorsementStatuses: EmrInterest['status'][] = ['Recommended', 'Endorsement Pending', 'Endorsement Submitted', 'Endorsement Signed', 'Submitted to Agency'];
+    const showEndorsementActions = interestDetails && endorsementStatuses.includes(interestDetails.status);
+    
     if (interestDetails) {
         if (isDashboardView) {
             return (
@@ -281,7 +282,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                             </AlertDescription>
                         </Alert>
                     ) : (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             {interestDetails.status === 'Registered' && (
                                 <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-900/20 rounded-md text-green-600 dark:text-green-300 text-sm font-semibold">
                                     <CheckCircle className="h-4 w-4"/>
@@ -291,17 +292,29 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
 
                             {call.status === 'Open' && interestDetails.status === 'Registered' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
                             
-                            {!showEndorsementUpload && (
+                            {!showEndorsementActions && (
                                 <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
                                     {interestDetails?.pptUrl ? <><Eye className="h-4 w-4 mr-2" /> Manage PPT</> : <><Upload className="h-4 w-4 mr-2" /> Upload PPT</>}
                                 </Button>
                             )}
                             
-                            {showEndorsementUpload && (
-                                <Button size="sm" onClick={() => setIsEndorsementUploadOpen(true)}>
-                                    <FileUp className="h-4 w-4 mr-2" />
-                                    {interestDetails.endorsementFormUrl ? 'Re-upload Endorsement Form' : 'Upload Endorsement Form'}
-                                </Button>
+                            {showEndorsementActions && (
+                                <>
+                                {interestDetails.endorsementFormUrl ? (
+                                    <>
+                                        <Button asChild size="sm" variant="outline">
+                                            <a href={interestDetails.endorsementFormUrl} target="_blank" rel="noopener noreferrer"><ViewIcon className="h-4 w-4 mr-2"/> View Endorsement Form</a>
+                                        </Button>
+                                        <Button size="sm" onClick={() => setIsEndorsementUploadOpen(true)}>
+                                            <FileUp className="h-4 w-4 mr-2" /> Re-upload
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <Button size="sm" onClick={() => setIsEndorsementUploadOpen(true)}>
+                                        <FileUp className="h-4 w-4 mr-2" /> Upload Endorsement Form
+                                    </Button>
+                                )}
+                                </>
                             )}
 
                         </div>
