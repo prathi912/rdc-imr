@@ -1355,7 +1355,6 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
         faculty: user.faculty,
         department: user.department,
         registeredAt: new Date().toISOString(),
-        submittedToAgency: false,
         status: 'Registered',
     };
 
@@ -1732,47 +1731,49 @@ export async function createFundingCall(
             detailsUrl: callData.detailsUrl,
             attachments: attachmentUrls,
             createdAt: new Date().toISOString(),
-            createdBy: 'Super-admin', // This should be dynamic in a real app
+            createdBy: 'Super-admin',
             status: 'Open',
         };
         
         await adminDb.collection('fundingCalls').doc(callId).set(newCall);
 
-        const allStaffEmail = process.env.ALL_STAFF_EMAIL;
-        
-        if (!allStaffEmail) {
-            console.warn("ALL_STAFF_EMAIL not set, skipping announcement email.");
-            return { success: true };
-        }
+        if (callData.notifyAllStaff) {
+            const allStaffEmail = process.env.ALL_STAFF_EMAIL;
+            
+            if (!allStaffEmail) {
+                console.warn("ALL_STAFF_EMAIL not set, skipping announcement email.");
+                return { success: true };
+            }
 
-        const attachmentLinks = attachmentUrls.map(att => `<li><a href="${att.url}">${att.name}</a></li>`).join('');
+            const attachmentLinks = attachmentUrls.map(att => `<li><a href="${att.url}">${att.name}</a></li>`).join('');
 
-        const emailHtml = `
-            <div style="font-family: Arial, sans-serif; padding: 20px;">
-                <h2 style="color: #2c5364;">New Funding Opportunity: ${newCall.title}</h2>
-                <p>A new funding call from <strong>${newCall.agency}</strong> has been posted on the PU Research Portal.</p>
-                <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
-                    <p><strong>Type:</strong> ${newCall.callType}</p>
-                    <p><strong>Description:</strong></p>
-                    <div>${newCall.description || 'No description provided.'}</div>
-                    <p><strong>Register Interest By:</strong> ${format(parseISO(newCall.interestDeadline), 'PPp')}</p>
-                    <p><strong>Agency Deadline:</strong> ${format(parseISO(newCall.applyDeadline), 'PP')}</p>
-                    ${attachmentLinks ? `<p><strong>Attachments:</strong><ul>${attachmentLinks}</ul></p>` : ''}
+            const emailHtml = `
+                <div style="font-family: Arial, sans-serif; padding: 20px;">
+                    <h2 style="color: #2c5364;">New Funding Opportunity: ${newCall.title}</h2>
+                    <p>A new funding call from <strong>${newCall.agency}</strong> has been posted on the PU Research Portal.</p>
+                    <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
+                        <p><strong>Type:</strong> ${newCall.callType}</p>
+                        <p><strong>Description:</strong></p>
+                        <div>${newCall.description || 'No description provided.'}</div>
+                        <p><strong>Register Interest By:</strong> ${format(parseISO(newCall.interestDeadline), 'PPp')}</p>
+                        <p><strong>Agency Deadline:</strong> ${format(parseISO(newCall.applyDeadline), 'PP')}</p>
+                        ${attachmentLinks ? `<p><strong>Attachments:</strong><ul>${attachmentLinks}</ul></p>` : ''}
+                    </div>
+                    <p style="margin-top: 20px;">
+                        <a href="${newCall.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+                            View Full Details on the Portal
+                        </a>
+                    </p>
                 </div>
-                <p style="margin-top: 20px;">
-                    <a href="${newCall.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
-                        View Full Details on the Portal
-                    </a>
-                </p>
-            </div>
-        `;
+            `;
 
-        await sendEmail({
-            to: allStaffEmail,
-            subject: `New Funding Call: ${newCall.title}`,
-            html: emailHtml,
-            from: 'rdc'
-        });
+            await sendEmail({
+                to: allStaffEmail,
+                subject: `New Funding Call: ${newCall.title}`,
+                html: emailHtml,
+                from: 'rdc'
+            });
+        }
 
         return { success: true };
     } catch (error: any) {

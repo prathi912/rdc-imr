@@ -27,7 +27,9 @@ import {
   ShieldCheck,
   Settings,
   Bell,
-  GraduationCap
+  GraduationCap,
+  Calendar,
+  NotebookPen
 } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 
@@ -44,47 +46,57 @@ const tutorialSteps = {
     },
     {
       icon: FilePlus2,
-      title: 'Submit New Projects',
-      description: "Click 'New Submission' in the sidebar to start a multi-step form to apply for IMR project funding. You can save your progress as a draft anytime.",
+      title: 'Submit IMR Projects',
+      description: "Click 'New Submission' in the sidebar to start a multi-step form to apply for Intramural Research (IMR) project funding. You can save your progress as a draft anytime.",
+    },
+    {
+      icon: Calendar,
+      title: 'Browse EMR Opportunities',
+      description: "Navigate to the 'EMR Calendar' to see all available externally funded research calls. Register your interest for any open call before the deadline.",
     },
     {
       icon: Book,
-      title: 'Track Your Projects',
-      description: "The 'My Projects' page lists all projects you are associated with. Click any project to view its detailed status, see feedback if revisions are needed, and manage grant funds if awarded.",
+      title: 'Track All Your Projects',
+      description: "The 'My Projects' page lists all IMR and EMR projects you are associated with. Here you can track statuses, see feedback, and manage your applications.",
     },
      {
-      icon: Bell,
-      title: 'Stay Notified',
-      description: "Keep an eye on the 'Notifications' tab. You'll receive important updates via mail too, here about your project status, meeting schedules, and more.",
+      icon: Award,
+      title: 'Claim Incentives',
+      description: "Once your research is published, use the 'Incentive Claims' module to apply for rewards for your hard work.",
     },
   ],
   Evaluator: [
     {
       icon: ClipboardCheck,
-      title: 'Your Evaluation Queue',
-      description: "The 'Evaluation Queue' page shows all projects currently assigned to you for review. Important: You can only evaluate projects on the day of the scheduled meeting.",
+      title: 'Your IMR Evaluation Queue',
+      description: "The 'IMR Evaluation Queue' page shows all Intramural projects currently assigned to you for review. Important: You can only evaluate projects on the day of the scheduled meeting.",
     },
     {
-      icon: FileCheck2,
-      title: 'Submit Your Feedback',
-      description: "From the project details page, you can submit your recommendation and detailed comments. Use the AI prompts to guide your assessment.",
+      icon: NotebookPen,
+      title: 'EMR Evaluations',
+      description: "The 'EMR Evaluations' page is where you will find Extramural project presentations assigned to you for review.",
     },
     {
       icon: History,
       title: 'View Your History',
-      description: "The 'My Evaluations' page keeps a record of all the projects you have previously reviewed, allowing you to see your past contributions.",
+      description: "The 'My IMR Evaluations' page keeps a record of all the projects you have previously reviewed, allowing you to see your past contributions.",
     },
   ],
   admin: [
      {
       icon: FileCheck2,
       title: 'Oversee All Projects',
-      description: "From the 'All Projects' page, you can view, manage, and track every project submission across the university.",
+      description: "From the 'All Projects' page, you can view, manage, and track every IMR project submission across the university.",
     },
     {
       icon: CalendarClock,
-      title: 'Schedule Meetings',
-      description: "Use the 'Schedule Meeting' module to assign multiple projects to an IMR evaluation meeting and notify all relevant parties.",
+      title: 'Schedule IMR Meetings',
+      description: "Use the 'Schedule Meeting' module to assign multiple IMR projects to an evaluation meeting and notify all relevant parties.",
+    },
+    {
+      icon: Calendar,
+      title: 'Manage EMR Calendar',
+      description: 'You can manage all Extramural Research calls from the EMR Calendar page, including scheduling presentation meetings for interested faculty.',
     },
     {
       icon: LineChart,
@@ -155,6 +167,11 @@ const tutorialSteps = {
       description: "You have access to all projects, users, and claims across the entire university. Your dashboards provide a global view of all activities.",
     },
     {
+      icon: Calendar,
+      title: 'Manage EMR Calls',
+      description: "From the 'EMR Calendar' page, you can add new funding calls, manage registrations, and schedule evaluation meetings for all applicants.",
+    },
+    {
       icon: ShieldCheck,
       title: 'Manage Modules',
       description: "Use 'Module Management' to dynamically grant or revoke access to any feature for any user, allowing for fine-grained permission control.",
@@ -163,11 +180,6 @@ const tutorialSteps = {
       icon: Users,
       title: 'Manage Users & Roles',
       description: "You have the highest level of control in 'Manage Users', including the ability to assign users to the CRO role and manage their faculty assignments.",
-    },
-    {
-      icon: LineChart,
-      title: 'Full Analytics',
-      description: "The 'Analytics' dashboard provides a high-level overview of all research activity across the university.",
     },
   ]
 };

@@ -60,7 +60,7 @@ import { Label } from '../ui/label';
 import { EmrActions } from './emr-actions';
 import { Checkbox } from '../ui/checkbox';
 import * as XLSX from 'xlsx';
-
+import { UploadPptDialog } from './upload-ppt-dialog';
 
 interface EmrCalendarProps {
   user: User;
@@ -80,6 +80,7 @@ const callSchema = z.object({
   interestDeadline: z.date({ required_error: 'Interest registration deadline is required.'}),
   detailsUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   attachments: z.any().optional(),
+  notifyAllStaff: z.boolean().default(false).optional(),
 });
 
 const scheduleSchema = z.object({
@@ -125,9 +126,10 @@ interface ScheduleMeetingDialogProps {
     allUsers: User[];
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
+    onActionComplete: () => void;
 }
 
-function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange }: ScheduleMeetingDialogProps) {
+function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange, onActionComplete }: ScheduleMeetingDialogProps) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -149,6 +151,7 @@ function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange
 
             if (result.success) {
                 toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
+                onActionComplete();
                 onOpenChange(false);
             } else {
                 toast({ variant: 'destructive', title: 'Error', description: result.error });
@@ -272,12 +275,13 @@ interface RegistrationsDialogProps {
     call: FundingCall;
     interests: EmrInterest[];
     allUsers: User[];
+    isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     onActionComplete: () => void;
     user: User;
 }
 
-function RegistrationsDialog({ call, interests, allUsers, onOpenChange, onActionComplete, user }: RegistrationsDialogProps) {
+function RegistrationsDialog({ call, interests, allUsers, isOpen, onOpenChange, onActionComplete, user }: RegistrationsDialogProps) {
     const { toast } = useToast();
     const userMap = new Map(allUsers.map(u => [u.uid, u]));
     const registeredInterests = interests.filter(i => i.callId === call.id);
@@ -325,10 +329,7 @@ function RegistrationsDialog({ call, interests, allUsers, onOpenChange, onAction
     };
 
     return (
-        <Dialog onOpenChange={onOpenChange}>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="sm"><Users className="mr-2 h-4 w-4" /> View Registrations ({registeredInterests.length})</Button>
-            </DialogTrigger>
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>Registered Interest for: {call.title}</DialogTitle>
@@ -475,6 +476,7 @@ function AddEditCallDialog({
         interestDeadline: undefined,
         applyDeadline: undefined,
         attachments: undefined,
+        notifyAllStaff: true,
       });
     }
   }, [existingCall, form]);
@@ -542,6 +544,26 @@ function AddEditCallDialog({
             </div>
              <FormField name="detailsUrl" control={form.control} render={({ field }) => ( <FormItem><FormLabel>URL for Full Details</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem> )} />
              <FormField name="attachments" control={form.control} render={({ field: { onChange, value, ...rest }}) => ( <FormItem><FormLabel>Attachments (Optional)</FormLabel><FormControl><Input type="file" multiple onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem> )} />
+              <FormField
+                control={form.control}
+                name="notifyAllStaff"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel>Notify All Staff</FormLabel>
+                      <FormDescription>
+                        Send an email announcement about this new call to all staff members.
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
           </form>
         </Form>
         <DialogFooter className="justify-between">
@@ -693,9 +715,9 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     }, [toast, user.uid, isAdmin]);
 
     useEffect(() => {
-        const unsubscribe = fetchData();
+        const unsubscribePromise = fetchData();
         return () => {
-             unsubscribe.then(fn => fn && fn());
+             unsubscribePromise.then(fn => fn && fn());
         }
     }, [fetchData]);
     
@@ -794,16 +816,18 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
-                                                <div className="flex items-center gap-2">
-                                                    <RegistrationsDialog 
-                                                        call={call} 
-                                                        interests={allInterests} 
-                                                        allUsers={allUsers} 
-                                                        user={user} 
-                                                        onOpenChange={setIsRegistrationsOpen}
-                                                        onActionComplete={fetchData}
-                                                    />
-                                                </div>
+                                                <RegistrationsDialog 
+                                                    call={call} 
+                                                    interests={allInterests} 
+                                                    allUsers={allUsers}
+                                                    isOpen={isRegistrationsOpen && selectedCall?.id === call.id}
+                                                    onOpenChange={(open) => {
+                                                        setIsRegistrationsOpen(open);
+                                                        if (open) setSelectedCall(call); else setSelectedCall(null);
+                                                    }}
+                                                    onActionComplete={fetchData}
+                                                    user={user}
+                                                />
                                             )}
                                             {isSuperAdmin && (
                                                 <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
@@ -845,6 +869,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                         <ScheduleMeetingDialog
                             isOpen={isScheduleDialogOpen}
                             onOpenChange={setIsScheduleDialogOpen}
+                            onActionComplete={fetchData}
                             call={selectedCall}
                             interests={allInterests}
                             allUsers={allUsers}
