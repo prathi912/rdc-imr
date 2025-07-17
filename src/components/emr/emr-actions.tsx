@@ -31,7 +31,7 @@ import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm } from '@/app/actions';
+import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm, uploadFileToServer } from '@/app/actions';
 import { isAfter, parseISO } from 'date-fns';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -62,13 +62,22 @@ function EndorsementUploadDialog({ interest, onUploadSuccess, isOpen, onOpenChan
         setIsUploading(true);
         try {
             const dataUrl = `data:${endorsementFile.type};base64,${Buffer.from(await endorsementFile.arrayBuffer()).toString('base64')}`;
-            const result = await uploadEndorsementForm(interest.id, dataUrl);
-            if (result.success) {
+            
+            const path = `emr-endorsements/${interest.callId}/${interest.userId}/${endorsementFile.name}`;
+            const result = await uploadFileToServer(dataUrl, path);
+
+            if (!result.success || !result.url) {
+                throw new Error(result.error || "Endorsement form upload failed.");
+            }
+
+            const updateResult = await uploadEndorsementForm(interest.id, result.url);
+            
+            if (updateResult.success) {
                 toast({ title: 'Success', description: 'Endorsement form submitted.' });
                 onUploadSuccess();
                 onOpenChange(false);
             } else {
-                throw new Error(result.error);
+                throw new Error(updateResult.error);
             }
         } catch (error: any) {
              toast({ variant: 'destructive', title: 'Upload Failed', description: error.message || 'An unexpected error occurred.' });
@@ -85,12 +94,12 @@ function EndorsementUploadDialog({ interest, onUploadSuccess, isOpen, onOpenChan
                     <DialogDescription>Please upload the signed endorsement form in Word format (.doc, .docx).</DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
-                    <Input type="file" accept=".doc,.docx" onChange={(e) => setEndorsementFile(e.target.files?.[0] || null)} />
+                    <Input type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(e) => setEndorsementFile(e.target.files?.[0] || null)} />
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                     <Button onClick={handleUpload} disabled={isUploading || !endorsementFile}>
-                        {isUploading ? 'Uploading...' : 'Upload Form'}
+                        {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Uploading...</> : 'Upload Form'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -233,6 +242,8 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
 
     const isSuperAdmin = user.role === 'Super-admin';
     const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
+    
+    const showEndorsementUpload = interestDetails?.status === 'Recommended' || interestDetails?.status === 'Endorsement Pending';
 
     if (interestDetails) {
         if (isDashboardView) {
@@ -263,7 +274,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                             <AlertTitle>Revision Required</AlertTitle>
                             <AlertDescription>
                                 The committee has requested a revision. Please review the comments and submit an updated presentation.
-                                <p className="font-semibold mt-2">Admin Remarks: {interestDetails.adminRemarks}</p>
+                                {interestDetails.adminRemarks && <p className="font-semibold mt-2">Admin Remarks: {interestDetails.adminRemarks}</p>}
                                 <Button size="sm" className="mt-2" onClick={() => setIsRevisionUploadOpen(true)}>
                                     <Pencil className="h-4 w-4 mr-2"/> Submit Revised PPT
                                 </Button>
@@ -280,16 +291,16 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
 
                             {call.status === 'Open' && interestDetails.status === 'Registered' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
                             
-                            {interestDetails.status !== 'Endorsement Pending' && (
+                            {!showEndorsementUpload && (
                                 <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
-                                    {interestDetails?.pptUrl ? 'Manage PPT' : 'Upload PPT'}
+                                    {interestDetails?.pptUrl ? <><Eye className="h-4 w-4 mr-2" /> Manage PPT</> : <><Upload className="h-4 w-4 mr-2" /> Upload PPT</>}
                                 </Button>
                             )}
                             
-                            {interestDetails.status === 'Endorsement Pending' && (
+                            {showEndorsementUpload && (
                                 <Button size="sm" onClick={() => setIsEndorsementUploadOpen(true)}>
                                     <FileUp className="h-4 w-4 mr-2" />
-                                    Upload Endorsement Form
+                                    {interestDetails.endorsementFormUrl ? 'Re-upload Endorsement Form' : 'Upload Endorsement Form'}
                                 </Button>
                             )}
 
