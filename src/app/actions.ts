@@ -1738,42 +1738,7 @@ export async function createFundingCall(
         await adminDb.collection('fundingCalls').doc(callId).set(newCall);
 
         if (callData.notifyAllStaff) {
-            const allStaffEmail = process.env.ALL_STAFF_EMAIL;
-            
-            if (!allStaffEmail) {
-                console.warn("ALL_STAFF_EMAIL not set, skipping announcement email.");
-                return { success: false, error: "Email could not be sent. The ALL_STAFF_EMAIL address is not configured on the server. Please add it to the .env file." };
-            }
-
-            const emailAttachments = attachments.map(att => ({ filename: att.name, path: att.url }));
-
-            const emailHtml = `
-                <div style="font-family: Arial, sans-serif; padding: 20px;">
-                    <h2 style="color: #2c5364;">New Funding Opportunity: ${newCall.title}</h2>
-                    <p>A new funding call from <strong>${newCall.agency}</strong> has been posted on the PU Research Portal.</p>
-                    <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
-                        <p><strong>Type:</strong> ${newCall.callType}</p>
-                        <p><strong>Description:</strong></p>
-                        <div>${newCall.description || 'No description provided.'}</div>
-                        <p><strong>Register Interest By:</strong> ${format(parseISO(newCall.interestDeadline), 'PPp')}</p>
-                        <p><strong>Agency Deadline:</strong> ${format(parseISO(newCall.applyDeadline), 'PP')}</p>
-                    </div>
-                    <p style="margin-top: 20px;">Please find the relevant documents attached to this email.</p>
-                    <p style="margin-top: 20px;">
-                        <a href="${newCall.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
-                            View Full Details on the Portal
-                        </a>
-                    </p>
-                </div>
-            `;
-
-            await sendEmail({
-                to: allStaffEmail,
-                subject: `New Funding Call: ${newCall.title}`,
-                html: emailHtml,
-                from: 'rdc',
-                attachments: emailAttachments
-            });
+            await announceEmrCall(callId);
         }
 
         return { success: true };
@@ -1781,6 +1746,58 @@ export async function createFundingCall(
         console.error("Error creating funding call:", error);
         return { success: false, error: error.message || "Failed to create funding call." };
     }
+}
+
+export async function announceEmrCall(callId: string): Promise<{ success: boolean, error?: string }> {
+  try {
+    const allStaffEmail = process.env.ALL_STAFF_EMAIL;
+    if (!allStaffEmail) {
+      return { success: false, error: "The 'All Staff' email address is not configured on the server. Please add it to the .env file." };
+    }
+    
+    const callRef = adminDb.collection('fundingCalls').doc(callId);
+    const callSnap = await callRef.get();
+
+    if (!callSnap.exists) {
+        return { success: false, error: 'Funding call not found.' };
+    }
+    const call = callSnap.data() as FundingCall;
+
+    const emailAttachments = (call.attachments || []).map(att => ({ filename: att.name, path: att.url }));
+
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2 style="color: #2c5364;">New Funding Opportunity: ${call.title}</h2>
+        <p>A new funding call from <strong>${call.agency}</strong> has been posted on the PU Research Portal.</p>
+        <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
+          <p><strong>Type:</strong> ${call.callType}</p>
+          <p><strong>Description:</strong></p>
+          <div>${call.description || 'No description provided.'}</div>
+          <p><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>
+          <p><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), 'PP')}</p>
+        </div>
+        <p style="margin-top: 20px;">Please find the relevant documents attached to this email.</p>
+        <p style="margin-top: 20px;">
+          <a href="${call.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+            View Full Details on the Portal
+          </a>
+        </p>
+      </div>
+    `;
+
+    await sendEmail({
+      to: allStaffEmail,
+      subject: `New Funding Call: ${call.title}`,
+      html: emailHtml,
+      from: 'rdc',
+      attachments: emailAttachments
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error announcing EMR call:", error);
+    return { success: false, error: error.message || "Failed to send announcement." };
+  }
 }
 
 export async function updateEmrStatus(
@@ -1960,3 +1977,4 @@ export async function submitToAgency(
         return { success: false, error: "Failed to log submission to agency." };
     }
 }
+

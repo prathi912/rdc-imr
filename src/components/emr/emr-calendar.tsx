@@ -38,16 +38,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown, MessageSquareWarning, Pencil, CalendarClock, Download } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown, MessageSquareWarning, Pencil, CalendarClock, Download, Send } from 'lucide-react';
 import type { FundingCall, User, EmrInterest, EmrEvaluation } from '@/types';
 import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
-import { uploadFileToServer, deleteEmrInterest, createFundingCall, findUserByMisId, uploadRevisedEmrPpt, updateEmrStatus, scheduleEmrMeeting } from '@/app/actions';
+import { uploadFileToServer, deleteEmrInterest, createFundingCall, findUserByMisId, uploadRevisedEmrPpt, updateEmrStatus, scheduleEmrMeeting, announceEmrCall } from '@/app/actions';
 import Link from 'next/link';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
@@ -496,7 +496,7 @@ function AddEditCallDialog({
         } else {
             const result = await createFundingCall(values);
             if (result.success) {
-                toast({ title: 'Success', description: 'Funding call has been added and announced.' });
+                toast({ title: 'Success', description: 'Funding call has been added.' });
             } else {
                 throw new Error(result.error);
             }
@@ -627,6 +627,8 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
+    const [isAnnounceDialogOpen, setIsAnnounceDialogOpen] = useState(false);
+    const [isAnnouncing, setIsAnnouncing] = useState(false);
 
     const isAdmin = user.role === 'Super-admin' || user.role === 'admin';
     const isSuperAdmin = user.role === 'Super-admin';
@@ -733,6 +735,24 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-200 dark:border-green-700">Open</Badge>;
     }
 
+    const handleAnnounceCall = async () => {
+      if (!selectedCall) return;
+      setIsAnnouncing(true);
+      try {
+        const result = await announceEmrCall(selectedCall.id);
+        if (result.success) {
+          toast({ title: "Success", description: "Announcement email has been sent to all staff." });
+        } else {
+          toast({ variant: "destructive", title: "Failed to Announce", description: result.error });
+        }
+      } catch (error: any) {
+        toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
+      } finally {
+        setIsAnnouncing(false);
+        setIsAnnounceDialogOpen(false);
+      }
+    };
+
 
     if (loading) {
         return <Skeleton className="h-96 w-full" />;
@@ -834,10 +854,17 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             <ViewDescriptionDialog call={call} />
                                             {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
                                         </div>
-                                        {isSuperAdmin && registeredCount > 0 && call.status !== 'Meeting Scheduled' && (
-                                             <Button size="sm" onClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true);}}>
-                                                <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
-                                            </Button>
+                                        {isSuperAdmin && (
+                                            <div className="flex items-center gap-2">
+                                                <Button size="sm" variant="outline" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
+                                                    <Send className="mr-2 h-4 w-4" /> Announce
+                                                </Button>
+                                                {registeredCount > 0 && call.status !== 'Meeting Scheduled' && (
+                                                    <Button size="sm" onClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true);}}>
+                                                        <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
+                                                    </Button>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
 
@@ -878,6 +905,23 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                             onActionComplete={fetchData}
                             user={user}
                         />
+                         <AlertDialog open={isAnnounceDialogOpen} onOpenChange={setIsAnnounceDialogOpen}>
+                           <AlertDialogContent>
+                             <AlertDialogHeader>
+                               <AlertDialogTitle>Announce Funding Call?</AlertDialogTitle>
+                               <AlertDialogDescription>
+                                 This will send an email notification to all staff members about the call for "{selectedCall.title}". This action cannot be undone. Are you sure?
+                               </AlertDialogDescription>
+                             </AlertDialogHeader>
+                             <AlertDialogFooter>
+                               <AlertDialogCancel>Cancel</AlertDialogCancel>
+                               <AlertDialogAction onClick={handleAnnounceCall} disabled={isAnnouncing}>
+                                 {isAnnouncing && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                 Confirm & Announce
+                               </AlertDialogAction>
+                             </AlertDialogFooter>
+                           </AlertDialogContent>
+                         </AlertDialog>
                         </>
                     )}
                 </>
