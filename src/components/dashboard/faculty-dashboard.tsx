@@ -77,8 +77,6 @@ export function FacultyDashboard({ user }: { user: User }) {
   const pendingApproval = projects.filter(p => pendingApprovalStatuses.includes(p.status)).length;
   
   const completedProjects = projects.filter(p => p.status === 'Completed').length;
-  const upcomingMeetings = projects.filter(p => p.meetingDetails && p.status !== 'Completed' && p.status !== 'Not Recommended');
-
 
   const statCards = [
     { title: 'Active IMR Projects', value: activeProjects.toString(), icon: BookOpenCheck },
@@ -124,28 +122,6 @@ export function FacultyDashboard({ user }: { user: User }) {
         </div>
       )}
       
-      {upcomingMeetings.length > 0 && (
-        <Card className="border-primary/40">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Video className="h-5 w-5"/> Upcoming IMR Evaluation Meeting</CardTitle>
-                <CardDescription>Details for your scheduled project presentation.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {upcomingMeetings.map(p => (
-                    p.meetingDetails &&
-                    <div key={p.id} className="p-3 border rounded-lg bg-background">
-                        <p className="font-semibold">{p.title}</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm mt-2 text-muted-foreground">
-                            <span><strong>Date:</strong> {new Date(p.meetingDetails.date.replace(/-/g, '/')).toLocaleDateString()}</span>
-                            <span><strong>Time:</strong> {p.meetingDetails.time}</span>
-                            <span><strong>Venue:</strong> {p.meetingDetails.venue}</span>
-                        </div>
-                    </div>
-                ))}
-            </CardContent>
-        </Card>
-      )}
-      
       {emrInterests.length > 0 && (
         <Card>
             <CardHeader>
@@ -159,7 +135,7 @@ export function FacultyDashboard({ user }: { user: User }) {
                         if (!call) return null;
                         return (
                             <div key={interest.id} className="p-3 border rounded-lg bg-background">
-                                <p className="font-semibold">{call.title}</p>
+                                <p className="font-semibold">{interest.callTitle || call.title}</p>
                                 <p className="text-sm text-muted-foreground">Registered on: {new Date(interest.registeredAt).toLocaleDateString()}</p>
                                 <div className="mt-2">
                                      <EmrActions user={user} call={call} interestDetails={interest} onActionComplete={async () => {
@@ -179,6 +155,19 @@ export function FacultyDashboard({ user }: { user: User }) {
         </Card>
       )}
 
+       <div className="mt-4">
+        <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-2xl font-bold tracking-tight">EMR Funding Calendar</h3>
+            <Link href="/dashboard/emr-calendar">
+              <Button variant="ghost">
+                View Full Calendar
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
+        </div>
+        {loading ? <Skeleton className="h-96 w-full" /> : <EmrCalendar user={user} />}
+      </div>
+
       <div className="mt-4">
         <div className="mb-4 flex items-center justify-between">
             <h3 className="text-2xl font-bold tracking-tight">My Recent IMR Projects</h3>
@@ -194,19 +183,6 @@ export function FacultyDashboard({ user }: { user: User }) {
         ) : (
           <ProjectList projects={recentProjects} userRole="faculty" />
         )}
-      </div>
-
-       <div className="mt-4">
-        <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-2xl font-bold tracking-tight">EMR Funding Calendar</h3>
-            <Link href="/dashboard/emr-calendar">
-              <Button variant="ghost">
-                View Full Calendar
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </Link>
-        </div>
-        {loading ? <Skeleton className="h-96 w-full" /> : <EmrCalendar user={user} />}
       </div>
     </div>
   );
