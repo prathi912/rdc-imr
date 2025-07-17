@@ -1511,7 +1511,7 @@ export async function uploadEmrPpt(interestId: string, pptDataUrl: string, origi
     
     // Standardize the filename
     const fileExtension = path.extname(originalFileName);
-    const standardizedName = `${userName.replace(/\s+/g, '_')}_${interest.callId}${fileExtension}`;
+    const standardizedName = `emr_${userName.replace(/\s+/g, '_')}${fileExtension}`;
 
     const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`;
     const result = await uploadFileToServer(pptDataUrl, filePath);
@@ -1981,5 +1981,3 @@ export async function submitToAgency(
         return { success: false, error: "Failed to log submission to agency." };
     }
 }
-
-

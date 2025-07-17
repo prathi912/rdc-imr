@@ -366,6 +366,7 @@ function RegistrationsDialog({ call, interests, allUsers, isOpen, onOpenChange, 
                                     <TableHead>Department</TableHead>
                                     <TableHead>Meeting Slot</TableHead>
                                     <TableHead>Presentation</TableHead>
+                                    <TableHead>Endorsement Form</TableHead>
                                     {user.role === 'Super-admin' && <TableHead className="text-right">Actions</TableHead>}
                                 </TableRow>
                             </TableHeader>
@@ -395,6 +396,13 @@ function RegistrationsDialog({ call, interests, allUsers, isOpen, onOpenChange, 
                                                  {interest.pptUrl ? (
                                                      <Button asChild variant="link" className="p-0 h-auto">
                                                          <a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View</a>
+                                                     </Button>
+                                                 ) : 'Not Submitted'}
+                                             </TableCell>
+                                             <TableCell>
+                                                {interest.endorsementFormUrl ? (
+                                                     <Button asChild variant="link" className="p-0 h-auto">
+                                                         <a href={interest.endorsementFormUrl} target="_blank" rel="noopener noreferrer">View</a>
                                                      </Button>
                                                  ) : 'Not Submitted'}
                                              </TableCell>
