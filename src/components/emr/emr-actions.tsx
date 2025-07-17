@@ -28,13 +28,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil } from 'lucide-react';
+import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { registerEmrInterest, withdrawEmrInterest, findUserByMisId } from '@/app/actions';
 import { isAfter, parseISO } from 'date-fns';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { UploadPptDialog } from './upload-ppt-dialog';
+import { format } from 'date-fns';
 
 
 interface EmrActionsProps {
@@ -189,6 +190,19 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
         if (isDashboardView) {
             return (
                 <div className="flex flex-col items-start gap-2">
+                    {interestDetails.meetingSlot && (
+                        <div className="w-full p-3 rounded-lg border-l-4 border-primary bg-primary/10 mb-2">
+                            <div className="flex items-center gap-2 font-semibold">
+                                <CalendarClock className="h-5 w-5"/>
+                                <span>Presentation Scheduled</span>
+                            </div>
+                            <div className="text-sm mt-2 pl-7 space-y-1">
+                                <p><strong>Date:</strong> {format(parseISO(interestDetails.meetingSlot.date), 'MMMM d, yyyy')}</p>
+                                <p><strong>Time:</strong> {interestDetails.meetingSlot.time}</p>
+                                <p><strong>Venue:</strong> {call.meetingDetails?.venue || 'TBD'}</p>
+                            </div>
+                        </div>
+                    )}
                     {interestDetails.status === 'Revision Needed' ? (
                         <Alert variant="destructive">
                             <MessageSquareWarning className="h-4 w-4" />
