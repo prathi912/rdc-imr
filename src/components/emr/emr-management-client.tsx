@@ -9,14 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Download, Trash2, CalendarClock, Eye } from 'lucide-react';
+import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Textarea } from '../ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '../ui/form';
+import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '../ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest } from '@/app/actions';
+import { deleteEmrInterest, updateEmrStatus, submitToAgency } from '@/app/actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +27,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ScheduleMeetingDialog } from './schedule-meeting-dialog';
+import { Input } from '../ui/input';
 
 interface EmrManagementClientProps {
     call: FundingCall;
@@ -41,25 +61,57 @@ const deleteRegistrationSchema = z.object({
     remarks: z.string().min(10, "Please provide a reason for deleting the registration."),
 });
 
+const adminRemarksSchema = z.object({
+    remarks: z.string().min(10, "Please provide remarks for the applicant."),
+});
+
+const submitToAgencySchema = z.object({
+    referenceNumber: z.string().min(3, "A reference number is required."),
+    acknowledgementFile: z.any().optional(),
+});
+
+
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
+
+
 export function EmrManagementClient({ call, interests, allUsers, currentUser, onActionComplete }: EmrManagementClientProps) {
     const { toast } = useToast();
     const userMap = new Map(allUsers.map(u => [u.uid, u]));
     const [isDeleting, setIsDeleting] = useState(false);
-    const [interestToDelete, setInterestToDelete] = useState<EmrInterest | null>(null);
+    const [interestToUpdate, setInterestToUpdate] = useState<EmrInterest | null>(null);
+    const [statusToUpdate, setStatusToUpdate] = useState<EmrInterest['status'] | null>(null);
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+    const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
+    const [isSubmitToAgencyOpen, setIsSubmitToAgencyOpen] = useState(false);
+    const [isSubmittingToAgency, setIsSubmittingToAgency] = useState(false);
 
-    const form = useForm<z.infer<typeof deleteRegistrationSchema>>({
+    const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
         resolver: zodResolver(deleteRegistrationSchema),
+    });
+    
+    const remarksForm = useForm<z.infer<typeof adminRemarksSchema>>({
+        resolver: zodResolver(adminRemarksSchema),
+    });
+
+    const agencyForm = useForm<z.infer<typeof submitToAgencySchema>>({
+        resolver: zodResolver(submitToAgencySchema),
     });
 
     const handleDeleteInterest = async (values: z.infer<typeof deleteRegistrationSchema>) => {
-        if (!interestToDelete) return;
+        if (!interestToUpdate) return;
         setIsDeleting(true);
         try {
-            const result = await deleteEmrInterest(interestToDelete.id, values.remarks, currentUser.name);
+            const result = await deleteEmrInterest(interestToUpdate.id, values.remarks, currentUser.name);
             if (result.success) {
                 toast({ title: "Registration Deleted", description: "The user has been notified." });
-                setInterestToDelete(null);
+                setInterestToUpdate(null);
                 onActionComplete();
             } else {
                 toast({ variant: 'destructive', title: "Error", description: result.error });
@@ -68,6 +120,71 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
             setIsDeleting(false);
         }
     };
+    
+    const handleStatusUpdate = async (interestId: string, newStatus: EmrInterest['status'], remarks?: string) => {
+        const result = await updateEmrStatus(interestId, newStatus, remarks);
+         if (result.success) {
+            toast({ title: "Status Updated", description: "The applicant has been notified." });
+            onActionComplete();
+        } else {
+            toast({ variant: 'destructive', title: "Error", description: result.error });
+        }
+    };
+
+    const handleRemarksSubmit = (values: z.infer<typeof adminRemarksSchema>) => {
+        if (interestToUpdate && statusToUpdate) {
+            handleStatusUpdate(interestToUpdate.id, statusToUpdate, values.remarks);
+        }
+        setIsRemarksDialogOpen(false);
+    };
+    
+    const handleOpenRemarksDialog = (interest: EmrInterest, status: EmrInterest['status']) => {
+        setInterestToUpdate(interest);
+        setStatusToUpdate(status);
+        remarksForm.reset({ remarks: '' });
+        setIsRemarksDialogOpen(true);
+    };
+
+    const handleOpenSubmitToAgencyDialog = (interest: EmrInterest) => {
+        setInterestToUpdate(interest);
+        agencyForm.reset();
+        setIsSubmitToAgencyOpen(true);
+    }
+    
+    const handleSubmitToAgency = async (values: z.infer<typeof submitToAgencySchema>) => {
+        if (!interestToUpdate) return;
+        setIsSubmittingToAgency(true);
+        try {
+            let acknowledgementUrl: string | undefined;
+            if (values.acknowledgementFile && values.acknowledgementFile[0]) {
+                const file = values.acknowledgementFile[0];
+                const dataUrl = await fileToDataUrl(file);
+                const path = `emr-acknowledgements/${interestToUpdate.callId}/${interestToUpdate.userId}/${file.name}`;
+                const result = await fetch('/api/upload', { method: 'POST', body: JSON.stringify({ dataUrl, path }) }).then(res => res.json());
+
+                if (!result.success || !result.url) {
+                    throw new Error(result.error || "Acknowledgement upload failed.");
+                }
+                acknowledgementUrl = result.url;
+            }
+
+            const submitResult = await submitToAgency(interestToUpdate.id, values.referenceNumber, acknowledgementUrl);
+
+            if (submitResult.success) {
+                toast({ title: "Success", description: "Application marked as submitted to agency." });
+                onActionComplete();
+                setIsSubmitToAgencyOpen(false);
+            } else {
+                throw new Error(submitResult.error);
+            }
+
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Submission Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsSubmittingToAgency(false);
+        }
+    };
+
 
     const handleExport = () => {
         const dataToExport = interests.map(interest => {
@@ -78,6 +195,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 'PI Email': interest.userEmail,
                 'PI Department': interestedUser?.department || interest.department,
                 'Co-PIs': interest.coPiNames?.join(', ') || 'None',
+                'Status': interest.status,
                 'Presentation URL': interest.pptUrl || 'Not Submitted'
             };
         });
@@ -112,12 +230,9 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Interest ID</TableHead>
                                 <TableHead>PI</TableHead>
-                                <TableHead>Department</TableHead>
-                                <TableHead>Co-PI(s)</TableHead>
-                                <TableHead>Presentation</TableHead>
-                                <TableHead>Endorsement Form</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Docs</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -126,7 +241,6 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                 const interestedUser = userMap.get(interest.userId);
                                 return (
                                     <TableRow key={interest.id}>
-                                        <TableCell className="font-mono text-xs">{interest.interestId || 'N/A'}</TableCell>
                                         <TableCell className="font-medium">
                                             {interestedUser?.misId ? (
                                                 <Link href={`/profile/${interestedUser.misId}`} target="_blank" className="text-primary hover:underline">
@@ -135,28 +249,43 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                             ) : (
                                                 interest.userName
                                             )}
-                                        </TableCell>
-                                        <TableCell>{interestedUser?.department || interest.department}</TableCell>
-                                        <TableCell>{interest.coPiNames?.join(', ') || 'None'}</TableCell>
-                                        <TableCell>
-                                            {interest.pptUrl ? (
-                                                <Button asChild variant="link" className="p-0 h-auto">
-                                                    <a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View PPT</a>
-                                                </Button>
-                                            ) : 'Not Submitted'}
+                                            <div className="text-xs text-muted-foreground">{interest.interestId}</div>
                                         </TableCell>
                                         <TableCell>
-                                            {interest.endorsementFormUrl ? (
-                                                 <Button asChild variant="link" className="p-0 h-auto">
-                                                     <a href={interest.endorsementFormUrl} target="_blank" rel="noopener noreferrer">View Form</a>
-                                                 </Button>
-                                             ) : 'Not Submitted'}
-                                         </TableCell>
+                                            <Badge variant={interest.status === 'Recommended' ? 'default' : 'secondary'}>{interest.status}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center gap-2">
+                                                {interest.pptUrl && <Button asChild size="icon" variant="ghost"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer" title="View Presentation"><ViewIcon className="h-4 w-4" /></a></Button>}
+                                                {interest.revisedPptUrl && <Button asChild size="icon" variant="ghost"><a href={interest.revisedPptUrl} target="_blank" rel="noopener noreferrer" title="View Revised Presentation"><FileUp className="h-4 w-4" /></a></Button>}
+                                                {interest.endorsementFormUrl && <Button asChild size="icon" variant="ghost"><a href={interest.endorsementFormUrl} target="_blank" rel="noopener noreferrer" title="View Endorsement Form"><FileUp className="h-4 w-4" /></a></Button>}
+                                            </div>
+                                        </TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="destructive" size="icon" onClick={() => setInterestToDelete(interest)}>
-                                                <Trash2 className="h-4 w-4" />
-                                                <span className="sr-only">Delete Registration</span>
-                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Actions</span></Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuSub>
+                                                        <DropdownMenuSubTrigger>Update Status</DropdownMenuSubTrigger>
+                                                        <DropdownMenuSubContent>
+                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
+                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Pending')}>Endorsement Pending</DropdownMenuItem>
+                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Endorsement Signed</DropdownMenuItem>
+                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
+                                                             <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
+                                                        </DropdownMenuSubContent>
+                                                    </DropdownMenuSub>
+                                                    <DropdownMenuItem onClick={() => handleOpenSubmitToAgencyDialog(interest)}>
+                                                        Submit to Agency
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem className="text-destructive" onClick={() => { setInterestToUpdate(interest); deleteForm.reset(); }}>
+                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -170,16 +299,16 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 )}
             </CardContent>
 
-             <AlertDialog open={!!interestToDelete} onOpenChange={() => setInterestToDelete(null)}>
+             <AlertDialog open={!!interestToUpdate && !isRemarksDialogOpen && !isSubmitToAgencyOpen} onOpenChange={() => setInterestToUpdate(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Registration for {interestToDelete?.userName}?</AlertDialogTitle>
+                        <AlertDialogTitle>Delete Registration for {interestToUpdate?.userName}?</AlertDialogTitle>
                         <AlertDialogDescription>Please provide a reason for this deletion. The user will be notified.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <Form {...form}>
-                        <form id="delete-interest-form" onSubmit={form.handleSubmit(handleDeleteInterest)}>
+                    <Form {...deleteForm}>
+                        <form id="delete-interest-form" onSubmit={deleteForm.handleSubmit(handleDeleteInterest)}>
                             <FormField
-                                control={form.control}
+                                control={deleteForm.control}
                                 name="remarks"
                                 render={({ field }) => (
                                     <FormItem>
@@ -198,6 +327,73 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <Dialog open={isRemarksDialogOpen} onOpenChange={setIsRemarksDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Provide Remarks for {statusToUpdate}</DialogTitle>
+                        <DialogDescription>These comments will be sent to the applicant.</DialogDescription>
+                    </DialogHeader>
+                     <Form {...remarksForm}>
+                        <form id="remarks-form" onSubmit={remarksForm.handleSubmit(handleRemarksSubmit)} className="py-4">
+                            <FormField
+                                control={remarksForm.control}
+                                name="remarks"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormControl><Textarea rows={4} {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </form>
+                    </Form>
+                    <DialogFooter>
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                        <Button type="submit" form="remarks-form">Submit Remarks</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+             <Dialog open={isSubmitToAgencyOpen} onOpenChange={setIsSubmitToAgencyOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Log Submission to Agency</DialogTitle>
+                        <DialogDescription>Provide the reference number and optionally upload the acknowledgement receipt.</DialogDescription>
+                    </DialogHeader>
+                     <Form {...agencyForm}>
+                        <form id="agency-form" onSubmit={agencyForm.handleSubmit(handleSubmitToAgency)} className="py-4 space-y-4">
+                            <FormField
+                                control={agencyForm.control}
+                                name="referenceNumber"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Agency Reference Number</FormLabel>
+                                        <FormControl><Input {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                control={agencyForm.control}
+                                name="acknowledgementFile"
+                                render={({ field: { value, onChange, ...fieldProps }}) => (
+                                    <FormItem>
+                                        <FormLabel>Acknowledgement/Receipt (Optional)</FormLabel>
+                                        <FormControl><Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...fieldProps} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </form>
+                    </Form>
+                    <DialogFooter>
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                        <Button type="submit" form="agency-form" disabled={isSubmittingToAgency}>
+                            {isSubmittingToAgency && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                            Confirm Submission
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <ScheduleMeetingDialog
                 isOpen={isScheduleDialogOpen}
                 onOpenChange={setIsScheduleDialogOpen}
