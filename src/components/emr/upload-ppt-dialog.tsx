@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Loader2, Upload, File, Trash2, MessageSquareWarning } from 'lucide-react';
 import { uploadEmrPpt, uploadRevisedEmrPpt, removeEmrPpt } from '@/app/actions';
-import { format, isAfter, parseISO, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
+import { format, isAfter, parseISO, subDays, setHours, setMinutes, setSeconds, addDays } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface UploadPptDialogProps {
@@ -94,28 +94,33 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         }
     };
 
-    const hasMeeting = !!call.meetingDetails?.date;
+    const hasMeeting = !!(call.meetingDetails?.date && interest.meetingSlot?.date);
     let deadlineWithTime: Date | null = null;
     let isDeadlinePast = false;
+    let dialogDescription = 'Upload your presentation for the upcoming evaluation meeting.';
 
     if (hasMeeting) {
-        const deadline = subDays(parseISO(call.meetingDetails!.date), 2); // Deadline is 2 days before
-        deadlineWithTime = setSeconds(setMinutes(setHours(deadline, 17), 0), 0); // at 5:00 PM
+        const meetingDate = parseISO(interest.meetingSlot!.date);
+        if (isRevision) {
+            // Deadline is 3 days after meeting at 5:00 PM for revisions
+            deadlineWithTime = setSeconds(setMinutes(setHours(addDays(meetingDate, 3), 17), 0), 0);
+            dialogDescription = `The deadline to submit your revision is ${format(deadlineWithTime, 'PPpp')}.`;
+        } else {
+            // Deadline is 2 days before meeting at 5:00 PM for initial submission
+            deadlineWithTime = setSeconds(setMinutes(setHours(subDays(meetingDate, 2), 17), 0), 0);
+            dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPp')}.`;
+        }
         isDeadlinePast = isAfter(new Date(), deadlineWithTime);
     }
     
-    const isUploadDisabled = hasMeeting && isDeadlinePast && !isRevision;
+    const isUploadDisabled = hasMeeting && isDeadlinePast;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{isRevision ? 'Submit Revised Presentation' : 'Manage Your Presentation'}</DialogTitle>
-                    <DialogDescription>
-                        {deadlineWithTime
-                            ? `The deadline to upload is ${format(deadlineWithTime, 'PPp')}.`
-                            : 'Upload your presentation for the upcoming evaluation meeting.'}
-                    </DialogDescription>
+                    <DialogDescription>{dialogDescription}</DialogDescription>
                 </DialogHeader>
                  {isUploadDisabled && (
                     <Alert variant="destructive">
@@ -148,3 +153,5 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         </Dialog>
     )
 }
+
+    

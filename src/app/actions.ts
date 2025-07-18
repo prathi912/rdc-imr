@@ -13,7 +13,7 @@ import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
-import { format, addMinutes, parse, parseISO } from "date-fns"
+import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds } from "date-fns"
 import * as z from 'zod';
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
@@ -847,7 +847,10 @@ export async function deleteBulkProject(projectId: string): Promise<{ success: b
 
 export async function fetchOrcidData(
   orcidId: string,
-): Promise<{ success: boolean; data?: { name: string }; error?: string }> {
+): Promise<{
+  success: boolean
+  data?: { name: string }; error?: string
+}> {
   if (!/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/.test(orcidId)) {
     return { success: false, error: "Invalid ORCID iD format." }
   }
@@ -1941,7 +1944,6 @@ export async function updateEmrStatus(
         updateData.submittedToAgencyAt = new Date().toISOString();
     }
 
-
     await interestRef.update(updateData)
 
     // Notify user
@@ -1963,6 +1965,18 @@ export async function updateEmrStatus(
             emailHtml += `<p>Your endorsement letter has been signed and is ready for collection from the RDC office.</p>`
         }
         
+        if (status === 'Revision Needed') {
+            const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
+            if (callSnap.exists()) {
+                const call = callSnap.data() as FundingCall;
+                if (call.meetingDetails?.date) {
+                    const meetingDate = parseISO(call.meetingDetails.date);
+                    const deadline = setSeconds(setMinutes(setHours(addDays(meetingDate, 3), 17), 0), 0); // 3 days after meeting at 5:00 PM
+                    emailHtml += `<p>Please submit your revised presentation on the portal by <strong>${format(deadline, 'PPpp')}</strong>.</p>`;
+                }
+            }
+        }
+
         emailHtml += `<p>Please check the portal for more details.</p>`
 
         await sendEmail({
@@ -2098,5 +2112,7 @@ export async function submitToAgency(
         return { success: false, error: "Failed to log submission to agency." };
     }
 }
+
+    
 
     
