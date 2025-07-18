@@ -27,12 +27,23 @@ import { EMR_EVALUATION_RECOMMENDATIONS, EmrEvaluationForm } from '@/components/
 import { updateEmrStatus, uploadRevisedEmrPpt } from '@/app/actions';
 import { Textarea } from '@/components/ui/textarea';
 
-function EvaluationDetailsDialog({ interest, call }: { interest: EmrInterestWithDetails, call: FundingCall }) {
+function AdminEvaluationOverviewDialog({
+    interest,
+    call,
+    user,
+    onEvaluationSubmitted
+}: {
+    interest: EmrInterestWithDetails,
+    call: FundingCall,
+    user: User,
+    onEvaluationSubmitted: () => void
+}) {
+    const [isMyEvaluationFormOpen, setIsMyEvaluationFormOpen] = useState(false);
 
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="sm">View Evaluations</Button>
+                <Button variant="outline" size="sm"><Eye className="h-4 w-4 mr-2"/> Manage Evaluations</Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
@@ -56,10 +67,25 @@ function EvaluationDetailsDialog({ interest, call }: { interest: EmrInterestWith
                     )) : (<div className="text-center py-8 text-muted-foreground">No evaluations submitted yet.</div>)}
                 </div>
                  <DialogFooter>
+                    <Button variant="secondary" onClick={() => setIsMyEvaluationFormOpen(true)}>
+                        {interest.evaluations.some(e => e.evaluatorUid === user.uid) ? 'View My Evaluation' : 'Submit My Evaluation'}
+                    </Button>
                     <DialogClose asChild>
                         <Button variant="outline">Close</Button>
                     </DialogClose>
                 </DialogFooter>
+                
+                {/* Nested dialog for the admin's own evaluation form */}
+                <EmrEvaluationForm 
+                    isOpen={isMyEvaluationFormOpen} 
+                    onOpenChange={setIsMyEvaluationFormOpen} 
+                    interest={interest} 
+                    user={user} 
+                    onEvaluationSubmitted={() => {
+                        setIsMyEvaluationFormOpen(false);
+                        onEvaluationSubmitted();
+                    }}
+                />
             </DialogContent>
         </Dialog>
     );
@@ -188,13 +214,11 @@ export default function EmrEvaluationsPage() {
                             <TableHead>Funding Call</TableHead>
                             <TableHead>Presentation</TableHead>
                             <TableHead>My Status</TableHead>
-                            {isSuperAdmin && <TableHead>Evaluations</TableHead>}
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow></TableHeader>
                         <TableBody>{interests.map(interest => {
                             const myEvaluation = interest.evaluations.find(e => e.evaluatorUid === user?.uid);
                             const call = calls.find(c => c.id === interest.callId);
-                            const allEvaluatorsAssigned = call?.meetingDetails?.assignedEvaluators || [];
                             
                             return (
                             <TableRow key={interest.id}>
@@ -202,12 +226,24 @@ export default function EmrEvaluationsPage() {
                                 <TableCell>{getCallTitle(interest.callId)}</TableCell>
                                 <TableCell>{interest.pptUrl ? (<Button asChild variant="link" className="p-0 h-auto"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><FileText className="h-4 w-4 mr-1"/> View</a></Button>) : "Not Submitted"}</TableCell>
                                 <TableCell>{myEvaluation ? <Badge variant="default"><UserCheck className="h-3 w-3 mr-1"/> Submitted</Badge> : <Badge variant="secondary"><UserX className="h-3 w-3 mr-1"/> Pending</Badge>}</TableCell>
-                                {isSuperAdmin && (<TableCell>
-                                    {interest.evaluations.length > 0 ? (
-                                        <EvaluationDetailsDialog interest={interest} call={call!} />
-                                    ) : `${interest.evaluations.length}/${allEvaluatorsAssigned.length}`}
-                                </TableCell>)}
-                                <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => { setSelectedInterest(interest); setIsEvaluationFormOpen(true); }}><Eye className="h-4 w-4 mr-2"/> {myEvaluation ? "View Evaluation" : "Evaluate"}</Button></TableCell>
+                                <TableCell className="text-right">
+                                    {isSuperAdmin ? (
+                                        <AdminEvaluationOverviewDialog 
+                                            interest={interest} 
+                                            call={call!} 
+                                            user={user!} 
+                                            onEvaluationSubmitted={fetchData} 
+                                        />
+                                    ) : (
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={() => { setSelectedInterest(interest); setIsEvaluationFormOpen(true); }}
+                                        >
+                                            <Eye className="h-4 w-4 mr-2"/> {myEvaluation ? "View Evaluation" : "Evaluate"}
+                                        </Button>
+                                    )}
+                                </TableCell>
                             </TableRow> );
                         })}</TableBody>
                     </Table></CardContent></Card>
