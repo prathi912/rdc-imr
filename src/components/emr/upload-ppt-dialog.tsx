@@ -94,9 +94,17 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         }
     };
 
-    const deadline = subDays(parseISO(call.meetingDetails?.date || new Date().toISOString()), 3);
-    const deadlineWithTime = setSeconds(setMinutes(setHours(deadline, 17), 0), 0);
-    const isDeadlinePast = isAfter(new Date(), deadlineWithTime);
+    const hasMeeting = !!call.meetingDetails?.date;
+    let deadlineWithTime: Date | null = null;
+    let isDeadlinePast = false;
+
+    if (hasMeeting) {
+        const deadline = subDays(parseISO(call.meetingDetails!.date), 2); // Deadline is 2 days before
+        deadlineWithTime = setSeconds(setMinutes(setHours(deadline, 17), 0), 0); // at 5:00 PM
+        isDeadlinePast = isAfter(new Date(), deadlineWithTime);
+    }
+    
+    const isUploadDisabled = hasMeeting && isDeadlinePast && !isRevision;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -104,12 +112,12 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
                 <DialogHeader>
                     <DialogTitle>{isRevision ? 'Submit Revised Presentation' : 'Manage Your Presentation'}</DialogTitle>
                     <DialogDescription>
-                        {call.meetingDetails?.date
+                        {deadlineWithTime
                             ? `The deadline to upload is ${format(deadlineWithTime, 'PPp')}.`
                             : 'Upload your presentation for the upcoming evaluation meeting.'}
                     </DialogDescription>
                 </DialogHeader>
-                 {isDeadlinePast && !isRevision && (
+                 {isUploadDisabled && (
                     <Alert variant="destructive">
                       <MessageSquareWarning className="h-4 w-4" />
                       <AlertTitle>Deadline Passed</AlertTitle>
@@ -122,16 +130,16 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
                           <a href={interest.pptUrl} target="_blank" rel="noopener noreferrer" className="text-primary font-medium hover:underline flex items-center gap-2">
                              <File className="h-4 w-4"/> View Current Presentation
                           </a>
-                          {!isDeadlinePast && (
+                          {!isUploadDisabled && (
                               <Button variant="destructive" size="sm" onClick={handleDelete} disabled={isUploading}><Trash2 className="h-4 w-4"/></Button>
                           )}
                        </div>
                     )}
-                    <Input type="file" accept=".ppt, .pptx" onChange={handleFileChange} disabled={isDeadlinePast && !isRevision} />
+                    <Input type="file" accept=".ppt, .pptx" onChange={handleFileChange} disabled={isUploadDisabled} />
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleUpload} disabled={isUploading || !pptFile || (isDeadlinePast && !isRevision)}>
+                    <Button onClick={handleUpload} disabled={isUploading || !pptFile || isUploadDisabled}>
                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
                         {interest.pptUrl && !isRevision ? 'Replace' : 'Upload'}
                     </Button>
