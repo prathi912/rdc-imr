@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import type { User, FundingCall, EmrInterest, EmrEvaluation } from '@/types';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, onSnapshot, doc, updateDoc } from 'firebase/firestore';
@@ -12,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, ThumbsDown, ThumbsUp, History as HistoryIcon, UserCheck, UserX, FileText, CheckCheck, Edit } from 'lucide-react';
+import { Eye, ThumbsDown, ThumbsUp, History as HistoryIcon, UserCheck, UserX, FileText, Download } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,9 +24,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { EMR_EVALUATION_RECOMMENDATIONS, EmrEvaluationForm } from '@/components/emr/emr-evaluation-form';
-import { updateEmrStatus, uploadRevisedEmrPpt } from '@/app/actions';
-import { Textarea } from '@/components/ui/textarea';
+import { EmrEvaluationForm } from '@/components/emr/emr-evaluation-form';
 
 function AdminEvaluationOverviewDialog({
     interest,
@@ -198,13 +197,42 @@ export default function EmrEvaluationsPage() {
     const getCallTitle = (callId: string) => calls.find(c => c.id === callId)?.title || 'Unknown Call';
     
     const handleEvaluationSubmitted = () => { setIsEvaluationFormOpen(false); setSelectedInterest(null); fetchData(); };
+    
+    const handleExport = () => {
+        if (!user) return;
+        const dataToExport = interests.map(interest => {
+            const myEvaluation = interest.evaluations.find(e => e.evaluatorUid === user.uid);
+            const call = calls.find(c => c.id === interest.callId);
+            return {
+                'Applicant': interest.userName,
+                'Funding Call': call?.title || 'Unknown',
+                'Institute': interest.userDetails?.institute || 'N/A',
+                'Department': interest.userDetails?.department || 'N/A',
+                'Faculty': interest.userDetails?.faculty || 'N/A',
+                'Presentation': interest.pptUrl || 'Not Submitted',
+                'My Status': myEvaluation ? 'Submitted' : 'Pending',
+            };
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'EMR_Evaluations');
+        XLSX.writeFile(workbook, `emr_evaluations_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
 
     return (
         <div className="container mx-auto py-10">
             <PageHeader
                 title="EMR Evaluations"
                 description={isSuperAdmin ? "Review all submitted EMR evaluations." : "EMR presentations assigned to you for evaluation."}
-            />
+            >
+                {interests.length > 0 && (
+                    <Button onClick={handleExport} disabled={loading}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export XLSX
+                    </Button>
+                )}
+            </PageHeader>
             <div className="mt-8">
                 {loading ? ( <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
                 ) : interests.length > 0 ? (
