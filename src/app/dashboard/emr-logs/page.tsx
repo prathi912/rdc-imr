@@ -60,7 +60,7 @@ export default function EmrLogsPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Applicant</TableHead>
+                                        <TableHead>PI</TableHead>
                                         <TableHead>Funding Call</TableHead>
                                         <TableHead>Reference No.</TableHead>
                                         <TableHead>Submission Date</TableHead>
@@ -70,7 +70,10 @@ export default function EmrLogsPage() {
                                 <TableBody>
                                     {logs.map(log => (
                                         <TableRow key={log.id}>
-                                            <TableCell className="font-medium">{log.userName}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <div>{log.userName}</div>
+                                                <div className="text-xs text-muted-foreground">{log.userEmail}</div>
+                                            </TableCell>
                                             <TableCell>{getCallTitle(log.callId)}</TableCell>
                                             <TableCell>{log.agencyReferenceNumber || 'N/A'}</TableCell>
                                             <TableCell>{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
