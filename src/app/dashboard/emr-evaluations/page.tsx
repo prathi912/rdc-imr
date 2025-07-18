@@ -23,40 +23,14 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { EMR_EVALUATION_RECOMMENDATIONS, EmrEvaluationForm } from '@/components/emr/emr-evaluation-form';
 import { updateEmrStatus, uploadRevisedEmrPpt } from '@/app/actions';
 import { Textarea } from '@/components/ui/textarea';
 
 function EvaluationDetailsDialog({ interest, call }: { interest: EmrInterestWithDetails, call: FundingCall }) {
-    const { toast } = useToast();
-    const [isStatusUpdateOpen, setIsStatusUpdateOpen] = useState(false);
-    const [statusToUpdate, setStatusToUpdate] = useState<EmrInterest['status'] | null>(null);
-    const [adminRemarks, setAdminRemarks] = useState('');
-
-    const handleUpdateStatus = async () => {
-        if (!statusToUpdate) return;
-        if (statusToUpdate === 'Revision Needed' && !adminRemarks) {
-            toast({ variant: 'destructive', title: 'Remarks Required', description: 'Please provide comments for the revision request.' });
-            return;
-        }
-        const result = await updateEmrStatus(interest.id, statusToUpdate, adminRemarks);
-        if (result.success) {
-            toast({ title: "Status Updated", description: "The applicant has been notified." });
-        } else {
-            toast({ variant: 'destructive', title: "Error", description: result.error });
-        }
-        setIsStatusUpdateOpen(false);
-        setAdminRemarks('');
-    };
 
     return (
-        <Dialog open={isStatusUpdateOpen} onOpenChange={setIsStatusUpdateOpen}>
+        <Dialog>
             <DialogTrigger asChild>
                 <Button variant="ghost" size="sm">View Evaluations</Button>
             </DialogTrigger>
@@ -81,24 +55,10 @@ function EvaluationDetailsDialog({ interest, call }: { interest: EmrInterestWith
                         </div>
                     )) : (<div className="text-center py-8 text-muted-foreground">No evaluations submitted yet.</div>)}
                 </div>
-                {statusToUpdate === 'Revision Needed' ? (
-                    <div className="space-y-2">
-                        <label htmlFor="adminRemarks" className="font-medium">Revision Comments</label>
-                        <Textarea id="adminRemarks" value={adminRemarks} onChange={(e) => setAdminRemarks(e.target.value)} placeholder="Provide clear instructions for the revision..."/>
-                    </div>
-                ) : null}
-                <DialogFooter>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button>Update Final Status</Button></DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => setStatusToUpdate('Recommended')}>Recommended</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setStatusToUpdate('Endorsement Pending')}>Recommended (Endorsement Pending)</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setStatusToUpdate('Endorsement Signed')}>Endorsement Signed</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setStatusToUpdate('Not Recommended')}>Not Recommended</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setStatusToUpdate('Revision Needed')}>Revision is Needed</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    {statusToUpdate && <Button onClick={handleUpdateStatus}>Confirm Status: {statusToUpdate}</Button>}
+                 <DialogFooter>
+                    <DialogClose asChild>
+                        <Button variant="outline">Close</Button>
+                    </DialogClose>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
