@@ -45,6 +45,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { ScheduleMeetingDialog } from './schedule-meeting-dialog';
 
@@ -204,16 +205,13 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Actions</span></Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuSub>
-                                                        <DropdownMenuSubTrigger>Update Status</DropdownMenuSubTrigger>
-                                                        <DropdownMenuSubContent>
-                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
-                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Pending')}>Endorsement Pending</DropdownMenuItem>
-                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Endorsement Signed</DropdownMenuItem>
-                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
-                                                             <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
-                                                        </DropdownMenuSubContent>
-                                                    </DropdownMenuSub>
+                                                    <DropdownMenuLabel>Update Status</DropdownMenuLabel>
+                                                    <DropdownMenuSeparator />
+                                                     <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
+                                                     <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Pending')}>Endorsement Pending</DropdownMenuItem>
+                                                     <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Endorsement Signed</DropdownMenuItem>
+                                                     <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
+                                                     <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem className="text-destructive" onClick={() => { setInterestToUpdate(interest); deleteForm.reset(); }}>
                                                         <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
