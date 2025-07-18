@@ -23,20 +23,20 @@ This is the base role for all teaching and research staff.
 1.  **Profile Setup:** On first login, complete your profile under **Settings**. This includes academic details and **crucially, your salary bank account details**, which are required for any grant disbursal.
 2.  **New Project Submission:**
     -   Navigate to **New Submission**.
-    -   Fill out the multi-step form, providing all required project details.
-    -   You can **Save as Draft** at any time and resume later from the **My Projects** page.
-    -   Once complete, agree to the guidelines and click **Submit Project**.
+    -   Fill out the multi-step form, providing all required project details, including team members, abstract, and timeline.
+    -   You can **Save as Draft** at any time and resume later. Drafts are accessible from the **My Projects** page.
+    -   Once complete, agree to the guidelines on the final step and click **Submit Project**.
 3.  **Project Tracking:**
     -   Go to **My Projects** to view a list of all projects you are associated with (as PI or Co-PI).
     -   Monitor the status of your projects (e.g., `Submitted`, `Under Review`, `Recommended`).
-    -   If a project status is `Revision Needed`, open the project details page to view comments and submit a revised proposal.
+    -   If a project status is `Revision Needed`, open the project details page to view evaluator comments and submit a revised proposal.
 
 **EMR Workflow:**
 1.  **Browse Opportunities:** Navigate to the **EMR Calendar**. This page lists all available external funding calls.
-2.  **Register Interest:** For any open call, click "Register Interest" before the deadline.
+2.  **Register Interest:** For any open call, click "Register Interest" before the deadline. You can also add Co-PIs at this stage.
 3.  **Await Meeting Schedule:** Once the interest registration period closes, an admin will schedule presentation slots. You will be notified via email and in-app notification with your specific date, time, and venue.
-4.  **Upload Presentation:** After a meeting is scheduled, you must upload your presentation (PPT/PPTX). The deadline for this is automatically set to **3 days prior to your presentation date at 5:00 PM**.
-5.  **Manage Uploads:** From the EMR Calendar, you can view, replace, or remove your uploaded presentation before the deadline.
+4.  **Upload Presentation:** After a meeting is scheduled, you must upload your presentation (PPT/PPTX). The deadline for this is automatically set to **2 days prior to your presentation date at 5:00 PM**.
+5.  **Manage Uploads:** From the dashboard, you can view, replace, or remove your uploaded presentation before the deadline.
 
 ---
 
@@ -48,9 +48,9 @@ This role is for assigned reviewers of IMR or EMR proposals.
 
 **IMR Evaluation Workflow:**
 1.  **Receive Assignment:** You will be notified when you are assigned to an IMR evaluation committee.
-2.  **Access Queue:** Navigate to the **Evaluation Queue**. This page lists all IMR projects awaiting your review.
-3.  **Evaluate:** On the day of the scheduled meeting, access the project details, review the proposal, and submit your recommendation and comments.
-4.  **View History:** The **My Evaluations** page shows a record of all IMR projects you have previously reviewed.
+2.  **Access Queue:** Navigate to the **IMR Evaluation Queue**. This page lists all IMR projects awaiting your review.
+3.  **Evaluate:** On the day of the scheduled meeting, access the project details, review the proposal, and use the AI-assisted form to submit your recommendation and comments.
+4.  **View History:** The **My IMR Evaluations** page shows a record of all IMR projects you have previously reviewed.
 
 **EMR Evaluation Workflow:**
 1.  **Receive Assignment:** You will be notified when you are assigned to an EMR evaluation committee.
@@ -60,11 +60,10 @@ This role is for assigned reviewers of IMR or EMR proposals.
 ---
 
 ## 3. Chief Research Officer (CRO)
-A faculty-level administrative role with oversight of all projects and claims within their specific faculty. Can also act as an Evaluator.
+A faculty-level administrative role with oversight of all projects within their specific faculty. Can also act as an Evaluator.
 
 **Key Capabilities:**
 -   View all projects submitted from their assigned faculty.
--   View all incentive claims submitted by faculty within their faculty.
 -   (If granted by Super-admin) Access to analytics, user management, and other administrative modules.
 -   Serve as an evaluator for both IMR and EMR presentations.
 
@@ -72,11 +71,9 @@ A faculty-level administrative role with oversight of all projects and claims wi
 1.  **Project Oversight:**
     -   Navigate to **All Projects**. The list will be automatically filtered to show only projects from your assigned faculty.
     -   Monitor the status and progress of research across the faculty.
-2.  **Claim Oversight:**
-    -   Navigate to **Manage Claims**. This page will show all incentive claims from your faculty, allowing you to review their status.
-3.  **Analytics (if enabled):**
+2.  **Analytics (if enabled):**
     -   The **Analytics** dashboard provides a high-level view of research trends. For CROs, the data is automatically aggregated by **Institute**, showing which institutes within your faculty are most active.
-4.  **Evaluation Duties:**
+3.  **Evaluation Duties:**
     -   When assigned as an evaluator, follow the workflows outlined in the [Evaluator](#2-evaluator) section for both IMR and EMR.
 
 ---
@@ -116,9 +113,9 @@ A department-level administrative role with oversight of all activities within t
 These roles have the highest level of access for managing the entire portal.
 
 **IMR Management:**
--   **Full Oversight:** View and manage all projects, claims, and users across all faculties and institutes.
+-   **Full Oversight:** View and manage all projects and users across all faculties and institutes.
 -   **Meeting Scheduling:** Use the **Schedule Meeting** module to assign multiple projects to an IMR evaluation meeting, set the schedule, and assign evaluators. This automatically notifies all relevant PIs and evaluators.
--   **Status Updates:** Manually update the status of any project or incentive claim.
+-   **Status Updates:** Manually update the status of any project.
 -   **User Management:** Assign roles (Faculty, Evaluator, CRO, Admin) to users.
 -   **Bulk Data Management:** Use the **Bulk Upload** feature to import historical project data from an Excel file.
 

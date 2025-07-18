@@ -17,7 +17,6 @@ import { useToast } from '@/hooks/use-toast';
 import {
   FilePlus2,
   Book,
-  Award,
   ClipboardCheck,
   History,
   FileCheck2,
@@ -26,7 +25,6 @@ import {
   CalendarClock,
   ShieldCheck,
   Settings,
-  Bell,
   GraduationCap,
   Calendar,
   NotebookPen
@@ -58,11 +56,6 @@ const tutorialSteps = {
       icon: Book,
       title: 'Track All Your Projects',
       description: "The 'My Projects' page lists all IMR and EMR projects you are associated with. Here you can track statuses, see feedback, and manage your applications.",
-    },
-     {
-      icon: Award,
-      title: 'Claim Incentives',
-      description: "Once your research is published, use the 'Incentive Claims' module to apply for rewards for your hard work.",
     },
   ],
   Evaluator: [
@@ -116,9 +109,9 @@ const tutorialSteps = {
       description: "Your 'All Projects' and 'Analytics' pages are automatically filtered to show data from your assigned faculties. Use the dropdown filter on these pages to switch between faculties.",
     },
     {
-      icon: Award,
-      title: 'Manage Claims',
-      description: "You can also review and manage all incentive claims submitted by faculty within your assigned faculties from the 'Manage Claims' module.",
+      icon: ClipboardCheck,
+      title: 'Serve as an Evaluator',
+      description: "You can be assigned as an evaluator for both IMR and EMR projects. Your assigned tasks will appear in the 'IMR Evaluation Queue' and 'EMR Evaluations' modules.",
     },
     {
       icon: GraduationCap,
@@ -164,7 +157,7 @@ const tutorialSteps = {
      {
       icon: FileCheck2,
       title: 'Complete Oversight',
-      description: "You have access to all projects, users, and claims across the entire university. Your dashboards provide a global view of all activities.",
+      description: "You have access to all projects, users, and data across the entire university. Your dashboards provide a global view of all activities.",
     },
     {
       icon: Calendar,
