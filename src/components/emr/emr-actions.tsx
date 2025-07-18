@@ -27,11 +27,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Form } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon } from 'lucide-react';
+import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm, uploadFileToServer } from '@/app/actions';
+import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm, uploadFileToServer, submitToAgency } from '@/app/actions';
 import { isAfter, parseISO } from 'date-fns';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -51,6 +51,98 @@ interface EmrActionsProps {
 const registerInterestSchema = z.object({
   coPis: z.array(z.object({ uid: z.string(), name: z.string() })).optional(),
 });
+
+const submitToAgencySchema = z.object({
+    referenceNumber: z.string().min(1, "Reference number is required."),
+    acknowledgement: z.any().optional(),
+});
+
+function SubmitToAgencyDialog({ interest, onActionComplete, isOpen, onOpenChange }: { interest: EmrInterest; onActionComplete: () => void; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const { toast } = useToast();
+    const form = useForm<z.infer<typeof submitToAgencySchema>>({
+        resolver: zodResolver(submitToAgencySchema),
+    });
+
+    const handleSubmit = async (values: z.infer<typeof submitToAgencySchema>) => {
+        setIsSubmitting(true);
+        try {
+            let acknowledgementUrl: string | undefined;
+            const acknowledgementFile = values.acknowledgement?.[0];
+
+            if (acknowledgementFile) {
+                const dataUrl = `data:${acknowledgementFile.type};base64,${Buffer.from(await acknowledgementFile.arrayBuffer()).toString('base64')}`;
+                const path = `emr-acknowledgements/${interest.callId}/${interest.userId}/${acknowledgementFile.name}`;
+                const result = await uploadFileToServer(dataUrl, path);
+                if (result.success && result.url) {
+                    acknowledgementUrl = result.url;
+                } else {
+                    throw new Error(result.error || "Failed to upload acknowledgement.");
+                }
+            }
+
+            const submissionResult = await submitToAgency(interest.id, values.referenceNumber, acknowledgementUrl);
+
+            if (submissionResult.success) {
+                toast({ title: 'Success', description: 'Submission details have been recorded.' });
+                onActionComplete();
+                onOpenChange(false);
+            } else {
+                throw new Error(submissionResult.error);
+            }
+
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Submission Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Submit to Funding Agency</DialogTitle>
+                    <DialogDescription>
+                        Please provide the reference number and acknowledgement from the funding agency's portal.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="submit-to-agency-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
+                        <FormField
+                            name="referenceNumber"
+                            control={form.control}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Agency Reference Number</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            name="acknowledgement"
+                            control={form.control}
+                            render={({ field: { onChange, value, ...rest }}) => (
+                                <FormItem>
+                                    <FormLabel>Acknowledgement (PDF, optional)</FormLabel>
+                                    <FormControl><Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="submit-to-agency-form" disabled={isSubmitting}>
+                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : 'Submit'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function EndorsementUploadDialog({ interest, onUploadSuccess, isOpen, onOpenChange }: { interest: EmrInterest; onUploadSuccess: () => void; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
     const [endorsementFile, setEndorsementFile] = useState<File | null>(null);
@@ -223,6 +315,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
     const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
     const [isWithdrawConfirmationOpen, setIsWithdrawConfirmationOpen] = useState(false);
     const [isEndorsementUploadOpen, setIsEndorsementUploadOpen] = useState(false);
+    const [isSubmitToAgencyOpen, setIsSubmitToAgencyOpen] = useState(false);
     const { toast } = useToast();
 
     if (!user) return null;
@@ -243,8 +336,8 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
     const isSuperAdmin = user.role === 'Super-admin';
     const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
     
-    const endorsementStatuses: EmrInterest['status'][] = ['Recommended', 'Endorsement Pending', 'Endorsement Submitted', 'Endorsement Signed', 'Submitted to Agency'];
-    const showEndorsementActions = interestDetails && endorsementStatuses.includes(interestDetails.status);
+    const showEndorsementActions = interestDetails && ['Recommended', 'Endorsement Pending', 'Endorsement Submitted'].includes(interestDetails.status);
+    const showSubmitToAgencyAction = interestDetails?.status === 'Endorsement Signed';
     
     if (interestDetails) {
         if (isDashboardView) {
@@ -292,7 +385,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
 
                             {call.status === 'Open' && interestDetails.status === 'Registered' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
                             
-                            {!showEndorsementActions && (
+                            {!showEndorsementActions && !showSubmitToAgencyAction && (
                                 <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
                                     {interestDetails?.pptUrl ? <><Eye className="h-4 w-4 mr-2" /> Manage PPT</> : <><Upload className="h-4 w-4 mr-2" /> Upload PPT</>}
                                 </Button>
@@ -316,13 +409,18 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                                 )}
                                 </>
                             )}
-
+                            
+                            {showSubmitToAgencyAction && (
+                                 <Button size="sm" onClick={() => setIsSubmitToAgencyOpen(true)}>
+                                    <Send className="h-4 w-4 mr-2"/> Submit to Agency
+                                </Button>
+                            )}
                         </div>
                     )}
                     {isUploadPptOpen && <UploadPptDialog isOpen={isUploadPptOpen} onOpenChange={setIsUploadPptOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} />}
                     {isRevisionUploadOpen && <UploadPptDialog isOpen={isRevisionUploadOpen} onOpenChange={setIsRevisionUploadOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} isRevision={true} />}
                     {isEndorsementUploadOpen && <EndorsementUploadDialog isOpen={isEndorsementUploadOpen} onOpenChange={setIsEndorsementUploadOpen} interest={interestDetails} onUploadSuccess={onActionComplete} />}
-
+                    {isSubmitToAgencyOpen && <SubmitToAgencyDialog isOpen={isSubmitToAgencyOpen} onOpenChange={setIsSubmitToAgencyOpen} interest={interestDetails} onActionComplete={onActionComplete} />}
                     <AlertDialog open={isWithdrawConfirmationOpen} onOpenChange={setIsWithdrawConfirmationOpen}>
                         <AlertDialogContent>
                             <AlertDialogHeader>
