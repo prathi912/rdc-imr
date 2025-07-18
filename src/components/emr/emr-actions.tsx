@@ -32,7 +32,7 @@ import { Input } from '@/components/ui/input';
 import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm, uploadFileToServer, submitToAgency } from '@/app/actions';
-import { isAfter, parseISO } from 'date-fns';
+import { isAfter, parseISO, addDays, setHours, setMinutes, setSeconds } from 'date-fns';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { UploadPptDialog } from './upload-ppt-dialog';
@@ -394,14 +394,9 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                             {showEndorsementActions && (
                                 <>
                                 {interestDetails.endorsementFormUrl ? (
-                                    <>
-                                        <Button asChild size="sm" variant="outline">
-                                            <a href={interestDetails.endorsementFormUrl} target="_blank" rel="noopener noreferrer"><ViewIcon className="h-4 w-4 mr-2"/> View Endorsement Form</a>
-                                        </Button>
-                                        <Button size="sm" onClick={() => setIsEndorsementUploadOpen(true)}>
-                                            <FileUp className="h-4 w-4 mr-2" /> Re-upload
-                                        </Button>
-                                    </>
+                                    <Button asChild size="sm" variant="outline">
+                                        <a href={interestDetails.endorsementFormUrl} target="_blank" rel="noopener noreferrer"><ViewIcon className="h-4 w-4 mr-2"/> View Endorsement Form</a>
+                                    </Button>
                                 ) : (
                                     <Button size="sm" onClick={() => setIsEndorsementUploadOpen(true)}>
                                         <FileUp className="h-4 w-4 mr-2" /> Upload Endorsement Form
