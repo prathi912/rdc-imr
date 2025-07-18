@@ -32,12 +32,13 @@ import { Input } from '@/components/ui/input';
 import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send } from 'lucide-react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm, uploadFileToServer, submitToAgency } from '@/app/actions';
-import { isAfter, parseISO, addDays, setHours, setMinutes, setSeconds } from 'date-fns';
+import { isAfter, parseISO, addDays, setHours, setMinutes, setSeconds, subDays } from 'date-fns';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { UploadPptDialog } from './upload-ppt-dialog';
 import { format } from 'date-fns';
 import { Badge } from '../ui/badge';
+import Link from 'next/link';
 
 
 interface EmrActionsProps {
@@ -349,7 +350,20 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                         </Badge>
                     </div>
 
-                    {interestDetails.meetingSlot && (
+                    {interestDetails.status === 'Submitted to Agency' ? (
+                        <div className="w-full p-3 rounded-lg border-l-4 border-green-500 bg-green-500/10 mb-2">
+                            <div className="flex items-center gap-2 font-semibold">
+                                <CheckCircle className="h-5 w-5"/>
+                                <span>Submitted to Agency</span>
+                            </div>
+                            <div className="text-sm mt-2 pl-7 space-y-1">
+                                <p><strong>Reference No:</strong> {interestDetails.agencyReferenceNumber || 'N/A'}</p>
+                                {interestDetails.agencyAcknowledgementUrl && (
+                                     <p><strong>Acknowledgement:</strong> <Button asChild variant="link" className="p-0 h-auto text-sm"><a href={interestDetails.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View Document</a></Button></p>
+                                )}
+                            </div>
+                        </div>
+                    ) : interestDetails.meetingSlot ? (
                         <div className="w-full p-3 rounded-lg border-l-4 border-primary bg-primary/10 mb-2">
                             <div className="flex items-center gap-2 font-semibold">
                                 <CalendarClock className="h-5 w-5"/>
@@ -361,7 +375,8 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                                 <p><strong>Venue:</strong> {call.meetingDetails?.venue || 'TBD'}</p>
                             </div>
                         </div>
-                    )}
+                    ) : null}
+
                     {interestDetails.status === 'Revision Needed' ? (
                         <Alert variant="destructive">
                             <MessageSquareWarning className="h-4 w-4" />
