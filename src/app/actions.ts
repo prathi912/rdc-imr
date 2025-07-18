@@ -1962,7 +1962,7 @@ export async function updateEmrStatus(
         let emailHtml = `<p>Dear ${interest.userName},</p><p>The status of your EMR application has been updated to <strong>${status}</strong>.</p>${adminRemarks ? `<p><strong>Admin Remarks:</strong> ${adminRemarks}</p>` : ""}`
         
         if (status === 'Endorsement Signed') {
-            emailHtml += `<p>Your endorsement letter has been signed and is ready for collection from the RDC office.</p>`
+            emailHtml += `<p>Your endorsement letter has been signed and is ready for collection from the RDC office. You may now submit your proposal to the funding agency. Once submitted, please log the Agency Reference Number and Acknowledgement on the portal.</p>`
         }
         
         if (status === 'Revision Needed') {
