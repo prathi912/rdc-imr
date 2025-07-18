@@ -64,6 +64,7 @@ export default function EmrManagementOverviewPage() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
+                                        <TableHead>Call ID</TableHead>
                                         <TableHead>Call Title</TableHead>
                                         <TableHead>Agency</TableHead>
                                         <TableHead>Interest Deadline</TableHead>
@@ -74,6 +75,7 @@ export default function EmrManagementOverviewPage() {
                                 <TableBody>
                                     {calls.map(call => (
                                         <TableRow key={call.id}>
+                                            <TableCell className="font-mono text-xs">{call.callIdentifier || 'N/A'}</TableCell>
                                             <TableCell className="font-medium">{call.title}</TableCell>
                                             <TableCell>{call.agency}</TableCell>
                                             <TableCell>{format(parseISO(call.interestDeadline), 'PPp')}</TableCell>

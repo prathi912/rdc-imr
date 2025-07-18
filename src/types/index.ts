@@ -262,6 +262,7 @@ export type IncentiveClaim = {
 
 export type FundingCall = {
   id: string;
+  callIdentifier?: string; // Human-readable sequential ID
   title: string;
   agency: string;
   description?: string;

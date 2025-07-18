@@ -1727,14 +1727,14 @@ export async function createFundingCall(
     callData: z.infer<any> // Using any because the zod schema is on the client
 ): Promise<{ success: boolean, error?: string }> {
     try {
-        const callId = adminDb.collection('fundingCalls').doc().id;
+        const newCallDocRef = adminDb.collection('fundingCalls').doc();
         const attachments: { name: string; url: string }[] = [];
 
         if (callData.attachments && callData.attachments.length > 0) {
             for (let i = 0; i < callData.attachments.length; i++) {
                 const file = callData.attachments[i];
                 const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`;
-                const path = `emr-attachments/${callId}/${file.name}`;
+                const path = `emr-attachments/${newCallDocRef.id}/${file.name}`;
                 const result = await uploadFileToServer(dataUrl, path);
                 if (result.success && result.url) {
                     attachments.push({ name: file.name, url: result.url });
@@ -1743,26 +1743,42 @@ export async function createFundingCall(
                 }
             }
         }
-
-        const newCall: Omit<FundingCall, 'id'> = {
-            title: callData.title,
-            agency: callData.agency,
-            description: callData.description,
-            callType: callData.callType,
-            applyDeadline: callData.applyDeadline.toISOString(),
-            interestDeadline: callData.interestDeadline.toISOString(),
-            detailsUrl: callData.detailsUrl,
-            attachments: attachments,
-            createdAt: new Date().toISOString(),
-            createdBy: 'Super-admin',
-            status: 'Open',
-            isAnnounced: callData.notifyAllStaff,
-        };
         
-        await adminDb.collection('fundingCalls').doc(callId).set(newCall);
+        // Transaction to generate a new sequential ID
+        const newCallData = await runTransaction(adminDb, async (transaction) => {
+            const counterRef = adminDb.collection('counters').doc('emrCall');
+            const counterDoc = await transaction.get(counterRef);
+
+            let newCount = 1;
+            if (counterDoc.exists) {
+                newCount = counterDoc.data()!.current + 1;
+            }
+            transaction.set(counterRef, { current: newCount }, { merge: true });
+
+            const callIdentifier = `RDC/EMR/CALL/${String(newCount).padStart(5, '0')}`;
+            
+            const newCall: Omit<FundingCall, 'id'> = {
+                callIdentifier: callIdentifier,
+                title: callData.title,
+                agency: callData.agency,
+                description: callData.description,
+                callType: callData.callType,
+                applyDeadline: callData.applyDeadline.toISOString(),
+                interestDeadline: callData.interestDeadline.toISOString(),
+                detailsUrl: callData.detailsUrl,
+                attachments: attachments,
+                createdAt: new Date().toISOString(),
+                createdBy: 'Super-admin',
+                status: 'Open',
+                isAnnounced: callData.notifyAllStaff,
+            };
+            
+            transaction.set(newCallDocRef, newCall);
+            return { id: newCallDocRef.id, ...newCall };
+        });
 
         if (callData.notifyAllStaff) {
-            await announceEmrCall(callId);
+            await announceEmrCall(newCallData.id);
         }
 
         return { success: true };
