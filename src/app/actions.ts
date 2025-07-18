@@ -10,11 +10,25 @@ import { adminDb, adminStorage } from "@/lib/admin"
 import { FieldValue, doc, updateDoc, getFirestore } from 'firebase-admin/firestore';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation } from "@/types"
 import { sendEmail } from "@/lib/email"
-import * as XLSX from "xlsx"
+import *s XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
 import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds } from "date-fns"
 import * as z from 'zod';
+
+const EMAIL_STYLES = {
+  background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
+  logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
+  footer: `
+    <p style="color:#b0bec5; margin-top: 30px;">Best Regards,</p>
+    <p style="color:#b0bec5;">Research & Development Cell Team,</p>
+    <p style="color:#b0bec5;">Parul University</p>
+    <hr style="border-top: 1px solid #4f5b62; margin-top: 20px;">
+    <p style="font-size:10px; color:#999999; text-align:center; margin-top:10px;">
+        This is a system generated automatic email. If you feel this is an error, please report at the earliest.
+    </p>`
+};
+
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
@@ -83,10 +97,8 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     await adminDb.collection("notifications").add(notification)
 
     let emailHtml = `
-      <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;">
-        <div style="text-align:center; margin-bottom:20px;">
-          <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width:300px; height:auto;" />
-        </div>
+      <div ${EMAIL_STYLES.background}>
+        ${EMAIL_STYLES.logo}
         <p style="color:#ffffff;">Dear ${project.pi},</p>
         <p style="color:#e0e0e0;">
           The status of your project, "<strong style="color:#ffffff;">${project.title}</strong>" has been updated to 
@@ -113,8 +125,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
           PU Research Portal
         </a>.
       </p>
-      <p style="color:#b0bec5;">Thank you,</p>
-      <p style="color:#b0bec5;">Research & Development Cell - PU</p>
+      ${EMAIL_STYLES.footer}
     </div>`
 
     if (project.pi_email) {
@@ -168,32 +179,25 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
         to: claim.userEmail,
         subject: `Incentive Claim Status Update: ${newStatus}`,
         html: `
-                  <div style="background:linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:10px;">
-                    <div style="text-align:center; margin-bottom:20px;">
-                      <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC-PU Logo" style="max-width:200px; height:auto;" />
-                    </div>
-                
-                    <p style="color:#ffffff;">Dear ${claim.userName},</p>
-                
-                    <p style="color:#e0e0e0;">
-                      The status of your incentive claim for 
-                      "<strong style="color:#ffffff;">${claimTitle}</strong>" has been updated to 
-                      <strong style="color:${newStatus === "Accepted" ? "#00e676" : newStatus === "Rejected" ? "#ff5252" : "#ffca28"};">
-                        ${newStatus}
-                      </strong>.
-                    </p>
-                
-                    <p style="color:#e0e0e0;">
-                      You can view your claims on the 
-                      <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim" style="color:#64b5f6; text-decoration:underline;">
-                        PU Research Portal
-                      </a>.
-                    </p>
-                
-                    <p style="color:#b0bec5;">Thank you,</p>
-                    <p style="color:#b0bec5;">Research & Development Cell - PU</p>
-                  </div>
-                `,
+            <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear ${claim.userName},</p>
+                <p style="color:#e0e0e0;">
+                  The status of your incentive claim for 
+                  "<strong style="color:#ffffff;">${claimTitle}</strong>" has been updated to 
+                  <strong style="color:${newStatus === "Accepted" ? "#00e676" : newStatus === "Rejected" ? "#ff5252" : "#ffca28"};">
+                    ${newStatus}
+                  </strong>.
+                </p>
+                <p style="color:#e0e0e0;">
+                  You can view your claims on the 
+                  <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim" style="color:#64b5f6; text-decoration:underline;">
+                    PU Research Portal
+                  </a>.
+                </p>
+                ${EMAIL_STYLES.footer}
+            </div>
+            `,
         from: 'default'
       })
     }
@@ -242,31 +246,23 @@ export async function scheduleMeeting(
           to: project.pi_email,
           subject: `IMR Meeting Scheduled for Your Project: ${project.title}`,
           html: `
-            <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
-              <div style="text-align: center; margin-bottom: 20px;">
-                <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width: 300px; height: auto;" />
-              </div>
-
+            <div ${EMAIL_STYLES.background}>
+              ${EMAIL_STYLES.logo}
               <p style="color: #ffffff;">Dear Researcher,</p>
-
               <p style="color: #e0e0e0;">
                 An <strong style="color: #ffffff;">IMR evaluation meeting</strong> has been scheduled for your project, 
                 "<strong style="color: #ffffff;">${project.title}</strong>".
               </p>
-
               <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
-
               <p style="color: #cccccc;">
                 Please prepare for your presentation. You can view more details on the 
                 <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${project.id}" style="color: #64b5f6; text-decoration: underline;">
                   PU Research Portal
                 </a>.
               </p>
-
-          <p style="color:#b0bec5;">Thank you,</p>
-          <p style="color:#b0bec5;">Research & Development Cell - PU</p>
+              ${EMAIL_STYLES.footer}
             </div>
           `,
           from: 'default'
@@ -300,10 +296,8 @@ export async function scheduleMeeting(
               to: evaluator.email,
               subject: "IMR Evaluation Committee Assignment",
               html: `
-                <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
-                    <div style="text-align: center; margin-bottom: 20px;">
-                        <img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width: 300px; height: auto;" />
-                    </div>
+                <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
                     <p style="color: #ffffff;">Dear Evaluator,</p>
                     <p style="color: #e0e0e0;">
                         You have been assigned to the IMR evaluation committee for a meeting with the following details. You are requested to be present.
@@ -321,8 +315,7 @@ export async function scheduleMeeting(
                         PU Research Portal
                         </a>.
                     </p>
-                    <p style="color:#b0bec5;">Thank you,</p>
-                    <p style="color:#b0bec5;">Research & Development Cell - PU</p>
+                    ${EMAIL_STYLES.footer}
                 </div>
               `,
               from: 'default'
@@ -1348,7 +1341,14 @@ export async function updateCoInvestigators(
 
         // Email notification
         if (coPi.email) {
-          const emailHtml = `<p>Dear ${coPi.name},</p><p>You have been added as a Co-PI to the IMR project titled "<strong>${project.title}</strong>" by ${project.pi}.</p><p>You can view the project details on the PU Research Portal.</p>`;
+          const emailHtml = `
+            <div ${EMAIL_STYLES.background}>
+              ${EMAIL_STYLES.logo}
+              <p style="color:#ffffff;">Dear ${coPi.name},</p>
+              <p style="color:#e0e0e0;">You have been added as a Co-PI to the IMR project titled "<strong style="color:#ffffff;">${project.title}</strong>" by ${project.pi}.</p>
+              <p style="color:#e0e0e0;">You can view the project details on the PU Research Portal.</p>
+              ${EMAIL_STYLES.footer}
+            </div>`;
           await sendEmail({
               to: coPi.email,
               subject: `You've been added to an IMR Project`,
@@ -1454,7 +1454,13 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
                 await sendEmail({
                     to: coPi.email,
                     subject: `You've been added to an EMR Application`,
-                    html: `<p>Dear ${coPi.name},</p><p>You have been added as a Co-PI by ${user.name} for the EMR funding opportunity titled "<strong>${callTitle}</strong>".</p>`,
+                    html: `
+                        <div ${EMAIL_STYLES.background}>
+                            ${EMAIL_STYLES.logo}
+                            <p style="color:#ffffff;">Dear ${coPi.name},</p>
+                            <p style="color:#e0e0e0;">You have been added as a Co-PI by ${user.name} for the EMR funding opportunity titled "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
+                             ${EMAIL_STYLES.footer}
+                        </div>`,
                     from: 'default'
                 });
             }
@@ -1527,7 +1533,8 @@ export async function scheduleEmrMeeting(
       });
       
       const emailHtml = `
-          <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
+          <div ${EMAIL_STYLES.background}>
+              ${EMAIL_STYLES.logo}
               <p style="color: #ffffff;">Dear ${interest.userName},</p>
               <p style="color: #e0e0e0;">
                   A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
@@ -1536,6 +1543,7 @@ export async function scheduleEmrMeeting(
               <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
               <p style="color: #cccccc;">Please prepare for your presentation.</p>
+              ${EMAIL_STYLES.footer}
           </div>
       `;
       
@@ -1572,13 +1580,15 @@ export async function scheduleEmrMeeting(
               to: evaluator.email,
               subject: `EMR Evaluation Assignment: ${call.title}`,
               html: `
-                <div style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color: #ffffff; font-family: Arial, sans-serif; padding: 20px; border-radius: 8px;">
+                <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
                     <p style="color: #ffffff;">Dear Evaluator,</p>
                     <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
                     <p><strong style="color: #ffffff;">Date:</strong> ${format(parseISO(date), 'MMMM d, yyyy')}</p>
                      <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
                     <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Portal.</p>
+                    ${EMAIL_STYLES.footer}
                 </div>
               `,
               from: 'default'
@@ -1737,16 +1747,16 @@ export async function deleteEmrInterest(interestId: string, remarks: string, adm
                 to: interest.userEmail,
                 subject: `Update on your EMR Interest for: ${callTitle}`,
                 html: `
-                    <div style="font-family: Arial, sans-serif; padding: 20px;">
-                        <p>Dear ${interest.userName},</p>
-                        <p>Your registration of interest for the EMR funding call, "<strong>${callTitle}</strong>," has been removed by the administration.</p>
-                        <div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 6px;">
-                            <h4 style="margin-top: 0;">Remarks from ${adminName}:</h4>
-                            <p>${remarks}</p>
+                    <div ${EMAIL_STYLES.background}>
+                        ${EMAIL_STYLES.logo}
+                        <p style="color:#ffffff;">Dear ${interest.userName},</p>
+                        <p style="color:#e0e0e0;">Your registration of interest for the EMR funding call, "<strong style="color:#ffffff;">${callTitle}</strong>," has been removed by the administration.</p>
+                        <div style="margin-top: 20px; padding: 15px; border: 1px solid #4f5b62; border-radius: 6px; background-color:#2c3e50;">
+                            <h4 style="color:#ffffff; margin-top: 0;">Remarks from ${adminName}:</h4>
+                            <p style="color:#e0e0e0;">${remarks}</p>
                         </div>
-                        <p>If you have any questions, please contact the RDC helpdesk.</p>
-                        <p>Thank you,</p>
-                        <p>Research & Development Cell - PU</p>
+                        <p style="color:#e0e0e0;">If you have any questions, please contact the RDC helpdesk.</p>
+                        ${EMAIL_STYLES.footer}
                     </div>
                 `,
                 from: 'default'
@@ -1888,21 +1898,22 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     const emailAttachments = (call.attachments || []).map(att => ({ filename: att.name, path: att.url }));
 
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #2c5364;">New Funding Opportunity: ${call.title}</h2>
-        <p>A new funding call from <strong>${call.agency}</strong> has been posted on the PU Research Portal.</p>
-        <div style="padding: 15px; border: 1px solid #ddd; border-radius: 8px; margin-top: 20px;">
-          
-          <div class="prose prose-sm">${call.description || 'No description provided.'}</div>
-          <p><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>
-          <p><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), 'PP')}</p>
+      <div ${EMAIL_STYLES.background}>
+        ${EMAIL_STYLES.logo}
+        <h2 style="color: #ffffff; text-align: center;">New Funding Opportunity: ${call.title}</h2>
+        <p style="color:#e0e0e0;">A new funding call from <strong style="color:#ffffff;">${call.agency}</strong> has been posted on the PU Research Portal.</p>
+        <div style="padding: 15px; border: 1px solid #4f5b62; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
+          <div style="color:#e0e0e0;" class="prose prose-sm">${call.description || 'No description provided.'}</div>
+          <p style="color:#e0e0e0;"><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>
+          <p style="color:#e0e0e0;"><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), 'PP')}</p>
         </div>
-        <p style="margin-top: 20px;">Please find the relevant documents attached to this email.</p>
-        <p style="margin-top: 20px;">
+        <p style="color:#e0e0e0; margin-top: 20px;">Please find the relevant documents attached to this email.</p>
+        <p style="margin-top: 20px; text-align: center;">
           <a href="${call.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
             View Full Details on the Portal
           </a>
         </p>
+         ${EMAIL_STYLES.footer}
       </div>
     `;
 
@@ -1959,10 +1970,16 @@ export async function updateEmrStatus(
       await adminDb.collection("notifications").add(notification)
 
       if (interest.userEmail) {
-        let emailHtml = `<p>Dear ${interest.userName},</p><p>The status of your EMR application has been updated to <strong>${status}</strong>.</p>${adminRemarks ? `<p><strong>Admin Remarks:</strong> ${adminRemarks}</p>` : ""}`
+        let emailHtml = `
+            <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear ${interest.userName},</p>
+                <p style="color:#e0e0e0;">The status of your EMR application has been updated to <strong style="color:#ffffff;">${status}</strong>.</p>
+                ${adminRemarks ? `<div style="margin-top:20px; padding:15px; border:1px solid #4f5b62; border-radius:6px; background-color:#2c3e50;"><h4 style="color:#ffffff; margin-top:0;">Admin Remarks:</h4><p style="color:#e0e0e0;">${adminRemarks}</p></div>` : ""}
+        `;
         
         if (status === 'Endorsement Signed') {
-            emailHtml += `<p>Your endorsement letter has been signed and is ready for collection from the RDC office. You may now submit your proposal to the funding agency. Once submitted, please log the Agency Reference Number and Acknowledgement on the portal.</p>`
+            emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Your endorsement letter has been signed and is ready for collection from the RDC office. You may now submit your proposal to the funding agency. Once submitted, please log the Agency Reference Number and Acknowledgement on the portal.</p>`
         }
         
         if (status === 'Revision Needed') {
@@ -1972,12 +1989,12 @@ export async function updateEmrStatus(
                 if (call.meetingDetails?.date) {
                     const meetingDate = parseISO(call.meetingDetails.date);
                     const deadline = setSeconds(setMinutes(setHours(addDays(meetingDate, 3), 17), 0), 0); // 3 days after meeting at 5:00 PM
-                    emailHtml += `<p>Please submit your revised presentation on the portal by <strong>${format(deadline, 'PPpp')}</strong>.</p>`;
+                    emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Please submit your revised presentation on the portal by <strong style="color:#ffffff;">${format(deadline, 'PPpp')}</strong>.</p>`;
                 }
             }
         }
 
-        emailHtml += `<p>Please check the portal for more details.</p>`
+        emailHtml += `<p style="color:#e0e0e0;">Please check the portal for more details.</p>${EMAIL_STYLES.footer}</div>`
 
         await sendEmail({
           to: interest.userEmail,
