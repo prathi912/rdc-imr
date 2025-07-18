@@ -376,7 +376,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         return <Skeleton className="h-96 w-full" />;
     }
 
-    const upcomingCalls = calls.filter(c => !isAfter(new Date(), parseISO(c.applyDeadline)));
+    const upcomingCalls = calls.filter(c => !isAfter(new Date(), parseISO(c.interestDeadline)));
 
     return (
         <div className="space-y-8">
