@@ -44,6 +44,7 @@ import {
   Send,
   GripVertical,
   Save,
+  Loader2,
 } from 'lucide-react';
 
 import {
