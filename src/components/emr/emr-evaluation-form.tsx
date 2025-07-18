@@ -103,13 +103,17 @@ export function EmrEvaluationForm({ interest, user, isOpen, onOpenChange, onEval
     }
   };
 
+  const isFormDisabled = isSubmitting || loading || !!existingEvaluation;
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>EMR Evaluation for {interest.userName}</DialogTitle>
           <DialogDescription>
-            Review the presentation and provide your recommendation.
+             {existingEvaluation
+              ? 'You have already submitted your evaluation for this project. It cannot be edited.'
+              : 'Review the presentation and provide your recommendation.'}
           </DialogDescription>
         </DialogHeader>
         {loading ? (
@@ -130,13 +134,14 @@ export function EmrEvaluationForm({ interest, user, isOpen, onOpenChange, onEval
                       onValueChange={field.onChange}
                       value={field.value}
                       className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                      disabled={isFormDisabled}
                     >
                       {EMR_EVALUATION_RECOMMENDATIONS.map((option) => (
                         <FormItem key={option.value}>
                           <FormControl>
                             <RadioGroupItem value={option.value} className="sr-only" />
                           </FormControl>
-                           <FormLabel className={`flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${field.value === option.value ? 'border-primary' : ''}`}>
+                           <FormLabel className={`flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground ${isFormDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${field.value === option.value ? 'border-primary' : ''}`}>
                             <option.icon className="mb-3 h-6 w-6" />
                             {option.label}
                           </FormLabel>
@@ -155,7 +160,7 @@ export function EmrEvaluationForm({ interest, user, isOpen, onOpenChange, onEval
                 <FormItem>
                   <FormLabel>Comments</FormLabel>
                   <FormControl>
-                    <Textarea rows={5} {...field} />
+                    <Textarea rows={5} {...field} disabled={isFormDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -165,11 +170,13 @@ export function EmrEvaluationForm({ interest, user, isOpen, onOpenChange, onEval
         </Form>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button type="submit" form="emr-evaluation-form" disabled={isSubmitting || loading}>
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {existingEvaluation ? 'Update Evaluation' : 'Submit Evaluation'}
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+          {!existingEvaluation && (
+            <Button type="submit" form="emr-evaluation-form" disabled={isFormDisabled}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Submit Evaluation
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

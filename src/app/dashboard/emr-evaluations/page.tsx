@@ -247,7 +247,7 @@ export default function EmrEvaluationsPage() {
                                         <EvaluationDetailsDialog interest={interest} call={call!} />
                                     ) : `${interest.evaluations.length}/${allEvaluatorsAssigned.length}`}
                                 </TableCell>)}
-                                <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => { setSelectedInterest(interest); setIsEvaluationFormOpen(true); }}><Eye className="h-4 w-4 mr-2"/> {myEvaluation ? "View/Edit" : "Evaluate"}</Button></TableCell>
+                                <TableCell className="text-right"><Button variant="outline" size="sm" onClick={() => { setSelectedInterest(interest); setIsEvaluationFormOpen(true); }}><Eye className="h-4 w-4 mr-2"/> {myEvaluation ? "View Evaluation" : "Evaluate"}</Button></TableCell>
                             </TableRow> );
                         })}</TableBody>
                     </Table></CardContent></Card>
