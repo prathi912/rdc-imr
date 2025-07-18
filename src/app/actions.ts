@@ -7,7 +7,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, doc, updateDoc, runTransaction } from 'firebase-admin/firestore';
+import { FieldValue, doc, updateDoc, getFirestore } from 'firebase-admin/firestore';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
@@ -1369,7 +1369,7 @@ export async function updateUserTutorialStatus(uid: string): Promise<{ success: 
     if (!uid) {
       return { success: false, error: "User ID is required." };
     }
-    const userRef = adminDb.collection("users").doc(uid);
+    const userRef = adminDb.collection('users').doc(uid);
     await userRef.update({ hasCompletedTutorial: true });
     return { success: true };
   } catch (error: any) {
@@ -1393,7 +1393,7 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
     }
 
     // Use a transaction to get the next sequential ID
-    const newInterest = await runTransaction(adminDb, async (transaction) => {
+    const newInterest = await getFirestore().runTransaction(async (transaction) => {
       const counterRef = adminDb.collection('counters').doc('emrInterest');
       const counterDoc = await transaction.get(counterRef);
 
@@ -1824,7 +1824,7 @@ export async function createFundingCall(
         }
         
         // Transaction to generate a new sequential ID
-        const newCallData = await runTransaction(adminDb, async (transaction) => {
+        const newCallData = await getFirestore().runTransaction(async (transaction) => {
             const counterRef = adminDb.collection('counters').doc('emrCall');
             const counterDoc = await transaction.get(counterRef);
 
@@ -2098,3 +2098,5 @@ export async function submitToAgency(
         return { success: false, error: "Failed to log submission to agency." };
     }
 }
+
+    
