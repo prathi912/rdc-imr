@@ -37,7 +37,7 @@ export function FacultyDashboard({ user }: { user: User }) {
       
       // Fetch EMR Interests for the user
       const interestsRef = collection(db, 'emrInterests');
-      const interestsQuery = query(interestsRef, where('userId', '==', user.uid));
+      const emrQuery = query(interestsRef, where('userId', '==', user.uid));
       
       // Fetch all funding calls to map titles
       const callsRef = collection(db, 'fundingCalls');
@@ -45,8 +45,8 @@ export function FacultyDashboard({ user }: { user: User }) {
 
       const [projectsSnapshot, interestsSnapshot, callsSnapshot] = await Promise.all([
           getDocs(projectsQuery),
-          getDocs(interestsSnapshot),
-          getDocs(callsSnapshot)
+          getDocs(emrQuery),
+          getDocs(callsQuery)
       ]);
 
       const userProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
