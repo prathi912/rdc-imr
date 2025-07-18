@@ -45,8 +45,8 @@ export function FacultyDashboard({ user }: { user: User }) {
 
       const [projectsSnapshot, interestsSnapshot, callsSnapshot] = await Promise.all([
           getDocs(projectsQuery),
-          getDocs(interestsQuery),
-          getDocs(callsQuery)
+          getDocs(interestsSnapshot),
+          getDocs(callsSnapshot)
       ]);
 
       const userProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
@@ -124,32 +124,6 @@ export function FacultyDashboard({ user }: { user: User }) {
             </Card>
           ))}
         </div>
-      )}
-      
-      {emrInterests.length > 0 && (
-        <Card>
-            <CardHeader>
-                <CardTitle>My EMR Applications</CardTitle>
-                <CardDescription>A summary of your registered interests in external funding calls.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    {emrInterests.map(interest => {
-                        const call = getCallById(interest.callId);
-                        if (!call) return null;
-                        return (
-                            <div key={interest.id} className="p-3 border rounded-lg bg-background">
-                                <p className="font-semibold">{interest.callTitle || call.title}</p>
-                                <p className="text-sm text-muted-foreground">Registered on: {new Date(interest.registeredAt).toLocaleDateString()}</p>
-                                <div className="mt-2">
-                                   <EmrActions user={user} call={call} interestDetails={interest} onActionComplete={fetchData} isDashboardView={true} />
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-            </CardContent>
-        </Card>
       )}
 
        <div className="mt-4">
