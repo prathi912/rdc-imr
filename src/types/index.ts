@@ -275,6 +275,7 @@ export type FundingCall = {
   status: 'Open' | 'Closed' | 'Meeting Scheduled';
   meetingDetails?: {
     date: string; // yyyy-MM-dd
+    time?: string; // HH:mm
     venue: string;
     assignedEvaluators?: string[];
   };
@@ -282,7 +283,8 @@ export type FundingCall = {
 };
 
 export type EmrInterest = {
-    id: string; // Combination of callId and userId
+    id: string; // Auto-generated Firestore ID
+    interestId?: string; // Human-readable sequential ID
     callId: string;
     callTitle?: string; // For convenience
     userId: string;

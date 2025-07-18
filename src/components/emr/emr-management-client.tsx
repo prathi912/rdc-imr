@@ -73,6 +73,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         const dataToExport = interests.map(interest => {
             const interestedUser = userMap.get(interest.userId);
             return {
+                'Interest ID': interest.interestId || 'N/A',
                 'PI Name': interest.userName,
                 'PI Email': interest.userEmail,
                 'PI Department': interestedUser?.department || interest.department,
@@ -111,6 +112,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead>Interest ID</TableHead>
                                 <TableHead>PI</TableHead>
                                 <TableHead>Department</TableHead>
                                 <TableHead>Co-PI(s)</TableHead>
@@ -124,6 +126,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                 const interestedUser = userMap.get(interest.userId);
                                 return (
                                     <TableRow key={interest.id}>
+                                        <TableCell className="font-mono text-xs">{interest.interestId || 'N/A'}</TableCell>
                                         <TableCell className="font-medium">
                                             {interestedUser?.misId ? (
                                                 <Link href={`/profile/${interestedUser.misId}`} target="_blank" className="text-primary hover:underline">

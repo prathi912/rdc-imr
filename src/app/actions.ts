@@ -7,7 +7,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, doc, updateDoc } from 'firebase-admin/firestore';
+import { FieldValue, doc, updateDoc, runTransaction } from 'firebase-admin/firestore';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
@@ -1339,32 +1339,49 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
     if (!user || !user.uid || !user.faculty || !user.department) {
       return { success: false, error: "User profile is incomplete. Please update your faculty and department in Settings." };
     }
-    const interestRef = adminDb.collection('emrInterests').doc(`${callId}_${user.uid}`);
     
     // Check if interest already registered
-    const docSnap = await interestRef.get();
-    if (docSnap.exists) {
+    const interestsRef = adminDb.collection('emrInterests');
+    const q = interestsRef.where('callId', '==', callId).where('userId', '==', user.uid);
+    const docSnap = await q.get();
+    if (!docSnap.empty) {
         return { success: false, error: "You have already registered your interest for this call." };
     }
 
-    const newInterest: EmrInterest = {
-        id: interestRef.id,
-        callId: callId,
-        userId: user.uid,
-        userName: user.name,
-        userEmail: user.email,
-        faculty: user.faculty,
-        department: user.department,
-        registeredAt: new Date().toISOString(),
-        status: 'Registered',
-    };
+    // Use a transaction to get the next sequential ID
+    const newInterest = await runTransaction(adminDb, async (transaction) => {
+      const counterRef = adminDb.collection('counters').doc('emrInterest');
+      const counterDoc = await transaction.get(counterRef);
 
-    if (coPis && coPis.length > 0) {
-      newInterest.coPiUids = coPis.map(p => p.uid);
-      newInterest.coPiNames = coPis.map(p => p.name);
-    }
+      let newCount = 1;
+      if (counterDoc.exists) {
+        newCount = counterDoc.data()!.current + 1;
+      }
+      transaction.set(counterRef, { current: newCount }, { merge: true });
 
-    await interestRef.set(newInterest);
+      const interestId = `RDC/EMR/INTEREST/${String(newCount).padStart(5, '0')}`;
+      
+      const newInterestDoc: Omit<EmrInterest, 'id'> = {
+          interestId: interestId,
+          callId: callId,
+          userId: user.uid,
+          userName: user.name,
+          userEmail: user.email,
+          faculty: user.faculty!,
+          department: user.department!,
+          registeredAt: new Date().toISOString(),
+          status: 'Registered',
+      };
+
+      if (coPis && coPis.length > 0) {
+        newInterestDoc.coPiUids = coPis.map(p => p.uid);
+        newInterestDoc.coPiNames = coPis.map(p => p.name);
+      }
+      
+      const interestRef = adminDb.collection('emrInterests').doc();
+      transaction.set(interestRef, newInterestDoc);
+      return { id: interestRef.id, ...newInterestDoc };
+    });
 
     return { success: true };
 
@@ -1405,10 +1422,15 @@ export async function scheduleEmrMeeting(
     });
 
     for (const userId of applicantUids) {
-      const interestRef = adminDb.collection('emrInterests').doc(`${callId}_${userId}`);
-      const interestDoc = await interestRef.get();
-      if (!interestDoc.exists) continue;
+      // Find the interest document for this user and call
+      const interestsRef = adminDb.collection('emrInterests');
+      const q = interestsRef.where('callId', '==', callId).where('userId', '==', userId);
+      const interestSnapshot = await q.get();
+
+      if (interestSnapshot.empty) continue;
       
+      const interestDoc = interestSnapshot.docs[0];
+      const interestRef = interestDoc.ref;
       const interest = interestDoc.data() as EmrInterest;
 
       batch.update(interestRef, {
