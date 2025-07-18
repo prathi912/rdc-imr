@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrStatus, submitToAgency } from '@/app/actions';
+import { deleteEmrInterest, updateEmrStatus } from '@/app/actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -65,21 +65,6 @@ const adminRemarksSchema = z.object({
     remarks: z.string().min(10, "Please provide remarks for the applicant."),
 });
 
-const submitToAgencySchema = z.object({
-    referenceNumber: z.string().min(3, "A reference number is required."),
-    acknowledgementFile: z.any().optional(),
-});
-
-
-const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-    });
-};
-
 
 export function EmrManagementClient({ call, interests, allUsers, currentUser, onActionComplete }: EmrManagementClientProps) {
     const { toast } = useToast();
@@ -89,8 +74,6 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [statusToUpdate, setStatusToUpdate] = useState<EmrInterest['status'] | null>(null);
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
     const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
-    const [isSubmitToAgencyOpen, setIsSubmitToAgencyOpen] = useState(false);
-    const [isSubmittingToAgency, setIsSubmittingToAgency] = useState(false);
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
         resolver: zodResolver(deleteRegistrationSchema),
@@ -98,10 +81,6 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     
     const remarksForm = useForm<z.infer<typeof adminRemarksSchema>>({
         resolver: zodResolver(adminRemarksSchema),
-    });
-
-    const agencyForm = useForm<z.infer<typeof submitToAgencySchema>>({
-        resolver: zodResolver(submitToAgencySchema),
     });
 
     const handleDeleteInterest = async (values: z.infer<typeof deleteRegistrationSchema>) => {
@@ -144,47 +123,6 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         remarksForm.reset({ remarks: '' });
         setIsRemarksDialogOpen(true);
     };
-
-    const handleOpenSubmitToAgencyDialog = (interest: EmrInterest) => {
-        setInterestToUpdate(interest);
-        agencyForm.reset();
-        setIsSubmitToAgencyOpen(true);
-    }
-    
-    const handleSubmitToAgency = async (values: z.infer<typeof submitToAgencySchema>) => {
-        if (!interestToUpdate) return;
-        setIsSubmittingToAgency(true);
-        try {
-            let acknowledgementUrl: string | undefined;
-            if (values.acknowledgementFile && values.acknowledgementFile[0]) {
-                const file = values.acknowledgementFile[0];
-                const dataUrl = await fileToDataUrl(file);
-                const path = `emr-acknowledgements/${interestToUpdate.callId}/${interestToUpdate.userId}/${file.name}`;
-                const result = await fetch('/api/upload', { method: 'POST', body: JSON.stringify({ dataUrl, path }) }).then(res => res.json());
-
-                if (!result.success || !result.url) {
-                    throw new Error(result.error || "Acknowledgement upload failed.");
-                }
-                acknowledgementUrl = result.url;
-            }
-
-            const submitResult = await submitToAgency(interestToUpdate.id, values.referenceNumber, acknowledgementUrl);
-
-            if (submitResult.success) {
-                toast({ title: "Success", description: "Application marked as submitted to agency." });
-                onActionComplete();
-                setIsSubmitToAgencyOpen(false);
-            } else {
-                throw new Error(submitResult.error);
-            }
-
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Submission Failed', description: error.message || 'An unexpected error occurred.' });
-        } finally {
-            setIsSubmittingToAgency(false);
-        }
-    };
-
 
     const handleExport = () => {
         const dataToExport = interests.map(interest => {
@@ -277,9 +215,6 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                              <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
                                                         </DropdownMenuSubContent>
                                                     </DropdownMenuSub>
-                                                    <DropdownMenuItem onClick={() => handleOpenSubmitToAgencyDialog(interest)}>
-                                                        Submit to Agency
-                                                    </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
                                                     <DropdownMenuItem className="text-destructive" onClick={() => { setInterestToUpdate(interest); deleteForm.reset(); }}>
                                                         <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
@@ -299,7 +234,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 )}
             </CardContent>
 
-             <AlertDialog open={!!interestToUpdate && !isRemarksDialogOpen && !isSubmitToAgencyOpen} onOpenChange={() => setInterestToUpdate(null)}>
+             <AlertDialog open={!!interestToUpdate && !isRemarksDialogOpen} onOpenChange={() => setInterestToUpdate(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Registration for {interestToUpdate?.userName}?</AlertDialogTitle>
@@ -350,47 +285,6 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     <DialogFooter>
                         <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                         <Button type="submit" form="remarks-form">Submit Remarks</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-             <Dialog open={isSubmitToAgencyOpen} onOpenChange={setIsSubmitToAgencyOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Log Submission to Agency</DialogTitle>
-                        <DialogDescription>Provide the reference number and optionally upload the acknowledgement receipt.</DialogDescription>
-                    </DialogHeader>
-                     <Form {...agencyForm}>
-                        <form id="agency-form" onSubmit={agencyForm.handleSubmit(handleSubmitToAgency)} className="py-4 space-y-4">
-                            <FormField
-                                control={agencyForm.control}
-                                name="referenceNumber"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Agency Reference Number</FormLabel>
-                                        <FormControl><Input {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={agencyForm.control}
-                                name="acknowledgementFile"
-                                render={({ field: { value, onChange, ...fieldProps }}) => (
-                                    <FormItem>
-                                        <FormLabel>Acknowledgement/Receipt (Optional)</FormLabel>
-                                        <FormControl><Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...fieldProps} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </form>
-                    </Form>
-                    <DialogFooter>
-                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                        <Button type="submit" form="agency-form" disabled={isSubmittingToAgency}>
-                            {isSubmittingToAgency && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                            Confirm Submission
-                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
