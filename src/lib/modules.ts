@@ -15,6 +15,7 @@ export const ALL_MODULES = [
   { id: 'pending-reviews', label: 'Pending Reviews' },
   { id: 'completed-reviews', label: 'Completed Reviews' },
   { id: 'all-projects', label: 'All Projects' },
+  { id: 'emr-management', label: 'EMR Management' },
   { id: 'emr-logs', label: 'EMR Logs'},
   { id: 'analytics', label: 'Analytics' },
   { id: 'manage-users', label: 'Manage Users' },
@@ -33,7 +34,7 @@ const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
 const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'manage-incentive-claims', 'emr-evaluations'];
-const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'system-health', 'bulk-upload', 'emr-logs'];
+const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'system-health', 'bulk-upload', 'emr-logs', 'emr-management'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes'];
 
 // Default modules for special designations who are otherwise 'faculty' role

@@ -30,37 +30,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, CheckCircle, Clock, Edit, Plus, Trash2, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Video, Upload, File, NotebookText, Replace, Eye, ChevronDown, MessageSquareWarning, Pencil, CalendarClock, Download, Send } from 'lucide-react';
+import { Calendar, Edit, Plus, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Upload, NotebookText, Send } from 'lucide-react';
 import type { FundingCall, User, EmrInterest, EmrEvaluation } from '@/types';
-import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, subDays, setHours, setMinutes, setSeconds } from 'date-fns';
-import { uploadFileToServer, deleteEmrInterest, createFundingCall, findUserByMisId, uploadRevisedEmrPpt, updateEmrStatus, scheduleEmrMeeting, announceEmrCall } from '@/app/actions';
+import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, setHours, setMinutes, setSeconds } from 'date-fns';
+import { uploadFileToServer, createFundingCall, announceEmrCall } from '@/app/actions';
 import Link from 'next/link';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Calendar as CalendarPicker } from '../ui/calendar';
-import { Textarea } from '../ui/textarea';
-import { Separator } from '../ui/separator';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import { Label } from '../ui/label';
-import { EmrActions } from './emr-actions';
 import { Checkbox } from '../ui/checkbox';
-import * as XLSX from 'xlsx';
-import { UploadPptDialog } from './upload-ppt-dialog';
+import { EmrActions } from './emr-actions';
+
 
 interface EmrCalendarProps {
   user: User;
@@ -82,388 +67,6 @@ const callSchema = z.object({
   attachments: z.any().optional(),
   notifyAllStaff: z.boolean().default(false).optional(),
 });
-
-const scheduleSchema = z.object({
-    date: z.date({ required_error: 'A meeting date is required.' }),
-    time: z.string().min(1, "Time is required."),
-    venue: z.string().min(3, 'Meeting venue is required.'),
-    evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
-    applicantUids: z.array(z.string()).min(1, 'Please select at least one applicant.'),
-});
-
-
-const deleteRegistrationSchema = z.object({
-    remarks: z.string().min(10, "Please provide a reason for deleting the registration."),
-});
-
-
-const TimeLeft = ({ deadline }: { deadline: string }) => {
-    const [now, setNow] = useState(new Date());
-
-    useEffect(() => {
-        const interval = setInterval(() => setNow(new Date()), 60000); // Update every minute
-        return () => clearInterval(interval);
-    }, []);
-
-    const deadLineDate = parseISO(deadline);
-    if (isAfter(now, deadLineDate)) {
-        return <span className="text-destructive font-semibold">Registration Closed</span>;
-    }
-
-    const days = differenceInDays(deadLineDate, now);
-    if (days > 0) return <span>{days} day{days > 1 ? 's' : ''} left</span>;
-
-    const hours = differenceInHours(deadLineDate, now);
-    if (hours > 0) return <span>{hours} hour{hours > 1 ? 's' : ''} left</span>;
-
-    const minutes = differenceInMinutes(deadLineDate, now);
-    return <span>{minutes} minute{minutes > 1 ? 's' : ''} left</span>;
-};
-
-interface ScheduleMeetingDialogProps {
-    call: FundingCall;
-    interests: EmrInterest[];
-    allUsers: User[];
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    onActionComplete: () => void;
-}
-
-function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange, onActionComplete }: ScheduleMeetingDialogProps) {
-    const { toast } = useToast();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const form = useForm<z.infer<typeof scheduleSchema>>({
-        resolver: zodResolver(scheduleSchema),
-        defaultValues: {
-            venue: 'RDC Committee Room, PIMSR',
-            evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
-            applicantUids: [],
-            date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
-            time: call.meetingDetails?.time || '',
-        },
-    });
-
-    useEffect(() => {
-        form.reset({
-            venue: 'RDC Committee Room, PIMSR',
-            evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
-            applicantUids: [],
-            date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
-            time: call.meetingDetails?.time || '',
-        });
-    }, [call, form]);
-
-    const handleBatchSchedule = async (values: z.infer<typeof scheduleSchema>) => {
-        setIsSubmitting(true);
-        try {
-            const meetingDetails = {
-                date: format(values.date, 'yyyy-MM-dd'),
-                time: values.time,
-                venue: values.venue,
-                evaluatorUids: values.evaluatorUids,
-            };
-            const result = await scheduleEmrMeeting(call.id, meetingDetails, values.applicantUids);
-
-            if (result.success) {
-                toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
-                onActionComplete();
-                onOpenChange(false);
-            } else {
-                toast({ variant: 'destructive', title: 'Error', description: result.error });
-            }
-        } catch (error) {
-            console.error('Error scheduling batch meeting:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not schedule meeting.' });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-    
-    // Show only users who are interested in THIS call and DO NOT have a meeting slot yet
-    const usersWithInterest = interests.filter(i => i.callId === call.id && !i.meetingSlot);
-    const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !usersWithInterest.some(interest => interest.userId === u.uid));
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
-                    <DialogDescription>Select applicants and set the details for the evaluation meeting.</DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                    <form id="schedule-form" onSubmit={form.handleSubmit(handleBatchSchedule)} className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
-                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                            <h4 className="font-semibold">Select Applicants</h4>
-                            <FormField
-                                control={form.control}
-                                name="applicantUids"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <div className="flex items-center space-x-2 p-2 border-b">
-                                            <Checkbox
-                                                checked={field.value?.length === usersWithInterest.length && usersWithInterest.length > 0}
-                                                onCheckedChange={(checked) => field.onChange(checked ? usersWithInterest.map(i => i.userId) : [])}
-                                            />
-                                            <FormLabel className="font-medium">Select All</FormLabel>
-                                        </div>
-                                        {usersWithInterest.map(interest => (
-                                            <FormField
-                                                key={interest.id}
-                                                control={form.control}
-                                                name="applicantUids"
-                                                render={({ field }) => (
-                                                    <FormItem className="flex items-center space-x-2 p-2 border-b">
-                                                        <FormControl>
-                                                            <Checkbox
-                                                                checked={field.value?.includes(interest.userId)}
-                                                                onCheckedChange={(checked) => {
-                                                                    return checked
-                                                                        ? field.onChange([...(field.value || []), interest.userId])
-                                                                        : field.onChange(field.value?.filter(id => id !== interest.userId));
-                                                                }}
-                                                            />
-                                                        </FormControl>
-                                                        <FormLabel className="font-normal w-full">{interest.userName}</FormLabel>
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        ))}
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
-                        <div className="space-y-4">
-                             <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<Calendar className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><CalendarPicker mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
-                             <FormField name="time" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                             <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                             <FormField
-                                control={form.control}
-                                name="evaluatorUids"
-                                render={({ field }) => (
-                                    <FormItem className="flex flex-col">
-                                    <FormLabel>Assign Evaluators</FormLabel>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between">
-                                            {field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}
-                                            <ChevronDown className="h-4 w-4 opacity-50" />
-                                        </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent className="w-[--radix-popover-trigger-width]">
-                                        <DropdownMenuLabel>Available Staff</DropdownMenuLabel>
-                                        <DropdownMenuSeparator />
-                                        {availableEvaluators.map((evaluator) => (
-                                            <DropdownMenuCheckboxItem
-                                                key={evaluator.uid}
-                                                checked={field.value?.includes(evaluator.uid)}
-                                                onCheckedChange={(checked) => {
-                                                    return checked
-                                                    ? field.onChange([...(field.value || []), evaluator.uid])
-                                                    : field.onChange(field.value?.filter((id) => id !== evaluator.uid));
-                                                }}
-                                            >
-                                            {evaluator.name}
-                                            </DropdownMenuCheckboxItem>
-                                        ))}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                             />
-                        </div>
-                    </form>
-                </Form>
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button type="submit" form="schedule-form" disabled={isSubmitting}>
-                      {isSubmitting ? 'Scheduling...' : 'Confirm & Schedule'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-
-interface RegistrationsDialogProps {
-    call: FundingCall;
-    interests: EmrInterest[];
-    allUsers: User[];
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    onActionComplete: () => void;
-    user: User;
-}
-
-function RegistrationsDialog({ call, interests, allUsers, isOpen, onOpenChange, onActionComplete, user }: RegistrationsDialogProps) {
-    const { toast } = useToast();
-    const userMap = new Map(allUsers.map(u => [u.uid, u]));
-    const registeredInterests = interests.filter(i => i.callId === call.id);
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [interestToDelete, setInterestToDelete] = useState<EmrInterest | null>(null);
-
-    const form = useForm<z.infer<typeof deleteRegistrationSchema>>({
-        resolver: zodResolver(deleteRegistrationSchema),
-    });
-
-    const handleDeleteInterest = async (values: z.infer<typeof deleteRegistrationSchema>) => {
-        if (!interestToDelete) return;
-        setIsDeleting(true);
-        try {
-            const result = await deleteEmrInterest(interestToDelete.id, values.remarks, user.name);
-            if (result.success) {
-                toast({ title: "Registration Deleted", description: "The user has been notified." });
-                setInterestToDelete(null);
-                onActionComplete();
-            } else {
-                toast({ variant: 'destructive', title: "Error", description: result.error });
-            }
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-    
-    const handleExport = () => {
-        const dataToExport = registeredInterests.map(interest => {
-            const interestedUser = userMap.get(interest.userId);
-            return {
-                'PI Name': interest.userName,
-                'PI Email': interest.userEmail,
-                'PI Department': interestedUser?.department || interest.department,
-                'Co-PIs': interest.coPiNames?.join(', ') || 'None',
-                'Meeting Slot': interest.meetingSlot ? `${format(parseISO(interest.meetingSlot.date), 'MMM d')} at ${interest.meetingSlot.time}` : 'Not Scheduled',
-                'Presentation URL': interest.pptUrl || 'Not Submitted'
-            };
-        });
-
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Registrations');
-        XLSX.writeFile(workbook, `registrations_${call.title.replace(/\s+/g, '_')}.xlsx`);
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-4xl">
-                <DialogHeader>
-                    <DialogTitle>Registered Interest for: {call.title}</DialogTitle>
-                    <DialogDescription>
-                        The following users have registered their interest for this funding call.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="max-h-[60vh] overflow-y-auto">
-                    {registeredInterests.length > 0 ? (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>PI</TableHead>
-                                    <TableHead>Email</TableHead>
-                                    <TableHead>Co-PI(s)</TableHead>
-                                    <TableHead>Department</TableHead>
-                                    <TableHead>Meeting Slot</TableHead>
-                                    <TableHead>Presentation</TableHead>
-                                    <TableHead>Endorsement Form</TableHead>
-                                    {user.role === 'Super-admin' && <TableHead className="text-right">Actions</TableHead>}
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {registeredInterests.map(interest => {
-                                    const interestedUser = userMap.get(interest.userId);
-                                    return (
-                                        <TableRow key={interest.id}>
-                                            <TableCell className="font-medium">
-                                                {interestedUser?.misId ? (
-                                                    <Link href={`/profile/${interestedUser.misId}`} target="_blank" className="text-primary hover:underline">
-                                                        {interest.userName}
-                                                    </Link>
-                                                ) : (
-                                                    interest.userName
-                                                )}
-                                            </TableCell>
-                                            <TableCell>{interest.userEmail}</TableCell>
-                                            <TableCell>{interest.coPiNames?.join(', ') || 'None'}</TableCell>
-                                            <TableCell>{interestedUser?.department || interest.department}</TableCell>
-                                             <TableCell>
-                                                {interest.meetingSlot ? 
-                                                    `${format(parseISO(interest.meetingSlot.date), 'MMM d')} at ${interest.meetingSlot.time}`
-                                                    : 'Not Scheduled'}
-                                             </TableCell>
-                                             <TableCell>
-                                                 {interest.pptUrl ? (
-                                                     <Button asChild variant="link" className="p-0 h-auto">
-                                                         <a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">View</a>
-                                                     </Button>
-                                                 ) : 'Not Submitted'}
-                                             </TableCell>
-                                             <TableCell>
-                                                {interest.endorsementFormUrl ? (
-                                                     <Button asChild variant="link" className="p-0 h-auto">
-                                                         <a href={interest.endorsementFormUrl} target="_blank" rel="noopener noreferrer">View</a>
-                                                     </Button>
-                                                 ) : 'Not Submitted'}
-                                             </TableCell>
-                                             {user.role === 'Super-admin' && (
-                                                <TableCell className="text-right">
-                                                    <Button variant="destructive" size="icon" onClick={() => setInterestToDelete(interest)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                        <span className="sr-only">Delete Registration</span>
-                                                    </Button>
-                                                </TableCell>
-                                             )}
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    ) : (
-                        <div className="text-center p-8 text-muted-foreground">
-                            No users have registered for this call yet.
-                        </div>
-                    )}
-                </div>
-                <DialogFooter className="justify-between">
-                    {user.role === 'Super-admin' && (
-                        <Button variant="outline" onClick={handleExport} disabled={registeredInterests.length === 0}>
-                            <Download className="mr-2 h-4 w-4" /> Export XLSX
-                        </Button>
-                    )}
-                    <DialogClose asChild><Button variant="outline">Close</Button></DialogClose>
-                </DialogFooter>
-                 <AlertDialog open={!!interestToDelete} onOpenChange={() => setInterestToDelete(null)}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Registration for {interestToDelete?.userName}?</AlertDialogTitle>
-                            <AlertDialogDescription>Please provide a reason for this deletion. The user will be notified.</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <Form {...form}>
-                            <form id="delete-interest-form" onSubmit={form.handleSubmit(handleDeleteInterest)}>
-                                <FormField
-                                    control={form.control}
-                                    name="remarks"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormControl><Textarea {...field} /></FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-                            </form>
-                        </Form>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction type="submit" form="delete-interest-form" disabled={isDeleting}>
-                                {isDeleting ? "Deleting..." : "Confirm & Delete"}
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 function AddEditCallDialog({
   isOpen,
@@ -651,14 +254,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const { toast } = useToast();
     const [calls, setCalls] = useState<FundingCall[]>([]);
     const [userInterests, setUserInterests] = useState<EmrInterest[]>([]);
-    const [allInterests, setAllInterests] = useState<EmrInterest[]>([]);
-    const [allUsers, setAllUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
-    const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [isRegistrationsOpen, setIsRegistrationsOpen] = useState(false);
     const [isAnnounceDialogOpen, setIsAnnounceDialogOpen] = useState(false);
     const [isAnnouncing, setIsAnnouncing] = useState(false);
 
@@ -709,12 +308,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            if (isAdmin) {
-                const usersQuery = query(collection(db, 'users'));
-                const usersSnapshot = await getDocs(usersQuery);
-                setAllUsers(usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User)));
-            }
-
             const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
             const unsubscribeCalls = onSnapshot(callsQuery, (snapshot) => {
                 setCalls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)));
@@ -724,21 +317,12 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
             const unsubscribeUserInterests = onSnapshot(userInterestsQuery, (snapshot) => {
                 setUserInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest})));
             });
-
-            let unsubscribeAllInterests = () => {};
-            if (isAdmin) {
-                const allInterestsQuery = query(collection(db, 'emrInterests'));
-                unsubscribeAllInterests = onSnapshot(allInterestsQuery, (snapshot) => {
-                    setAllInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest})));
-                });
-            }
             
             setLoading(false);
 
             return () => {
                 unsubscribeCalls();
                 unsubscribeUserInterests();
-                unsubscribeAllInterests();
             }
 
         } catch (error) {
@@ -746,7 +330,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch EMR data.' });
             setLoading(false);
         }
-    }, [toast, user.uid, isAdmin]);
+    }, [toast, user.uid]);
 
     useEffect(() => {
         const unsubscribePromise = fetchData();
@@ -794,7 +378,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
 
     return (
         <div className="space-y-8">
-            {userInterests.length > 0 && (
+             {userInterests.length > 0 && (
                 <Card>
                     <CardHeader>
                         <CardTitle>My EMR Applications</CardTitle>
@@ -871,9 +455,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                             {upcomingCalls.length > 0 ? upcomingCalls.map(call => {
                                 const interestDetails = userInterests.find(i => i.callId === call.id);
                                 const callRef = eventRefs.get(`deadline-${call.id}`);
-                                const registeredCount = allInterests.filter(i => i.callId === call.id).length;
-                                const allApplicantsScheduled = registeredCount > 0 && allInterests.filter(i => i.callId === call.id && !!i.meetingSlot).length === registeredCount;
-
                                 return (
                                     <div key={call.id} ref={callRef} className="border p-4 rounded-lg space-y-3">
                                         <div className="flex items-start justify-between gap-4">
@@ -895,11 +476,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 {isAdmin && (
-                                                    <Button
-                                                        variant="ghost" size="sm"
-                                                        onClick={() => { setSelectedCall(call); setIsRegistrationsOpen(true); }}
-                                                    >
-                                                        <Users className="h-4 w-4 mr-1"/> View Registrations ({registeredCount})
+                                                    <Button asChild variant="ghost" size="sm">
+                                                        <Link href={`/dashboard/emr-management/${call.id}`}>
+                                                            <Users className="h-4 w-4 mr-1"/> View Registrations
+                                                        </Link>
                                                     </Button>
                                                 )}
                                                 {isSuperAdmin && (
@@ -913,19 +493,10 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                 <ViewDescriptionDialog call={call} />
                                                 {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
                                             </div>
-                                            {isSuperAdmin && (
-                                                <div className="flex items-center gap-2">
-                                                    {!call.isAnnounced && (
-                                                        <Button size="sm" variant="outline" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
-                                                            <Send className="mr-2 h-4 w-4" /> Announce
-                                                        </Button>
-                                                    )}
-                                                    {registeredCount > 0 && !allApplicantsScheduled && (
-                                                        <Button size="sm" onClick={() => {setSelectedCall(call); setIsScheduleDialogOpen(true);}}>
-                                                            <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
-                                                        </Button>
-                                                    )}
-                                                </div>
+                                            {isSuperAdmin && !call.isAnnounced && (
+                                                <Button size="sm" variant="outline" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
+                                                    <Send className="mr-2 h-4 w-4" /> Announce
+                                                </Button>
                                             )}
                                         </div>
 
@@ -948,25 +519,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                             user={user}
                             onActionComplete={fetchData}
                         />
-                        {selectedCall && (
-                            <>
-                             <ScheduleMeetingDialog
-                                isOpen={isScheduleDialogOpen}
-                                onOpenChange={setIsScheduleDialogOpen}
-                                onActionComplete={fetchData}
-                                call={selectedCall}
-                                interests={allInterests}
-                                allUsers={allUsers}
-                             />
-                             <RegistrationsDialog 
-                                call={selectedCall} 
-                                interests={allInterests} 
-                                allUsers={allUsers}
-                                isOpen={isRegistrationsOpen}
-                                onOpenChange={setIsRegistrationsOpen}
-                                onActionComplete={fetchData}
-                                user={user}
-                            />
+                         {selectedCall && (
                              <AlertDialog open={isAnnounceDialogOpen} onOpenChange={setIsAnnounceDialogOpen}>
                                <AlertDialogContent>
                                  <AlertDialogHeader>
@@ -984,8 +537,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                  </AlertDialogFooter>
                                </AlertDialogContent>
                              </AlertDialog>
-                            </>
-                        )}
+                         )}
                     </>
                 )}
             </Card>

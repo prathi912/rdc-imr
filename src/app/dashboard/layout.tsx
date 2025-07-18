@@ -45,6 +45,7 @@ import {
   GripVertical,
   Save,
   Loader2,
+  Briefcase,
 } from 'lucide-react';
 
 import {
@@ -143,6 +144,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'pending-reviews', href: '/dashboard/pending-reviews', tooltip: 'Pending Reviews', icon: GanttChartSquare, label: 'Pending Reviews' },
     { id: 'completed-reviews', href: '/dashboard/completed-reviews', tooltip: 'Completed Reviews', icon: FileCheck2, label: 'Completed Reviews' },
     { id: 'all-projects', href: '/dashboard/all-projects', tooltip: 'All Projects', icon: Book, label: 'All Projects' },
+    { id: 'emr-management', href: '/dashboard/emr-management', tooltip: 'EMR Management', icon: Briefcase, label: 'EMR Management' },
     { id: 'emr-logs', href: '/dashboard/emr-logs', tooltip: 'EMR Logs', icon: Send, label: 'EMR Logs' },
     { id: 'analytics', href: '/dashboard/analytics', tooltip: 'Analytics', icon: LineChart, label: 'Analytics' },
     { id: 'manage-users', href: '/dashboard/manage-users', tooltip: 'Manage Users', icon: Users, label: 'Manage Users' },
