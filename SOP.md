@@ -79,7 +79,7 @@ A faculty-level administrative role with oversight of all projects within their 
 ---
 
 ## 4. Principal
-An institute-level administrative role with oversight of all activities within their specific institute.
+An institute-level administrative role with oversight of all activities within their specific institute. Principals are requested to sign up using institutional Email Id (Ex: piet@paruluniversity.ac.in). Also, principals when logging in to portal from Personal Email (Ex:firstname.lastname82921@paruluniversity.ac.in) should mark thier role as **Professor**, as applicable. Designation of "Prinicpal* is strictly for Institutional IDs.
 
 **Key Capabilities:**
 -   View all projects submitted from their institute.

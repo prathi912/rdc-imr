@@ -7,14 +7,17 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, doc, updateDoc, getFirestore } from 'firebase-admin/firestore';
-import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation } from "@/types"
+import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection } from 'firebase-admin/firestore';
+import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
 import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds } from "date-fns"
 import * as z from 'zod';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
+
 
 const EMAIL_STYLES = {
   background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
@@ -2130,8 +2133,66 @@ export async function submitToAgency(
     }
 }
 
+export async function generateRecommendationForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
+  try {
+    const projectRef = adminDb.collection('projects').doc(projectId);
+    const projectSnap = await projectRef.get();
+    if (!projectSnap.exists) {
+      return { success: false, error: 'Project not found.' };
+    }
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
     
-
+    const evaluationsRef = collection(projectRef, 'evaluations');
+    const evaluationsSnap = await getDocs(evaluationsRef);
+    const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
     
+    const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
+    if (!fs.existsSync(templatePath)) {
+      return { success: false, error: 'Recommendation form template not found on the server.' };
+    }
+    const content = fs.readFileSync(templatePath, 'binary');
 
+    const zip = new PizZip(content);
+    const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+    });
 
+    const recommendationText = evaluations.map(e => {
+        return `${e.evaluatorName} (${e.recommendation}):\n${e.comments}`;
+    }).join('\n\n');
+
+    const data = {
+        pi_name: project.pi,
+        submission_date: new Date(project.submissionDate).toLocaleDateString(),
+        project_title: project.title,
+        faculty: project.faculty,
+        department: project.departmentName,
+        institute: project.institute,
+        grant_amount: project.grant?.totalAmount.toLocaleString('en-IN') || 'N/A',
+        evaluator_comments: recommendationText || 'No evaluations submitted yet.'
+    };
+    
+    doc.setData(data);
+
+    try {
+      doc.render();
+    } catch (error: any) {
+      console.error('Docxtemplater render error:', error);
+      return { success: false, error: 'Failed to render the document template.' };
+    }
+
+    const buf = doc.getZip().generate({ type: 'nodebuffer' });
+    const base64 = buf.toString('base64');
+
+    return { success: true, fileData: base64 };
+  } catch (error: any) {
+    console.error('Error generating recommendation form:', error);
+    return { success: false, error: error.message || 'Failed to generate the form.' };
+  }
+}
+    
+```
+- src/devDependencies
+- @types/pizzip
+- 3.0.5
