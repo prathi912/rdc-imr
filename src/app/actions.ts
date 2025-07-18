@@ -1310,9 +1310,53 @@ export async function updateCoInvestigators(
       return { success: false, error: "Project ID is required." }
     }
     const projectRef = adminDb.collection("projects").doc(projectId)
+    const projectSnap = await projectRef.get();
+    if (!projectSnap.exists) {
+        return { success: false, error: "Project not found." };
+    }
+    const project = projectSnap.data() as Project;
+    const existingCoPis = project.coPiUids || [];
+
     await projectRef.update({
       coPiUids: coPiUids,
     })
+
+    const newCoPis = coPiUids.filter(uid => !existingCoPis.includes(uid));
+
+    if (newCoPis.length > 0) {
+      const usersRef = adminDb.collection("users");
+      const usersQuery = usersRef.where(FieldValue.documentId(), "in", newCoPis);
+      const newCoPiDocs = await usersQuery.get();
+      
+      const batch = adminDb.batch();
+
+      for (const userDoc of newCoPiDocs.docs) {
+        const coPi = userDoc.data() as User;
+        
+        // In-app notification
+        const notificationRef = adminDb.collection("notifications").doc();
+        batch.set(notificationRef, {
+            uid: coPi.uid,
+            projectId: projectId,
+            title: `You have been added as a Co-PI to the IMR project: "${project.title}"`,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+        });
+
+        // Email notification
+        if (coPi.email) {
+          const emailHtml = `<p>Dear ${coPi.name},</p><p>You have been added as a Co-PI to the IMR project titled "<strong>${project.title}</strong>" by ${project.pi}.</p><p>You can view the project details on the PU Research Portal.</p>`;
+          await sendEmail({
+              to: coPi.email,
+              subject: `You've been added to an IMR Project`,
+              html: emailHtml,
+              from: 'default'
+          });
+        }
+      }
+      await batch.commit();
+    }
+    
     return { success: true }
   } catch (error: any) {
     console.error("Error updating Co-PIs:", error)
@@ -1382,6 +1426,39 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
       transaction.set(interestRef, newInterestDoc);
       return { id: interestRef.id, ...newInterestDoc };
     });
+
+     // Notify Co-PIs
+    if (coPis && coPis.length > 0) {
+        const callSnap = await adminDb.collection('fundingCalls').doc(callId).get();
+        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : "an EMR call";
+
+        const usersRef = adminDb.collection("users");
+        const usersQuery = usersRef.where(FieldValue.documentId(), "in", coPis.map(p => p.uid));
+        const coPiDocs = await usersQuery.get();
+        const batch = adminDb.batch();
+
+        for (const userDoc of coPiDocs.docs) {
+            const coPi = userDoc.data() as User;
+            const notificationRef = adminDb.collection("notifications").doc();
+            batch.set(notificationRef, {
+                uid: coPi.uid,
+                title: `You've been added as a Co-PI for the EMR call: "${callTitle}"`,
+                createdAt: new Date().toISOString(),
+                isRead: false,
+            });
+
+            if (coPi.email) {
+                await sendEmail({
+                    to: coPi.email,
+                    subject: `You've been added to an EMR Application`,
+                    html: `<p>Dear ${coPi.name},</p><p>You have been added as a Co-PI by ${user.name} for the EMR funding opportunity titled "<strong>${callTitle}</strong>".</p>`,
+                    from: 'default'
+                });
+            }
+        }
+        await batch.commit();
+    }
+
 
     return { success: true };
 
