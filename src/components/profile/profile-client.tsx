@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { User, IncentiveClaim, Project, EmrInterest } from '@/types';
+import type { User, IncentiveClaim, Project, EmrInterest, FundingCall } from '@/types';
 import { getResearchDomain } from '@/app/actions';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Bot, Loader2 } from 'lucide-react';
+import { format } from 'date-fns';
 
 function ProfileDetail({ label, value }: { label: string; value?: string }) {
     if (!value) return null;
@@ -22,7 +23,7 @@ function ProfileDetail({ label, value }: { label: string; value?: string }) {
     );
 }
 
-export function ProfileClient({ user, projects, emrInterests }: { user: User; projects: Project[], emrInterests: EmrInterest[] }) {
+export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[] }) {
     const [domain, setDomain] = useState<string | null>(null);
     const [loadingDomain, setLoadingDomain] = useState(false);
 
@@ -45,6 +46,10 @@ export function ProfileClient({ user, projects, emrInterests }: { user: User; pr
         };
         fetchDomain();
     }, [projects]);
+    
+    const getCallTitle = (callId: string) => {
+        return fundingCalls.find(c => c.id === callId)?.title || callId;
+    }
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
@@ -130,11 +135,16 @@ export function ProfileClient({ user, projects, emrInterests }: { user: User; pr
                              {emrInterests.length > 0 ? emrInterests.map(interest => (
                                 <Card key={interest.id}>
                                     <CardContent className="p-4">
-                                        <p className="font-semibold">{interest.callId}</p>
-                                        <p className="text-sm text-muted-foreground">Registered on: {new Date(interest.registeredAt).toLocaleDateString()}</p>
-                                        {interest.meetingSlot && (
-                                            <Badge variant="secondary" className="mt-2">Meeting: {new Date(interest.meetingSlot.date).toLocaleDateString()} at {interest.meetingSlot.time}</Badge>
-                                        )}
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <p className="font-semibold">{getCallTitle(interest.callId)}</p>
+                                            {interest.userId === user.uid ? (
+                                                <Badge variant="secondary">PI</Badge>
+                                            ) : (
+                                                <Badge variant="outline">Co-PI</Badge>
+                                            )}
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">Registered on: {format(new Date(interest.registeredAt), 'PPP')}</p>
+                                        <Badge variant={interest.status === 'Recommended' ? 'default' : 'secondary'} className="mt-2">{interest.status}</Badge>
                                     </CardContent>
                                 </Card>
                             )) : (
@@ -147,5 +157,3 @@ export function ProfileClient({ user, projects, emrInterests }: { user: User; pr
         </div>
     );
 }
-
-    
