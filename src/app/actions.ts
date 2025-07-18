@@ -1512,6 +1512,7 @@ export async function scheduleEmrMeeting(
 
       batch.update(interestRef, {
         meetingSlot: { date, time },
+        status: 'Evaluation Pending',
       });
 
       const notificationRef = adminDb.collection("notifications").doc();
@@ -1621,7 +1622,8 @@ export async function uploadEmrPpt(interestId: string, pptDataUrl: string, origi
     
     await interestRef.update({
       pptUrl: result.url,
-      pptSubmissionDate: new Date().toISOString()
+      pptSubmissionDate: new Date().toISOString(),
+      status: 'PPT Submitted',
     });
 
     return { success: true };
