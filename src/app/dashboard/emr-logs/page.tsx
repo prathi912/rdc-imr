@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from '@/lib/config';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
-import type { EmrInterest, FundingCall } from '@/types';
+import type { EmrInterest, FundingCall, User } from '@/types';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function EmrLogsPage() {
     const [logs, setLogs] = useState<EmrInterest[]>([]);
     const [calls, setCalls] = useState<Map<string, FundingCall>>(new Map());
+    const [users, setUsers] = useState<Map<string, User>>(new Map());
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
 
@@ -26,26 +27,41 @@ export default function EmrLogsPage() {
         const fetchData = async () => {
             setLoading(true);
             try {
+                // Fetch logs
                 const logsQuery = query(collection(db, 'emrInterests'), where('status', '==', 'Submitted to Agency'), orderBy('submittedToAgencyAt', 'desc'));
                 const logsSnapshot = await getDocs(logsQuery);
                 const fetchedLogs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
                 setLogs(fetchedLogs);
 
+                // Get unique call and user IDs from logs
                 const callIds = [...new Set(fetchedLogs.map(log => log.callId))];
+                const userIds = [...new Set(fetchedLogs.map(log => log.userId))];
+
+                // Fetch related calls
                 if (callIds.length > 0) {
                     const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
                     const callsSnapshot = await getDocs(callsQuery);
                     const callsMap = new Map(callsSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as FundingCall]));
                     setCalls(callsMap);
                 }
+
+                // Fetch related users
+                if (userIds.length > 0) {
+                    const usersQuery = query(collection(db, 'users'), where('__name__', 'in', userIds));
+                    const usersSnapshot = await getDocs(usersQuery);
+                    const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as User]));
+                    setUsers(usersMap);
+                }
+
             } catch (error) {
                 console.error("Error fetching EMR logs:", error);
+                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch EMR logs and user data.'});
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, []);
+    }, [toast]);
 
     const getCall = (callId: string) => calls.get(callId);
     
@@ -57,9 +73,13 @@ export default function EmrLogsPage() {
 
         const dataToExport = logs.map(log => {
             const call = getCall(log.callId);
+            const user = users.get(log.userId);
             return {
                 'PI': log.userName,
                 'PI Email': log.userEmail,
+                'Institute': user?.institute || 'N/A',
+                'Department': user?.department || 'N/A',
+                'Faculty': user?.faculty || 'N/A',
                 'Funding Call': call?.title || 'Unknown',
                 'Agency Name': call?.agency || 'Unknown',
                 'Reference No.': log.agencyReferenceNumber || 'N/A',
