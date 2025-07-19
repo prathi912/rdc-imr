@@ -279,7 +279,7 @@ export async function scheduleMeeting(
         meetingDetails.evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()),
       )
 
-      const projectTitles = projectsToSchedule.map((p) => `<li style="color: #cccccc;">${p.title}</li>`).join("")
+      const projectTitles = projectsToSchedule.map((p) => `<li style="color: #cccccc;">${p.title}</li>`).join("");
 
       for (const evaluatorDocSnapshot of evaluatorDocs) {
         if (evaluatorDocSnapshot.exists) {
@@ -2191,4 +2191,5 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
 }
+
 
