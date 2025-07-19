@@ -200,7 +200,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     try {
       const evaluationsCol = collection(db, "projects", initialProject.id, "evaluations")
       const evaluationsSnapshot = await getDocs(evaluationsCol)
-      const evaluationsList = evaluationsSnapshot.docs.map((doc) => doc.data() as Evaluation)
+      const evaluationsList = evaluationsSnapshot.docs.map((evaluationDoc) => evaluationDoc.data() as Evaluation)
       setEvaluations(evaluationsList)
     } catch (error) {
       console.error("Error refetching evaluations:", error)
@@ -647,39 +647,39 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }
 
   const handlePrint = async () => {
-    setIsPrinting(true);
+    setIsPrinting(true)
     try {
-      const result = await generatePresentationNoting(project.id);
+      const result = await generatePresentationNoting(project.id)
       if (result.success && result.fileData) {
-        const byteCharacters = atob(result.fileData);
-        const byteNumbers = new Array(byteCharacters.length);
+        const byteCharacters = atob(result.fileData)
+        const byteNumbers = new Array(byteCharacters.length)
         for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
         }
-        const byteArray = new Uint8Array(byteNumbers);
+        const byteArray = new Uint8Array(byteNumbers)
         const blob = new Blob([byteArray], {
           type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        });
+        })
 
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${project.pi.replace(/\s/g, "_")}_APPLICATION_IMR.docx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
-        toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${project.pi.replace(/\s/g, "_")}_APPLICATION_IMR.docx`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.URL.revokeObjectURL(url)
+        toast({ title: "Download Started", description: "Office Notings form is being downloaded." })
       } else {
-        throw new Error(result.error || "Failed to generate form.");
+        throw new Error(result.error || "Failed to generate form.")
       }
     } catch (error: any) {
-      console.error("Print error:", error);
-      toast({ variant: "destructive", title: "Download Failed", description: error.message });
+      console.error("Print error:", error)
+      toast({ variant: "destructive", title: "Download Failed", description: error.message })
     } finally {
-      setIsPrinting(false);
+      setIsPrinting(false)
     }
-  };
+  }
 
   const availableStatuses: Project["status"][] = [
     "Submitted",
