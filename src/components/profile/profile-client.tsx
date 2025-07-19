@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
 
@@ -66,8 +66,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
 
     return (
         <div className="flex flex-col items-center">
-            <div className="w-full h-20" />
-            <Card className="w-full max-w-4xl -mt-20 mx-auto shadow-xl border-0 bg-card/80 backdrop-blur-lg">
+            <Card className="w-full max-w-4xl mt-12 mx-auto shadow-xl border-0 bg-card/80 backdrop-blur-lg">
                 <CardContent className="p-6 md:p-8">
                     <div className="relative flex flex-col items-center md:flex-row md:items-start md:justify-between -mt-24 md:-mt-16">
                          <Avatar className="h-32 w-32 border-4 border-background">
@@ -96,11 +95,13 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-6 border-t">
                         <div className="space-y-4">
-                            <h3 className="font-semibold text-lg">Academic Details</h3>
+                            <h3 className="font-semibold text-lg">Academic & Contact Details</h3>
                             <div className="space-y-4">
                                 <ProfileDetail label="Faculty" value={user.faculty} icon={Building2} />
                                 <ProfileDetail label="Institute" value={user.institute} icon={Building2} />
                                 <ProfileDetail label="Department" value={user.department} icon={Briefcase} />
+                                <ProfileDetail label="Email" value={user.email} icon={Mail} />
+                                <ProfileDetail label="Phone" value={user.phoneNumber} icon={Phone} />
                             </div>
                         </div>
                         <div className="space-y-4">
