@@ -42,12 +42,6 @@ export default function EmrLogsPage() {
                 const logsSnapshot = await getDocs(logsQuery);
                 let fetchedLogs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
 
-                // Filter logs for CROs
-                if (currentUser.role === 'CRO' && currentUser.faculties && currentUser.faculties.length > 0) {
-                    fetchedLogs = fetchedLogs.filter(log => currentUser.faculties!.includes(log.faculty));
-                }
-                setLogs(fetchedLogs);
-
                 // Get unique call and user IDs from logs
                 const callIds = [...new Set(fetchedLogs.map(log => log.callId))];
                 const userIds = [...new Set(fetchedLogs.map(log => log.userId))];
@@ -61,12 +55,30 @@ export default function EmrLogsPage() {
                 }
 
                 // Fetch related users
+                const usersMap = new Map<string, User>();
                 if (userIds.length > 0) {
                     const usersQuery = query(collection(db, 'users'), where('__name__', 'in', userIds));
                     const usersSnapshot = await getDocs(usersQuery);
-                    const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as User]));
+                    usersSnapshot.forEach(doc => {
+                        usersMap.set(doc.id, { id: doc.id, ...doc.data() } as User);
+                    });
                     setUsers(usersMap);
                 }
+
+                // Filter logs for CROs
+                if (currentUser.role === 'CRO' && currentUser.faculties && currentUser.faculties.length > 0) {
+                    fetchedLogs = fetchedLogs.filter(log => currentUser.faculties!.includes(log.faculty));
+                } 
+                // Filter logs for Principals
+                else if (currentUser.designation === 'Principal' && currentUser.institute) {
+                    fetchedLogs = fetchedLogs.filter(log => {
+                        const applicant = usersMap.get(log.userId);
+                        return applicant?.institute === currentUser.institute;
+                    });
+                }
+                
+                setLogs(fetchedLogs);
+
 
             } catch (error) {
                 console.error("Error fetching EMR logs:", error);
@@ -110,10 +122,16 @@ export default function EmrLogsPage() {
         toast({ title: "Export Started", description: `Downloading ${logs.length} log entries.` });
     };
 
-    const pageTitle = currentUser?.role === 'CRO' ? `EMR Logs for Your Faculties` : "EMR Submission Logs";
-    const pageDescription = currentUser?.role === 'CRO' 
-        ? "Records of EMR applications submitted to the funding agency from your faculties." 
-        : "Records of all EMR applications that have been submitted to the funding agency.";
+    let pageTitle = "EMR Submission Logs";
+    let pageDescription = "Records of all EMR applications that have been submitted to the funding agency.";
+    
+    if (currentUser?.role === 'CRO') {
+        pageTitle = `EMR Logs for Your Faculties`;
+        pageDescription = "Records of EMR applications submitted to the funding agency from your faculties.";
+    } else if (currentUser?.designation === 'Principal' && currentUser.institute) {
+        pageTitle = `EMR Logs for ${currentUser.institute}`;
+        pageDescription = "Records of EMR applications submitted to the funding agency from your institute.";
+    }
 
 
     return (
@@ -166,7 +184,7 @@ export default function EmrLogsPage() {
                             </Table>
                         ) : (
                             <div className="text-center text-muted-foreground py-8">
-                                No submissions have been logged yet for your faculties.
+                                No submissions have been logged yet for your scope.
                             </div>
                         )}
                     </CardContent>
