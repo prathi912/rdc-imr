@@ -66,8 +66,8 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
 
     return (
         <div className="flex flex-col items-center">
-            <div className="w-full h-40 bg-gradient-to-r from-blue-400 to-teal-500 rounded-t-lg" />
-            <Card className="w-full max-w-4xl -mt-20 mx-auto shadow-xl border-0">
+            <div className="w-full h-20" />
+            <Card className="w-full max-w-4xl -mt-20 mx-auto shadow-xl border-0 bg-card/80 backdrop-blur-lg">
                 <CardContent className="p-6 md:p-8">
                     <div className="relative flex flex-col items-center md:flex-row md:items-start md:justify-between -mt-24 md:-mt-16">
                          <Avatar className="h-32 w-32 border-4 border-background">
