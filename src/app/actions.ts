@@ -2057,10 +2057,10 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
     const batch = adminDb.batch();
     const notificationTitle = `New ${role.toUpperCase()} joined: ${userName}`;
 
-    superAdminUsersSnapshot.forEach((userDoc) => {
+    superAdminUsersSnapshot.forEach((docSnapshot) => {
       const notificationRef = adminDb.collection("notifications").doc();
       batch.set(notificationRef, {
-        uid: userDoc.id,
+        uid: docSnapshot.id,
         title: notificationTitle,
         createdAt: new Date().toISOString(),
         isRead: false,
