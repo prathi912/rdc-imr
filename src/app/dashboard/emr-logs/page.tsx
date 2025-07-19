@@ -21,16 +21,31 @@ export default function EmrLogsPage() {
     const [calls, setCalls] = useState<Map<string, FundingCall>>(new Map());
     const [users, setUsers] = useState<Map<string, User>>(new Map());
     const [loading, setLoading] = useState(true);
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const { toast } = useToast();
 
     useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            setCurrentUser(JSON.parse(storedUser));
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        
         const fetchData = async () => {
             setLoading(true);
             try {
                 // Fetch logs
                 const logsQuery = query(collection(db, 'emrInterests'), where('status', '==', 'Submitted to Agency'), orderBy('submittedToAgencyAt', 'desc'));
                 const logsSnapshot = await getDocs(logsQuery);
-                const fetchedLogs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+                let fetchedLogs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+
+                // Filter logs for CROs
+                if (currentUser.role === 'CRO' && currentUser.faculties && currentUser.faculties.length > 0) {
+                    fetchedLogs = fetchedLogs.filter(log => currentUser.faculties!.includes(log.faculty));
+                }
                 setLogs(fetchedLogs);
 
                 // Get unique call and user IDs from logs
@@ -61,7 +76,7 @@ export default function EmrLogsPage() {
             }
         };
         fetchData();
-    }, [toast]);
+    }, [toast, currentUser]);
 
     const getCall = (callId: string) => calls.get(callId);
     
@@ -95,10 +110,15 @@ export default function EmrLogsPage() {
         toast({ title: "Export Started", description: `Downloading ${logs.length} log entries.` });
     };
 
+    const pageTitle = currentUser?.role === 'CRO' ? `EMR Logs for Your Faculties` : "EMR Submission Logs";
+    const pageDescription = currentUser?.role === 'CRO' 
+        ? "Records of EMR applications submitted to the funding agency from your faculties." 
+        : "Records of all EMR applications that have been submitted to the funding agency.";
+
 
     return (
         <div className="container mx-auto py-10">
-            <PageHeader title="EMR Submission Logs" description="Records of all EMR applications that have been submitted to the funding agency.">
+            <PageHeader title={pageTitle} description={pageDescription}>
                 <Button onClick={handleExport} disabled={loading || logs.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
                     Export XLSX
@@ -146,7 +166,7 @@ export default function EmrLogsPage() {
                             </Table>
                         ) : (
                             <div className="text-center text-muted-foreground py-8">
-                                No submissions have been logged yet.
+                                No submissions have been logged yet for your faculties.
                             </div>
                         )}
                     </CardContent>
