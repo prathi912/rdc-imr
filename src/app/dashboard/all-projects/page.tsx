@@ -412,7 +412,7 @@ export default function AllProjectsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={filteredProjects} userRole={user!.role} />
+          <ProjectList projects={filteredProjects} userRole={user!.role} allUsers={users} />
         )}
       </div>
     </div>
