@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -1266,7 +1265,15 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               <h3 className="font-semibold text-lg">Submitter Information</h3>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <dt className="font-medium text-muted-foreground">Principal Investigator</dt>
-                <dd>{project.pi}</dd>
+                <dd>
+                    {piUser?.misId ? (
+                        <Link href={`/profile/${piUser.misId}`} className="text-primary hover:underline" target="_blank">
+                            {project.pi}
+                        </Link>
+                    ) : (
+                        project.pi
+                    )}
+                </dd>
                 <dt className="font-medium text-muted-foreground">Email</dt>
                 <dd>{project.pi_email || "N/A"}</dd>
                 <dt className="font-medium text-muted-foreground">Phone</dt>

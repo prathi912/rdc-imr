@@ -62,7 +62,7 @@ export default function EmrLogsPage() {
                     const usersQuery = query(collection(db, 'users'), where('__name__', 'in', userIds));
                     const usersSnapshot = await getDocs(usersQuery);
                     usersSnapshot.forEach(doc => {
-                        usersMap.set(doc.id, { id: doc.id, ...doc.data() } as User);
+                        usersMap.set(doc.id, { uid: doc.id, ...doc.data()} as User);
                     });
                     setUsers(usersMap);
                 }
@@ -202,7 +202,15 @@ export default function EmrLogsPage() {
                                         return (
                                             <TableRow key={log.id}>
                                                 <TableCell className="font-medium">
-                                                    <div>{log.userName}</div>
+                                                    <div>
+                                                        {user?.misId ? (
+                                                            <Link href={`/profile/${user.misId}`} className="text-primary hover:underline" target="_blank">
+                                                                {log.userName}
+                                                            </Link>
+                                                        ) : (
+                                                            log.userName
+                                                        )}
+                                                    </div>
                                                     <div className="text-xs text-muted-foreground">{log.userEmail}</div>
                                                 </TableCell>
                                                 <TableCell>{user?.institute || 'N/A'}</TableCell>
