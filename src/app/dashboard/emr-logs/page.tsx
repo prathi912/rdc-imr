@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from '@/lib/config';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
 
 export default function EmrLogsPage() {
     const [logs, setLogs] = useState<EmrInterest[]>([]);
@@ -22,6 +23,7 @@ export default function EmrLogsPage() {
     const [users, setUsers] = useState<Map<string, User>>(new Map());
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
     const { toast } = useToast();
 
     useEffect(() => {
@@ -91,14 +93,36 @@ export default function EmrLogsPage() {
     }, [toast, currentUser]);
 
     const getCall = (callId: string) => calls.get(callId);
+
+    const filteredLogs = useMemo(() => {
+        if (!searchTerm) {
+            return logs;
+        }
+        const lowercasedFilter = searchTerm.toLowerCase();
+        return logs.filter(log => {
+            const user = users.get(log.userId);
+            const call = getCall(log.callId);
+
+            return (
+                log.userName.toLowerCase().includes(lowercasedFilter) ||
+                log.userEmail.toLowerCase().includes(lowercasedFilter) ||
+                (user?.institute && user.institute.toLowerCase().includes(lowercasedFilter)) ||
+                (user?.department && user.department.toLowerCase().includes(lowercasedFilter)) ||
+                (user?.faculty && user.faculty.toLowerCase().includes(lowercasedFilter)) ||
+                (call?.title && call.title.toLowerCase().includes(lowercasedFilter)) ||
+                (log.agencyReferenceNumber && log.agencyReferenceNumber.toLowerCase().includes(lowercasedFilter))
+            );
+        });
+    }, [logs, searchTerm, users, getCall]);
     
     const handleExport = () => {
-        if (logs.length === 0) {
-            toast({ variant: 'destructive', title: 'No Data', description: 'There are no logs to export.' });
+        const dataToExport = filteredLogs;
+        if (dataToExport.length === 0) {
+            toast({ variant: 'destructive', title: 'No Data', description: 'There are no logs to export with the current filter.' });
             return;
         }
 
-        const dataToExport = logs.map(log => {
+        const dataForSheet = dataToExport.map(log => {
             const call = getCall(log.callId);
             const user = users.get(log.userId);
             return {
@@ -115,11 +139,11 @@ export default function EmrLogsPage() {
             };
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const worksheet = XLSX.utils.json_to_sheet(dataForSheet);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'EMR Submission Logs');
         XLSX.writeFile(workbook, `emr_submission_logs_${new Date().toISOString().split('T')[0]}.xlsx`);
-        toast({ title: "Export Started", description: `Downloading ${logs.length} log entries.` });
+        toast({ title: "Export Started", description: `Downloading ${dataForSheet.length} log entries.` });
     };
 
     let pageTitle = "EMR Submission Logs";
@@ -137,12 +161,20 @@ export default function EmrLogsPage() {
     return (
         <div className="container mx-auto py-10">
             <PageHeader title={pageTitle} description={pageDescription}>
-                <Button onClick={handleExport} disabled={loading || logs.length === 0}>
+                <Button onClick={handleExport} disabled={loading || filteredLogs.length === 0}>
                     <Download className="mr-2 h-4 w-4" />
                     Export XLSX
                 </Button>
             </PageHeader>
-            <div className="mt-8">
+            <div className="flex items-center py-4">
+                <Input
+                    placeholder="Search logs..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="max-w-sm"
+                />
+            </div>
+            <div className="mt-4">
                 <Card>
                     <CardContent className="pt-6">
                         {loading ? (
@@ -150,7 +182,7 @@ export default function EmrLogsPage() {
                                 <Skeleton className="h-10 w-full" />
                                 <Skeleton className="h-10 w-full" />
                             </div>
-                        ) : logs.length > 0 ? (
+                        ) : filteredLogs.length > 0 ? (
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -165,7 +197,7 @@ export default function EmrLogsPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {logs.map(log => {
+                                    {filteredLogs.map(log => {
                                         const user = users.get(log.userId);
                                         return (
                                             <TableRow key={log.id}>
@@ -193,7 +225,7 @@ export default function EmrLogsPage() {
                             </Table>
                         ) : (
                             <div className="text-center text-muted-foreground py-8">
-                                No submissions have been logged yet for your scope.
+                                No submissions have been logged yet for your scope or current filter.
                             </div>
                         )}
                     </CardContent>
