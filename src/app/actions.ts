@@ -2191,8 +2191,3 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
 }
-    
-```
-- src/devDependencies
-- @types/pizzip
-- 3.0.5

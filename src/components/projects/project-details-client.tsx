@@ -23,6 +23,7 @@ import {
   notifyAdminsOnCompletionRequest,
   findUserByMisId,
   updateCoInvestigators,
+  generateRecommendationForm,
 } from "@/app/actions"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -78,6 +79,7 @@ import {
   AlertCircle,
   Users,
   Loader2,
+  Printer,
 } from "lucide-react"
 
 import { GrantManagement } from "./grant-management"
@@ -167,6 +169,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isDurationDialogOpen, setIsDurationDialogOpen] = useState(false)
   const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false)
   const [isRevisionCommentDialogOpen, setIsRevisionCommentDialogOpen] = useState(false)
+  const [isPrinting, setIsPrinting] = useState(false)
 
   // Co-PI management state
   const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
@@ -642,6 +645,41 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     handleStatusUpdate("Revision Needed", data.comments)
   }
 
+  const handlePrint = async () => {
+    setIsPrinting(true)
+    try {
+      const result = await generateRecommendationForm(project.id)
+      if (result.success && result.fileData) {
+        const byteCharacters = atob(result.fileData)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        })
+
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${project.pi.replace(/\s/g, "_")}_APPLICATION_IMR.docx`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.URL.revokeObjectURL(url)
+        toast({ title: "Download Started", description: "Recommendation form is being downloaded." })
+      } else {
+        throw new Error(result.error || "Failed to generate form.")
+      }
+    } catch (error: any) {
+      console.error("Print error:", error)
+      toast({ variant: "destructive", title: "Download Failed", description: error.message })
+    } finally {
+      setIsPrinting(false)
+    }
+  }
+
   const availableStatuses: Project["status"][] = [
     "Submitted",
     "Under Review",
@@ -652,6 +690,20 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   return (
     <>
+      <div className="flex items-center justify-between mb-4">
+        <div>{/* Spacer */}</div>
+        {isAdmin && project.status === "Recommended" && (
+          <Button onClick={handlePrint} disabled={isPrinting}>
+            {isPrinting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Printer className="mr-2 h-4 w-4" />
+            )}
+            Print Recommendation Form
+          </Button>
+        )}
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
