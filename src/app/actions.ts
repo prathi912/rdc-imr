@@ -429,10 +429,10 @@ export async function notifySuperAdminsOnEvaluation(projectId: string, projectNa
     const batch = adminDb.batch()
     const notificationTitle = `Evaluation submitted for "${projectName}" by ${evaluatorName}`
 
-    superAdminUsersSnapshot.forEach((userDoc) => {
+    superAdminUsersSnapshot.forEach((userDocSnapshot) => {
       const notificationRef = adminDb.collection("notifications").doc()
       batch.set(notificationRef, {
-        uid: userDoc.id,
+        uid: userDocSnapshot.id,
         projectId: projectId,
         title: notificationTitle,
         createdAt: new Date().toISOString(),
@@ -2191,3 +2191,4 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
 }
+
