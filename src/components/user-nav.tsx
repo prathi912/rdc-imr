@@ -27,7 +27,12 @@ export function UserNav({ user, onLogout }: UserNavProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button variant="ghost" className="relative h-10 pl-2 pr-2 rounded-full flex items-center gap-2">
+           <div className="hidden sm:flex flex-col items-end text-right">
+                <span className="text-sm font-medium leading-none text-foreground">
+                    Hi, {user.name}
+                </span>
+           </div>
           <Avatar className="h-9 w-9">
             <AvatarImage src={user.photoURL || undefined} alt={user.name || 'User'} />
             <AvatarFallback>{user.name?.[0]?.toUpperCase() || 'U'}</AvatarFallback>
