@@ -106,7 +106,7 @@ export default function EmrLogsPage() {
                 'PI Email': log.userEmail,
                 'Institute': user?.institute || 'N/A',
                 'Department': user?.department || 'N/A',
-                'Faculty': user?.faculty || 'N/A',
+                'Faculty': user?.faculty || log.faculty,
                 'Funding Call': call?.title || 'Unknown',
                 'Agency Name': call?.agency || 'Unknown',
                 'Reference No.': log.agencyReferenceNumber || 'N/A',
@@ -155,6 +155,9 @@ export default function EmrLogsPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>PI</TableHead>
+                                        <TableHead>Institute</TableHead>
+                                        <TableHead>Department</TableHead>
+                                        <TableHead>Faculty</TableHead>
                                         <TableHead>Funding Call</TableHead>
                                         <TableHead>Reference No.</TableHead>
                                         <TableHead>Submission Logged On</TableHead>
@@ -162,24 +165,30 @@ export default function EmrLogsPage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {logs.map(log => (
-                                        <TableRow key={log.id}>
-                                            <TableCell className="font-medium">
-                                                <div>{log.userName}</div>
-                                                <div className="text-xs text-muted-foreground">{log.userEmail}</div>
-                                            </TableCell>
-                                            <TableCell>{getCall(log.callId)?.title || 'Loading...'}</TableCell>
-                                            <TableCell>{log.agencyReferenceNumber || 'N/A'}</TableCell>
-                                            <TableCell>{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
-                                            <TableCell>
-                                                {log.agencyAcknowledgementUrl ? (
-                                                    <Button asChild variant="link" className="p-0 h-auto">
-                                                        <Link href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View PDF</Link>
-                                                    </Button>
-                                                ) : 'Not Provided'}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
+                                    {logs.map(log => {
+                                        const user = users.get(log.userId);
+                                        return (
+                                            <TableRow key={log.id}>
+                                                <TableCell className="font-medium">
+                                                    <div>{log.userName}</div>
+                                                    <div className="text-xs text-muted-foreground">{log.userEmail}</div>
+                                                </TableCell>
+                                                <TableCell>{user?.institute || 'N/A'}</TableCell>
+                                                <TableCell>{user?.department || 'N/A'}</TableCell>
+                                                <TableCell>{user?.faculty || log.faculty}</TableCell>
+                                                <TableCell>{getCall(log.callId)?.title || 'Loading...'}</TableCell>
+                                                <TableCell>{log.agencyReferenceNumber || 'N/A'}</TableCell>
+                                                <TableCell>{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
+                                                <TableCell>
+                                                    {log.agencyAcknowledgementUrl ? (
+                                                        <Button asChild variant="link" className="p-0 h-auto">
+                                                            <Link href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View PDF</Link>
+                                                        </Button>
+                                                    ) : 'Not Provided'}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         ) : (
