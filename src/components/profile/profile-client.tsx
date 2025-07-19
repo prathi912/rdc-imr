@@ -1,24 +1,29 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { User, IncentiveClaim, Project, EmrInterest, FundingCall } from '@/types';
+import type { User, Project, EmrInterest, FundingCall } from '@/types';
 import { getResearchDomain } from '@/app/actions';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2 } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy } from 'lucide-react';
 import { format } from 'date-fns';
+import { Button } from '../ui/button';
 
-function ProfileDetail({ label, value }: { label: string; value?: string }) {
+function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
     return (
-        <div>
-            <p className="text-sm font-medium text-muted-foreground">{label}</p>
-            <p className="text-base">{value}</p>
+        <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+                <Icon className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+                <p className="text-sm font-medium">{label}</p>
+                <p className="text-sm text-muted-foreground">{value}</p>
+            </div>
         </div>
     );
 }
@@ -51,58 +56,81 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         return fundingCalls.find(c => c.id === callId)?.title || callId;
     }
 
+    const StatItem = ({ value, label }: { value: number | string; label: string }) => (
+        <div className="flex flex-col items-center">
+            <p className="text-2xl font-bold">{value}</p>
+            <p className="text-sm text-muted-foreground">{label}</p>
+        </div>
+    );
+
+
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-            <div className="lg:col-span-1 space-y-6">
-                <Card>
-                    <CardContent className="p-6 text-center">
-                        <Avatar className="h-28 w-28 mx-auto mb-4">
+        <div className="flex flex-col items-center">
+            <div className="w-full h-40 bg-gradient-to-r from-blue-400 to-teal-500 rounded-t-lg" />
+            <Card className="w-full max-w-4xl -mt-20 mx-auto shadow-xl border-0">
+                <CardContent className="p-6 md:p-8">
+                    <div className="relative flex flex-col items-center md:flex-row md:items-start md:justify-between -mt-24 md:-mt-16">
+                         <Avatar className="h-32 w-32 border-4 border-background">
                             <AvatarImage src={user.photoURL || undefined} alt={user.name} />
-                            <AvatarFallback>{user.name?.[0].toUpperCase()}</AvatarFallback>
+                            <AvatarFallback className="text-4xl">{user.name?.[0].toUpperCase()}</AvatarFallback>
                         </Avatar>
-                        <h1 className="text-2xl font-bold">{user.name}</h1>
-                        <p className="text-muted-foreground break-words">{user.email}</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <ProfileDetail label="Designation" value={user.designation} />
-                        <ProfileDetail label="MIS ID" value={user.misId} />
-                        <ProfileDetail label="ORCID ID" value={user.orcidId} />
-                        <ProfileDetail label="Scopus ID" value={user.scopusId} />
-                        <ProfileDetail label="Vidwan ID" value={user.vidwanId} />
-                        <ProfileDetail label="Google Scholar ID" value={user.googleScholarId} />
-                        <ProfileDetail label="Faculty" value={user.faculty} />
-                        <ProfileDetail label="Institute" value={user.institute} />
-                        <ProfileDetail label="Department" value={user.department} />
-                    </CardContent>
-                </Card>
-                 <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                          <Bot className="h-5 w-5" />
-                          <CardTitle>Core Research Domain</CardTitle>
+                        <div className="mt-4 md:mt-0 md:ml-auto flex items-center gap-2">
+                             <Button asChild variant="outline">
+                                <a href={`mailto:${user.email}`}>
+                                    <Mail className="mr-2 h-4 w-4" /> Email
+                                </a>
+                            </Button>
                         </div>
-                        <CardDescription>AI-suggested domain based on publications.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loadingDomain ? (
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Analyzing...</span>
+                    </div>
+                    
+                    <div className="text-center md:text-left md:ml-36 md:-mt-12 space-y-1">
+                        <h1 className="text-3xl font-bold">{user.name}</h1>
+                        <p className="text-muted-foreground">{user.designation}</p>
+                        <p className="text-muted-foreground">{user.department}, {user.institute}</p>
+                    </div>
+
+                    <div className="flex justify-center md:justify-start md:ml-36 gap-8 my-6">
+                        <StatItem value={projects.length} label="IMR Projects" />
+                        <StatItem value={emrInterests.length} label="EMR Interests" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-6 border-t">
+                        <div className="space-y-4">
+                            <h3 className="font-semibold text-lg">Academic Details</h3>
+                            <div className="space-y-4">
+                                <ProfileDetail label="Faculty" value={user.faculty} icon={Building2} />
+                                <ProfileDetail label="Institute" value={user.institute} icon={Building2} />
+                                <ProfileDetail label="Department" value={user.department} icon={Briefcase} />
                             </div>
-                        ) : domain ? (
-                            <Badge variant="secondary" className="text-base">{domain}</Badge>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">Not enough data to determine a domain.</p>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-            <div className="lg:col-span-3">
+                        </div>
+                        <div className="space-y-4">
+                            <h3 className="font-semibold text-lg">Researcher IDs</h3>
+                             <div className="space-y-4">
+                                <ProfileDetail label="ORCID iD" value={user.orcidId} icon={BookCopy} />
+                                <ProfileDetail label="Scopus ID" value={user.scopusId} icon={BookCopy} />
+                                <ProfileDetail label="Vidwan ID" value={user.vidwanId} icon={BookCopy} />
+                                <ProfileDetail label="Google Scholar ID" value={user.googleScholarId} icon={BookCopy} />
+                            </div>
+                        </div>
+                         <div className="space-y-4 md:col-span-2">
+                            <h3 className="font-semibold text-lg flex items-center gap-2"><Bot className="h-5 w-5" /> AI-Suggested Research Domain</h3>
+                             {loadingDomain ? (
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <span>Analyzing publications...</span>
+                                </div>
+                            ) : domain ? (
+                                <Badge variant="secondary" className="text-base">{domain}</Badge>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">Not enough data to determine a domain.</p>
+                            )}
+                        </div>
+                    </div>
+
+                </CardContent>
+            </Card>
+
+            <div className="w-full max-w-4xl mt-8">
                 <Tabs defaultValue="projects" className="w-full">
                     <TabsList className="grid w-full grid-cols-2">
                         <TabsTrigger value="projects">IMR Projects ({projects.length})</TabsTrigger>
