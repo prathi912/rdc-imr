@@ -156,7 +156,7 @@ export default function ManageUsersPage() {
     try {
       const usersCollection = collection(db, 'users');
       const userSnapshot = await getDocs(usersCollection);
-      const userList = userSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User));
+      const userList = userSnapshot.docs.map(userDoc => ({ ...userDoc.data(), uid: userDoc.id } as User));
       setUsers(userList);
 
       const claimsCollection = collection(db, 'incentiveClaims');

@@ -312,7 +312,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         try {
             const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
             const unsubscribeCalls = onSnapshot(callsQuery, (snapshot) => {
-                setCalls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)));
+                setCalls(snapshot.docs.map(callDoc => ({ id: callDoc.id, ...callDoc.data() } as FundingCall)));
             });
 
             const userInterestsQuery = query(collection(db, 'emrInterests'), where('userId', '==', user.uid));

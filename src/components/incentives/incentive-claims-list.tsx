@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -32,7 +33,7 @@ export function IncentiveClaimsList() {
       const claimsCollection = collection(db, 'incentiveClaims');
       const q = query(claimsCollection, orderBy('submissionDate', 'desc'));
       const claimSnapshot = await getDocs(q);
-      const claimList = claimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
+      const claimList = claimSnapshot.docs.map(claimDoc => ({ ...claimDoc.data(), id: claimDoc.id } as IncentiveClaim));
       setClaims(claimList);
     } catch (error) {
       console.error("Error fetching claims:", error);

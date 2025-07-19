@@ -223,8 +223,8 @@ export async function scheduleMeeting(
     const dateForFormatting = new Date(meetingDetails.date.replace(/-/g, "/"))
     const formattedDate = format(dateForFormatting, "MMMM d, yyyy")
 
-    for (const project of projectsToSchedule) {
-      const projectRef = adminDb.collection("projects").doc(project.id)
+    for (const projectData of projectsToSchedule) {
+      const projectRef = adminDb.collection("projects").doc(projectData.id)
       batch.update(projectRef, {
         meetingDetails: {
           date: meetingDetails.date,
@@ -237,31 +237,31 @@ export async function scheduleMeeting(
 
       const notificationRef = adminDb.collection("notifications").doc()
       batch.set(notificationRef, {
-        uid: project.pi_uid,
-        projectId: project.id,
-        title: `IMR meeting scheduled for your project: "${project.title}"`,
+        uid: projectData.pi_uid,
+        projectId: projectData.id,
+        title: `IMR meeting scheduled for your project: "${projectData.title}"`,
         createdAt: new Date().toISOString(),
         isRead: false,
       })
 
-      if (project.pi_email) {
+      if (projectData.pi_email) {
         await sendEmail({
-          to: project.pi_email,
-          subject: `IMR Meeting Scheduled for Your Project: ${project.title}`,
+          to: projectData.pi_email,
+          subject: `IMR Meeting Scheduled for Your Project: ${projectData.title}`,
           html: `
             <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
               <p style="color: #ffffff;">Dear Researcher,</p>
               <p style="color: #e0e0e0;">
                 An <strong style="color: #ffffff;">IMR evaluation meeting</strong> has been scheduled for your project, 
-                "<strong style="color: #ffffff;">${project.title}</strong>".
+                "<strong style="color: #ffffff;">${projectData.title}</strong>".
               </p>
               <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
               <p style="color: #cccccc;">
                 Please prepare for your presentation. You can view more details on the 
-                <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${project.id}" style="color: #64b5f6; text-decoration: underline;">
+                <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectData.id}" style="color: #64b5f6; text-decoration: underline;">
                   PU Research Portal
                 </a>.
               </p>
@@ -281,9 +281,9 @@ export async function scheduleMeeting(
 
       const projectTitles = projectsToSchedule.map((p) => `<li style="color: #cccccc;">${p.title}</li>`).join("")
 
-      for (const evaluatorDoc of evaluatorDocs) {
-        if (evaluatorDoc.exists) {
-          const evaluator = evaluatorDoc.data() as User
+      for (const evaluatorDocSnapshot of evaluatorDocs) {
+        if (evaluatorDocSnapshot.exists) {
+          const evaluator = evaluatorDocSnapshot.data() as User
 
           const evaluatorNotificationRef = adminDb.collection("notifications").doc()
           batch.set(evaluatorNotificationRef, {
@@ -398,11 +398,11 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
     const batch = adminDb.batch()
     const notificationTitle = `New Project Submitted: "${projectTitle}" by ${piName}`
 
-    adminUsersSnapshot.forEach((userDoc) => {
-      // userDoc.id is the UID of the admin user
+    adminUsersSnapshot.forEach((userDocSnapshot) => {
+      // userDocSnapshot.id is the UID of the admin user
       const notificationRef = adminDb.collection("notifications").doc()
       batch.set(notificationRef, {
-        uid: userDoc.id,
+        uid: userDocSnapshot.id,
         projectId: projectId,
         title: notificationTitle,
         createdAt: new Date().toISOString(),
