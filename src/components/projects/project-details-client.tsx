@@ -238,7 +238,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         const usersRef = collection(db, "users")
         const q = query(usersRef, where("__name__", "in", project.coPiUids))
         const querySnapshot = await getDocs(q)
-        const fetchedUsers = querySnapshot.docs.map((d) => ({ uid: d.id, ...d.data() }) as User)
+        const fetchedUsers = querySnapshot.docs.map((userDoc) => ({ uid: userDoc.id, ...userDoc.data() }) as User)
         setCoPiUsers(fetchedUsers)
         setCoPiList(fetchedUsers.map((u) => ({ uid: u.uid, name: u.name })))
       }
