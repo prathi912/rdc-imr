@@ -23,7 +23,7 @@ This is the base role for all teaching and research staff.
 1.  **Profile Setup:** On first login, complete your profile under **Settings**. This includes academic details and **crucially, your salary bank account details**, which are required for any grant disbursal.
 2.  **New Project Submission:**
     -   Navigate to **New Submission**.
-    -   Fill out the multi-step form, providing all required project details, including team members, abstract, and timeline.
+    -   Fill out the multi-step form, providing all required project details, including team members, abstract, and timeline. Team Members can be added by searching through thier MIS id. It is crucial that team member has created thier profile on the Portal.
     -   You can **Save as Draft** at any time and resume later. Drafts are accessible from the **My Projects** page.
     -   Once complete, agree to the guidelines on the final step and click **Submit Project**.
 3.  **Project Tracking:**
