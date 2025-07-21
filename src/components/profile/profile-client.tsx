@@ -66,34 +66,38 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
 
     return (
         <div className="flex flex-col items-center">
-            <Card className="w-full max-w-4xl mt-12 mx-auto shadow-xl border-0 bg-card/80 backdrop-blur-lg">
+            <Card className="w-full max-w-4xl shadow-xl border-0 bg-card/80 backdrop-blur-lg">
                 <CardContent className="p-6 md:p-8">
-                    <div className="relative flex flex-col items-center md:flex-row md:items-start md:justify-between -mt-24 md:-mt-16">
-                         <Avatar className="h-32 w-32 border-4 border-background">
-                            <AvatarImage src={user.photoURL || undefined} alt={user.name} />
-                            <AvatarFallback className="text-4xl">{user.name?.[0].toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="mt-4 md:mt-0 md:ml-auto flex items-center gap-2">
-                             <Button asChild variant="outline">
-                                <a href={`mailto:${user.email}`}>
-                                    <Mail className="mr-2 h-4 w-4" /> Email
-                                </a>
-                            </Button>
+                    <div className="flex flex-col md:flex-row items-center gap-6">
+                        {/* Avatar */}
+                        <div className="flex-shrink-0">
+                            <Avatar className="h-28 w-28 md:h-32 md:w-32 border-4 border-background shadow-lg">
+                                <AvatarImage src={user.photoURL || undefined} alt={user.name} />
+                                <AvatarFallback className="text-4xl">{user.name?.[0].toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                        </div>
+                        
+                        {/* Details Section */}
+                        <div className="flex flex-col items-center md:items-start text-center md:text-left w-full">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full">
+                                <h1 className="text-3xl font-bold">{user.name}</h1>
+                                <Button asChild variant="outline" className="mt-4 sm:mt-0">
+                                    <a href={`mailto:${user.email}`}>
+                                        <Mail className="mr-2 h-4 w-4" /> Email
+                                    </a>
+                                </Button>
+                            </div>
+                            <p className="text-muted-foreground mt-1">{user.designation}</p>
+                            <p className="text-muted-foreground">{user.department}, {user.institute}</p>
+                            
+                            <div className="flex justify-center md:justify-start gap-8 my-4">
+                                <StatItem value={projects.length} label="IMR Projects" />
+                                <StatItem value={emrInterests.length} label="EMR Interests" />
+                            </div>
                         </div>
                     </div>
-                    
-                    <div className="text-center md:text-left md:ml-36 md:-mt-12 space-y-1">
-                        <h1 className="text-3xl font-bold">{user.name}</h1>
-                        <p className="text-muted-foreground">{user.designation}</p>
-                        <p className="text-muted-foreground">{user.department}, {user.institute}</p>
-                    </div>
 
-                    <div className="flex justify-center md:justify-start md:ml-36 gap-8 my-6">
-                        <StatItem value={projects.length} label="IMR Projects" />
-                        <StatItem value={emrInterests.length} label="EMR Interests" />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-6 border-t">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-6 mt-6 border-t">
                         <div className="space-y-4">
                             <h3 className="font-semibold text-lg">Academic & Contact Details</h3>
                             <div className="space-y-4">
