@@ -38,8 +38,8 @@ const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'c
 const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes'];
 
 // Default modules for special designations who are otherwise 'faculty' role
-const principalDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects'];
-const hodDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects'];
+const principalDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects', 'emr-logs'];
+const hodDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects','emr-logs'];
 
 export function getDefaultModulesForRole(role: User['role'], designation?: User['designation']): string[] {
   if (role === 'faculty') {

@@ -217,7 +217,6 @@ export default function AnalyticsPage() {
           if (facultyFilter === 'all') return `Analytics for All Your Faculties`;
           return `Analytics for ${facultyFilter}`;
       }
-      if (user?.email === 'pit@paruluniversity.ac.in') return 'Analytics for Parul Institute of Technology';
       if (user?.designation === 'Principal' && user.institute) return `Analytics for ${user.institute}`;
       if (user?.designation === 'Principal' && !user.institute) return 'Analytics (Principal - No Institute Set)';
       if (user?.designation === 'HOD' && user.department && user.institute) return `Analytics for ${user.department}, ${user.institute}`;

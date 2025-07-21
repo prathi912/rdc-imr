@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
 import Image from 'next/image';
-import { Award, BookCheck, GanttChartSquare, Check, Users, ShieldCheck, FilePlus, Bot } from 'lucide-react';
+import { BookCheck, GanttChartSquare, Check, Users, ShieldCheck } from 'lucide-react';
 import { auth } from '@/lib/config';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,10 +60,10 @@ export default function LandingPage() {
                     Research & Development Cell
                   </div>
                   <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                    Empowering Research & Recognizing Achievement
+                    Empowering University Research
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    Our comprehensive portal streamlines the entire research lifecycle. From IMR proposal submissions and AI-assisted evaluations to simplified claims for publication incentives, we provide the tools to foster innovation at Parul University.
+                    Our comprehensive portal streamlines the entire research lifecycle. From IMR & EMR proposal submissions to AI-assisted evaluations, we provide the tools to foster innovation at Parul University.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -73,17 +73,22 @@ export default function LandingPage() {
                         <Skeleton className="h-12 w-32" />
                     </div>
                   ) : user ? (
-                    <Link href="/dashboard">
-                      <Button size="lg">Go to Dashboard</Button>
-                    </Link>
+                    <>
+                      <Link href="/dashboard">
+                        <Button size="lg">Go to Dashboard</Button>
+                      </Link>
+                       <Link href="/sop">
+                        <Button variant="outline" size="lg">Read SOP</Button>
+                      </Link>
+                    </>
                   ) : (
                     <>
                       <Link href="/signup">
                         <Button size="lg">Get Started</Button>
                       </Link>
-                      <Link href="/login">
+                      <Link href="/sop">
                         <Button variant="outline" size="lg">
-                          Sign In
+                          Read SOP
                         </Button>
                       </Link>
                     </>
@@ -108,7 +113,7 @@ export default function LandingPage() {
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">A Unified Platform for Your Research Journey</h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  One portal to manage everything from initial project funding to celebrating your publication success.
+                  One portal to manage everything from initial project funding to tracking your submissions.
                 </p>
               </div>
             </div>
@@ -117,15 +122,15 @@ export default function LandingPage() {
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <GanttChartSquare className="h-8 w-8" />
                 </div>
-                <h3 className="text-xl font-bold">IMR Project Funding</h3>
-                <p className="text-muted-foreground mt-2">A guided workflow for submitting intramural research proposals, tracking their evaluation status, and managing awarded grants efficiently.</p>
+                <h3 className="text-xl font-bold">IMR & EMR Project Management</h3>
+                <p className="text-muted-foreground mt-2">A guided workflow for submitting intramural research proposals and registering interest for extramural funding, with easy status tracking.</p>
               </div>
-              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
+               <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <Award className="h-8 w-8" />
+                  <Users className="h-8 w-8" />
                 </div>
-                <h3 className="text-xl font-bold">Incentive Claims</h3>
-                <p className="text-muted-foreground mt-2">Easily apply for incentives for your published research papers, patents, books, and conference presentations through dedicated, easy-to-use forms.</p>
+                <h3 className="text-xl font-bold">Role-Based Workflows</h3>
+                <p className="text-muted-foreground mt-2">A tailored experience for faculty, evaluators, and administrators, ensuring everyone has the right tools and access for their responsibilities.</p>
               </div>
             </div>
           </div>
@@ -151,10 +156,10 @@ export default function LandingPage() {
                             </div>
                             <h3 className="text-xl font-bold">For Faculty</h3>
                         </div>
-                        <p className="text-muted-foreground">Submit, track, and manage your research projects and incentive claims from a personalized dashboard.</p>
+                        <p className="text-muted-foreground">Submit, track, and manage your research projects from a personalized dashboard.</p>
                         <ul className="grid gap-2 text-sm">
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Simplified Proposal Submission</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Streamlined Incentive Claims</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> EMR Funding Calendar</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Real-time Status Tracking</li>
                         </ul>
                     </div>
@@ -182,7 +187,7 @@ export default function LandingPage() {
                         <p className="text-muted-foreground">Oversee the entire process with powerful dashboards, user management tools, and comprehensive analytics.</p>
                          <ul className="grid gap-2 text-sm">
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Centralized Project Oversight</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Incentive Claim Management</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Meeting & User Management</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Data Analytics & Reporting</li>
                         </ul>
                     </div>
