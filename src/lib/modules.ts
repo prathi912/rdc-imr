@@ -33,7 +33,7 @@ const facultyCoreModules = ['new-submission', 'my-projects', 'incentive-claim'];
 const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'manage-incentive-claims', 'emr-evaluations'];
+const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'emr-evaluations'];
 const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'system-health', 'bulk-upload', 'emr-logs', 'emr-management'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes'];
 
