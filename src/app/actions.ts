@@ -1456,7 +1456,7 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
             if (coPi.email) {
                 await sendEmail({
                     to: coPi.email,
-                    subject: `You've been added to an EMR Application`,
+                    subject: `You've been added to an EMR Application `,
                     html: `
                         <div ${EMAIL_STYLES.background}>
                             ${EMAIL_STYLES.logo}

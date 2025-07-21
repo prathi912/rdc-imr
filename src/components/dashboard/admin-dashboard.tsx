@@ -176,7 +176,7 @@ export function AdminDashboard() {
           <Info className="h-4 w-4" />
           <AlertTitle>Configuration Pending</AlertTitle>
           <AlertDescription>
-            You have not been assigned to any faculties yet. Please contact the Super-admin. Your dashboard will refresh automatically once faculties are assigned to you.
+            You have not been assigned to any faculties yet. Please wait for some time. Your dashboard will refresh automatically once faculties are assigned to you.
           </AlertDescription>
         </Alert>
       ) : (

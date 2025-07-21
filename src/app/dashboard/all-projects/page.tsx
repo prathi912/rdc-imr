@@ -65,9 +65,9 @@ export default function AllProjectsPage() {
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
-      // For CROs, if they have a primary faculty, set it as the default filter
-      if (parsedUser.role === 'CRO' && parsedUser.faculty) {
-        setFacultyFilter(parsedUser.faculty);
+      // For CROs, default to showing all their assigned faculties.
+      if (parsedUser.role === 'CRO') {
+        setFacultyFilter('all');
       }
     } else {
       setLoading(false);
@@ -191,7 +191,7 @@ export default function AllProjectsPage() {
     pageTitle = `Projects from ${user.department}`;
     pageDescription = `Browse all projects submitted from your department within ${user.institute}.`;
     exportFileName = `projects_${user.department.replace(/[ &]/g, '_')}`;
-  } else if (isCro && user?.faculty) {
+  } else if (isCro && user?.faculties) {
       if (facultyFilter === 'all' || !facultyFilter) {
           pageTitle = `Projects from All Your Faculties`;
       } else {
