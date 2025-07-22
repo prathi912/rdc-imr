@@ -1,5 +1,4 @@
 
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -7,20 +6,31 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection } from 'firebase-admin/firestore';
-import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation } from "@/types"
+import { FieldValue, getFirestore } from "firebase-admin/firestore"
+import type {
+  Project,
+  IncentiveClaim,
+  User,
+  GrantDetails,
+  GrantPhase,
+  Transaction,
+  EmrInterest,
+  FundingCall,
+  EmrEvaluation,
+  Evaluation,
+} from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
-import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds } from "date-fns"
-import * as z from 'zod';
-import PizZip from 'pizzip';
-import Docxtemplater from 'docxtemplater';
-
+import { format, parse, parseISO, addDays, setHours, setMinutes, setSeconds } from "date-fns"
+import type * as z from "zod"
+import PizZip from "pizzip"
+import Docxtemplater from "docxtemplater"
 
 const EMAIL_STYLES = {
-  background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
+  background:
+    'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
   logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
   footer: `
     <p style="color:#b0bec5; margin-top: 30px;">Best Regards,</p>
@@ -29,9 +39,8 @@ const EMAIL_STYLES = {
     <hr style="border-top: 1px solid #4f5b62; margin-top: 20px;">
     <p style="font-size:10px; color:#999999; text-align:center; margin-top:10px;">
         This is a system generated automatic email. If you feel this is an error, please report at the earliest.
-    </p>`
-};
-
+    </p>`,
+}
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
@@ -136,7 +145,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
         to: project.pi_email,
         subject: `Project Status Update: ${project.title}`,
         html: emailHtml,
-        from: 'default'
+        from: "default",
       })
     }
 
@@ -201,7 +210,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
                 ${EMAIL_STYLES.footer}
             </div>
             `,
-        from: 'default'
+        from: "default",
       })
     }
 
@@ -268,7 +277,7 @@ export async function scheduleMeeting(
               ${EMAIL_STYLES.footer}
             </div>
           `,
-          from: 'default'
+          from: "default",
         })
       }
     }
@@ -279,7 +288,7 @@ export async function scheduleMeeting(
         meetingDetails.evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()),
       )
 
-      const projectTitles = projectsToSchedule.map((p) => `<li style="color: #cccccc;">${p.title}</li>`).join("");
+      const projectTitles = projectsToSchedule.map((p) => `<li style="color: #cccccc;">${p.title}</li>`).join("")
 
       for (const evaluatorDocSnapshot of evaluatorDocs) {
         if (evaluatorDocSnapshot.exists) {
@@ -321,7 +330,7 @@ export async function scheduleMeeting(
                     ${EMAIL_STYLES.footer}
                 </div>
               `,
-              from: 'default'
+              from: "default",
             })
           }
         }
@@ -448,6 +457,34 @@ export async function notifySuperAdminsOnEvaluation(projectId: string, projectNa
   }
 }
 
+export async function notifySuperAdminsOnNewUser(userName: string, role: string) {
+  try {
+    const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get()
+    if (superAdminUsersSnapshot.empty) {
+      console.log("No Super-admin users found to notify.")
+      return { success: true, message: "No Super-admins to notify." }
+    }
+
+    const batch = adminDb.batch()
+    const notificationTitle = `New ${role.toUpperCase()} joined: ${userName}`
+
+    superAdminUsersSnapshot.forEach((docSnapshot) => {
+      const notificationRef = adminDb.collection("notifications").doc()
+      batch.set(notificationRef, {
+        uid: docSnapshot.id,
+        title: notificationTitle,
+        createdAt: new Date().toISOString(),
+      })
+    })
+
+    await batch.commit()
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error notifying Super-admins about new user:", error)
+    return { success: false, error: error.message || "Failed to notify Super-admins." }
+  }
+}
+
 export async function notifyAdminsOnCompletionRequest(projectId: string, projectTitle: string, piName: string) {
   try {
     const adminRoles = ["admin", "Super-admin"]
@@ -470,7 +507,6 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
         projectId: projectId,
         title: notificationTitle,
         createdAt: new Date().toISOString(),
-        isRead: false,
       })
     })
 
@@ -743,6 +779,7 @@ export async function bulkUploadProjects(
       let faculty = project.Faculty
       let institute = project.Institute
       let departmentName = project.Department
+      let campus = project.Campus || ""
 
       // Find user by email to get UID and profile data
       const userQuery = await usersRef.where("email", "==", project.pi_email).limit(1).get()
@@ -753,7 +790,8 @@ export async function bulkUploadProjects(
         pi_name = userData.name || pi_name
         faculty = userData.faculty || faculty
         institute = userData.institute || institute
-        departmentName = userData.department || department
+        departmentName = userData.department || departmentName
+        campus = userData.campus || campus
       }
 
       const projectRef = adminDb.collection("projects").doc()
@@ -767,7 +805,7 @@ export async function bulkUploadProjects(
           submissionDate = excelDateToJSDate(project.sanction_date).toISOString()
         } else if (typeof project.sanction_date === "string") {
           // Attempt to parse various string formats
-          const parsedDate = new Date(project.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'))
+          const parsedDate = new Date(project.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, "$3-$2-$1"))
           if (!isNaN(parsedDate.getTime())) {
             submissionDate = parsedDate.toISOString()
           } else {
@@ -841,11 +879,10 @@ export async function deleteBulkProject(projectId: string): Promise<{ success: b
   }
 }
 
-export async function fetchOrcidData(
-  orcidId: string,
-): Promise<{
+export async function fetchOrcidData(orcidId: string): Promise<{
   success: boolean
-  data?: { name: string }; error?: string
+  data?: { name: string }
+  error?: string
 }> {
   if (!/^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/.test(orcidId)) {
     return { success: false, error: "Invalid ORCID iD format." }
@@ -975,7 +1012,7 @@ export async function linkHistoricalData(
   userData: Partial<User> & { uid: string; email: string },
 ): Promise<{ success: boolean; count: number; error?: string }> {
   try {
-    const { uid, email, institute, department, phoneNumber } = userData
+    const { uid, email, institute, department, phoneNumber, campus } = userData
     if (!uid || !email) {
       return { success: false, count: 0, error: "User UID and Email are required." }
     }
@@ -995,6 +1032,7 @@ export async function linkHistoricalData(
       if (institute) updateData.institute = institute
       if (department) updateData.departmentName = department
       if (phoneNumber) updateData.pi_phoneNumber = phoneNumber
+      if (campus) updateData.campus = campus
 
       batch.update(projectDoc.ref, updateData)
     })
@@ -1048,7 +1086,6 @@ export async function updateProjectWithRevision(
           projectId: projectId,
           title: notificationTitle,
           createdAt: new Date().toISOString(),
-          isRead: false,
         })
       })
 
@@ -1309,38 +1346,37 @@ export async function updateCoInvestigators(
       return { success: false, error: "Project ID is required." }
     }
     const projectRef = adminDb.collection("projects").doc(projectId)
-    const projectSnap = await projectRef.get();
+    const projectSnap = await projectRef.get()
     if (!projectSnap.exists) {
-        return { success: false, error: "Project not found." };
+      return { success: false, error: "Project not found." }
     }
-    const project = projectSnap.data() as Project;
-    const existingCoPis = project.coPiUids || [];
+    const project = projectSnap.data() as Project
+    const existingCoPis = project.coPiUids || []
 
     await projectRef.update({
       coPiUids: coPiUids,
     })
 
-    const newCoPis = coPiUids.filter(uid => !existingCoPis.includes(uid));
+    const newCoPis = coPiUids.filter((uid) => !existingCoPis.includes(uid))
 
     if (newCoPis.length > 0) {
-      const usersRef = adminDb.collection("users");
-      const usersQuery = usersRef.where(FieldValue.documentId(), "in", newCoPis);
-      const newCoPiDocs = await usersQuery.get();
-      
-      const batch = adminDb.batch();
+      const usersRef = adminDb.collection("users")
+      const usersQuery = usersRef.where(FieldValue.documentId(), "in", newCoPis)
+      const newCoPiDocs = await usersQuery.get()
+
+      const batch = adminDb.batch()
 
       for (const userDoc of newCoPiDocs.docs) {
-        const coPi = userDoc.data() as User;
-        
+        const coPi = userDoc.data() as User
+
         // In-app notification
-        const notificationRef = adminDb.collection("notifications").doc();
+        const notificationRef = adminDb.collection("notifications").doc()
         batch.set(notificationRef, {
-            uid: coPi.uid,
-            projectId: projectId,
-            title: `You have been added as a Co-PI to the IMR project: "${project.title}"`,
-            createdAt: new Date().toISOString(),
-            isRead: false,
-        });
+          uid: coPi.uid,
+          projectId: projectId,
+          title: `You have been added as a Co-PI to the IMR project: "${project.title}"`,
+          createdAt: new Date().toISOString(),
+        })
 
         // Email notification
         if (coPi.email) {
@@ -1351,18 +1387,18 @@ export async function updateCoInvestigators(
               <p style="color:#e0e0e0;">You have been added as a Co-PI to the IMR project titled "<strong style="color:#ffffff;">${project.title}</strong>" by ${project.pi}.</p>
               <p style="color:#e0e0e0;">You can view the project details on the PU Research Portal.</p>
               ${EMAIL_STYLES.footer}
-            </div>`;
+            </div>`
           await sendEmail({
-              to: coPi.email,
-              subject: `You've been added to an IMR Project`,
-              html: emailHtml,
-              from: 'default'
-          });
+            to: coPi.email,
+            subject: `You've been added to an IMR Project`,
+            html: emailHtml,
+            from: "default",
+          })
         }
       }
-      await batch.commit();
+      await batch.commit()
     }
-    
+
     return { success: true }
   } catch (error: any) {
     console.error("Error updating Co-PIs:", error)
@@ -1373,110 +1409,118 @@ export async function updateCoInvestigators(
 export async function updateUserTutorialStatus(uid: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (!uid) {
-      return { success: false, error: "User ID is required." };
+      return { success: false, error: "User ID is required." }
     }
-    const userRef = adminDb.collection('users').doc(uid);
-    await userRef.update({ hasCompletedTutorial: true });
-    return { success: true };
+    const userRef = adminDb.collection("users").doc(uid)
+    await userRef.update({ hasCompletedTutorial: true })
+    return { success: true }
   } catch (error: any) {
-    console.error("Error updating tutorial status:", error);
-    return { success: false, error: "Failed to update tutorial status." };
+    console.error("Error updating tutorial status:", error)
+    return { success: false, error: "Failed to update tutorial status." }
   }
 }
 
-export async function registerEmrInterest(callId: string, user: User, coPis?: { uid: string, name: string }[]): Promise<{ success: boolean; error?: string }> {
+export async function registerEmrInterest(
+  callId: string,
+  user: User,
+  coPis?: { uid: string; name: string }[],
+): Promise<{ success: boolean; error?: string }> {
   try {
     if (!user || !user.uid || !user.faculty || !user.department) {
-      return { success: false, error: "User profile is incomplete. Please update your faculty and department in Settings." };
+      return {
+        success: false,
+        error: "User profile is incomplete. Please update your faculty and department in Settings.",
+      }
     }
-    
+
     // Check if interest already registered
-    const interestsRef = adminDb.collection('emrInterests');
-    const q = interestsRef.where('callId', '==', callId).where('userId', '==', user.uid);
-    const docSnap = await q.get();
+    const interestsRef = adminDb.collection("emrInterests")
+    const q = interestsRef.where("callId", "==", callId).where("userId", "==", user.uid)
+    const docSnap = await q.get()
     if (!docSnap.empty) {
-        return { success: false, error: "You have already registered your interest for this call." };
+      return { success: false, error: "You have already registered your interest for this call." }
     }
 
     // Use a transaction to get the next sequential ID
     const newInterest = await getFirestore().runTransaction(async (transaction) => {
-      const counterRef = adminDb.collection('counters').doc('emrInterest');
-      const counterDoc = await transaction.get(counterRef);
+      const counterRef = adminDb.collection("counters").doc("emrInterest")
+      const counterDoc = await transaction.get(counterRef)
 
-      let newCount = 1;
+      let newCount = 1
       if (counterDoc.exists) {
-        newCount = counterDoc.data()!.current + 1;
+        newCount = counterDoc.data()!.current + 1
       }
-      transaction.set(counterRef, { current: newCount }, { merge: true });
+      transaction.set(counterRef, { current: newCount }, { merge: true })
 
-      const interestId = `RDC/EMR/INTEREST/${String(newCount).padStart(5, '0')}`;
-      
-      const newInterestDoc: Omit<EmrInterest, 'id'> = {
-          interestId: interestId,
-          callId: callId,
-          userId: user.uid,
-          userName: user.name,
-          userEmail: user.email,
-          faculty: user.faculty!,
-          department: user.department!,
-          registeredAt: new Date().toISOString(),
-          status: 'Registered',
-      };
+      const interestId = `RDC/EMR/INTEREST/${String(newCount).padStart(5, "0")}`
+
+      const newInterestDoc: Omit<EmrInterest, "id"> = {
+        interestId: interestId,
+        callId: callId,
+        userId: user.uid,
+        userName: user.name,
+        userEmail: user.email,
+        faculty: user.faculty!,
+        department: user.department!,
+        registeredAt: new Date().toISOString(),
+        status: "Registered",
+      }
 
       if (coPis && coPis.length > 0) {
-        newInterestDoc.coPiUids = coPis.map(p => p.uid);
-        newInterestDoc.coPiNames = coPis.map(p => p.name);
+        newInterestDoc.coPiUids = coPis.map((p) => p.uid)
+        newInterestDoc.coPiNames = coPis.map((p) => p.name)
       }
-      
-      const interestRef = adminDb.collection('emrInterests').doc();
-      transaction.set(interestRef, newInterestDoc);
-      return { id: interestRef.id, ...newInterestDoc };
-    });
 
-     // Notify Co-PIs
+      const interestRef = adminDb.collection("emrInterests").doc()
+      transaction.set(interestRef, newInterestDoc)
+      return { id: interestRef.id, ...newInterestDoc }
+    })
+
+    // Notify Co-PIs
     if (coPis && coPis.length > 0) {
-        const callSnap = await adminDb.collection('fundingCalls').doc(callId).get();
-        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : "an EMR call";
+      const callSnap = await adminDb.collection("fundingCalls").doc(callId).get()
+      const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : "an EMR call"
 
-        const usersRef = adminDb.collection("users");
-        const usersQuery = usersRef.where(FieldValue.documentId(), "in", coPis.map(p => p.uid));
-        const coPiDocs = await usersQuery.get();
-        const batch = adminDb.batch();
+      const usersRef = adminDb.collection("users")
+      const usersQuery = usersRef.where(
+        FieldValue.documentId(),
+        "in",
+        coPis.map((p) => p.uid),
+      )
+      const coPiDocs = await usersQuery.get()
+      const batch = adminDb.batch()
 
-        for (const userDoc of coPiDocs.docs) {
-            const coPi = userDoc.data() as User;
-            const notificationRef = adminDb.collection("notifications").doc();
-            batch.set(notificationRef, {
-                uid: coPi.uid,
-                title: `You've been added as a Co-PI for the EMR call: "${callTitle}"`,
-                createdAt: new Date().toISOString(),
-                isRead: false,
-            });
+      for (const userDoc of coPiDocs.docs) {
+        const coPi = userDoc.data() as User
+        const notificationRef = adminDb.collection("notifications").doc()
+        batch.set(notificationRef, {
+          uid: coPi.uid,
+          title: `You've been added as a Co-PI for the EMR call: "${callTitle}"`,
+          createdAt: new Date().toISOString(),
+        })
 
-            if (coPi.email) {
-                await sendEmail({
-                    to: coPi.email,
-                    subject: `You've been added to an EMR Application `,
-                    html: `
+        if (coPi.email) {
+          await sendEmail({
+            to: coPi.email,
+            subject: `You've been added to an EMR Application `,
+            html: `
                         <div ${EMAIL_STYLES.background}>
                             ${EMAIL_STYLES.logo}
                             <p style="color:#ffffff;">Dear ${coPi.name},</p>
                             <p style="color:#e0e0e0;">You have been added as a Co-PI by ${user.name} for the EMR funding opportunity titled "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
                              ${EMAIL_STYLES.footer}
                         </div>`,
-                    from: 'default'
-                });
-            }
+            from: "default",
+          })
         }
-        await batch.commit();
+      }
+      await batch.commit()
     }
 
-
-    return { success: true };
-
+    return { success: true }
   } catch (error: any) {
-    console.error("Error registering EMR interest:", error);
-    return { success: false, error: error.message || "Failed to register interest." };
+    console.error("Error registering EMR interest:", error)
+    return { success: false, error: error.message || "Failed to register interest." }
   }
 }
 
@@ -1486,55 +1530,54 @@ export async function scheduleEmrMeeting(
   applicantUids: string[],
 ) {
   try {
-    const { date, time, venue, evaluatorUids } = meetingDetails;
+    const { date, time, venue, evaluatorUids } = meetingDetails
 
     if (!evaluatorUids || evaluatorUids.length === 0) {
-      return { success: false, error: "An evaluation committee must be assigned." };
+      return { success: false, error: "An evaluation committee must be assigned." }
     }
-    
-    const callRef = adminDb.collection('fundingCalls').doc(callId);
-    const callSnap = await callRef.get();
-    if (!callSnap.exists) {
-      return { success: false, error: "Funding call not found." };
-    }
-    const call = callSnap.data() as FundingCall;
-    
-    const batch = adminDb.batch();
-    const emailPromises = [];
 
-    const meetingTime = parse(time, 'HH:mm', parseISO(date));
+    const callRef = adminDb.collection("fundingCalls").doc(callId)
+    const callSnap = await callRef.get()
+    if (!callSnap.exists) {
+      return { success: false, error: "Funding call not found." }
+    }
+    const call = callSnap.data() as FundingCall
+
+    const batch = adminDb.batch()
+    const emailPromises = []
+
+    const meetingTime = parse(time, "HH:mm", parseISO(date))
 
     // Update meeting details on the call document itself
     batch.update(callRef, {
-        status: 'Meeting Scheduled',
-        meetingDetails: { date, venue, assignedEvaluators: evaluatorUids }
-    });
+      status: "Meeting Scheduled",
+      meetingDetails: { date, venue, assignedEvaluators: evaluatorUids },
+    })
 
     for (const userId of applicantUids) {
       // Find the interest document for this user and call
-      const interestsRef = adminDb.collection('emrInterests');
-      const q = interestsRef.where('callId', '==', callId).where('userId', '==', userId);
-      const interestSnapshot = await q.get();
+      const interestsRef = adminDb.collection("emrInterests")
+      const q = interestsRef.where("callId", "==", callId).where("userId", "==", userId)
+      const interestSnapshot = await q.get()
 
-      if (interestSnapshot.empty) continue;
-      
-      const interestDoc = interestSnapshot.docs[0];
-      const interestRef = interestDoc.ref;
-      const interest = interestDoc.data() as EmrInterest;
+      if (interestSnapshot.empty) continue
+
+      const interestDoc = interestSnapshot.docs[0]
+      const interestRef = interestDoc.ref
+      const interest = interestDoc.data() as EmrInterest
 
       batch.update(interestRef, {
         meetingSlot: { date, time },
-        status: 'Evaluation Pending',
-      });
+        status: "Evaluation Pending",
+      })
 
-      const notificationRef = adminDb.collection("notifications").doc();
+      const notificationRef = adminDb.collection("notifications").doc()
       batch.set(notificationRef, {
         uid: interest.userId,
         title: `Your EMR Presentation for "${call.title}" has been scheduled.`,
         createdAt: new Date().toISOString(),
-        isRead: false,
-      });
-      
+      })
+
       const emailHtml = `
           <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
@@ -1542,214 +1585,222 @@ export async function scheduleEmrMeeting(
               <p style="color: #e0e0e0;">
                   A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
               </p>
-              <p><strong style="color: #ffffff;">Date:</strong> ${format(meetingTime, 'MMMM d, yyyy')}</p>
-              <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
+              <p><strong style="color: #ffffff;">Date:</strong> ${format(meetingTime, "MMMM d, yyyy")}</p>
+              <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, "h:mm a")}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
               <p style="color: #cccccc;">Please prepare for your presentation.</p>
               ${EMAIL_STYLES.footer}
           </div>
-      `;
-      
+      `
+
       if (interest.userEmail) {
-          emailPromises.push(sendEmail({
-              to: interest.userEmail,
-              subject: `Your EMR Presentation Slot for: ${call.title}`,
-              html: emailHtml,
-              from: 'default'
-          }));
+        emailPromises.push(
+          sendEmail({
+            to: interest.userEmail,
+            subject: `Your EMR Presentation Slot for: ${call.title}`,
+            html: emailHtml,
+            from: "default",
+          }),
+        )
       }
     }
 
     // Notify evaluators once
     if (evaluatorUids && evaluatorUids.length > 0) {
-      const evaluatorDocs = await Promise.all(
-        evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()),
-      );
+      const evaluatorDocs = await Promise.all(evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()))
 
       for (const evaluatorDoc of evaluatorDocs) {
         if (evaluatorDoc.exists) {
-          const evaluator = evaluatorDoc.data() as User;
+          const evaluator = evaluatorDoc.data() as User
 
-          const evaluatorNotificationRef = adminDb.collection("notifications").doc();
+          const evaluatorNotificationRef = adminDb.collection("notifications").doc()
           batch.set(evaluatorNotificationRef, {
             uid: evaluator.uid,
             title: `You've been assigned to an EMR evaluation meeting for "${call.title}"`,
             createdAt: new Date().toISOString(),
-            isRead: false,
-          });
+          })
 
           if (evaluator.email) {
-            emailPromises.push(sendEmail({
-              to: evaluator.email,
-              subject: `EMR Evaluation Assignment: ${call.title}`,
-              html: `
+            emailPromises.push(
+              sendEmail({
+                to: evaluator.email,
+                subject: `EMR Evaluation Assignment: ${call.title}`,
+                html: `
                 <div ${EMAIL_STYLES.background}>
                     ${EMAIL_STYLES.logo}
                     <p style="color: #ffffff;">Dear Evaluator,</p>
                     <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
-                    <p><strong style="color: #ffffff;">Date:</strong> ${format(parseISO(date), 'MMMM d, yyyy')}</p>
-                     <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
+                    <p><strong style="color: #ffffff;">Date:</strong> ${format(parseISO(date), "MMMM d, yyyy")}</p>
+                     <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, "h:mm a")}</p>
                     <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Portal.</p>
                     ${EMAIL_STYLES.footer}
                 </div>
               `,
-              from: 'default'
-            }));
+                from: "default",
+              }),
+            )
           }
         }
       }
     }
 
-    await batch.commit();
-    await Promise.all(emailPromises);
+    await batch.commit()
+    await Promise.all(emailPromises)
 
-    return { success: true };
+    return { success: true }
   } catch (error: any) {
-    console.error("Error scheduling EMR meeting:", error);
-    return { success: false, error: error.message || "Failed to schedule EMR meeting." };
+    console.error("Error scheduling EMR meeting:", error)
+    return { success: false, error: error.message || "Failed to schedule EMR meeting." }
   }
 }
 
-
-export async function uploadEmrPpt(interestId: string, pptDataUrl: string, originalFileName: string, userName: string): Promise<{ success: boolean; error?: string }> {
+export async function uploadEmrPpt(
+  interestId: string,
+  pptDataUrl: string,
+  originalFileName: string,
+  userName: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId || !pptDataUrl) {
-      return { success: false, error: "Interest ID and file data are required." };
+      return { success: false, error: "Interest ID and file data are required." }
     }
-    
-    const interestRef = adminDb.collection('emrInterests').doc(interestId);
-    const interestSnap = await interestRef.get();
-    if (!interestSnap.exists) {
-        return { success: false, error: "Interest registration not found." };
-    }
-    const interest = interestSnap.data() as EmrInterest;
-    
-    // Standardize the filename
-    const fileExtension = path.extname(originalFileName);
-    const standardizedName = `emr_${userName.replace(/\s+/g, '_')}${fileExtension}`;
 
-    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`;
-    const result = await uploadFileToServer(pptDataUrl, filePath);
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    // Standardize the filename
+    const fileExtension = path.extname(originalFileName)
+    const standardizedName = `emr_${userName.replace(/\s+/g, "_")}${fileExtension}`
+
+    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`
+    const result = await uploadFileToServer(pptDataUrl, filePath)
 
     if (!result.success || !result.url) {
-        throw new Error(result.error || "PPT upload failed.");
+      throw new Error(result.error || "PPT upload failed.")
     }
-    
+
     await interestRef.update({
       pptUrl: result.url,
       pptSubmissionDate: new Date().toISOString(),
-      status: 'PPT Submitted',
-    });
+      status: "PPT Submitted",
+    })
 
-    return { success: true };
+    return { success: true }
   } catch (error: any) {
-    console.error("Error uploading EMR presentation:", error);
-    return { success: false, error: error.message || "Failed to upload presentation." };
+    console.error("Error uploading EMR presentation:", error)
+    return { success: false, error: error.message || "Failed to upload presentation." }
   }
 }
 
 export async function removeEmrPpt(interestId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-        if (!interestId) {
-            return { success: false, error: "Interest ID is required." };
-        }
-
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const interestSnap = await interestRef.get();
-        if (!interestSnap.exists) {
-            return { success: false, error: "Interest registration not found." };
-        }
-        const interest = interestSnap.data() as EmrInterest;
-
-        if (interest.pptUrl) {
-            const bucket = adminStorage.bucket();
-            const url = new URL(interest.pptUrl);
-            const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf('/o/') + 3));
-            
-            try {
-                await bucket.file(filePath).delete();
-                console.log(`Deleted file from Storage: ${filePath}`);
-            } catch(storageError: any) {
-                // If the file doesn't exist, we can ignore the error and proceed.
-                if (storageError.code !== 404) {
-                    throw storageError;
-                }
-                 console.warn(`Storage file not found during deletion, but proceeding: ${filePath}`);
-            }
-        }
-
-        await interestRef.update({
-            pptUrl: FieldValue.delete(),
-            pptSubmissionDate: FieldValue.delete()
-        });
-
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error removing EMR presentation:", error);
-        return { success: false, error: error.message || "Failed to remove presentation." };
+  try {
+    if (!interestId) {
+      return { success: false, error: "Interest ID is required." }
     }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    if (interest.pptUrl) {
+      const bucket = adminStorage.bucket()
+      const url = new URL(interest.pptUrl)
+      const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf("/o/") + 3))
+
+      try {
+        await bucket.file(filePath).delete()
+        console.log(`Deleted file from Storage: ${filePath}`)
+      } catch (storageError: any) {
+        // If the file doesn't exist, we can ignore the error and proceed.
+        if (storageError.code !== 404) {
+          throw storageError
+        }
+        console.warn(`Storage file not found during deletion, but proceeding: ${filePath}`)
+      }
+    }
+
+    await interestRef.update({
+      pptUrl: FieldValue.delete(),
+      pptSubmissionDate: FieldValue.delete(),
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error removing EMR presentation:", error)
+    return { success: false, error: error.message || "Failed to remove presentation." }
+  }
 }
 
 export async function withdrawEmrInterest(interestId: string): Promise<{ success: boolean; error?: string }> {
-    try {
-        if (!interestId) {
-            return { success: false, error: "Interest ID is required." };
-        }
-
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const interestSnap = await interestRef.get();
-
-        if (!interestSnap.exists) {
-            return { success: false, error: "Interest registration not found." };
-        }
-        const interest = interestSnap.data() as EmrInterest;
-
-        // If a presentation was uploaded, delete it from storage first.
-        if (interest.pptUrl) {
-            await removeEmrPpt(interest.id);
-        }
-        
-        // Delete the interest document from Firestore.
-        await interestRef.delete();
-
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error withdrawing EMR interest:", error);
-        return { success: false, error: error.message || "Failed to withdraw interest." };
+  try {
+    if (!interestId) {
+      return { success: false, error: "Interest ID is required." }
     }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    // If a presentation was uploaded, delete it from storage first.
+    if (interest.pptUrl) {
+      await removeEmrPpt(interest.id)
+    }
+
+    // Delete the interest document from Firestore.
+    await interestRef.delete()
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error withdrawing EMR interest:", error)
+    return { success: false, error: error.message || "Failed to withdraw interest." }
+  }
 }
 
-export async function deleteEmrInterest(interestId: string, remarks: string, adminName: string): Promise<{ success: boolean; error?: string }> {
-    try {
-        if (!interestId) return { success: false, error: "Interest ID is required." };
+export async function deleteEmrInterest(
+  interestId: string,
+  remarks: string,
+  adminName: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId) return { success: false, error: "Interest ID is required." }
 
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const interestSnap = await interestRef.get();
-        if (!interestSnap.exists) return { success: false, error: "Interest registration not found." };
-        
-        const interest = interestSnap.data() as EmrInterest;
-        const callRef = adminDb.collection('fundingCalls').doc(interest.callId);
-        const callSnap = await callRef.get();
-        const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : 'an EMR call';
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) return { success: false, error: "Interest registration not found." }
 
-        // Withdraw interest to also handle file deletion
-        await withdrawEmrInterest(interestId);
-        
-        // Notify the user
-        const notification = {
-            uid: interest.userId,
-            title: `Your EMR registration for "${callTitle}" was removed.`,
-            createdAt: new Date().toISOString(),
-            isRead: false,
-        };
-        await adminDb.collection("notifications").add(notification);
+    const interest = interestSnap.data() as EmrInterest
+    const callRef = adminDb.collection("fundingCalls").doc(interest.callId)
+    const callSnap = await callRef.get()
+    const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call"
 
-        if (interest.userEmail) {
-            await sendEmail({
-                to: interest.userEmail,
-                subject: `Update on your EMR Interest for: ${callTitle}`,
-                html: `
+    // Withdraw interest to also handle file deletion
+    await withdrawEmrInterest(interestId)
+
+    // Notify the user
+    const notification = {
+      uid: interest.userId,
+      title: `Your EMR registration for "${callTitle}" was removed.`,
+      createdAt: new Date().toISOString(),
+    }
+    await adminDb.collection("notifications").add(notification)
+
+    if (interest.userEmail) {
+      await sendEmail({
+        to: interest.userEmail,
+        subject: `Update on your EMR Interest for: ${callTitle}`,
+        html: `
                     <div ${EMAIL_STYLES.background}>
                         ${EMAIL_STYLES.logo}
                         <p style="color:#ffffff;">Dear ${interest.userName},</p>
@@ -1762,143 +1813,149 @@ export async function deleteEmrInterest(interestId: string, remarks: string, adm
                         ${EMAIL_STYLES.footer}
                     </div>
                 `,
-                from: 'default'
-            });
-        }
-        
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error deleting EMR interest:", error);
-        return { success: false, error: error.message || "Failed to delete interest." };
+        from: "default",
+      })
     }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error deleting EMR interest:", error)
+    return { success: false, error: error.message || "Failed to delete interest." }
+  }
 }
 
 export async function addEmrEvaluation(
-  interestId: string, 
-  evaluator: User, 
-  evaluationData: { recommendation: EmrEvaluation['recommendation']; comments: string }
-): Promise<{ success: boolean, error?: string }> {
+  interestId: string,
+  evaluator: User,
+  evaluationData: { recommendation: EmrEvaluation["recommendation"]; comments: string },
+): Promise<{ success: boolean; error?: string }> {
   try {
-    const evaluationRef = adminDb.collection('emrInterests').doc(interestId).collection('evaluations').doc(evaluator.uid);
-    
+    const evaluationRef = adminDb
+      .collection("emrInterests")
+      .doc(interestId)
+      .collection("evaluations")
+      .doc(evaluator.uid)
+
     const newEvaluation: EmrEvaluation = {
       evaluatorUid: evaluator.uid,
       evaluatorName: evaluator.name,
       evaluationDate: new Date().toISOString(),
-      ...evaluationData
-    };
-    
-    await evaluationRef.set(newEvaluation, { merge: true });
+      ...evaluationData,
+    }
+
+    await evaluationRef.set(newEvaluation, { merge: true })
 
     // Notify Super Admins
-    const interestSnap = await adminDb.collection('emrInterests').doc(interestId).get();
-    if(interestSnap.exists) {
-      const interest = interestSnap.data() as EmrInterest;
-      const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
+    const interestSnap = await adminDb.collection("emrInterests").doc(interestId).get()
+    if (interestSnap.exists) {
+      const interest = interestSnap.data() as EmrInterest
+      const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get()
       if (!superAdminUsersSnapshot.empty) {
-        const batch = adminDb.batch();
-        const notificationTitle = `EMR evaluation submitted for ${interest.userName} by ${evaluator.name}`;
+        const batch = adminDb.batch()
+        const notificationTitle = `EMR evaluation submitted for ${interest.userName} by ${evaluator.name}`
         superAdminUsersSnapshot.forEach((userDoc) => {
-          const notificationRef = adminDb.collection("notifications").doc();
+          const notificationRef = adminDb.collection("notifications").doc()
           batch.set(notificationRef, {
             uid: userDoc.id,
             title: notificationTitle,
             createdAt: new Date().toISOString(),
-            isRead: false,
-          });
-        });
-        await batch.commit();
+          })
+        })
+        await batch.commit()
       }
     }
-    
-    return { success: true };
-  } catch(error: any) {
-    console.error("Error adding EMR evaluation:", error);
-    return { success: false, error: error.message || 'Failed to submit evaluation.' };
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error adding EMR evaluation:", error)
+    return { success: false, error: error.message || "Failed to submit evaluation." }
   }
 }
 
 export async function createFundingCall(
-    callData: z.infer<any> // Using any because the zod schema is on the client
-): Promise<{ success: boolean, error?: string }> {
-    try {
-        const newCallDocRef = adminDb.collection('fundingCalls').doc();
-        const attachments: { name: string; url: string }[] = [];
+  callData: z.infer<any>, // Using any because the zod schema is on the client
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const newCallDocRef = adminDb.collection("fundingCalls").doc()
+    const attachments: { name: string; url: string }[] = []
 
-        if (callData.attachments && callData.attachments.length > 0) {
-            for (let i = 0; i < callData.attachments.length; i++) {
-                const file = callData.attachments[i];
-                const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`;
-                const path = `emr-attachments/${newCallDocRef.id}/${file.name}`;
-                const result = await uploadFileToServer(dataUrl, path);
-                if (result.success && result.url) {
-                    attachments.push({ name: file.name, url: result.url });
-                } else {
-                    throw new Error(`Failed to upload attachment: ${file.name}`);
-                }
-            }
+    if (callData.attachments && callData.attachments.length > 0) {
+      for (let i = 0; i < callData.attachments.length; i++) {
+        const file = callData.attachments[i]
+        const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString("base64")}`
+        const path = `emr-attachments/${newCallDocRef.id}/${file.name}`
+        const result = await uploadFileToServer(dataUrl, path)
+        if (result.success && result.url) {
+          attachments.push({ name: file.name, url: result.url })
+        } else {
+          throw new Error(`Failed to upload attachment: ${file.name}`)
         }
-        
-        // Transaction to generate a new sequential ID
-        const newCallData = await getFirestore().runTransaction(async (transaction) => {
-            const counterRef = adminDb.collection('counters').doc('emrCall');
-            const counterDoc = await transaction.get(counterRef);
-
-            let newCount = 1;
-            if (counterDoc.exists) {
-                newCount = counterDoc.data()!.current + 1;
-            }
-            transaction.set(counterRef, { current: newCount }, { merge: true });
-
-            const callIdentifier = `RDC/EMR/CALL/${String(newCount).padStart(5, '0')}`;
-            
-            const newCall: Omit<FundingCall, 'id'> = {
-                callIdentifier: callIdentifier,
-                title: callData.title,
-                agency: callData.agency,
-                description: callData.description,
-                callType: callData.callType,
-                applyDeadline: callData.applyDeadline.toISOString(),
-                interestDeadline: callData.interestDeadline.toISOString(),
-                detailsUrl: callData.detailsUrl,
-                attachments: attachments,
-                createdAt: new Date().toISOString(),
-                createdBy: 'Super-admin',
-                status: 'Open',
-                isAnnounced: callData.notifyAllStaff,
-            };
-            
-            transaction.set(newCallDocRef, newCall);
-            return { id: newCallDocRef.id, ...newCall };
-        });
-
-        if (callData.notifyAllStaff) {
-            await announceEmrCall(newCallData.id);
-        }
-
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error creating funding call:", error);
-        return { success: false, error: error.message || "Failed to create funding call." };
+      }
     }
+
+    // Transaction to generate a new sequential ID
+    const newCallData = await getFirestore().runTransaction(async (transaction) => {
+      const counterRef = adminDb.collection("counters").doc("emrCall")
+      const counterDoc = await transaction.get(counterRef)
+
+      let newCount = 1
+      if (counterDoc.exists) {
+        newCount = counterDoc.data()!.current + 1
+      }
+      transaction.set(counterRef, { current: newCount }, { merge: true })
+
+      const callIdentifier = `RDC/EMR/CALL/${String(newCount).padStart(5, "0")}`
+
+      const newCall: Omit<FundingCall, "id"> = {
+        callIdentifier: callIdentifier,
+        title: callData.title,
+        agency: callData.agency,
+        description: callData.description,
+        callType: callData.callType,
+        applyDeadline: callData.applyDeadline.toISOString(),
+        interestDeadline: callData.interestDeadline.toISOString(),
+        detailsUrl: callData.detailsUrl,
+        attachments: attachments,
+        createdAt: new Date().toISOString(),
+        createdBy: "Super-admin",
+        status: "Open",
+        isAnnounced: callData.notifyAllStaff,
+      }
+
+      transaction.set(newCallDocRef, newCall)
+      return { id: newCallDocRef.id, ...newCall }
+    })
+
+    if (callData.notifyAllStaff) {
+      await announceEmrCall(newCallData.id)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error creating funding call:", error)
+    return { success: false, error: error.message || "Failed to create funding call." }
+  }
 }
 
-export async function announceEmrCall(callId: string): Promise<{ success: boolean, error?: string }> {
+export async function announceEmrCall(callId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const allStaffEmail = process.env.ALL_STAFF_EMAIL;
+    const allStaffEmail = process.env.ALL_STAFF_EMAIL
     if (!allStaffEmail) {
-      return { success: false, error: "The 'All Staff' email address is not configured on the server. Please add it to the .env file." };
+      return {
+        success: false,
+        error: "The 'All Staff' email address is not configured on the server. Please add it to the .env file.",
+      }
     }
-    
-    const callRef = adminDb.collection('fundingCalls').doc(callId);
-    const callSnap = await callRef.get();
+
+    const callRef = adminDb.collection("fundingCalls").doc(callId)
+    const callSnap = await callRef.get()
 
     if (!callSnap.exists) {
-        return { success: false, error: 'Funding call not found.' };
+      return { success: false, error: "Funding call not found." }
     }
-    const call = callSnap.data() as FundingCall;
+    const call = callSnap.data() as FundingCall
 
-    const emailAttachments = (call.attachments || []).map(att => ({ filename: att.name, path: att.url }));
+    const emailAttachments = (call.attachments || []).map((att) => ({ filename: att.name, path: att.url }))
 
     const emailHtml = `
       <div ${EMAIL_STYLES.background}>
@@ -1906,290 +1963,264 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
         <h2 style="color: #ffffff; text-align: center;">New Funding Opportunity: ${call.title}</h2>
         <p style="color:#e0e0e0;">A new funding call from <strong style="color:#ffffff;">${call.agency}</strong> has been posted on the PU Research Portal.</p>
         <div style="padding: 15px; border: 1px solid #4f5b62; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
-          <div style="color:#e0e0e0;" class="prose prose-sm">${call.description || 'No description provided.'}</div>
-          <p style="color:#e0e0e0;"><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>
-          <p style="color:#e0e0e0;"><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), 'PP')}</p>
+          <div style="color:#e0e0e0;" class="prose prose-sm">${call.description || "No description provided."}</div>
+          <p style="color:#e0e0e0;"><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), "PPp")}</p>
+          <p style="color:#e0e0e0;"><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), "PP")}</p>
         </div>
         <p style="color:#e0e0e0; margin-top: 20px;">Please find the relevant documents attached to this email.</p>
         <p style="margin-top: 20px; text-align: center;">
-          <a href="${call.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+          <a href="${call.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + "/dashboard/emr-calendar"}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
             View Full Details on the Portal
           </a>
         </p>
-         ${EMAIL_STYLES.footer}
+        ${EMAIL_STYLES.footer}
       </div>
-    `;
+    `
 
     await sendEmail({
       to: allStaffEmail,
-      subject: `New Funding Call: ${call.title}`,
+      subject: `New Funding Opportunity: ${call.title}`,
       html: emailHtml,
-      from: 'rdc',
-      attachments: emailAttachments
-    });
-    
-    // Mark the call as announced
-    await callRef.update({ isAnnounced: true });
+      attachments: emailAttachments,
+      from: "default",
+    })
 
-    return { success: true };
+    await callRef.update({ isAnnounced: true })
+
+    return { success: true }
   } catch (error: any) {
-    console.error("Error announcing EMR call:", error);
-    return { success: false, error: error.message || "Failed to send announcement." };
+    console.error("Error announcing EMR call:", error)
+    return { success: false, error: error.message || "Failed to announce funding call." }
   }
 }
 
-export async function updateEmrStatus(
-    interestId: string, 
-    status: EmrInterest['status'],
-    adminRemarks?: string,
-): Promise<{ success: boolean, error?: string }> {
+export async function updateEmrInterestStatus(
+  interestId: string,
+  newStatus: EmrInterest["status"],
+  adminName: string,
+): Promise<{ success: boolean; error?: string }> {
   try {
     const interestRef = adminDb.collection("emrInterests").doc(interestId)
-    const updateData: { [key: string]: any } = { status }
-
-    if (adminRemarks) {
-      updateData.adminRemarks = adminRemarks
-    }
-    
-    if (status === 'Endorsement Signed') {
-        updateData.endorsementSignedAt = new Date().toISOString();
-    }
-    if (status === 'Submitted to Agency') {
-        updateData.submittedToAgencyAt = new Date().toISOString();
-    }
-
-    await interestRef.update(updateData)
-
-    // Notify user
     const interestSnap = await interestRef.get()
-    if (interestSnap.exists) {
-      const interest = interestSnap.data() as EmrInterest
-      const notification = {
-        uid: interest.userId,
-        title: `Your EMR application status has been updated to: ${status}`,
-        createdAt: new Date().toISOString(),
-        isRead: false,
-      }
-      await adminDb.collection("notifications").add(notification)
-
-      if (interest.userEmail) {
-        let emailHtml = `
-            <div ${EMAIL_STYLES.background}>
-                ${EMAIL_STYLES.logo}
-                <p style="color:#ffffff;">Dear ${interest.userName},</p>
-                <p style="color:#e0e0e0;">The status of your EMR application has been updated to <strong style="color:#ffffff;">${status}</strong>.</p>
-                ${adminRemarks ? `<div style="margin-top:20px; padding:15px; border:1px solid #4f5b62; border-radius:6px; background-color:#2c3e50;"><h4 style="color:#ffffff; margin-top:0;">Admin Remarks:</h4><p style="color:#e0e0e0;">${adminRemarks}</p></div>` : ""}
-        `;
-        
-        if (status === 'Endorsement Signed') {
-            emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Your endorsement letter has been signed and is ready for collection from the RDC office. You may now submit your proposal to the funding agency. Once submitted, please log the Agency Reference Number and Acknowledgement on the portal.</p>`
-        }
-        
-        if (status === 'Revision Needed') {
-            const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
-            if (callSnap.exists()) {
-                const call = callSnap.data() as FundingCall;
-                if (call.meetingDetails?.date) {
-                    const meetingDate = parseISO(call.meetingDetails.date);
-                    const deadline = setSeconds(setMinutes(setHours(addDays(meetingDate, 3), 17), 0), 0); // 3 days after meeting at 5:00 PM
-                    emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Please submit your revised presentation on the portal by <strong style="color:#ffffff;">${format(deadline, 'PPpp')}</strong>.</p>`;
-                }
-            }
-        }
-
-        emailHtml += `<p style="color:#e0e0e0;">Please check the portal for more details.</p>${EMAIL_STYLES.footer}</div>`
-
-        await sendEmail({
-          to: interest.userEmail,
-          subject: `Update on your EMR Application`,
-          html: emailHtml,
-          from: "default",
-        })
-      }
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
     }
+    const interest = interestSnap.data() as EmrInterest
+
+    await interestRef.update({ status: newStatus })
+
+    const callRef = adminDb.collection("fundingCalls").doc(interest.callId)
+    const callSnap = await callRef.get()
+    const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call"
+
+    const notification = {
+      uid: interest.userId,
+      title: `Your EMR application for "${callTitle}" status was updated to: ${newStatus}`,
+      createdAt: new Date().toISOString(),
+    }
+    await adminDb.collection("notifications").add(notification)
+
+    if (interest.userEmail) {
+      const emailHtml = `
+        <div ${EMAIL_STYLES.background}>
+          ${EMAIL_STYLES.logo}
+          <p style="color:#ffffff;">Dear ${interest.userName},</p>
+          <p style="color:#e0e0e0;">
+            The status of your EMR application for "<strong style="color:#ffffff;">${callTitle}</strong>" has been updated to 
+            <strong style="color:${newStatus === "Recommended" ? "#00e676" : newStatus === "Not Recommended" ? "#ff5252" : "#ffca28"};">
+              ${newStatus}
+            </strong> by ${adminName}.
+          </p>
+          ${EMAIL_STYLES.footer}
+        </div>
+      `
+      await sendEmail({
+        to: interest.userEmail,
+        subject: `EMR Application Status Update: ${newStatus}`,
+        html: emailHtml,
+        from: "default",
+      })
+    }
+
     return { success: true }
   } catch (error: any) {
-    console.error("Error updating EMR status:", error)
+    console.error("Error updating EMR interest status:", error)
     return { success: false, error: error.message || "Failed to update status." }
   }
 }
 
-
-export async function uploadRevisedEmrPpt(interestId: string, pptDataUrl: string, originalFileName: string, userName: string): Promise<{ success: boolean; error?: string }> {
+export async function sendMeetingReminders(): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!interestId || !pptDataUrl) {
-      return { success: false, error: "Interest ID and file data are required." };
+    const tomorrow = addDays(new Date(), 1)
+    const tomorrowDateString = format(tomorrow, "yyyy-MM-dd")
+
+    // Find IMR projects with meetings tomorrow
+    const imrProjectsSnapshot = await adminDb
+      .collection("projects")
+      .where("meetingDetails.date", "==", tomorrowDateString)
+      .get()
+
+    // Find EMR interests with meetings tomorrow
+    const emrInterestsSnapshot = await adminDb
+      .collection("emrInterests")
+      .where("meetingSlot.date", "==", tomorrowDateString)
+      .get()
+
+    const emailPromises = []
+
+    // Process IMR projects
+    for (const projectDoc of imrProjectsSnapshot.docs) {
+      const project = projectDoc.data() as Project
+      if (project.pi_email && project.meetingDetails) {
+        const meetingDateTime = setHours(setMinutes(setSeconds(tomorrow, 0), 0), 0)
+        const [hours, minutes] = project.meetingDetails.time.split(":").map(Number)
+        const finalMeetingTime = setHours(setMinutes(meetingDateTime, minutes), hours)
+
+        const emailHtml = `
+          <div ${EMAIL_STYLES.background}>
+            ${EMAIL_STYLES.logo}
+            <p style="color:#ffffff;">Dear ${project.pi},</p>
+            <p style="color:#e0e0e0;">This is a reminder that your IMR evaluation meeting for the project "<strong style="color:#ffffff;">${project.title}</strong>" is scheduled for tomorrow.</p>
+            <p><strong style="color:#ffffff;">Date:</strong> ${format(finalMeetingTime, "MMMM d, yyyy")}</p>
+            <p><strong style="color:#ffffff;">Time:</strong> ${format(finalMeetingTime, "h:mm a")}</p>
+            <p><strong style="color:#ffffff;">Venue:</strong> ${project.meetingDetails.venue}</p>
+            <p style="color:#e0e0e0;">Please ensure you are prepared for your presentation.</p>
+            ${EMAIL_STYLES.footer}
+          </div>
+        `
+
+        emailPromises.push(
+          sendEmail({
+            to: project.pi_email,
+            subject: `Reminder: IMR Meeting Tomorrow for ${project.title}`,
+            html: emailHtml,
+            from: "default",
+          }),
+        )
+      }
     }
-    
-    const interestRef = adminDb.collection('emrInterests').doc(interestId);
-    
-    // Standardize the filename
-    const fileExtension = path.extname(originalFileName);
-    const standardizedName = `${userName.replace(/\s+/g, '_')}_revised_${new Date().getTime()}${fileExtension}`;
 
-    const filePath = `emr-presentations/${path.dirname(interestId)}/${standardizedName}`;
-    const result = await uploadFileToServer(pptDataUrl, filePath);
+    // Process EMR interests
+    for (const interestDoc of emrInterestsSnapshot.docs) {
+      const interest = interestDoc.data() as EmrInterest
+      if (interest.userEmail && interest.meetingSlot) {
+        const meetingDateTime = setHours(setMinutes(setSeconds(tomorrow, 0), 0), 0)
+        const [hours, minutes] = interest.meetingSlot.time.split(":").map(Number)
+        const finalMeetingTime = setHours(setMinutes(meetingDateTime, minutes), hours)
 
-    if (!result.success || !result.url) {
-        throw new Error(result.error || "Revised PPT upload failed.");
+        // Get call details
+        const callSnap = await adminDb.collection("fundingCalls").doc(interest.callId).get()
+        const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "EMR Call"
+
+        const emailHtml = `
+          <div ${EMAIL_STYLES.background}>
+            ${EMAIL_STYLES.logo}
+            <p style="color:#ffffff;">Dear ${interest.userName},</p>
+            <p style="color:#e0e0e0;">This is a reminder that your EMR presentation for "<strong style="color:#ffffff;">${callTitle}</strong>" is scheduled for tomorrow.</p>
+            <p><strong style="color:#ffffff;">Date:</strong> ${format(finalMeetingTime, "MMMM d, yyyy")}</p>
+            <p><strong style="color:#ffffff;">Time:</strong> ${format(finalMeetingTime, "h:mm a")}</p>
+            <p style="color:#e0e0e0;">Please ensure you are prepared for your presentation.</p>
+            ${EMAIL_STYLES.footer}
+          </div>
+        `
+
+        emailPromises.push(
+          sendEmail({
+            to: interest.userEmail,
+            subject: `Reminder: EMR Presentation Tomorrow for ${callTitle}`,
+            html: emailHtml,
+            from: "default",
+          }),
+        )
+      }
     }
-    
-    await interestRef.update({
-      revisedPptUrl: result.url,
-      status: 'Revision Submitted',
-    });
 
-    return { success: true };
+    await Promise.all(emailPromises)
+
+    console.log(`Sent ${emailPromises.length} meeting reminder emails for ${tomorrowDateString}`)
+    return { success: true }
   } catch (error: any) {
-    console.error("Error uploading revised EMR presentation:", error);
-    return { success: false, error: error.message || "Failed to upload presentation." };
+    console.error("Error sending meeting reminders:", error)
+    return { success: false, error: error.message || "Failed to send meeting reminders." }
   }
 }
 
-export async function notifySuperAdminsOnNewUser(userName: string, role: string) {
+export async function generateImrRecommendationDocument(
+  projectId: string,
+  evaluations: Evaluation[],
+  projectData: Project,
+): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
-    const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
-    if (superAdminUsersSnapshot.empty) {
-      console.log("No Super-admin users found to notify.");
-      return { success: true, message: "No Super-admins to notify." };
-    }
-
-    const batch = adminDb.batch();
-    const notificationTitle = `New ${role.toUpperCase()} joined: ${userName}`;
-
-    superAdminUsersSnapshot.forEach((docSnapshot) => {
-      const notificationRef = adminDb.collection("notifications").doc();
-      batch.set(notificationRef, {
-        uid: docSnapshot.id,
-        title: notificationTitle,
-        createdAt: new Date().toISOString(),
-        isRead: false,
-      });
-    });
-
-    await batch.commit();
-    return { success: true };
-  } catch (error: any) {
-    console.error("Error notifying Super-admins about new user:", error);
-    return { success: false, error: error.message || "Failed to notify Super-admins." };
-  }
-}
-
-export async function saveSidebarOrder(uid: string, order: string[]): Promise<{ success: boolean, error?: string }> {
-  try {
-    if (!uid || !Array.isArray(order)) {
-      return { success: false, error: 'Invalid user ID or order provided.' };
-    }
-    const userRef = adminDb.collection('users').doc(uid);
-    await userRef.update({ sidebarOrder: order });
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error saving sidebar order:', error);
-    return { success: false, error: error.message || 'Failed to save sidebar order.' };
-  }
-}
-
-export async function uploadEndorsementForm(interestId: string, endorsementUrl: string): Promise<{ success: boolean, error?: string }> {
-    try {
-        if (!interestId || !endorsementUrl) {
-            return { success: false, error: "Interest ID and endorsement form URL are required." };
-        }
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        await interestRef.update({
-            endorsementFormUrl: endorsementUrl,
-            status: 'Endorsement Submitted',
-        });
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error submitting endorsement form:", error);
-        return { success: false, error: "Failed to submit endorsement form." };
-    }
-}
-
-
-export async function submitToAgency(
-  interestId: string, 
-  referenceNumber: string, 
-  acknowledgementUrl?: string
-): Promise<{ success: boolean, error?: string }> {
-    try {
-        if (!interestId || !referenceNumber) {
-            return { success: false, error: "Interest ID and reference number are required." };
-        }
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const updateData: { [key: string]: any } = {
-            agencyReferenceNumber: referenceNumber,
-            status: 'Submitted to Agency',
-            submittedToAgencyAt: new Date().toISOString(),
-        };
-        if (acknowledgementUrl) {
-            updateData.agencyAcknowledgementUrl = acknowledgementUrl;
-        }
-        await interestRef.update(updateData);
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error submitting to agency:", error);
-        return { success: false, error: "Failed to log submission to agency." };
-    }
-}
-
-export async function generateRecommendationForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
-  try {
-    const projectRef = adminDb.collection('projects').doc(projectId);
-    const projectSnap = await projectRef.get();
-    if (!projectSnap.exists) {
-      return { success: false, error: 'Project not found.' };
-    }
-    const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
-    
-    const evaluationsRef = collection(projectRef, 'evaluations');
-    const evaluationsSnap = await getDocs(evaluationsRef);
-    const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
-    
-    const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
+    const templatePath = path.join(process.cwd(), "IMR_RECOMMENDATION_TEMPLATE.docx")
     if (!fs.existsSync(templatePath)) {
-      return { success: false, error: 'Recommendation form template not found on the server.' };
+      return {
+        success: false,
+        error: 'Template file "IMR_RECOMMENDATION_TEMPLATE.docx" not found in the project root directory.',
+      }
     }
-    const content = fs.readFileSync(templatePath, 'binary');
 
-    const zip = new PizZip(content);
+    const templateBuffer = fs.readFileSync(templatePath)
+    const zip = new PizZip(templateBuffer)
     const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-    });
+      paragraphLoop: true,
+      linebreaks: true,
+    })
 
-    const recommendationText = evaluations.map(e => {
-        return `${e.evaluatorName} (${e.recommendation}):\n${e.comments}`;
-    }).join('\n\n');
+    // Calculate overall recommendation
+    const recommendedCount = evaluations.filter((e) => e.recommendation === "Recommended").length
+    const totalEvaluations = evaluations.length
+    const overallRecommendation = recommendedCount > totalEvaluations / 2 ? "Recommended" : "Not Recommended"
 
-    const data = {
-        pi_name: project.pi,
-        submission_date: new Date(project.submissionDate).toLocaleDateString(),
-        project_title: project.title,
-        faculty: project.faculty,
-        department: project.departmentName,
-        institute: project.institute,
-        grant_amount: project.grant?.totalAmount.toLocaleString('en-IN') || 'N/A',
-        evaluator_comments: recommendationText || 'No evaluations submitted yet.'
-    };
-    
-    doc.setData(data);
+    // Prepare evaluator data
+    const evaluatorData = evaluations.map((evaluation, index) => ({
+      evaluatorName: evaluation.evaluatorName,
+      recommendation: evaluation.recommendation,
+      comments: evaluation.comments || "No comments provided",
+      serialNumber: index + 1,
+    }))
 
-    try {
-      doc.render();
-    } catch (error: any) {
-      console.error('Docxtemplater render error:', error);
-      return { success: false, error: 'Failed to render the document template.' };
+    // Prepare template data
+    const templateData = {
+      projectTitle: projectData.title,
+      piName: projectData.pi,
+      faculty: projectData.faculty,
+      institute: projectData.institute,
+      department: projectData.departmentName || "N/A",
+      grantAmount: projectData.grant?.totalAmount ? `₹${projectData.grant.totalAmount.toLocaleString()}` : "N/A",
+      evaluationDate: format(new Date(), "MMMM d, yyyy"),
+      overallRecommendation: overallRecommendation,
+      evaluators: evaluatorData,
+      recommendedCount: recommendedCount,
+      totalEvaluators: totalEvaluations,
     }
 
-    const buf = doc.getZip().generate({ type: 'nodebuffer' });
-    const base64 = buf.toString('base64');
+    doc.render(templateData)
 
-    return { success: true, fileData: base64 };
+    const buffer = doc.getZip().generate({
+      type: "base64",
+      mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    })
+
+    return { success: true, fileData: buffer }
   } catch (error: any) {
-    console.error('Error generating recommendation form:', error);
-    return { success: false, error: error.message || 'Failed to generate the form.' };
+    console.error("Error generating IMR recommendation document:", error)
+    return { success: false, error: error.message || "Failed to generate document." }
   }
 }
 
-
+export async function saveSidebarOrder(
+  uid: string,
+  sidebarOrder: string[],
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!uid) {
+      return { success: false, error: "User ID is required." }
+    }
+    const userRef = adminDb.collection("users").doc(uid)
+    await userRef.update({ sidebarOrder: sidebarOrder })
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error saving sidebar order:", error)
+    return { success: false, error: "Failed to save sidebar order." }
+  }
+}
