@@ -1,6 +1,5 @@
-export { default } from "@/src/app/page"
+import { redirect } from "next/navigation"
 
-export default function Page() {
-  // Placeholder for the actual page content
-  return <div>Page Content</div>
+export default function HomePage() {
+  redirect("/dashboard")
 }

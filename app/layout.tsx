@@ -1,32 +1,37 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Inter, Source_Code_Pro } from "next/font/google"
-import "@/src/app/globals.css"
-import { ThemeProvider } from "@/src/components/providers/theme-provider"
-import { Toaster } from "@/src/components/ui/toaster"
-import { isFirebaseInitialized } from "@/src/lib/config"
-import { FirebaseNotConfigured } from "@/src/components/firebase-not-configured"
+import { Inter } from "next/font/google"
+import "./globals.css"
+import { ThemeProvider } from "@/components/providers/theme-provider"
+import { Toaster } from "@/components/ui/toaster"
+import { FirebaseNotConfigured } from "@/components/firebase-not-configured"
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
-const sourceCodePro = Source_Code_Pro({ subsets: ["latin"], variable: "--font-source-code-pro" })
+const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "PU Research Portal",
-  description: "IMR Research Project Submission Portal for Parul University",
+  title: "Research Management System",
+  description: "University research project management and evaluation system",
     generator: 'v0.dev'
 }
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
-  if (!isFirebaseInitialized) {
+}) {
+  // Check if Firebase is configured
+  const isFirebaseConfigured =
+    process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
+    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN &&
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+
+  if (!isFirebaseConfigured) {
     return (
-      <html lang="en" suppressHydrationWarning>
-        <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`} suppressHydrationWarning>
+      <html lang="en">
+        <body className={inter.className}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <FirebaseNotConfigured />
+            <Toaster />
           </ThemeProvider>
         </body>
       </html>
@@ -34,8 +39,8 @@ export default function RootLayout({
   }
 
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`} suppressHydrationWarning>
+    <html lang="en">
+      <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />
