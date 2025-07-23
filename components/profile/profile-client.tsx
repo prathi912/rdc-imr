@@ -663,3 +663,5 @@ export function ProfileClient({ user: initialUser, projects, emrInterests, fundi
     </div>
   )
 }
+
+export * from "@/src/components/profile/profile-client"
