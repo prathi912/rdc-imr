@@ -1,4 +1,3 @@
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -474,6 +473,7 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
         uid: docSnapshot.id,
         title: notificationTitle,
         createdAt: new Date().toISOString(),
+        isRead: false,
       })
     })
 
@@ -507,6 +507,7 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
         projectId: projectId,
         title: notificationTitle,
         createdAt: new Date().toISOString(),
+        isRead: false,
       })
     })
 
@@ -1086,6 +1087,7 @@ export async function updateProjectWithRevision(
           projectId: projectId,
           title: notificationTitle,
           createdAt: new Date().toISOString(),
+          isRead: false,
         })
       })
 
@@ -1376,6 +1378,7 @@ export async function updateCoInvestigators(
           projectId: projectId,
           title: `You have been added as a Co-PI to the IMR project: "${project.title}"`,
           createdAt: new Date().toISOString(),
+          isRead: false,
         })
 
         // Email notification
@@ -1497,6 +1500,7 @@ export async function registerEmrInterest(
           uid: coPi.uid,
           title: `You've been added as a Co-PI for the EMR call: "${callTitle}"`,
           createdAt: new Date().toISOString(),
+          isRead: false,
         })
 
         if (coPi.email) {
@@ -1576,6 +1580,7 @@ export async function scheduleEmrMeeting(
         uid: interest.userId,
         title: `Your EMR Presentation for "${call.title}" has been scheduled.`,
         createdAt: new Date().toISOString(),
+        isRead: false,
       })
 
       const emailHtml = `
@@ -1618,6 +1623,7 @@ export async function scheduleEmrMeeting(
             uid: evaluator.uid,
             title: `You've been assigned to an EMR evaluation meeting for "${call.title}"`,
             createdAt: new Date().toISOString(),
+            isRead: false,
           })
 
           if (evaluator.email) {
@@ -1793,6 +1799,7 @@ export async function deleteEmrInterest(
       uid: interest.userId,
       title: `Your EMR registration for "${callTitle}" was removed.`,
       createdAt: new Date().toISOString(),
+      isRead: false,
     }
     await adminDb.collection("notifications").add(notification)
 
@@ -1859,6 +1866,7 @@ export async function addEmrEvaluation(
             uid: userDoc.id,
             title: notificationTitle,
             createdAt: new Date().toISOString(),
+            isRead: false,
           })
         })
         await batch.commit()
@@ -1994,58 +2002,17 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
   }
 }
 
-export async function updateEmrInterestStatus(
-  interestId: string,
-  newStatus: EmrInterest["status"],
-  adminName: string,
-): Promise<{ success: boolean; error?: string }> {
+export async function saveSidebarOrder(uid: string, order: string[]): Promise<{ success: boolean; error?: string }> {
   try {
-    const interestRef = adminDb.collection("emrInterests").doc(interestId)
-    const interestSnap = await interestRef.get()
-    if (!interestSnap.exists) {
-      return { success: false, error: "Interest registration not found." }
+    if (!uid || !Array.isArray(order)) {
+      return { success: false, error: "Invalid user ID or order provided." }
     }
-    const interest = interestSnap.data() as EmrInterest
-
-    await interestRef.update({ status: newStatus })
-
-    const callRef = adminDb.collection("fundingCalls").doc(interest.callId)
-    const callSnap = await callRef.get()
-    const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call"
-
-    const notification = {
-      uid: interest.userId,
-      title: `Your EMR application for "${callTitle}" status was updated to: ${newStatus}`,
-      createdAt: new Date().toISOString(),
-    }
-    await adminDb.collection("notifications").add(notification)
-
-    if (interest.userEmail) {
-      const emailHtml = `
-        <div ${EMAIL_STYLES.background}>
-          ${EMAIL_STYLES.logo}
-          <p style="color:#ffffff;">Dear ${interest.userName},</p>
-          <p style="color:#e0e0e0;">
-            The status of your EMR application for "<strong style="color:#ffffff;">${callTitle}</strong>" has been updated to 
-            <strong style="color:${newStatus === "Recommended" ? "#00e676" : newStatus === "Not Recommended" ? "#ff5252" : "#ffca28"};">
-              ${newStatus}
-            </strong> by ${adminName}.
-          </p>
-          ${EMAIL_STYLES.footer}
-        </div>
-      `
-      await sendEmail({
-        to: interest.userEmail,
-        subject: `EMR Application Status Update: ${newStatus}`,
-        html: emailHtml,
-        from: "default",
-      })
-    }
-
+    const userRef = adminDb.collection("users").doc(uid)
+    await userRef.update({ sidebarOrder: order })
     return { success: true }
   } catch (error: any) {
-    console.error("Error updating EMR interest status:", error)
-    return { success: false, error: error.message || "Failed to update status." }
+    console.error("Error saving sidebar order:", error)
+    return { success: false, error: error.message || "Failed to save sidebar order." }
   }
 }
 
@@ -2145,6 +2112,175 @@ export async function sendMeetingReminders(): Promise<{ success: boolean; error?
   }
 }
 
+export async function uploadEndorsementForm(
+  interestId: string,
+  endorsementDataUrl: string,
+  originalFileName: string,
+  userName: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId || !endorsementDataUrl) {
+      return { success: false, error: "Interest ID and file data are required." }
+    }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    // Standardize the filename
+    const fileExtension = path.extname(originalFileName)
+    const standardizedName = `endorsement_${userName.replace(/\s+/g, "_")}${fileExtension}`
+
+    const filePath = `emr-endorsements/${interest.callId}/${interest.userId}/${standardizedName}`
+    const result = await uploadFileToServer(endorsementDataUrl, filePath)
+
+    if (!result.success || !result.url) {
+      throw new Error(result.error || "Endorsement form upload failed.")
+    }
+
+    await interestRef.update({
+      endorsementFormUrl: result.url,
+      endorsementSubmissionDate: new Date().toISOString(),
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error uploading endorsement form:", error)
+    return { success: false, error: error.message || "Failed to upload endorsement form." }
+  }
+}
+
+export async function submitToAgency(
+  interestId: string,
+  submissionData: {
+    agencySubmissionUrl?: string
+    agencySubmissionDate: string
+    submissionNotes?: string
+  },
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId) {
+      return { success: false, error: "Interest ID is required." }
+    }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    await interestRef.update({
+      agencySubmissionUrl: submissionData.agencySubmissionUrl || "",
+      agencySubmissionDate: submissionData.agencySubmissionDate,
+      submissionNotes: submissionData.submissionNotes || "",
+      status: "Submitted to Agency",
+    })
+
+    // Notify the user
+    const callRef = adminDb.collection("fundingCalls").doc(interest.callId)
+    const callSnap = await callRef.get()
+    const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "EMR Call"
+
+    const notification = {
+      uid: interest.userId,
+      title: `Your EMR application for "${callTitle}" has been submitted to the funding agency`,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    }
+    await adminDb.collection("notifications").add(notification)
+
+    if (interest.userEmail) {
+      const emailHtml = `
+        <div ${EMAIL_STYLES.background}>
+          ${EMAIL_STYLES.logo}
+          <p style="color:#ffffff;">Dear ${interest.userName},</p>
+          <p style="color:#e0e0e0;">
+            Your EMR application for "<strong style="color:#ffffff;">${callTitle}</strong>" has been successfully submitted to the funding agency.
+          </p>
+          ${
+            submissionData.agencySubmissionUrl
+              ? `
+            <p style="color:#e0e0e0;">
+              Agency Submission URL: <a href="${submissionData.agencySubmissionUrl}" style="color:#64b5f6; text-decoration:underline;">${submissionData.agencySubmissionUrl}</a>
+            </p>
+          `
+              : ""
+          }
+          ${
+            submissionData.submissionNotes
+              ? `
+            <div style="margin-top: 20px; padding: 15px; border: 1px solid #4f5b62; border-radius: 6px; background-color:#2c3e50;">
+              <h4 style="color:#ffffff; margin-top: 0;">Submission Notes:</h4>
+              <p style="color:#e0e0e0;">${submissionData.submissionNotes}</p>
+            </div>
+          `
+              : ""
+          }
+          <p style="color:#e0e0e0;">You will be notified of any updates regarding your application status.</p>
+          ${EMAIL_STYLES.footer}
+        </div>
+      `
+      await sendEmail({
+        to: interest.userEmail,
+        subject: `EMR Application Submitted: ${callTitle}`,
+        html: emailHtml,
+        from: "default",
+      })
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error submitting to agency:", error)
+    return { success: false, error: error.message || "Failed to submit to agency." }
+  }
+}
+
+export async function uploadRevisedEmrPpt(
+  interestId: string,
+  pptDataUrl: string,
+  originalFileName: string,
+  userName: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId || !pptDataUrl) {
+      return { success: false, error: "Interest ID and file data are required." }
+    }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    // Standardize the filename for revised presentation
+    const fileExtension = path.extname(originalFileName)
+    const standardizedName = `emr_revised_${userName.replace(/\s+/g, "_")}${fileExtension}`
+
+    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`
+    const result = await uploadFileToServer(pptDataUrl, filePath)
+
+    if (!result.success || !result.url) {
+      throw new Error(result.error || "Revised PPT upload failed.")
+    }
+
+    await interestRef.update({
+      revisedPptUrl: result.url,
+      revisedPptSubmissionDate: new Date().toISOString(),
+      status: "Revised PPT Submitted",
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error uploading revised EMR presentation:", error)
+    return { success: false, error: error.message || "Failed to upload revised presentation." }
+  }
+}
+
 export async function generateImrRecommendationDocument(
   projectId: string,
   evaluations: Evaluation[],
@@ -2205,22 +2341,5 @@ export async function generateImrRecommendationDocument(
   } catch (error: any) {
     console.error("Error generating IMR recommendation document:", error)
     return { success: false, error: error.message || "Failed to generate document." }
-  }
-}
-
-export async function saveSidebarOrder(
-  uid: string,
-  sidebarOrder: string[],
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    if (!uid) {
-      return { success: false, error: "User ID is required." }
-    }
-    const userRef = adminDb.collection("users").doc(uid)
-    await userRef.update({ sidebarOrder: sidebarOrder })
-    return { success: true }
-  } catch (error: any) {
-    console.error("Error saving sidebar order:", error)
-    return { success: false, error: "Failed to save sidebar order." }
   }
 }

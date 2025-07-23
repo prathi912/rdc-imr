@@ -147,7 +147,21 @@ const institutes = [
   "Parul Aarogya Seva Mandal",
 ]
 
-const campuses = ["Vadodara Campus", "Ahmedabad Campus", "Rajkot Campus", "Surat Campus"]
+const campuses = ["Vadodara", "Ahmedabad", "Rajkot", "Goa"]
+
+const campusFacultyMap: Record<string, string[]> = {
+  "Goa": [
+    "Faculty of Engineering, IT & CS",
+    "Faculty of Management Studies",
+    "Faculty of Pharmacy",
+    "Faculty of Applied and Health Sciences",
+    "Faculty of Nursing",
+    "Faculty of Physiotherapy",
+  ],
+  "Vadodara": faculties,
+  "Ahmedabad": faculties,
+  "Rajkot": faculties,
+}
 
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"]
 
@@ -215,6 +229,9 @@ export default function SettingsPage() {
       ifscCode: "",
     },
   })
+
+  const selectedCampus = profileForm.watch("campus")
+  const availableFaculties = campusFacultyMap[selectedCampus] || []
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -539,19 +556,43 @@ export default function SettingsPage() {
                   />
                 </div>
                 <FormField
+                  name="campus"
+                  control={profileForm.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Campus</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your campus" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {campuses.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
                   name="faculty"
                   control={profileForm.control}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Faculty</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked || !selectedCampus}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select your faculty" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {faculties.map((f) => (
+                          {availableFaculties.map((f) => (
                             <SelectItem key={f} value={f}>
                               {f}
                             </SelectItem>
@@ -578,30 +619,6 @@ export default function SettingsPage() {
                           {institutes.map((i) => (
                             <SelectItem key={i} value={i}>
                               {i}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  name="campus"
-                  control={profileForm.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Campus</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your campus" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {campuses.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
                             </SelectItem>
                           ))}
                         </SelectContent>
