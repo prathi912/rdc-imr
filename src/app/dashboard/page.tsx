@@ -5,12 +5,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
 import { FacultyDashboard } from '@/components/dashboard/faculty-dashboard';
+import { WelcomeTutorial } from '@/components/dashboard/welcome-tutorial';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PRINCIPAL_EMAILS } from '@/lib/constants';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -23,13 +24,13 @@ export default function DashboardPage() {
       if (parsedUser.role === 'Evaluator') {
         router.replace('/dashboard/evaluator-dashboard');
       }
-
     } else {
       router.replace('/');
     }
+    setLoading(false);
   }, [router]);
   
-  if (!user || user.role === 'Evaluator') {
+  if (loading || !user || user.role === 'Evaluator') {
       return (
           <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -52,6 +53,7 @@ export default function DashboardPage() {
 
   return (
     <div className="animate-in fade-in-0 duration-500">
+      {user && user.hasCompletedTutorial === false && <WelcomeTutorial user={user} />}
       {showAdminView && <AdminDashboard />}
       {isStandardFaculty && <FacultyDashboard user={user} />}
     </div>

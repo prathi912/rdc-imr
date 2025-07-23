@@ -28,16 +28,14 @@ import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { auth, db } from '@/lib/config';
 import { createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut, User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
-import { linkHistoricalData } from '@/app/actions';
-import { PRINCIPAL_EMAILS, CRO_EMAILS } from '@/lib/constants';
+import { linkHistoricalData, notifySuperAdminsOnNewUser } from '@/app/actions';
 import { Eye, EyeOff } from 'lucide-react';
 
 const signupSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z
     .string()
     .email('Invalid email address.')
@@ -71,28 +69,13 @@ export default function SignupPage() {
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
     defaultValues: {
-      name: '',
       email: '',
       password: '',
       confirmPassword: '',
     },
   });
-  
-  const determineUserRoleAndDesignation = (email: string): { role: User['role'], designation: User['designation'] } => {
-    if (email === 'rathipranav07@gmail.com') {
-      return { role: 'Super-admin', designation: 'Super-admin' };
-    }
-    if (CRO_EMAILS.includes(email)) {
-      return { role: 'CRO', designation: 'CRO' };
-    }
-    if (PRINCIPAL_EMAILS.includes(email)) {
-      return { role: 'faculty', designation: 'Principal' };
-    }
-    // New users are faculty by default. Super-admin can change roles.
-    return { role: 'faculty', designation: 'faculty' };
-  }
 
-  const processNewUser = async (firebaseUser: FirebaseUser, name?: string) => {
+  const processNewUser = async (firebaseUser: FirebaseUser) => {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDocSnap = await getDoc(userDocRef);
 
@@ -106,15 +89,47 @@ export default function SignupPage() {
       return;
     }
     
-    const { role, designation } = determineUserRoleAndDesignation(firebaseUser.email!);
-    const user: User = {
+    // Fetch staff data using email. The user will be prompted for MIS ID on profile setup.
+    const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`);
+    const staffResult = await staffRes.json();
+    
+    let userDataFromExcel: Partial<User> = {};
+    let role: User['role'] = 'faculty';
+    let designation: User['designation'] = 'faculty';
+    let profileComplete = false;
+    let notifyRole: string | null = null;
+
+    if (staffResult.success) {
+        userDataFromExcel = staffResult.data;
+        const userType = staffResult.data.type;
+        
+        if (userType === 'CRO') {
+            role = 'CRO';
+            designation = 'CRO';
+            profileComplete = true;
+            notifyRole = 'CRO';
+        } else if (userType === 'Institutional') {
+            role = 'faculty';
+            designation = 'Principal';
+            profileComplete = true;
+            notifyRole = 'Principal';
+        }
+    }
+    
+    let user: User = {
       uid: firebaseUser.uid,
-      name: name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
+      name: userDataFromExcel.name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
-      role: role,
-      designation: designation,
-      profileComplete: role === 'Super-admin',
+      role,
+      designation,
+      faculty: userDataFromExcel.faculty || null,
+      institute: userDataFromExcel.institute || null,
+      department: userDataFromExcel.department || null,
+      phoneNumber: userDataFromExcel.phoneNumber || null,
+      misId: userDataFromExcel.misId || null,
+      profileComplete,
       allowedModules: getDefaultModulesForRole(role, designation),
+      hasCompletedTutorial: false,
     };
 
     if (firebaseUser.photoURL) {
@@ -123,6 +138,10 @@ export default function SignupPage() {
     
     await setDoc(userDocRef, user);
 
+    if (notifyRole) {
+      await notifySuperAdminsOnNewUser(user.name, notifyRole);
+    }
+    
     // Back-fill pi_uid for migrated projects using a server action
     try {
       const result = await linkHistoricalData(user);
@@ -159,7 +178,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      await processNewUser(userCredential.user, data.name);
+      await processNewUser(userCredential.user);
     } catch (error: any) {
       console.error('Signup Error:', error);
       toast({
@@ -231,19 +250,6 @@ export default function SignupPage() {
             <CardContent>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onEmailSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="email"

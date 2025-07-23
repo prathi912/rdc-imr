@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -20,7 +21,10 @@ import {
   updateProjectDuration,
   updateProjectEvaluators,
   notifyAdminsOnCompletionRequest,
+  findUserByMisId,
+  updateCoInvestigators,
 } from "@/app/actions"
+import { generatePresentationNoting } from "@/app/document-actions"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
@@ -75,6 +79,8 @@ import {
   AlertCircle,
   Users,
   Loader2,
+  Printer,
+  Download,
 } from "lucide-react"
 
 import { GrantManagement } from "./grant-management"
@@ -164,6 +170,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isDurationDialogOpen, setIsDurationDialogOpen] = useState(false)
   const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false)
   const [isRevisionCommentDialogOpen, setIsRevisionCommentDialogOpen] = useState(false)
+  const [isPrinting, setIsPrinting] = useState(false)
+
+  // Co-PI management state
+  const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
+  const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null)
+  const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [isSavingCoPis, setIsSavingCoPis] = useState(false)
 
   const scheduleForm = useForm<ScheduleFormData>({
     resolver: zodResolver(scheduleSchema),
@@ -186,7 +200,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     try {
       const evaluationsCol = collection(db, "projects", initialProject.id, "evaluations")
       const evaluationsSnapshot = await getDocs(evaluationsCol)
-      const evaluationsList = evaluationsSnapshot.docs.map((doc) => doc.data() as Evaluation)
+      const evaluationsList = evaluationsSnapshot.docs.map((evaluationDoc) => evaluationDoc.data() as Evaluation)
       setEvaluations(evaluationsList)
     } catch (error) {
       console.error("Error refetching evaluations:", error)
@@ -224,8 +238,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         const usersRef = collection(db, "users")
         const q = query(usersRef, where("__name__", "in", project.coPiUids))
         const querySnapshot = await getDocs(q)
-        const fetchedUsers = querySnapshot.docs.map((d) => ({ uid: d.id, ...d.data() }) as User)
+        const fetchedUsers = querySnapshot.docs.map((coPiDoc) => ({ uid: coPiDoc.id, ...coPiDoc.data() }) as User)
         setCoPiUsers(fetchedUsers)
+        setCoPiList(fetchedUsers.map((u) => ({ uid: u.uid, name: u.name })))
       }
     }
     fetchCoPiUsers()
@@ -301,6 +316,53 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     } else {
       toast({ variant: "destructive", title: "Error", description: result.error || "Failed to update project status." })
     }
+  }
+
+  const handleSearchCoPi = async () => {
+    if (!coPiSearchTerm) return
+    setIsSearching(true)
+    setFoundCoPi(null)
+    try {
+      const result = await findUserByMisId(coPiSearchTerm)
+      if (result.success && result.user) {
+        setFoundCoPi(result.user)
+      } else {
+        toast({ variant: "destructive", title: "User Not Found", description: result.error })
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Search Failed", description: "An error occurred while searching." })
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const handleAddCoPi = () => {
+    if (foundCoPi && !coPiList.some((coPi) => coPi.uid === foundCoPi.uid)) {
+      if (user && foundCoPi.uid === user.uid) {
+        toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself as a Co-PI." })
+        return
+      }
+      setCoPiList([...coPiList, foundCoPi])
+    }
+    setFoundCoPi(null)
+    setCoPiSearchTerm("")
+  }
+
+  const handleRemoveCoPi = (uidToRemove: string) => {
+    setCoPiList(coPiList.filter((coPi) => coPi.uid !== uidToRemove))
+  }
+
+  const handleSaveCoPis = async () => {
+    setIsSavingCoPis(true)
+    const coPiUids = coPiList.map((coPi) => coPi.uid)
+    const result = await updateCoInvestigators(project.id, coPiUids)
+    if (result.success) {
+      toast({ title: "Success", description: "Co-PI list has been updated." })
+      setProject((prev) => ({ ...prev, coPiUids }))
+    } else {
+      toast({ variant: "destructive", title: "Error", description: result.error })
+    }
+    setIsSavingCoPis(false)
   }
 
   const handleScheduleUpdate = async (data: ScheduleFormData) => {
@@ -584,6 +646,41 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     handleStatusUpdate("Revision Needed", data.comments)
   }
 
+  const handlePrint = async () => {
+    setIsPrinting(true)
+    try {
+      const result = await generatePresentationNoting(project.id)
+      if (result.success && result.fileData) {
+        const byteCharacters = atob(result.fileData)
+        const byteNumbers = new Array(byteCharacters.length)
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i)
+        }
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        })
+
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${project.pi.replace(/\s/g, "_")}_APPLICATION_IMR.docx`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.URL.revokeObjectURL(url)
+        toast({ title: "Download Started", description: "Office Notings form is being downloaded." })
+      } else {
+        throw new Error(result.error || "Failed to generate form.")
+      }
+    } catch (error: any) {
+      console.error("Print error:", error)
+      toast({ variant: "destructive", title: "Download Failed", description: error.message })
+    } finally {
+      setIsPrinting(false)
+    }
+  }
+
   const availableStatuses: Project["status"][] = [
     "Submitted",
     "Under Review",
@@ -594,6 +691,20 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   return (
     <>
+      <div className="flex items-center justify-between mb-4">
+        <div>{/* Spacer */}</div>
+        {isAdmin && project.status === "Under Review" && (
+          <Button onClick={handlePrint} disabled={isPrinting}>
+            {isPrinting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Download Office Notings
+          </Button>
+        )}
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -1154,7 +1265,15 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               <h3 className="font-semibold text-lg">Submitter Information</h3>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <dt className="font-medium text-muted-foreground">Principal Investigator</dt>
-                <dd>{project.pi}</dd>
+                <dd>
+                    {piUser?.misId ? (
+                        <Link href={`/profile/${piUser.misId}`} className="text-primary hover:underline" target="_blank">
+                            {project.pi}
+                        </Link>
+                    ) : (
+                        project.pi
+                    )}
+                </dd>
                 <dt className="font-medium text-muted-foreground">Email</dt>
                 <dd>{project.pi_email || "N/A"}</dd>
                 <dt className="font-medium text-muted-foreground">Phone</dt>
@@ -1169,26 +1288,62 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             </div>
           </div>
           <Separator />
-          {(project.teamInfo || (coPiUsers && coPiUsers.length > 0)) && (
+          {(project.teamInfo || (coPiUsers && coPiUsers.length > 0) || isPI) && (
             <>
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <Users className="h-5 w-5" />
                   Team Information
                 </h3>
-                {coPiUsers && coPiUsers.length > 0 && (
-                  <div className="space-y-1">
-                    <p className="font-medium">Co-PI(s):</p>
-                    <ul className="list-disc list-inside pl-4 text-muted-foreground">
-                      {coPiUsers.map((copi) => (
-                        <li key={copi.uid}>
-                          <Link href={`/profile/${copi.misId}`} className="hover:underline text-primary">
-                            {copi.name}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+                {isPI && (
+                  <Card className="bg-muted/50">
+                    <CardHeader>
+                      <CardTitle className="text-base">Manage Co-Investigators</CardTitle>
+                      <CardDescription>Add or remove Co-PIs for this project.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Search & Add Co-PI by MIS ID</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Search by Co-PI's MIS ID"
+                            value={coPiSearchTerm}
+                            onChange={(e) => setCoPiSearchTerm(e.target.value)}
+                          />
+                          <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
+                            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+                          </Button>
+                        </div>
+                        {foundCoPi && (
+                          <div className="flex items-center justify-between p-2 border rounded-md">
+                            <p>{foundCoPi.name}</p>
+                            <Button type="button" size="sm" onClick={handleAddCoPi}>
+                              Add
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Current Co-PI(s)</Label>
+                        {coPiList.length > 0 ? (
+                          coPiList.map((coPi) => (
+                            <div key={coPi.uid} className="flex items-center justify-between p-2 bg-background rounded-md">
+                              <p className="text-sm font-medium">{coPi.name}</p>
+                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>
+                                Remove
+                              </Button>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No Co-PIs added.</p>
+                        )}
+                      </div>
+                      <Button onClick={handleSaveCoPis} disabled={isSavingCoPis}>
+                        {isSavingCoPis && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Co-PI List
+                      </Button>
+                    </CardContent>
+                  </Card>
                 )}
                 {project.teamInfo && (
                   <p className="text-muted-foreground whitespace-pre-wrap">

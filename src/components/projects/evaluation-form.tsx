@@ -133,15 +133,21 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
       setIsSubmitting(false);
     }
   };
+  
+  const isFormDisabled = isSubmitting || loadingExisting || !!existingEvaluation;
 
   return (
     <Card className="mt-8 border-primary/50">
       <CardHeader>
         <div className="flex items-center gap-2">
             <Wand2 className="h-6 w-6" />
-            <CardTitle>Submit Your Evaluation</CardTitle>
+            <CardTitle>{existingEvaluation ? 'Your Submitted Evaluation' : 'Submit Your Evaluation'}</CardTitle>
         </div>
-        <CardDescription>{existingEvaluation ? 'You can update your previous evaluation below.' : 'Please provide your recommendation and comments for this project.'}</CardDescription>
+        <CardDescription>
+          {existingEvaluation 
+            ? 'You have already submitted your evaluation for this project. It cannot be edited.' 
+            : 'Please provide your recommendation and comments for this project.'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {loadingExisting ? (
@@ -162,13 +168,14 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
                       onValueChange={field.onChange}
                       value={field.value}
                       className="grid grid-cols-1 md:grid-cols-3 gap-4"
+                      disabled={isFormDisabled}
                     >
                       {recommendationOptions.map((option) => (
                         <FormItem key={option.value}>
                           <FormControl>
                             <RadioGroupItem value={option.value} className="sr-only" />
                           </FormControl>
-                           <FormLabel className={`flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground cursor-pointer ${field.value === option.value ? 'border-primary' : ''}`}>
+                           <FormLabel className={`flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground ${isFormDisabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} ${field.value === option.value ? 'border-primary' : ''}`}>
                             <option.icon className="mb-3 h-6 w-6" />
                             {option.label}
                           </FormLabel>
@@ -196,16 +203,18 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
                     </Alert>
                   )}
                   <FormControl>
-                    <Textarea rows={5} {...field} disabled={isSubmitting || loadingExisting} />
+                    <Textarea rows={5} {...field} disabled={isFormDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" disabled={isSubmitting || loadingExisting}>
-              {(isSubmitting || loadingExisting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : (existingEvaluation ? 'Update Evaluation' : 'Submit Evaluation')}
-            </Button>
+            {!existingEvaluation && (
+              <Button type="submit" disabled={isFormDisabled}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Submit Evaluation
+              </Button>
+            )}
           </form>
         </Form>
         )}

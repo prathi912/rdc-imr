@@ -1,10 +1,11 @@
+
 "use client"
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore"
+import { collection, query, where, getDocs, limit, orderBy, or } from "firebase/firestore"
 import { db } from "@/lib/config"
-import type { User, IncentiveClaim, Project } from "@/types"
+import type { User, IncentiveClaim, Project, EmrInterest, FundingCall } from "@/types"
 import { PageHeader } from "@/components/page-header"
 import { ProfileClient } from "@/components/profile/profile-client"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -17,6 +18,8 @@ export default function ProfilePage() {
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const [claims, setClaims] = useState<IncentiveClaim[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [emrInterests, setEmrInterests] = useState<EmrInterest[]>([]);
+  const [fundingCalls, setFundingCalls] = useState<FundingCall[]>([]);
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessionUser, setSessionUser] = useState<User | null>(null)
@@ -61,12 +64,27 @@ export default function ProfilePage() {
 
         setProfileUser(fetchedUser)
 
-        // Fetch user's incentive claims
-        const claimsRef = collection(db, "incentiveClaims")
-        const claimsQuery = query(claimsRef, where("uid", "==", fetchedUser.uid), orderBy("submissionDate", "desc"))
-        const claimsSnapshot = await getDocs(claimsQuery)
-        const fetchedClaims = claimsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as IncentiveClaim)
-        setClaims(fetchedClaims)
+        // Fetch user's EMR interests (both as PI and Co-PI)
+        const emrInterestsRef = collection(db, "emrInterests");
+        const emrInterestsQuery = query(
+          emrInterestsRef, 
+          or(
+            where("userId", "==", fetchedUser.uid), 
+            where("coPiUids", "array-contains", fetchedUser.uid)
+          )
+        );
+        const emrInterestsSnapshot = await getDocs(emrInterestsQuery);
+        const fetchedEmrInterests = emrInterestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+        setEmrInterests(fetchedEmrInterests);
+
+        // Fetch corresponding funding calls for the interests found
+        if (fetchedEmrInterests.length > 0) {
+            const callIds = [...new Set(fetchedEmrInterests.map(i => i.callId))];
+            const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
+            const callsSnapshot = await getDocs(callsQuery);
+            const fetchedCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+            setFundingCalls(fetchedCalls);
+        }
 
         // Fetch user's projects with better error handling
         try {
@@ -199,7 +217,7 @@ export default function ProfilePage() {
         showBackButton={false}
       />
       <div className="mt-8">
-        <ProfileClient user={profileUser} claims={claims} projects={projects} />
+        <ProfileClient user={profileUser} projects={projects} emrInterests={emrInterests} fundingCalls={fundingCalls} />
       </div>
     </div>
   )

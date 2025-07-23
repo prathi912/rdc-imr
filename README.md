@@ -1,6 +1,6 @@
 # Research & Development Portal - Parul University
 
-This is a comprehensive, full-stack web application designed to streamline and manage the entire research lifecycle at Parul University. It serves as a central hub for faculty, evaluators, and administrators to handle Intramural Research (IMR) project proposals, incentive claims, and user management.
+This is a comprehensive, full-stack web application designed to streamline and manage the entire research lifecycle at Parul University. It serves as a central hub for faculty, evaluators, and administrators to handle Intramural Research (IMR) project proposals, and user management.
 
 The portal is built with a modern tech stack, leveraging the power of Next.js for the frontend and backend, Firebase for its powerful suite of backend services, and Google's Genkit for integrating cutting-edge AI features.
 
@@ -22,19 +22,12 @@ A complete workflow for managing research project funding from submission to com
 -   **Meeting Scheduling:** Admins and CROs can schedule IMR evaluation meetings for multiple submitted projects at once and automatically notify the Principal Investigators (PIs) via email.
 -   **Grant Management:** A system for awarding grants, tracking fund utilization through transaction logging, and managing the disbursement process.
 
-### 3. Incentive Claim System
-A streamlined process for faculty to claim incentives for their research output.
--   **Dedicated Forms:** Easy-to-use, specific forms for various claim types, including Research Papers, Patents, Books, Conference Presentations, Professional Body Memberships, and APC reimbursements.
--   **Automated Data Fetching:** AI-powered tools to fetch publication details automatically from Scopus, Web of Science, and other sources using just a DOI or URL, simplifying the application process.
--   **Admin Review Dashboard:** A central dashboard for administrators to review, approve, or reject claims and notify claimants of status changes automatically.
--   **Excel Export:** Export claim details to a pre-formatted Excel template for streamlined processing and record-keeping by the administrative team.
-
-### 4. AI Integration (Powered by Google Genkit)
+### 3. AI Integration (Powered by Google Genkit)
 -   **Project Summarization:** Instantly generate concise summaries of complex project proposals to aid in quick reviews.
 -   **Research Domain Suggestion:** AI analyzes a faculty member's publication history to suggest their core research domain for their public profile.
 -   **Journal Website Finder:** An AI tool to find the official website of an academic journal based on its name, helping to verify publication sources.
 
-### 5. User & System Management
+### 4. User & System Management
 -   **User Profiles:** Public-facing profiles for faculty to showcase their research contributions, publications, and projects, enhancing visibility within the university.
 -   **Module Management:** A Super-admin exclusive feature to dynamically assign access to different parts of the portal (e.g., "Manage Users", "Analytics") for each user.
 -   **System Health Dashboard:** A dedicated page to monitor the connectivity and status of all integrated Firebase services (Firestore, Auth, Storage) in real-time.

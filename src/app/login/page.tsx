@@ -33,7 +33,6 @@ import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { linkHistoricalData } from '@/app/actions';
-import { PRINCIPAL_EMAILS, CRO_EMAILS } from '@/lib/constants';
 import { Eye, EyeOff } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -63,20 +62,6 @@ export default function LoginPage() {
     },
   });
 
-  const determineUserRoleAndDesignation = (email: string): { role: User['role'], designation: User['designation'] } => {
-    if (email === 'rathipranav07@gmail.com') {
-      return { role: 'Super-admin', designation: 'Super-admin' };
-    }
-    if (CRO_EMAILS.includes(email)) {
-      return { role: 'CRO', designation: 'CRO' };
-    }
-    if (PRINCIPAL_EMAILS.includes(email)) {
-      return { role: 'faculty', designation: 'Principal' };
-    }
-    // New users are faculty by default, admins can change roles.
-    return { role: 'faculty', designation: 'faculty' };
-  }
-
   const processSignIn = async (firebaseUser: FirebaseUser) => {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDocSnap = await getDoc(userDocRef);
@@ -89,15 +74,43 @@ export default function LoginPage() {
         user.name = firebaseUser.displayName;
       }
     } else {
-      // Create new user if they don't exist in Firestore (e.g., first Google sign-in)
-      const { role, designation } = determineUserRoleAndDesignation(firebaseUser.email!);
+      // User does not exist, need to create them.
+      // We will fetch their details from staffdata.xlsx
+      const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`);
+      const staffResult = await staffRes.json();
+      
+      let userDataFromExcel: Partial<User> = {};
+      let role: User['role'] = 'faculty';
+      let designation: User['designation'] = 'faculty';
+      let profileComplete = false;
+
+      if (staffResult.success) {
+          userDataFromExcel = staffResult.data;
+          const userType = staffResult.data.type;
+          
+          if (userType === 'CRO') {
+              role = 'CRO';
+              designation = 'CRO';
+              profileComplete = true; // CROs skip profile setup
+          } else if (userType === 'Institutional') {
+              role = 'faculty';
+              designation = 'Principal'; // Institutional type maps to Principal
+              profileComplete = true; // Principals skip profile setup
+          }
+      }
+
       user = {
         uid: firebaseUser.uid,
-        name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
+        name: userDataFromExcel.name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
         email: firebaseUser.email!,
-        role: role,
-        designation: designation,
-        profileComplete: false,
+        role,
+        designation,
+        faculty: userDataFromExcel.faculty || null,
+        institute: userDataFromExcel.institute || null,
+        department: userDataFromExcel.department || null,
+        phoneNumber: userDataFromExcel.phoneNumber || null,
+        misId: userDataFromExcel.misId || null,
+        profileComplete,
         allowedModules: getDefaultModulesForRole(role, designation),
       };
     }
@@ -105,15 +118,6 @@ export default function LoginPage() {
     // Always update/set the photoURL from provider on sign-in
     if (firebaseUser.photoURL) {
         user.photoURL = firebaseUser.photoURL;
-    }
-
-    // Ensure admin and special roles are correctly set and bypass profile setup for them
-    const { role: determinedRole, designation: determinedDesignation } = determineUserRoleAndDesignation(user.email);
-    if (user.role !== determinedRole) user.role = determinedRole;
-    if (user.designation !== determinedDesignation) user.designation = determinedDesignation;
-    
-    if (user.role === 'Super-admin' && !user.profileComplete) {
-        user.profileComplete = true;
     }
 
     // Ensure default modules for existing users if they don't have them

@@ -7,8 +7,7 @@ export interface DebugInfo {
     role: string;
     designation?: string;
     institute?: string;
-    isPrincipalByEmail: boolean;
-    isPrincipalByDesignation: boolean;
+    isPrincipal: boolean;
   };
   queryInfo: {
     shouldFilterByInstitute: boolean;
@@ -23,12 +22,9 @@ export interface DebugInfo {
 
 export function createDebugInfo(
   user: User, 
-  projects: Project[], 
-  principalEmails: string[]
+  projects: Project[]
 ): DebugInfo {
-  const isPrincipalByEmail = principalEmails.includes(user.email);
-  const isPrincipalByDesignation = user.designation === 'Principal';
-  const isPrincipal = isPrincipalByEmail || isPrincipalByDesignation;
+  const isPrincipal = user.designation === 'Principal';
   
   // Get unique institute values from projects
   const instituteValues = [...new Set(projects.map(p => p.institute).filter(Boolean) as string[])];
@@ -40,8 +36,7 @@ export function createDebugInfo(
       role: user.role,
       designation: user.designation,
       institute: user.institute,
-      isPrincipalByEmail,
-      isPrincipalByDesignation,
+      isPrincipal,
     },
     queryInfo: {
       shouldFilterByInstitute: isPrincipal && !!user.institute,
@@ -62,7 +57,7 @@ export function logDebugInfo(debugInfo: DebugInfo, context: string) {
   console.log('Data Info:', debugInfo.dataInfo);
   
   // Highlight potential issues
-  if (debugInfo.userInfo.isPrincipalByEmail || debugInfo.userInfo.isPrincipalByDesignation) {
+  if (debugInfo.userInfo.isPrincipal) {
     if (!debugInfo.userInfo.institute) {
       console.warn('Potential Issue: Principal user has no institute value set in their profile.');
     }

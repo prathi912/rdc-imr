@@ -8,7 +8,7 @@ import type { DateRange } from 'react-day-picker';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, or } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,8 +23,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { PRINCIPAL_EMAILS } from '@/lib/constants';
 import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
+
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
@@ -53,6 +53,7 @@ export default function AllProjectsPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [facultyFilter, setFacultyFilter] = useState('all');
 
   // State for export dialog
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -62,7 +63,12 @@ export default function AllProjectsPage() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      // For CROs, default to showing all their assigned faculties.
+      if (parsedUser.role === 'CRO') {
+        setFacultyFilter('all');
+      }
     } else {
       setLoading(false);
     }
@@ -71,73 +77,91 @@ export default function AllProjectsPage() {
   useEffect(() => {
     if (!user) return;
 
-    async function getProjectsAndUsers() {
-      setLoading(true);
-      try {
-        const usersCol = collection(db, 'users');
-        const userSnapshot = await getDocs(usersCol);
+    setLoading(true);
+
+    const usersCol = collection(db, 'users');
+    getDocs(usersCol).then(userSnapshot => {
         const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
         setUsers(userList);
+    }).catch(error => {
+        console.error("Error fetching users:", error);
+    });
 
-        const projectsCol = collection(db, 'projects');
-        let projectList: Project[] = [];
-        
-        const isSuperAdmin = user.role === 'Super-admin';
-        const isAdmin = user.role === 'admin';
-        const isCro = user.role === 'CRO';
-        const isPrincipal = user.designation === 'Principal';
-        const isHod = user.designation === 'HOD';
+    async function fetchProjects() {
+        try {
+            const projectsCol = collection(db, 'projects');
+            const isSuperAdmin = user?.role === 'Super-admin';
+            const isAdmin = user?.role === 'admin';
+            const isCro = user?.role === 'CRO';
+            const isPrincipal = user?.designation === 'Principal';
+            const isHod = user?.designation === 'HOD';
+            const isSpecialPitUser = user?.email === 'pit@paruluniversity.ac.in';
 
-        let q;
-        if (isSuperAdmin || isAdmin) {
-          q = query(projectsCol);
-        } else if (isCro && user.faculty) {
-          q = query(projectsCol, where('faculty', '==', user.faculty));
-        } else if (isPrincipal && user.institute) {
-          q = query(projectsCol, where('institute', '==', user.institute));
-        } else if (isHod && user.department) {
-          q = query(projectsCol, where('departmentName', '==', user.department));
-        } else {
-           // Default query for standard faculty, though this page is mainly for admins
-          q = query(projectsCol, where('pi_uid', '==', user.uid));
-        }
-        
-        const projectSnapshot = await getDocs(q);
-        projectList = projectSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-        
-        // Fallback for Principals/HODs if strict query fails
-        if ((isPrincipal || isHod) && projectList.length === 0) {
-            console.warn(`Initial query for ${user.institute || user.department} returned 0 projects. Fetching all and filtering client-side as a fallback.`);
-            const allProjectsSnapshot = await getDocs(query(projectsCol));
-            const allProjectsList = allProjectsSnapshot.docs.map(doc => ({...doc.data(), id: doc.id } as Project));
+
+            let projectList: Project[] = [];
+
+            if (isSuperAdmin || isAdmin) {
+                const q = query(projectsCol, orderBy('submissionDate', 'desc'));
+                const snapshot = await getDocs(q);
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            } else if (isCro && user.faculties && user.faculties.length > 0) {
+                // Fetch projects for all assigned faculties
+                const croFaculties = user.faculties;
+                const q = query(projectsCol, where('faculty', 'in', croFaculties), orderBy('submissionDate', 'desc'));
+                const snapshot = await getDocs(q);
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            } else if (isHod && user.department && user.institute) {
+                const q = query(
+                    projectsCol, 
+                    where('departmentName', '==', user.department), 
+                    where('institute', '==', user.institute),
+                    orderBy('submissionDate', 'desc')
+                );
+                const snapshot = await getDocs(q);
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            } else if (isSpecialPitUser) {
+                 const q = query(projectsCol, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']), orderBy('submissionDate', 'desc'));
+                 const snapshot = await getDocs(q);
+                 projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            }
+            else if (isPrincipal && user.institute) {
+                // First, try an exact match.
+                const exactQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
+                let snapshot = await getDocs(exactQuery);
+
+                if (snapshot.empty) {
+                    // Fallback to client-side filtering if exact match yields no results
+                    const allProjectsSnapshot = await getDocs(query(projectsCol, orderBy('submissionDate', 'desc')));
+                    projectList = allProjectsSnapshot.docs
+                        .map(doc => ({ ...doc.data(), id: doc.id } as Project))
+                        .filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
+
+                    // Logging for debug purposes
+                    const allProjectInstitutes = allProjectsSnapshot.docs.map(d => d.data().institute);
+                    const debugInfo = createDebugInfo(user, projectList);
+                    logDebugInfo(debugInfo, 'All Projects Fallback');
+
+                } else {
+                    projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                }
+
+            } else {
+                const q = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
+                 const snapshot = await getDocs(q);
+                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            }
             
-            if (isPrincipal && user.institute) {
-              projectList = allProjectsList.filter(p => p.institute?.toLowerCase() === user.institute?.toLowerCase());
-            } else if (isHod && user.department) {
-              projectList = allProjectsList.filter(p => p.departmentName?.toLowerCase() === user.department?.toLowerCase());
-            }
-
-            if (isPrincipal) {
-              const debugInfo = createDebugInfo(user, allProjectsList, PRINCIPAL_EMAILS);
-              logDebugInfo(debugInfo, 'AllProjectsPage (Fallback)');
-            }
-        } else if (isPrincipal) {
-            const debugInfo = createDebugInfo(user, projectList, PRINCIPAL_EMAILS);
-            logDebugInfo(debugInfo, 'AllProjectsPage (Standard)');
+            setAllProjects(projectList);
+        } catch (error) {
+            console.error("Error fetching projects: ", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data.' });
+        } finally {
+            setLoading(false);
         }
-        
-        projectList.sort((a,b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime());
-        setAllProjects(projectList);
-
-      } catch (error) {
-        console.error("Error fetching data: ", error);
-        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data. Check permissions or network.' });
-      } finally {
-        setLoading(false);
-      }
     }
-    getProjectsAndUsers();
-  }, [user, toast]);
+
+    fetchProjects();
+}, [user, toast]);
   
   const isSuperAdmin = user?.role === 'Super-admin';
   const isAdmin = user?.role === 'admin';
@@ -150,7 +174,12 @@ export default function AllProjectsPage() {
   let pageDescription = "Browse and manage all projects in the system.";
   let exportFileName = 'all_projects';
 
-  if (isPrincipal && user?.institute) {
+  if (user?.email === 'pit@paruluniversity.ac.in') {
+      pageTitle = `Projects from Parul Institute of Technology`;
+      pageDescription = "Browse all projects from Parul Institute of Technology and its Diploma studies wing.";
+      exportFileName = `projects_PIT_Combined`;
+  }
+  else if (isPrincipal && user?.institute) {
     pageTitle = `Projects from ${user.institute}`;
     pageDescription = "Browse all projects submitted from your institute.";
     exportFileName = `projects_${user.institute.replace(/[ &]/g, '_')}`;
@@ -160,12 +189,16 @@ export default function AllProjectsPage() {
     exportFileName = 'principal_all_projects';
   } else if (isHod && user?.department) {
     pageTitle = `Projects from ${user.department}`;
-    pageDescription = "Browse all projects submitted from your department.";
+    pageDescription = `Browse all projects submitted from your department within ${user.institute}.`;
     exportFileName = `projects_${user.department.replace(/[ &]/g, '_')}`;
-  } else if (isCro && user?.faculty) {
-    pageTitle = `Projects from ${user.faculty}`;
-    pageDescription = "Browse all projects submitted from your faculty.";
-    exportFileName = `projects_${user.faculty.replace(/[ &]/g, '_')}`;
+  } else if (isCro && user?.faculties) {
+      if (facultyFilter === 'all' || !facultyFilter) {
+          pageTitle = `Projects from All Your Faculties`;
+      } else {
+          pageTitle = `Projects from ${facultyFilter}`;
+      }
+      pageDescription = "Browse all projects submitted from your assigned faculties.";
+      exportFileName = `projects_${facultyFilter.replace(/[ &]/g, '_')}`;
   }
 
   const filteredProjects = useMemo(() => {
@@ -173,6 +206,9 @@ export default function AllProjectsPage() {
       .filter(project => {
         if (statusFilter !== 'all' && project.status !== statusFilter) {
           return false;
+        }
+        if (isCro && facultyFilter !== 'all' && project.faculty !== facultyFilter) {
+            return false;
         }
         if (searchTerm === '') {
           return true;
@@ -183,7 +219,7 @@ export default function AllProjectsPage() {
           project.pi.toLowerCase().includes(lowerCaseSearch)
         );
       });
-  }, [allProjects, searchTerm, statusFilter]);
+  }, [allProjects, searchTerm, statusFilter, facultyFilter, isCro]);
 
   const handleColumnSelectionChange = (columnId: string, checked: boolean) => {
     setSelectedExportColumns(prev => {
@@ -349,6 +385,19 @@ export default function AllProjectsPage() {
                 ))}
             </SelectContent>
         </Select>
+        {isCro && user && user.faculties && user.faculties.length > 1 && (
+             <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                <SelectTrigger className="w-[280px]">
+                    <SelectValue placeholder="Filter by faculty" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Assigned Faculties</SelectItem>
+                    {user.faculties.map(faculty => (
+                        <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        )}
       </div>
 
       <div className="mt-4">
@@ -363,7 +412,7 @@ export default function AllProjectsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={filteredProjects} userRole={user!.role} />
+          <ProjectList projects={filteredProjects} userRole={user!.role} allUsers={users} />
         )}
       </div>
     </div>

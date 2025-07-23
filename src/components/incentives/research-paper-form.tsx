@@ -42,7 +42,7 @@ import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl } from '@/ap
 import { Loader2, AlertCircle, Bot } from 'lucide-react';
 
 const SPECIAL_POLICY_FACULTIES = [
-    "Faculty of Applied Sciences", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurveda",
+    "Faculty of Applied Sciences", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
     "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health",
     "Faculty of Engineering & Technology"
 ];

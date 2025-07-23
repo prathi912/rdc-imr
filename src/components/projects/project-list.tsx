@@ -28,6 +28,7 @@ import { parseISO } from 'date-fns';
 interface ProjectListProps {
   projects: Project[];
   userRole: User['role'];
+  allUsers?: User[];
 }
 
 const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
@@ -41,9 +42,11 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
 };
 
 
-export function ProjectList({ projects, userRole }: ProjectListProps) {
+export function ProjectList({ projects, userRole, allUsers = [] }: ProjectListProps) {
   const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(userRole);
   const isEvaluator = userRole === 'Evaluator';
+
+  const usersMap = useMemo(() => new Map(allUsers.map(u => [u.uid, u])), [allUsers]);
 
   type SortableKeys = keyof Pick<Project, 'title' | 'faculty' | 'pi' | 'status' | 'submissionDate'> | 'meetingDate';
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
@@ -116,7 +119,8 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
           </TableHeader>
           <TableBody>
             {sortedProjects.map((project) => {
-              const meetingDate = project.meetingDetails?.date ? parseISO(project.meetingDetails.date) : null;
+              const displayDate = project.submissionDate;
+              const piUser = usersMap.get(project.pi_uid);
              
               let actionButton;
               if (project.status === 'Draft') {
@@ -141,8 +145,16 @@ export function ProjectList({ projects, userRole }: ProjectListProps) {
               return (
                 <TableRow key={project.id}>
                   <TableCell className="font-medium">{project.title}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{project.pi}</TableCell>
-                  <TableCell className="hidden sm:table-cell">{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    {piUser?.misId ? (
+                        <Link href={`/profile/${piUser.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
+                            {project.pi}
+                        </Link>
+                    ) : (
+                        project.pi
+                    )}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">{new Date(displayDate).toLocaleDateString()}</TableCell>
                   <TableCell className="hidden md:table-cell">
                     <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
                   </TableCell>
