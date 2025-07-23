@@ -27,8 +27,8 @@ export default function RootLayout({
 
   if (!isFirebaseConfigured) {
     return (
-      <html lang="en">
-        <body className={inter.className}>
+      <html lang="en" suppressHydrationWarning>
+        <body className={inter.className} suppressHydrationWarning>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <FirebaseNotConfigured />
             <Toaster />
@@ -39,8 +39,8 @@ export default function RootLayout({
   }
 
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className} suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />

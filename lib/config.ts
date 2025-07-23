@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from "firebase/app"
-import { getFirestore } from "firebase/firestore"
 import { getAuth } from "firebase/auth"
+import { getFirestore } from "firebase/firestore"
 import { getStorage } from "firebase/storage"
 
 const firebaseConfig = {
@@ -12,10 +12,14 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 }
 
-// Initialize Firebase only if it hasn't been initialized already
+// Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
 
-export const db = getFirestore(app)
+// Initialize Firebase services
 export const auth = getAuth(app)
+export const db = getFirestore(app)
 export const storage = getStorage(app)
+
+export const isFirebaseInitialized = !!(firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId)
+
 export default app
