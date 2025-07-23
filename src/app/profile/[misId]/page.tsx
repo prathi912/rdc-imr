@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -11,6 +10,17 @@ import { ProfileClient } from "@/components/profile/profile-client"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 
+// Add Publication type
+interface Publication {
+  id: string
+  title: string
+  authorUids: string[]
+  authorNames: string[]
+  addedByUid: string
+  addedAt: string
+  status: string
+}
+
 export default function ProfilePage() {
   const params = useParams()
   const misId = params.misId as string
@@ -18,8 +28,9 @@ export default function ProfilePage() {
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const [claims, setClaims] = useState<IncentiveClaim[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [emrInterests, setEmrInterests] = useState<EmrInterest[]>([]);
-  const [fundingCalls, setFundingCalls] = useState<FundingCall[]>([]);
+  const [emrInterests, setEmrInterests] = useState<EmrInterest[]>([])
+  const [fundingCalls, setFundingCalls] = useState<FundingCall[]>([])
+  const [publications, setPublications] = useState<Publication[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessionUser, setSessionUser] = useState<User | null>(null)
@@ -64,26 +75,48 @@ export default function ProfilePage() {
 
         setProfileUser(fetchedUser)
 
-        // Fetch user's EMR interests (both as PI and Co-PI)
-        const emrInterestsRef = collection(db, "emrInterests");
-        const emrInterestsQuery = query(
-          emrInterestsRef, 
-          or(
-            where("userId", "==", fetchedUser.uid), 
-            where("coPiUids", "array-contains", fetchedUser.uid)
+        // Fetch user's publications
+        try {
+          const publicationsRef = collection(db, "publications")
+          const publicationsQuery = query(
+            publicationsRef,
+            where("authorUids", "array-contains", fetchedUser.uid),
+            where("status", "==", "active"),
+            orderBy("addedAt", "desc"),
           )
-        );
-        const emrInterestsSnapshot = await getDocs(emrInterestsQuery);
-        const fetchedEmrInterests = emrInterestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
-        setEmrInterests(fetchedEmrInterests);
+          const publicationsSnapshot = await getDocs(publicationsQuery)
+          const fetchedPublications = publicationsSnapshot.docs.map(
+            (doc) =>
+              ({
+                id: doc.id,
+                ...doc.data(),
+              }) as Publication,
+          )
+          setPublications(fetchedPublications)
+        } catch (publicationsError) {
+          console.warn("Could not fetch publications:", publicationsError)
+          setPublications([])
+        }
+
+        // Fetch user's EMR interests (both as PI and Co-PI)
+        const emrInterestsRef = collection(db, "emrInterests")
+        const emrInterestsQuery = query(
+          emrInterestsRef,
+          or(where("userId", "==", fetchedUser.uid), where("coPiUids", "array-contains", fetchedUser.uid)),
+        )
+        const emrInterestsSnapshot = await getDocs(emrInterestsQuery)
+        const fetchedEmrInterests = emrInterestsSnapshot.docs.map(
+          (doc) => ({ id: doc.id, ...doc.data() }) as EmrInterest,
+        )
+        setEmrInterests(fetchedEmrInterests)
 
         // Fetch corresponding funding calls for the interests found
         if (fetchedEmrInterests.length > 0) {
-            const callIds = [...new Set(fetchedEmrInterests.map(i => i.callId))];
-            const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
-            const callsSnapshot = await getDocs(callsQuery);
-            const fetchedCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-            setFundingCalls(fetchedCalls);
+          const callIds = [...new Set(fetchedEmrInterests.map((i) => i.callId))]
+          const callsQuery = query(collection(db, "fundingCalls"), where("__name__", "in", callIds))
+          const callsSnapshot = await getDocs(callsQuery)
+          const fetchedCalls = callsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as FundingCall)
+          setFundingCalls(fetchedCalls)
         }
 
         // Fetch user's projects with better error handling
@@ -217,7 +250,13 @@ export default function ProfilePage() {
         showBackButton={false}
       />
       <div className="mt-8">
-        <ProfileClient user={profileUser} projects={projects} emrInterests={emrInterests} fundingCalls={fundingCalls} />
+        <ProfileClient
+          user={profileUser}
+          projects={projects}
+          emrInterests={emrInterests}
+          fundingCalls={fundingCalls}
+          publications={publications}
+        />
       </div>
     </div>
   )
