@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -153,5 +152,3 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         </Dialog>
     )
 }
-
-    

@@ -1,4 +1,3 @@
-
 import { PageHeader } from '@/components/page-header';
 import { SubmissionForm } from '@/components/projects/submission-form';
 import { Guidelines } from '@/components/projects/guidelines';

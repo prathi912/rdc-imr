@@ -1,4 +1,3 @@
-
 'use client';
 
 // This component centralizes the SOP content so it can be used in both the public SOP page and the dashboard dialog.
