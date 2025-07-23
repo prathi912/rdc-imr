@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -16,7 +17,7 @@ import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { db, auth } from "@/lib/config"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
-import { uploadFileToServer, fetchOrcidData } from "@/app/actions"
+import { uploadFileToServer, fetchOrcidData, findUserByMisId as findUserByMisIdAction, addPublication, findUserByEmail } from "@/app/actions"
 import type { User } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -27,8 +28,10 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Banknote, Bot, Loader2 } from "lucide-react"
+import { Banknote, Bot, Loader2, BookCopy, X } from "lucide-react"
+import Link from "next/link"
 import { Combobox } from "@/components/ui/combobox"
+import { Badge } from "@/components/ui/badge"
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -68,6 +71,11 @@ const bankDetailsSchema = z.object({
   ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC code format."),
 })
 type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>
+
+const publicationSchema = z.object({
+  title: z.string().min(10, "Paper title must be at least 10 characters long."),
+})
+type PublicationFormValues = z.infer<typeof publicationSchema>
 
 const faculties = [
   "Faculty of Engineering & Technology",
@@ -181,11 +189,15 @@ export default function SettingsPage() {
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false)
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false)
   const [isSubmittingBank, setIsSubmittingBank] = useState(false)
+  const [isSubmittingPublication, setIsSubmittingPublication] = useState(false)
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false)
   const [departments, setDepartments] = useState<string[]>([])
+  const [coAuthorSearch, setCoAuthorSearch] = useState("")
+  const [isSearchingCoAuthor, setIsSearchingCoAuthor] = useState(false)
+  const [coAuthors, setCoAuthors] = useState<{ uid: string; name: string; email: string }[]>([])
 
   const isPrincipal = useMemo(() => user?.designation === "Principal", [user])
   const isCro = useMemo(() => user?.role === "CRO", [user])
@@ -228,6 +240,11 @@ export default function SettingsPage() {
       city: "",
       ifscCode: "",
     },
+  })
+
+  const publicationForm = useForm<PublicationFormValues>({
+    resolver: zodResolver(publicationSchema),
+    defaultValues: { title: "" },
   })
 
   const selectedCampus = profileForm.watch("campus")
@@ -445,6 +462,57 @@ export default function SettingsPage() {
   }
 
   const isAcademicInfoLocked = isCro || isPrincipal
+
+  const handleSearchCoAuthor = async () => {
+    if (!coAuthorSearch.trim()) return;
+    setIsSearchingCoAuthor(true);
+    try {
+      const result = await findUserByEmail(coAuthorSearch.trim());
+      if (result.success && result.user) {
+        if (coAuthors.some(author => author.uid === result.user!.uid) || user?.uid === result.user.uid) {
+           toast({ variant: 'destructive', title: 'Author Already Added', description: 'This user is already in the author list.' });
+        } else {
+          setCoAuthors(prev => [...prev, result.user!]);
+          setCoAuthorSearch("");
+        }
+      } else {
+        toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+      }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Search Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+      setIsSearchingCoAuthor(false);
+    }
+  }
+
+  const removeCoAuthor = (uid: string) => {
+    setCoAuthors(prev => prev.filter(author => author.uid !== uid));
+  }
+
+  const onPublicationSubmit = async (data: PublicationFormValues) => {
+      if (!user) return;
+      setIsSubmittingPublication(true);
+      try {
+        const result = await addPublication({
+          title: data.title,
+          authorUids: [user.uid, ...coAuthors.map(a => a.uid)],
+          authorNames: [user.name, ...coAuthors.map(a => a.name)],
+          addedByUid: user.uid,
+        });
+        if (result.success) {
+          toast({ title: 'Publication Added', description: 'Your research domain will be updated shortly.' });
+          publicationForm.reset();
+          setCoAuthors([]);
+        } else {
+          toast({ variant: 'destructive', title: 'Error', description: result.error });
+        }
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+      } finally {
+        setIsSubmittingPublication(false);
+      }
+  }
+
 
   if (loading) {
     return (
@@ -765,6 +833,68 @@ export default function SettingsPage() {
               <CardFooter className="border-t px-6 py-4">
                 <Button type="submit" disabled={isSubmittingProfile}>
                   {isSubmittingProfile ? "Saving..." : "Save Changes"}
+                </Button>
+              </CardFooter>
+            </Card>
+          </form>
+        </Form>
+        
+        <Form {...publicationForm}>
+          <form onSubmit={publicationForm.handleSubmit(onPublicationSubmit)}>
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <BookCopy />
+                  <CardTitle>Add Published Paper</CardTitle>
+                </div>
+                <CardDescription>
+                  Add your published papers to build your research profile and help generate your research domain.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                 <FormField
+                  control={publicationForm.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Paper Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter the full title of your published paper" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <div>
+                    <FormLabel>Co-Authors</FormLabel>
+                    <div className="flex items-center gap-2 mt-2">
+                        <Input 
+                            placeholder="Search co-author by email"
+                            value={coAuthorSearch}
+                            onChange={(e) => setCoAuthorSearch(e.target.value)}
+                        />
+                        <Button type="button" variant="outline" onClick={handleSearchCoAuthor} disabled={isSearchingCoAuthor || !coAuthorSearch}>
+                            {isSearchingCoAuthor ? <Loader2 className="h-4 w-4 animate-spin"/> : "Add"}
+                        </Button>
+                    </div>
+                 </div>
+                 {coAuthors.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                        {coAuthors.map(author => (
+                            <Badge key={author.uid} variant="secondary">
+                                {author.name}
+                                <button type="button" onClick={() => removeCoAuthor(author.uid)} className="ml-2 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                                </button>
+                            </Badge>
+                        ))}
+                    </div>
+                 )}
+              </CardContent>
+              <CardFooter className="border-t px-6 py-4">
+                <Button type="submit" disabled={isSubmittingPublication}>
+                  {isSubmittingPublication ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  {isSubmittingPublication ? "Adding..." : "Add Publication"}
                 </Button>
               </CardFooter>
             </Card>
