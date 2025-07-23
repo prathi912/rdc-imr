@@ -21,7 +21,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // If Firebase isn't configured, show a helpful message instead of crashing.
   if (!isFirebaseInitialized) {
     return (
       <html lang="en" suppressHydrationWarning>
