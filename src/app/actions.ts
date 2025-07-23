@@ -74,10 +74,126 @@ export async function getResearchDomain(input: ResearchDomainInput) {
 export async function getJournalWebsite(input: JournalWebsiteInput) {
   try {
     const result = await findJournalWebsite(input)
-    return { success: true, url: result.url }
+    return { success: true, url: result.websiteUrl }
   } catch (error) {
     console.error("Error finding journal website:", error)
     return { success: false, error: "Failed to find journal website." }
+  }
+}
+
+export async function addPublication(publicationData: {
+  title: string
+  authorUids: string[]
+  authorNames: string[]
+  addedByUid: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!publicationData.title || !publicationData.authorNames || publicationData.authorNames.length === 0) {
+      return { success: false, error: "Publication title and at least one author are required." }
+    }
+
+    // Ensure the person adding the publication is included in authorUids
+    if (!publicationData.authorUids.includes(publicationData.addedByUid)) {
+      return { success: false, error: "You must be listed as an author of this publication." }
+    }
+
+    // Create the publication document
+    const publicationRef = adminDb.collection("publications").doc()
+    const publicationDoc = {
+      title: publicationData.title,
+      authorUids: publicationData.authorUids, // Only registered users
+      authorNames: publicationData.authorNames, // All authors (including external)
+      addedByUid: publicationData.addedByUid,
+      createdAt: new Date().toISOString(),
+      status: "active",
+      // Add metadata for better tracking
+      totalAuthors: publicationData.authorNames.length,
+      registeredAuthors: publicationData.authorUids.length,
+    }
+
+    await publicationRef.set(publicationDoc)
+
+    // Update research domains for all registered authors asynchronously
+    const updatePromises = publicationData.authorUids.map(async (authorUid) => {
+      try {
+        // Get all publications for this author
+        const authorPublicationsQuery = adminDb
+          .collection("publications")
+          .where("authorUids", "array-contains", authorUid)
+          .where("status", "==", "active")
+
+        const authorPublicationsSnapshot = await authorPublicationsQuery.get()
+        const publicationTitles = authorPublicationsSnapshot.docs.map((doc) => doc.data().title)
+
+        if (publicationTitles.length > 0) {
+          // Generate research domain suggestion
+          const domainResult = await getResearchDomain({
+            publications: publicationTitles,
+          })
+
+          if (domainResult.success && domainResult.domain) {
+            // Update user's research domain
+            const userRef = adminDb.collection("users").doc(authorUid)
+            await userRef.update({
+              researchDomain: domainResult.domain,
+              lastDomainUpdate: new Date().toISOString(),
+              publicationCount: publicationTitles.length,
+            })
+          }
+        }
+      } catch (error) {
+        console.error(`Error updating research domain for user ${authorUid}:`, error)
+        // Don't fail the entire operation if domain update fails
+      }
+    })
+
+    // Execute all domain updates in parallel but don't wait for them
+    Promise.all(updatePromises).catch((error) => {
+      console.error("Error updating research domains:", error)
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error adding publication:", error)
+    return { success: false, error: error.message || "Failed to add publication." }
+  }
+}
+
+export async function findUserByEmail(
+  email: string,
+): Promise<{ success: boolean; user?: { uid: string; name: string; email: string }; error?: string }> {
+  try {
+    if (!email || email.trim() === "") {
+      return { success: false, error: "Email is required." }
+    }
+
+    const usersRef = adminDb.collection("users")
+    const q = usersRef.where("email", "==", email.trim().toLowerCase()).limit(1)
+    const querySnapshot = await q.get()
+
+    if (querySnapshot.empty) {
+      return { success: false, error: "No user found with this email address." }
+    }
+
+    const userDoc = querySnapshot.docs[0]
+    const userData = userDoc.data()
+
+    // Prevent adding admins as co-authors
+    if (userData.role === "admin" || userData.role === "Super-admin") {
+      return { success: false, error: "Administrative users cannot be added as co-authors." }
+    }
+
+    return {
+      success: true,
+      user: {
+        uid: userDoc.id,
+        name: userData.name,
+        email: userData.email,
+      },
+    }
+  } catch (error: any) {
+    console.error("Error finding user by email:", error)
+    return { success: false, error: error.message || "Failed to search for user." }
   }
 }
 
