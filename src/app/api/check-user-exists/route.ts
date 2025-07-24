@@ -14,12 +14,13 @@ export async function POST(request: NextRequest) {
     const querySnapshot = await getDocs(q);
 
     if (!querySnapshot.empty) {
-      const userData = querySnapshot.docs[0].data();
-      return NextResponse.json({ success: true, user: { name: userData.name, email: userData.email } });
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data();
+      return NextResponse.json({ success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email } });
     } else {
       return NextResponse.json({ success: true, user: null });
     }
-  } catch (error) {
+  } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message || 'Internal Server Error' }, { status: 500 });
   }
 }

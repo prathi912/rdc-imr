@@ -2,18 +2,19 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { User, Project, EmrInterest, FundingCall } from '@/types';
-import { getResearchDomain, addResearchPaper, fetchResearchPapersByUserUid } from '@/app/actions';
+import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author } from '@/types';
+import { getResearchDomain, addResearchPaper, fetchResearchPapersByUserUid, checkUserOrStaff } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
@@ -30,23 +31,19 @@ function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: st
     );
 }
 
-type CoAuthor = {
-  email: string;
-  name?: string | null;
-  authorType?: 'Co-Author' | 'First Author' | 'Corresponding Author';
-  isExternal?: boolean;
-};
+const AUTHOR_ROLES: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author'];
 
 export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[] }) {
-    const [domain, setDomain] = useState<string | null>(null);
+    const [domain, setDomain] = useState<string | null>(user.researchDomain || null);
     const [loadingDomain, setLoadingDomain] = useState(false);
-    const [researchPapers, setResearchPapers] = useState<any[]>([]);
+    const [researchPapers, setResearchPapers] = useState<ResearchPaper[]>([]);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [newPaperTitle, setNewPaperTitle] = useState('');
     const [newCoAuthorEmail, setNewCoAuthorEmail] = useState('');
     const [newPaperUrl, setNewPaperUrl] = useState('');
-    const [coAuthorEmails, setCoAuthorEmails] = useState<CoAuthor[]>([]);
+    const [coAuthors, setCoAuthors] = useState<Author[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selfRole, setSelfRole] = useState<Author['role']>('First Author');
     const { toast } = useToast();
 
     useEffect(() => {
@@ -54,7 +51,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
             try {
                 const result = await fetchResearchPapersByUserUid(user.uid);
                 if (result.success) {
-                    setResearchPapers(result.papers || []);
+                    setResearchPapers(result.papers as ResearchPaper[] || []);
                 }
             } catch (error) {
                 console.error("Error fetching research papers:", error);
@@ -66,7 +63,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     useEffect(() => {
         const fetchDomain = async () => {
             const titles = [...projects.map(p => p.title), ...researchPapers.map(p => p.title)];
-            if (titles.length > 0) {
+            if (titles.length > 0 && !user.researchDomain) {
                 setLoadingDomain(true);
                 try {
                     const result = await getResearchDomain({ paperTitles: titles });
@@ -81,7 +78,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
             }
         };
         fetchDomain();
-    }, [projects, researchPapers]);
+    }, [projects, researchPapers, user.researchDomain]);
 
     const getCallTitle = (callId: string) => {
         return fundingCalls.find(c => c.id === callId)?.title || callId;
@@ -94,83 +91,66 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         </div>
     );
 
-    const addCoAuthorEmail = async () => {
+    const addCoAuthor = async () => {
       const email = newCoAuthorEmail.trim().toLowerCase();
       if (!email) return;
 
-      if (coAuthorEmails.find(ca => ca.email === email)) {
+      if (coAuthors.find(ca => ca.email === email)) {
         toast({ title: 'Co-author already added', variant: 'destructive' });
         return;
       }
 
-      const isInternal = email.endsWith('@paruluniversity.ac.in');
+      const isExternal = !email.endsWith('@paruluniversity.ac.in');
+      let name: string | null = null;
+      let uid: string | null = null;
 
-      if (!isInternal) {
-        const externalName = prompt('Enter the name of the external co-author:');
-        if (!externalName || !externalName.trim()) {
+      if (isExternal) {
+        name = prompt('Enter the name of the external co-author:');
+        if (!name || !name.trim()) {
           toast({ title: 'Name is required for external authors', variant: 'destructive' });
           return;
         }
-        setCoAuthorEmails([...coAuthorEmails, { email, name: externalName.trim(), authorType: 'Co-Author', isExternal: true }]);
-        setNewCoAuthorEmail('');
-        return;
-      }
-
-      try {
-        const resUser = await fetch('/api/check-user-exists', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        });
-        const dataUser = await resUser.json();
-
-        let name: string | null = null;
-        if (dataUser.success && dataUser.user) {
-          name = dataUser.user.name;
-        } else {
-          const resStaff = await fetch('/api/get-staff-name', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
-          });
-          const dataStaff = await resStaff.json();
-          if (dataStaff.success && dataStaff.name) {
-            name = dataStaff.name;
-          }
+      } else {
+        const result = await checkUserOrStaff(email);
+        if (result.success) {
+            name = result.name;
+            uid = result.uid;
         }
-
-        setCoAuthorEmails([...coAuthorEmails, { email, name, authorType: 'Co-Author', isExternal: false }]);
-        setNewCoAuthorEmail('');
-      } catch (error) {
-        toast({ title: 'Error checking co-author', variant: 'destructive' });
-        console.error('Error checking co-author:', error);
       }
+
+      setCoAuthors([...coAuthors, { email, name: name || email, role: 'Co-Author', isExternal, uid: uid || undefined }]);
+      setNewCoAuthorEmail('');
     };
 
-    const removeCoAuthorEmail = (email: string) => {
-      setCoAuthorEmails(coAuthorEmails.filter(ca => ca.email !== email));
+    const removeCoAuthor = (email: string) => {
+      setCoAuthors(coAuthors.filter(ca => ca.email !== email));
     };
+
+    const updateCoAuthorRole = (email: string, role: Author['role']) => {
+        setCoAuthors(coAuthors.map(ca => ca.email === email ? { ...ca, role } : ca));
+    }
 
     const handleAddPaper = async () => {
-      if (!newPaperTitle.trim()) {
-        toast({ title: "Paper title is required", variant: "destructive" });
-        return;
-      }
-      if (!newPaperUrl.trim()) {
-        toast({ title: "Paper URL is required", variant: "destructive" });
+      if (!newPaperTitle.trim() || !newPaperUrl.trim()) {
+        toast({ title: "Paper title and URL are required", variant: "destructive" });
         return;
       }
       setIsSubmitting(true);
       try {
-        const coAuthorEmailsOnly = coAuthorEmails.map(ca => ca.email);
-        const result = await addResearchPaper(newPaperTitle.trim(), user.uid, coAuthorEmailsOnly);
-        if (result.success) {
+        const allAuthors: Author[] = [
+            { email: user.email, name: user.name, role: selfRole, isExternal: false, uid: user.uid },
+            ...coAuthors
+        ];
+        
+        const result = await addResearchPaper(newPaperTitle.trim(), newPaperUrl.trim(), user.uid, allAuthors);
+
+        if (result.success && result.paper) {
           toast({ title: "Research paper added successfully" });
-          const newPaper = { id: result.paperId, title: newPaperTitle.trim(), coAuthorEmails: coAuthorEmailsOnly, url: newPaperUrl.trim() };
-          setResearchPapers(prevPapers => [...prevPapers, newPaper]);
+          setResearchPapers(prevPapers => [...prevPapers, result.paper!]);
+          if(result.paper.domain) setDomain(result.paper.domain);
           setNewPaperTitle('');
           setNewPaperUrl('');
-          setCoAuthorEmails([]);
+          setCoAuthors([]);
           setIsAddDialogOpen(false);
         } else {
           toast({ title: "Failed to add research paper", description: result.error, variant: "destructive" });
@@ -182,21 +162,19 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         setIsSubmitting(false);
       }
     };
+    
 
     return (
         <div className="flex flex-col items-center">
             <Card className="w-full max-w-4xl shadow-xl border-0 bg-card/80 backdrop-blur-lg">
                 <CardContent className="p-6 md:p-8">
                     <div className="flex flex-col md:flex-row items-center gap-6">
-                        {/* Avatar */}
                         <div className="flex-shrink-0">
                             <Avatar className="h-28 w-28 md:h-32 md:w-32 border-4 border-background shadow-lg">
                                 <AvatarImage src={user.photoURL || undefined} alt={user.name} />
                                 <AvatarFallback className="text-4xl">{user.name?.[0].toUpperCase()}</AvatarFallback>
                             </Avatar>
                         </div>
-
-                        {/* Details Section */}
                         <div className="flex flex-col items-center md:items-start text-center md:text-left w-full">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full">
                                 <h1 className="text-3xl font-bold">{user.name}</h1>
@@ -208,7 +186,6 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                             </div>
                             <p className="text-muted-foreground mt-1">{user.designation}</p>
                             <p className="text-muted-foreground">{user.department}, {user.institute}</p>
-
                             <div className="flex justify-center md:justify-start gap-8 my-4">
                                 <StatItem value={projects.length} label="IMR Projects" />
                                 <StatItem value={emrInterests.length} label="EMR Interests" />
@@ -259,7 +236,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="projects">IMR Projects ({projects.length})</TabsTrigger>
                         <TabsTrigger value="emr">EMR Interests ({emrInterests.length})</TabsTrigger>
-                        <TabsTrigger value="papers">Research Papers ({researchPapers.length})</TabsTrigger>
+                        <TabsTrigger value="papers">Paper Publications ({researchPapers.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="projects">
                         <div className="space-y-4 mt-4">
@@ -313,11 +290,21 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                             </Button>
                             {researchPapers.length > 0 ? researchPapers.map(paper => (
                                 <Card key={paper.id}>
-                                    <CardContent className="p-4">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <p className="font-semibold">{paper.title}</p>
+                                    <CardContent className="p-4 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <a href={paper.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">{paper.title}</a>
+                                            <div className="flex gap-2">
+                                                <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4"/></Button>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>
+                                            </div>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">Co-Authors: {paper.coAuthorEmails?.join(', ') || 'None'}</p>
+                                        <div className="flex flex-wrap gap-2 items-center">
+                                            {paper.authors.map((author: Author) => (
+                                                <Badge key={author.email} variant={author.email === user.email ? 'default' : 'secondary'}>
+                                                    {author.name} ({author.role}) {author.isExternal && '(Ext)'}
+                                                </Badge>
+                                            ))}
+                                        </div>
                                     </CardContent>
                                 </Card>
                             )) : (
@@ -329,59 +316,44 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
             </div>
 
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Add Research Paper</DialogTitle>
-                        <DialogDescription>
-                            Add the title of your research paper and co-authors by their email addresses.
-                        </DialogDescription>
+                        <DialogDescription>Add the title, URL, and authors of your published paper.</DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4">
-                        <div>
-                            <label htmlFor="paperTitle" className="block text-sm font-medium">Paper Title</label>
-                            <Input
-                                id="paperTitle"
-                                value={newPaperTitle}
-                                onChange={(e) => setNewPaperTitle(e.target.value)}
-                                placeholder="Enter paper title"
-                                className="mt-1 block w-full"
-                            />
+                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                         <div><label htmlFor="paperTitle" className="block text-sm font-medium">Paper Title</label><Input id="paperTitle" value={newPaperTitle} onChange={(e) => setNewPaperTitle(e.target.value)} placeholder="Enter paper title" className="mt-1"/></div>
+                         <div><label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</label><Input id="paperUrl" value={newPaperUrl} onChange={(e) => setNewPaperUrl(e.target.value)} placeholder="https://doi.org/..." className="mt-1"/></div>
+                        
+                        <div className="flex items-end gap-2">
+                           <div className="flex-grow"><label className="block text-sm font-medium">Your Role</label>
+                           <Select value={selfRole} onValueChange={(value) => setSelfRole(value as Author['role'])}>
+                            <SelectTrigger><SelectValue/></SelectTrigger>
+                            <SelectContent>{AUTHOR_ROLES.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                           </Select>
+                           </div>
                         </div>
-                        <div>
-                            <label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</label>
-                            <Input
-                                id="paperUrl"
-                                value={newPaperUrl}
-                                onChange={(e) => setNewPaperUrl(e.target.value)}
-                                placeholder="Enter published paper URL"
-                                className="mt-1 block w-full"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="coAuthorEmail" className="block text-sm font-medium">Add Co-Author Email</label>
-                            <div className="flex gap-2 mt-1">
-                                <Input
-                                    id="coAuthorEmail"
-                                    value={newCoAuthorEmail}
-                                    onChange={(e) => setNewCoAuthorEmail(e.target.value)}
-                                    placeholder="Enter co-author email"
-                                    className="flex-grow"
-                                />
-                                <Button onClick={addCoAuthorEmail} variant="outline" size="icon" disabled={!newCoAuthorEmail.trim()}>
-                                    <UserPlus className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {coAuthorEmails.map(({ email, name, authorType }) => (
-                                    <Badge key={email} variant="secondary" className="flex items-center gap-1">
-                                        {name ? `${name} (${email})` : email} - <em>{authorType || 'Co-Author'}</em>
-                                        <X className="cursor-pointer h-3 w-3" onClick={() => removeCoAuthorEmail(email)} />
-                                    </Badge>
-                                ))}
-                            </div>
+
+                         <div><label htmlFor="coAuthorEmail" className="block text-sm font-medium">Add Co-Author</label><div className="flex gap-2 mt-1"><Input id="coAuthorEmail" value={newCoAuthorEmail} onChange={(e) => setNewCoAuthorEmail(e.target.value)} placeholder="Enter co-author's @paruluniversity.ac.in email or external email"/><Button onClick={addCoAuthor} variant="outline" size="icon" disabled={!newCoAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button></div></div>
+                        
+                        <div className="space-y-2">
+                            {coAuthors.map((author) => (
+                                <div key={author.email} className="flex items-center gap-2 p-2 border rounded-md">
+                                    <div className="flex-grow">
+                                        <p className="font-medium text-sm">{author.name} {author.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}</p>
+                                        <p className="text-xs text-muted-foreground">{author.email}</p>
+                                    </div>
+                                    <Select value={author.role} onValueChange={(value) => updateCoAuthorRole(author.email, value as Author['role'])}>
+                                        <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue/></SelectTrigger>
+                                        <SelectContent>{AUTHOR_ROLES.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeCoAuthor(author.email)}><X className="h-4 w-4"/></Button>
+                                </div>
+                            ))}
                         </div>
                     </div>
                     <DialogFooter>
+                        <Button onClick={() => setIsAddDialogOpen(false)} variant="outline">Cancel</Button>
                         <Button onClick={handleAddPaper} disabled={isSubmitting}>
                             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Add Paper'}
                         </Button>

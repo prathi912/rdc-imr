@@ -7,7 +7,7 @@ import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flo
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
 import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection } from 'firebase-admin/firestore';
-import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation } from "@/types"
+import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
@@ -34,70 +34,91 @@ const EMAIL_STYLES = {
 
 export async function addResearchPaper(
   title: string,
-  authorUid: string,
-  coAuthorEmails: string[]
-): Promise<{ success: boolean; paperId?: string; error?: string }> {
+  url: string,
+  mainAuthorUid: string,
+  authors: Author[]
+): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
-    const usersRef = adminDb.collection("users")
-    const coAuthorUids: string[] = []
-
-    if (coAuthorEmails.length > 0) {
-      const usersQuery = await usersRef.where("email", "in", coAuthorEmails).get()
-      usersQuery.forEach(doc => {
-        coAuthorUids.push(doc.id)
-      })
-    }
-
-    const allAuthorUids = Array.from(new Set([authorUid, ...coAuthorUids]))
-
-    let detectedDomain = ""
-    try {
-      const domainResult = await getResearchDomainSuggestion({ paperTitles: [title] })
-      detectedDomain = domainResult.domain || ""
-
-      // If a domain was detected, update the profiles of all authors.
-      if (detectedDomain) {
-        const batch = adminDb.batch();
-        allAuthorUids.forEach(uid => {
-          const userRef = usersRef.doc(uid);
-          batch.update(userRef, { researchDomain: detectedDomain });
-        });
-        await batch.commit();
-        console.log(`Updated research domain to "${detectedDomain}" for ${allAuthorUids.length} authors.`);
-      }
-    } catch (aiError: any) {
-      console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message)
-      // The paper will be saved without a domain if the AI call fails.
-    }
-    
-    const papersRef = adminDb.collection("papers")
-    const newPaperRef = papersRef.doc()
-
-    const paperData = {
+    const paperRef = adminDb.collection('papers').doc();
+    const paperData: Omit<ResearchPaper, 'id'> = {
       title,
-      authorUids: allAuthorUids,
-      mainAuthorUid: authorUid,
-      coAuthorEmails,
-      domain: detectedDomain,
+      url,
+      mainAuthorUid,
+      authors,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+    };
+
+    const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
+
+    // AI Domain Suggestion
+    try {
+      const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids).get();
+      const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
+      const allTitles = [...new Set([title, ...existingTitles])];
+      
+      if (allTitles.length > 0) {
+        const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
+        paperData.domain = domainResult.domain;
+        
+        // Update all authors' profiles with the new domain
+        const batch = adminDb.batch();
+        allAuthorUids.forEach(uid => {
+          const userRef = adminDb.collection('users').doc(uid);
+          batch.update(userRef, { researchDomain: domainResult.domain });
+        });
+        await batch.commit();
+      }
+    } catch (aiError: any) {
+      console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
     }
+    
+    await paperRef.set(paperData);
 
-    await newPaperRef.set(paperData)
-
-    return { success: true, paperId: newPaperRef.id }
+    return { success: true, paper: { id: paperRef.id, ...paperData } };
   } catch (error: any) {
-    console.error("Error adding research paper:", error)
-    return { success: false, error: error.message || "Failed to add research paper." }
+    console.error("Error adding research paper:", error);
+    return { success: false, error: error.message || "Failed to add research paper." };
   }
 }
+
+export async function checkUserOrStaff(email: string): Promise<{ success: boolean; name: string | null; uid: string | null }> {
+    try {
+        const userRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/check-user-exists`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        const userData = await userRes.json();
+        if (userData.success && userData.user) {
+            return { success: true, name: userData.user.name, uid: userData.user.uid || null };
+        }
+
+        const staffRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/get-staff-name`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+        });
+        const staffData = await staffRes.json();
+        if (staffData.success && staffData.name) {
+            return { success: true, name: staffData.name, uid: null };
+        }
+        
+        return { success: true, name: null, uid: null };
+
+    } catch (error) {
+        console.error("Error checking user/staff:", error);
+        return { success: false, name: null, uid: null };
+    }
+}
+
 
 export async function fetchResearchPapersByUserUid(
   userUid: string
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
     const papersRef = adminDb.collection("papers")
-    const papersQuery = papersRef.where("authorUids", "array-contains", userUid)
+    const papersQuery = papersRef.where("mainAuthorUid", "==", userUid) // Simplified for now
     const papersSnapshot = await papersQuery.get()
 
     if (papersSnapshot.empty) {

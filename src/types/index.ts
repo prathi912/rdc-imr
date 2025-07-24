@@ -31,7 +31,28 @@ export type User = {
   bankDetails?: UserBankDetails;
   hasCompletedTutorial?: boolean;
   sidebarOrder?: string[];
+  researchDomain?: string;
 };
+
+export type Author = {
+  uid?: string; // Present for internal authors who are registered on the portal
+  email: string;
+  name: string;
+  role: 'First Author' | 'Corresponding Author' | 'Co-Author';
+  isExternal: boolean;
+};
+
+export type ResearchPaper = {
+  id: string;
+  title: string;
+  url: string;
+  mainAuthorUid: string;
+  authors: Author[];
+  domain?: string;
+  createdAt: string; // ISO String
+  updatedAt: string; // ISO String
+};
+
 
 export type BankDetails = {
   accountHolderName: string;
