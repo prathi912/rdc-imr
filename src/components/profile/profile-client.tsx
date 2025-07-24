@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author } from '@/types';
-import { getResearchDomain, addResearchPaper, fetchResearchPapersByUserUid, checkUserOrStaff } from '@/app/actions';
+import { getResearchDomain, addResearchPaper, fetchResearchPapersByUserUid, checkUserOrStaff, updateResearchPaper, deleteResearchPaper } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,8 @@ import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPl
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
@@ -33,20 +34,170 @@ function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: st
 
 const AUTHOR_ROLES: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author'];
 
+function AddEditPaperDialog({ 
+    isOpen, 
+    onOpenChange, 
+    onSuccess, 
+    user, 
+    existingPaper 
+}: { 
+    isOpen: boolean; 
+    onOpenChange: (open: boolean) => void;
+    onSuccess: (paper: ResearchPaper, isNew: boolean) => void;
+    user: User;
+    existingPaper?: ResearchPaper | null;
+}) {
+    const { toast } = useToast();
+    const [title, setTitle] = useState('');
+    const [url, setUrl] = useState('');
+    const [coAuthorEmail, setCoAuthorEmail] = useState('');
+    const [authors, setAuthors] = useState<Author[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    
+    useEffect(() => {
+        if (existingPaper) {
+            setTitle(existingPaper.title);
+            setUrl(existingPaper.url);
+            setAuthors(existingPaper.authors);
+        } else {
+            setTitle('');
+            setUrl('');
+            setAuthors([{ email: user.email, name: user.name, role: 'First Author', isExternal: false, uid: user.uid }]);
+        }
+    }, [existingPaper, user]);
+
+    const addCoAuthor = async () => {
+        const email = coAuthorEmail.trim().toLowerCase();
+        if (!email) return;
+
+        if (authors.find(ca => ca.email === email)) {
+            toast({ title: 'Co-author already added', variant: 'destructive' });
+            return;
+        }
+
+        const isExternal = !email.endsWith('@paruluniversity.ac.in');
+        let name: string | null = null;
+        let uid: string | null = null;
+
+        if (isExternal) {
+            name = prompt('Enter the name of the external co-author:');
+            if (!name || !name.trim()) {
+                toast({ title: 'Name is required for external authors', variant: 'destructive' });
+                return;
+            }
+        } else {
+            const result = await checkUserOrStaff(email);
+            if (result.success) {
+                name = result.name;
+                uid = result.uid;
+            }
+        }
+
+        setAuthors([...authors, { email, name: name || email, role: 'Co-Author', isExternal, uid: uid || undefined }]);
+        setCoAuthorEmail('');
+    };
+
+    const removeAuthor = (email: string) => {
+        if (email === user.email) {
+            toast({ title: 'Cannot remove the main author', variant: 'destructive' });
+            return;
+        }
+        setAuthors(authors.filter(ca => ca.email !== email));
+    };
+
+    const updateAuthorRole = (email: string, role: Author['role']) => {
+        setAuthors(authors.map(ca => ca.email === email ? { ...ca, role } : ca));
+    };
+
+    const handleSubmit = async () => {
+        if (!title.trim() || !url.trim()) {
+            toast({ title: "Paper title and URL are required", variant: "destructive" });
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            let result;
+            if (existingPaper) {
+                result = await updateResearchPaper(existingPaper.id, user.uid, { title: title.trim(), url: url.trim(), authors });
+            } else {
+                result = await addResearchPaper(title.trim(), url.trim(), user.uid, authors);
+            }
+
+            if (result.success && result.paper) {
+                toast({ title: `Research paper ${existingPaper ? 'updated' : 'added'} successfully` });
+                onSuccess(result.paper, !existingPaper);
+                onOpenChange(false);
+            } else {
+                toast({ title: `Failed to ${existingPaper ? 'update' : 'add'} research paper`, description: result.error, variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: `Error ${existingPaper ? 'updating' : 'adding'} research paper`, variant: "destructive" });
+            console.error(`Error ${existingPaper ? 'updating' : 'adding'} research paper:`, error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>{existingPaper ? 'Edit' : 'Add'} Research Paper</DialogTitle>
+                    <DialogDescription>Add the title, URL, and authors of your published paper.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                    <div><label htmlFor="paperTitle" className="block text-sm font-medium">Paper Title</label><Input id="paperTitle" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter paper title" className="mt-1"/></div>
+                    <div><label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</label><Input id="paperUrl" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://doi.org/..." className="mt-1"/></div>
+                    
+                    <div><label className="block text-sm font-medium mb-1">Authors</label>
+                        <div className="space-y-2">
+                            {authors.map((author) => (
+                                <div key={author.email} className="flex items-center gap-2 p-2 border rounded-md">
+                                    <div className="flex-grow">
+                                        <p className="font-medium text-sm">{author.name} {author.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}</p>
+                                        <p className="text-xs text-muted-foreground">{author.email}</p>
+                                    </div>
+                                    <Select value={author.role} onValueChange={(value) => updateAuthorRole(author.email, value as Author['role'])}>
+                                        <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue/></SelectTrigger>
+                                        <SelectContent>{AUTHOR_ROLES.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    {author.email !== user.email && <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeAuthor(author.email)}><X className="h-4 w-4"/></Button>}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    
+                    <div><label htmlFor="coAuthorEmail" className="block text-sm font-medium">Add Co-Author</label><div className="flex gap-2 mt-1"><Input id="coAuthorEmail" value={coAuthorEmail} onChange={(e) => setCoAuthorEmail(e.target.value)} placeholder="Enter co-author's @paruluniversity.ac.in email or external email"/><Button onClick={addCoAuthor} variant="outline" size="icon" disabled={!coAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button></div></div>
+                </div>
+                <DialogFooter>
+                    <Button onClick={() => onOpenChange(false)} variant="outline">Cancel</Button>
+                    <Button onClick={handleSubmit} disabled={isSubmitting}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (existingPaper ? 'Save Changes' : 'Add Paper')}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+
 export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[] }) {
     const [domain, setDomain] = useState<string | null>(user.researchDomain || null);
     const [loadingDomain, setLoadingDomain] = useState(false);
     const [researchPapers, setResearchPapers] = useState<ResearchPaper[]>([]);
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [newPaperTitle, setNewPaperTitle] = useState('');
-    const [newCoAuthorEmail, setNewCoAuthorEmail] = useState('');
-    const [newPaperUrl, setNewPaperUrl] = useState('');
-    const [coAuthors, setCoAuthors] = useState<Author[]>([]);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [selfRole, setSelfRole] = useState<Author['role']>('First Author');
+    const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+    const [paperToEdit, setPaperToEdit] = useState<ResearchPaper | null>(null);
+    const [paperToDelete, setPaperToDelete] = useState<ResearchPaper | null>(null);
     const { toast } = useToast();
+    const [sessionUser, setSessionUser] = useState<User | null>(null);
+
 
     useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            setSessionUser(JSON.parse(storedUser));
+        }
+        
         const fetchPapers = async () => {
             try {
                 const result = await fetchResearchPapersByUserUid(user.uid);
@@ -79,6 +230,29 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         };
         fetchDomain();
     }, [projects, researchPapers, user.researchDomain]);
+    
+    const handlePaperSuccess = (paper: ResearchPaper, isNew: boolean) => {
+        if (isNew) {
+            setResearchPapers(prev => [paper, ...prev]);
+        } else {
+            setResearchPapers(prev => prev.map(p => p.id === paper.id ? paper : p));
+        }
+        if (paper.domain) setDomain(paper.domain);
+    };
+
+    const handleDeletePaper = async () => {
+        if (!paperToDelete || !sessionUser) return;
+        const result = await deleteResearchPaper(paperToDelete.id, sessionUser.uid);
+        if (result.success) {
+            toast({ title: "Paper Deleted" });
+            setResearchPapers(prev => prev.filter(p => p.id !== paperToDelete.id));
+            setPaperToDelete(null);
+        } else {
+            toast({ title: "Error", description: result.error, variant: "destructive" });
+        }
+    };
+    
+    const isOwner = sessionUser?.uid === user.uid;
 
     const getCallTitle = (callId: string) => {
         return fundingCalls.find(c => c.id === callId)?.title || callId;
@@ -90,80 +264,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
             <p className="text-sm text-muted-foreground">{label}</p>
         </div>
     );
-
-    const addCoAuthor = async () => {
-      const email = newCoAuthorEmail.trim().toLowerCase();
-      if (!email) return;
-
-      if (coAuthors.find(ca => ca.email === email)) {
-        toast({ title: 'Co-author already added', variant: 'destructive' });
-        return;
-      }
-
-      const isExternal = !email.endsWith('@paruluniversity.ac.in');
-      let name: string | null = null;
-      let uid: string | null = null;
-
-      if (isExternal) {
-        name = prompt('Enter the name of the external co-author:');
-        if (!name || !name.trim()) {
-          toast({ title: 'Name is required for external authors', variant: 'destructive' });
-          return;
-        }
-      } else {
-        const result = await checkUserOrStaff(email);
-        if (result.success) {
-            name = result.name;
-            uid = result.uid;
-        }
-      }
-
-      setCoAuthors([...coAuthors, { email, name: name || email, role: 'Co-Author', isExternal, uid: uid || undefined }]);
-      setNewCoAuthorEmail('');
-    };
-
-    const removeCoAuthor = (email: string) => {
-      setCoAuthors(coAuthors.filter(ca => ca.email !== email));
-    };
-
-    const updateCoAuthorRole = (email: string, role: Author['role']) => {
-        setCoAuthors(coAuthors.map(ca => ca.email === email ? { ...ca, role } : ca));
-    }
-
-    const handleAddPaper = async () => {
-      if (!newPaperTitle.trim() || !newPaperUrl.trim()) {
-        toast({ title: "Paper title and URL are required", variant: "destructive" });
-        return;
-      }
-      setIsSubmitting(true);
-      try {
-        const allAuthors: Author[] = [
-            { email: user.email, name: user.name, role: selfRole, isExternal: false, uid: user.uid },
-            ...coAuthors
-        ];
-        
-        const result = await addResearchPaper(newPaperTitle.trim(), newPaperUrl.trim(), user.uid, allAuthors);
-
-        if (result.success && result.paper) {
-          toast({ title: "Research paper added successfully" });
-          setResearchPapers(prevPapers => [...prevPapers, result.paper!]);
-          if(result.paper.domain) setDomain(result.paper.domain);
-          setNewPaperTitle('');
-          setNewPaperUrl('');
-          setCoAuthors([]);
-          setIsAddDialogOpen(false);
-        } else {
-          toast({ title: "Failed to add research paper", description: result.error, variant: "destructive" });
-        }
-      } catch (error) {
-        toast({ title: "Error adding research paper", variant: "destructive" });
-        console.error("Error adding research paper:", error);
-      } finally {
-        setIsSubmitting(false);
-      }
-    };
     
-
     return (
         <div className="flex flex-col items-center">
             <Card className="w-full max-w-4xl shadow-xl border-0 bg-card/80 backdrop-blur-lg">
@@ -284,19 +385,22 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     </TabsContent>
                     <TabsContent value="papers">
                         <div className="space-y-4 mt-4">
-                            <Button onClick={() => setIsAddDialogOpen(true)} className="mb-4" variant="outline" size="sm">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Research Paper
-                            </Button>
+                            {isOwner && (
+                                <Button onClick={() => { setPaperToEdit(null); setIsAddEditDialogOpen(true); }} className="mb-4" variant="outline" size="sm">
+                                    <Plus className="mr-2 h-4 w-4" /> Add Research Paper
+                                </Button>
+                            )}
                             {researchPapers.length > 0 ? researchPapers.map(paper => (
                                 <Card key={paper.id}>
                                     <CardContent className="p-4 space-y-2">
                                         <div className="flex items-center justify-between">
                                             <a href={paper.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">{paper.title}</a>
-                                            <div className="flex gap-2">
-                                                <Button variant="ghost" size="icon" className="h-7 w-7"><Edit className="h-4 w-4"/></Button>
-                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                                            </div>
+                                            {isOwner && (
+                                                <div className="flex gap-2">
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setPaperToEdit(paper); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPaperToDelete(paper)}><Trash2 className="h-4 w-4"/></Button>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex flex-wrap gap-2 items-center">
                                             {paper.authors.map((author: Author) => (
@@ -315,51 +419,28 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                 </Tabs>
             </div>
 
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogContent className="sm:max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Add Research Paper</DialogTitle>
-                        <DialogDescription>Add the title, URL, and authors of your published paper.</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
-                         <div><label htmlFor="paperTitle" className="block text-sm font-medium">Paper Title</label><Input id="paperTitle" value={newPaperTitle} onChange={(e) => setNewPaperTitle(e.target.value)} placeholder="Enter paper title" className="mt-1"/></div>
-                         <div><label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</label><Input id="paperUrl" value={newPaperUrl} onChange={(e) => setNewPaperUrl(e.target.value)} placeholder="https://doi.org/..." className="mt-1"/></div>
-                        
-                        <div className="flex items-end gap-2">
-                           <div className="flex-grow"><label className="block text-sm font-medium">Your Role</label>
-                           <Select value={selfRole} onValueChange={(value) => setSelfRole(value as Author['role'])}>
-                            <SelectTrigger><SelectValue/></SelectTrigger>
-                            <SelectContent>{AUTHOR_ROLES.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
-                           </Select>
-                           </div>
-                        </div>
-
-                         <div><label htmlFor="coAuthorEmail" className="block text-sm font-medium">Add Co-Author</label><div className="flex gap-2 mt-1"><Input id="coAuthorEmail" value={newCoAuthorEmail} onChange={(e) => setNewCoAuthorEmail(e.target.value)} placeholder="Enter co-author's @paruluniversity.ac.in email or external email"/><Button onClick={addCoAuthor} variant="outline" size="icon" disabled={!newCoAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button></div></div>
-                        
-                        <div className="space-y-2">
-                            {coAuthors.map((author) => (
-                                <div key={author.email} className="flex items-center gap-2 p-2 border rounded-md">
-                                    <div className="flex-grow">
-                                        <p className="font-medium text-sm">{author.name} {author.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}</p>
-                                        <p className="text-xs text-muted-foreground">{author.email}</p>
-                                    </div>
-                                    <Select value={author.role} onValueChange={(value) => updateCoAuthorRole(author.email, value as Author['role'])}>
-                                        <SelectTrigger className="w-[180px] h-8 text-xs"><SelectValue/></SelectTrigger>
-                                        <SelectContent>{AUTHOR_ROLES.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => removeCoAuthor(author.email)}><X className="h-4 w-4"/></Button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button onClick={() => setIsAddDialogOpen(false)} variant="outline">Cancel</Button>
-                        <Button onClick={handleAddPaper} disabled={isSubmitting}>
-                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Add Paper'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {isOwner && (
+                <AddEditPaperDialog 
+                    isOpen={isAddEditDialogOpen}
+                    onOpenChange={setIsAddEditDialogOpen}
+                    onSuccess={handlePaperSuccess}
+                    user={user}
+                    existingPaper={paperToEdit}
+                />
+            )}
+            
+            <AlertDialog open={!!paperToDelete} onOpenChange={() => setPaperToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>This will permanently delete the research paper "{paperToDelete?.title}". This action cannot be undone.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeletePaper} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

@@ -6,7 +6,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection, query, where } from 'firebase-admin/firestore';
+import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection, query, where, getDoc } from 'firebase-admin/firestore';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
@@ -63,10 +63,17 @@ export async function addResearchPaper(
         
         // Update all authors' profiles with the new domain
         const batch = adminDb.batch();
-        allAuthorUids.forEach(uid => {
-          const userRef = adminDb.collection('users').doc(uid);
-          batch.update(userRef, { researchDomain: domainResult.domain });
-        });
+        const userRef = adminDb.collection('users').doc(mainAuthorUid);
+        batch.update(userRef, { researchDomain: domainResult.domain });
+        
+        const coAuthorUids = allAuthorUids.filter(uid => uid !== mainAuthorUid);
+        if (coAuthorUids.length > 0) {
+          const coAuthorDocs = await adminDb.collection('users').where(FieldValue.documentId(), 'in', coAuthorUids).get();
+          coAuthorDocs.forEach(doc => {
+            batch.update(doc.ref, { researchDomain: domainResult.domain });
+          });
+        }
+        
         await batch.commit();
       }
     } catch (aiError: any) {
@@ -81,6 +88,67 @@ export async function addResearchPaper(
     return { success: false, error: error.message || "Failed to add research paper." };
   }
 }
+
+export async function updateResearchPaper(
+  paperId: string,
+  userId: string,
+  data: { title: string; url: string; authors: Author[] }
+): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
+  try {
+    const paperRef = adminDb.collection('papers').doc(paperId);
+    const paperSnap = await paperRef.get();
+
+    if (!paperSnap.exists) {
+      return { success: false, error: "Paper not found." };
+    }
+
+    const paperData = paperSnap.data() as ResearchPaper;
+
+    if (paperData.mainAuthorUid !== userId) {
+      return { success: false, error: "You do not have permission to edit this paper." };
+    }
+
+    const updatedData: Partial<ResearchPaper> = {
+      title: data.title,
+      url: data.url,
+      authors: data.authors,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await paperRef.update(updatedData);
+    
+    return { success: true, paper: { ...paperData, ...updatedData, id: paperId } };
+
+  } catch (error: any) {
+    console.error("Error updating research paper:", error);
+    return { success: false, error: error.message || "Failed to update paper." };
+  }
+}
+
+export async function deleteResearchPaper(paperId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const paperRef = adminDb.collection('papers').doc(paperId);
+    const paperSnap = await paperRef.get();
+
+    if (!paperSnap.exists) {
+      return { success: false, error: "Paper not found." };
+    }
+
+    const paperData = paperSnap.data() as ResearchPaper;
+
+    if (paperData.mainAuthorUid !== userId) {
+      return { success: false, error: "You do not have permission to delete this paper." };
+    }
+
+    await paperRef.delete();
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error deleting research paper:", error);
+    return { success: false, error: error.message || "Failed to delete paper." };
+  }
+}
+
 
 export async function checkUserOrStaff(email: string): Promise<{ success: boolean; name: string | null; uid: string | null }> {
     try {
@@ -127,7 +195,7 @@ export async function fetchResearchPapersByUserUid(
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
     const papersRef = adminDb.collection("papers")
-    const papersQuery = papersRef.where("mainAuthorUid", "==", userUid) // Simplified for now
+    const papersQuery = query(papersRef, where("mainAuthorUid", "==", userUid), orderBy("createdAt", "desc"));
     const papersSnapshot = await papersQuery.get()
 
     if (papersSnapshot.empty) {
