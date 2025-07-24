@@ -5,11 +5,13 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { collection, query, where, getDocs, limit, orderBy, or } from "firebase/firestore"
 import { db } from "@/lib/config"
-import type { User, IncentiveClaim, Project, EmrInterest, FundingCall } from "@/types"
+import type { User, IncentiveClaim, Project, EmrInterest, FundingCall, ResearchPaper } from "@/types"
 import { PageHeader } from "@/components/page-header"
 import { ProfileClient } from "@/components/profile/profile-client"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
+import { fetchEvaluatorProjectsForUser } from "@/app/actions"
+import { isToday, parseISO } from "date-fns"
 
 export default function ProfilePage() {
   const params = useParams()
@@ -55,17 +57,25 @@ export default function ProfilePage() {
         const targetUserDoc = userSnapshot.docs[0]
         const fetchedUser = { uid: targetUserDoc.id, ...targetUserDoc.data() } as User
 
-        // Check permissions: user can view their own profile, or admins can view any profile
+        // --- Permission Check ---
         const isAdmin = ["Super-admin", "admin", "CRO"].includes(sessionUser.role)
         const isOwner = sessionUser.uid === fetchedUser.uid
-
+        
+        let isAssignedEvaluatorOnMeetingDay = false;
         if (!isAdmin && !isOwner) {
+            const result = await fetchEvaluatorProjectsForUser(sessionUser.uid, fetchedUser.uid);
+            if (result.success && result.projects && result.projects.length > 0) {
+                isAssignedEvaluatorOnMeetingDay = true;
+            }
+        }
+        
+        if (!isAdmin && !isOwner && !isAssignedEvaluatorOnMeetingDay) {
           throw new Error("Access Denied: You do not have permission to view this profile.")
         }
 
         setProfileUser(fetchedUser)
 
-        // Fetch user's EMR interests (both as PI and Co-PI)
+        // --- Data Fetching (if permission is granted) ---
         const emrInterestsRef = collection(db, "emrInterests");
         const emrInterestsQuery = query(
           emrInterestsRef, 
@@ -78,7 +88,6 @@ export default function ProfilePage() {
         const fetchedEmrInterests = emrInterestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
         setEmrInterests(fetchedEmrInterests);
 
-        // Fetch corresponding funding calls for the interests found
         if (fetchedEmrInterests.length > 0) {
             const callIds = [...new Set(fetchedEmrInterests.map(i => i.callId))];
             const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
@@ -87,18 +96,13 @@ export default function ProfilePage() {
             setFundingCalls(fetchedCalls);
         }
 
-        // Fetch user's projects with better error handling
         try {
           const projectsRef = collection(db, "projects")
-
-          // Try individual queries first, then combine results
-          const piProjectsQuery = query(projectsRef, where("pi_uid", "==", fetchedUser.uid))
-          const piProjectsSnapshot = await getDocs(piProjectsQuery)
-
           const allProjects: Project[] = []
           const projectIds = new Set<string>()
 
-          // Add PI projects
+          const piProjectsQuery = query(projectsRef, where("pi_uid", "==", fetchedUser.uid))
+          const piProjectsSnapshot = await getDocs(piProjectsQuery)
           piProjectsSnapshot.forEach((doc) => {
             if (!projectIds.has(doc.id)) {
               allProjects.push({ id: doc.id, ...doc.data() } as Project)
@@ -106,11 +110,9 @@ export default function ProfilePage() {
             }
           })
 
-          // Try to get Co-PI projects
           try {
             const coPiProjectsQuery = query(projectsRef, where("coPiUids", "array-contains", fetchedUser.uid))
             const coPiProjectsSnapshot = await getDocs(coPiProjectsQuery)
-
             coPiProjectsSnapshot.forEach((doc) => {
               if (!projectIds.has(doc.id)) {
                 allProjects.push({ id: doc.id, ...doc.data() } as Project)
@@ -121,12 +123,10 @@ export default function ProfilePage() {
             console.warn("Could not fetch Co-PI projects:", coPiError)
           }
 
-          // Try to get historical projects by email
           if (fetchedUser.email) {
             try {
               const emailProjectsQuery = query(projectsRef, where("pi_email", "==", fetchedUser.email))
               const emailProjectsSnapshot = await getDocs(emailProjectsQuery)
-
               emailProjectsSnapshot.forEach((doc) => {
                 if (!projectIds.has(doc.id)) {
                   allProjects.push({ id: doc.id, ...doc.data() } as Project)
@@ -145,11 +145,9 @@ export default function ProfilePage() {
           setProjects(sortedProjects)
         } catch (projectsError) {
           console.error("Error fetching projects:", projectsError)
-          // Don't throw here, just log the error and continue with empty projects
           setProjects([])
         }
 
-        // Fetch research papers for the user
         try {
           const res = await fetch('/api/get-research-papers?userUid=' + fetchedUser.uid)
           if (res.ok) {

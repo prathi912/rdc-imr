@@ -12,7 +12,7 @@ import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
-import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds } from "date-fns"
+import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds, isToday } from "date-fns"
 import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
@@ -2303,6 +2303,49 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
   }
 }
 
+export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, targetUserUid: string): Promise<{ success: boolean; projects?: (Project | FundingCall)[]; error?: string }> {
+  try {
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    // IMR Projects
+    const imrProjectsRef = adminDb.collection('projects');
+    const imrPiQuery = query(imrProjectsRef, where('pi_uid', '==', targetUserUid), where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), where('meetingDetails.date', '==', today));
+    const imrCoPiQuery = query(imrProjectsRef, where('coPiUids', 'array-contains', targetUserUid), where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), where('meetingDetails.date', '==', today));
+
+    // EMR Projects
+    const fundingCallsRef = adminDb.collection('fundingCalls');
+    const emrCallsQuery = query(fundingCallsRef, where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), where('meetingDetails.date', '==', today));
+
+    const [imrPiSnapshot, imrCoPiSnapshot, emrCallsSnapshot] = await Promise.all([
+      getDocs(imrPiQuery),
+      getDocs(imrCoPiQuery),
+      getDocs(emrCallsQuery),
+    ]);
+
+    const imrProjects = new Map<string, Project>();
+    imrPiSnapshot.forEach(doc => imrProjects.set(doc.id, { id: doc.id, ...doc.data() } as Project));
+    imrCoPiSnapshot.forEach(doc => imrProjects.set(doc.id, { id: doc.id, ...doc.data() } as Project));
+
+    const emrCalls = emrCallsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+
+    // For EMR, we need to check if the target user is actually an applicant for these calls
+    let relevantEmrCalls: FundingCall[] = [];
+    if (emrCalls.length > 0) {
+        const callIds = emrCalls.map(c => c.id);
+        const interestsRef = adminDb.collection('emrInterests');
+        const interestsQuery = query(interestsRef, where('callId', 'in', callIds), where('userId', '==', targetUserUid));
+        const interestsSnapshot = await getDocs(interestsQuery);
+        const relevantCallIds = new Set(interestsSnapshot.docs.map(d => d.data().callId));
+        relevantEmrCalls = emrCalls.filter(c => relevantCallIds.has(c.id));
+    }
+    
+    return { success: true, projects: [...imrProjects.values(), ...relevantEmrCalls] };
+
+  } catch (error: any) {
+    console.error("Error fetching projects for evaluator:", error);
+    return { success: false, error: "Failed to fetch project data for permission check." };
+  }
+}
     
 
     
