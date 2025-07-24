@@ -53,10 +53,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         {...rest}
       >
-        <>
-          {leftIcon}
-          {children}
-        </>
+        {leftIcon}
+        {children}
       </Comp>
     )
   }
