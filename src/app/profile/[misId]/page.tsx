@@ -20,6 +20,7 @@ export default function ProfilePage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [emrInterests, setEmrInterests] = useState<EmrInterest[]>([]);
   const [fundingCalls, setFundingCalls] = useState<FundingCall[]>([]);
+  const [researchPapers, setResearchPapers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessionUser, setSessionUser] = useState<User | null>(null)
@@ -146,6 +147,21 @@ export default function ProfilePage() {
           console.error("Error fetching projects:", projectsError)
           // Don't throw here, just log the error and continue with empty projects
           setProjects([])
+        }
+
+        // Fetch research papers for the user
+        try {
+          const res = await fetch('/api/get-research-papers?userUid=' + fetchedUser.uid)
+          if (res.ok) {
+            const data = await res.json()
+            setResearchPapers(data.papers || [])
+          } else {
+            console.warn("Failed to fetch research papers")
+            setResearchPapers([])
+          }
+        } catch (paperError) {
+          console.error("Error fetching research papers:", paperError)
+          setResearchPapers([])
         }
       } catch (err: any) {
         if (err.code === "permission-denied") {

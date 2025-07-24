@@ -3,15 +3,17 @@
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall } from '@/types';
-import { getResearchDomain } from '@/app/actions';
-
+import { getResearchDomain, addResearchPaper, fetchResearchPapersByUserUid } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
@@ -31,13 +33,34 @@ function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: st
 export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[] }) {
     const [domain, setDomain] = useState<string | null>(null);
     const [loadingDomain, setLoadingDomain] = useState(false);
+    const [researchPapers, setResearchPapers] = useState<any[]>([]);
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [newPaperTitle, setNewPaperTitle] = useState('');
+    const [newCoAuthorEmail, setNewCoAuthorEmail] = useState('');
+    const [coAuthorEmails, setCoAuthorEmails] = useState<string[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const toast = useToast();
+
+    useEffect(() => {
+        const fetchPapers = async () => {
+            try {
+                const result = await fetchResearchPapersByUserUid(user.uid);
+                if (result.success) {
+                    setResearchPapers(result.papers || []);
+                }
+            } catch (error) {
+                console.error("Error fetching research papers:", error);
+            }
+        };
+        fetchPapers();
+    }, [user.uid]);
 
     useEffect(() => {
         const fetchDomain = async () => {
-            if (projects.length > 0) {
+            const titles = [...projects.map(p => p.title), ...researchPapers.map(p => p.title)];
+            if (titles.length > 0) {
                 setLoadingDomain(true);
                 try {
-                    const titles = projects.map(p => p.title);
                     const result = await getResearchDomain({ paperTitles: titles });
                     if (result.success) {
                         setDomain(result.domain);
@@ -50,11 +73,11 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
             }
         };
         fetchDomain();
-    }, [projects]);
-    
+    }, [projects, researchPapers]);
+
     const getCallTitle = (callId: string) => {
         return fundingCalls.find(c => c.id === callId)?.title || callId;
-    }
+    };
 
     const StatItem = ({ value, label }: { value: number | string; label: string }) => (
         <div className="flex flex-col items-center">
@@ -63,6 +86,42 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         </div>
     );
 
+    const addCoAuthorEmail = () => {
+        const email = newCoAuthorEmail.trim();
+        if (email && !coAuthorEmails.includes(email)) {
+            setCoAuthorEmails([...coAuthorEmails, email]);
+            setNewCoAuthorEmail('');
+        }
+    };
+
+    const removeCoAuthorEmail = (email: string) => {
+        setCoAuthorEmails(coAuthorEmails.filter(e => e !== email));
+    };
+
+    const handleAddPaper = async () => {
+        if (!newPaperTitle.trim()) {
+            toast.toast({ title: "Paper title is required", variant: "destructive" });
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const result = await addResearchPaper(newPaperTitle.trim(), user.uid, coAuthorEmails);
+            if (result.success) {
+                toast.toast({ title: "Research paper added successfully" });
+                setResearchPapers([...researchPapers, { id: result.paperId, title: newPaperTitle.trim(), coAuthorEmails }]);
+                setNewPaperTitle('');
+                setCoAuthorEmails([]);
+                setIsAddDialogOpen(false);
+            } else {
+                toast.toast({ title: "Failed to add research paper", variant: "destructive" });
+            }
+        } catch (error) {
+            toast.toast({ title: "Error adding research paper", variant: "destructive" });
+            console.error("Error adding research paper:", error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div className="flex flex-col items-center">
@@ -76,7 +135,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                                 <AvatarFallback className="text-4xl">{user.name?.[0].toUpperCase()}</AvatarFallback>
                             </Avatar>
                         </div>
-                        
+
                         {/* Details Section */}
                         <div className="flex flex-col items-center md:items-start text-center md:text-left w-full">
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between w-full">
@@ -89,10 +148,11 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                             </div>
                             <p className="text-muted-foreground mt-1">{user.designation}</p>
                             <p className="text-muted-foreground">{user.department}, {user.institute}</p>
-                            
+
                             <div className="flex justify-center md:justify-start gap-8 my-4">
                                 <StatItem value={projects.length} label="IMR Projects" />
                                 <StatItem value={emrInterests.length} label="EMR Interests" />
+                                <StatItem value={researchPapers.length} label="Research Papers" />
                             </div>
                         </div>
                     </div>
@@ -110,16 +170,16 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                         </div>
                         <div className="space-y-4">
                             <h3 className="font-semibold text-lg">Researcher IDs</h3>
-                             <div className="space-y-4">
+                            <div className="space-y-4">
                                 <ProfileDetail label="ORCID iD" value={user.orcidId} icon={BookCopy} />
                                 <ProfileDetail label="Scopus ID" value={user.scopusId} icon={BookCopy} />
                                 <ProfileDetail label="Vidwan ID" value={user.vidwanId} icon={BookCopy} />
                                 <ProfileDetail label="Google Scholar ID" value={user.googleScholarId} icon={BookCopy} />
                             </div>
                         </div>
-                         <div className="space-y-4 md:col-span-2">
+                        <div className="space-y-4 md:col-span-2">
                             <h3 className="font-semibold text-lg flex items-center gap-2"><Bot className="h-5 w-5" /> AI-Suggested Research Domain</h3>
-                             {loadingDomain ? (
+                            {loadingDomain ? (
                                 <div className="flex items-center gap-2 text-muted-foreground">
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                     <span>Analyzing publications...</span>
@@ -131,15 +191,15 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                             )}
                         </div>
                     </div>
-
                 </CardContent>
             </Card>
 
             <div className="w-full max-w-4xl mt-8">
                 <Tabs defaultValue="projects" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="projects">IMR Projects ({projects.length})</TabsTrigger>
                         <TabsTrigger value="emr">EMR Interests ({emrInterests.length})</TabsTrigger>
+                        <TabsTrigger value="papers">Research Papers ({researchPapers.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="projects">
                         <div className="space-y-4 mt-4">
@@ -165,7 +225,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     </TabsContent>
                     <TabsContent value="emr">
                         <div className="space-y-4 mt-4">
-                             {emrInterests.length > 0 ? emrInterests.map(interest => (
+                            {emrInterests.length > 0 ? emrInterests.map(interest => (
                                 <Card key={interest.id}>
                                     <CardContent className="p-4">
                                         <div className="flex items-center gap-2 mb-1">
@@ -185,8 +245,78 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                             )}
                         </div>
                     </TabsContent>
+                    <TabsContent value="papers">
+                        <div className="space-y-4 mt-4">
+                            <Button onClick={() => setIsAddDialogOpen(true)} className="mb-4" variant="outline" size="sm" leftIcon={<Plus />}>
+                                Add Research Paper
+                            </Button>
+                            {researchPapers.length > 0 ? researchPapers.map(paper => (
+                                <Card key={paper.id}>
+                                    <CardContent className="p-4">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <p className="font-semibold">{paper.title}</p>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">Co-Authors: {paper.coAuthorEmails?.join(', ') || 'None'}</p>
+                                    </CardContent>
+                                </Card>
+                            )) : (
+                                <Card><CardContent className="p-6 text-center text-muted-foreground">No research papers found.</CardContent></Card>
+                            )}
+                        </div>
+                    </TabsContent>
                 </Tabs>
             </div>
+
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add Research Paper</DialogTitle>
+                        <DialogDescription>
+                            Add the title of your research paper and co-authors by their email addresses.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div>
+                            <label htmlFor="paperTitle" className="block text-sm font-medium text-gray-700">Paper Title</label>
+                            <Input
+                                id="paperTitle"
+                                value={newPaperTitle}
+                                onChange={(e) => setNewPaperTitle(e.target.value)}
+                                placeholder="Enter paper title"
+                                className="mt-1 block w-full"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="coAuthorEmail" className="block text-sm font-medium text-gray-700">Add Co-Author Email</label>
+                            <div className="flex gap-2 mt-1">
+                                <Input
+                                    id="coAuthorEmail"
+                                    value={newCoAuthorEmail}
+                                    onChange={(e) => setNewCoAuthorEmail(e.target.value)}
+                                    placeholder="Enter co-author email"
+                                    className="flex-grow"
+                                />
+                                <Button onClick={addCoAuthorEmail} variant="outline" size="sm" disabled={!newCoAuthorEmail.trim()}>
+                                    <UserPlus />
+                                </Button>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                                {coAuthorEmails.map(email => (
+                                    <Badge key={email} variant="secondary" className="flex items-center gap-1">
+                                        {email}
+                                        <X className="cursor-pointer" onClick={() => removeCoAuthorEmail(email)} />
+                                    </Badge>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={handleAddPaper} disabled={isSubmitting}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Add Paper'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

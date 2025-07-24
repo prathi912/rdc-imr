@@ -78,6 +78,27 @@ export async function addResearchPaper(
   }
 }
 
+export async function fetchResearchPapersByUserUid(
+  userUid: string
+): Promise<{ success: boolean; papers?: any[]; error?: string }> {
+  try {
+    const papersRef = adminDb.collection("papers")
+    const papersQuery = papersRef.where("authorUids", "array-contains", userUid)
+    const papersSnapshot = await papersQuery.get()
+
+    if (papersSnapshot.empty) {
+      return { success: true, papers: [] }
+    }
+
+    const papers = papersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+
+    return { success: true, papers }
+  } catch (error: any) {
+    console.error("Error fetching research papers:", error)
+    return { success: false, error: error.message || "Failed to fetch research papers." }
+  }
+}
+
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
