@@ -53,7 +53,6 @@ export async function addResearchPaper(
     
     // AI Domain Suggestion
     try {
-      // Get titles from all authors to create a more robust domain suggestion
       const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids.map(uid => ({ uid }))).get();
       const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
       const allTitles = [...new Set([title, ...existingTitles])];
@@ -62,7 +61,6 @@ export async function addResearchPaper(
         const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
         paperData.domain = domainResult.domain;
         
-        // Update all internal authors' profiles with the new domain
         if (allAuthorUids.length > 0) {
             const batch = adminDb.batch();
             const userDocs = await adminDb.collection('users').where(FieldValue.documentId(), 'in', allAuthorUids).get();
@@ -78,6 +76,28 @@ export async function addResearchPaper(
     
     await paperRef.set(paperData);
 
+    // Notify co-authors
+    const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
+    const mainAuthorName = mainAuthorDoc.exists() ? mainAuthorDoc.data()?.name : 'A colleague';
+    const mainAuthorMisId = mainAuthorDoc.exists() ? mainAuthorDoc.data()?.misId : null;
+
+    const notificationBatch = adminDb.batch();
+    authors.forEach(author => {
+      // Notify only registered co-authors who are not the main author
+      if (author.uid && author.uid !== mainAuthorUid) {
+        const notificationRef = adminDb.collection('notifications').doc();
+        notificationBatch.set(notificationRef, {
+          uid: author.uid,
+          title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          // Link to the main author's profile if MIS ID is available
+          projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+        });
+      }
+    });
+    await notificationBatch.commit();
+
     return { success: true, paper: { id: paperRef.id, ...paperData } };
   } catch (error: any) {
     console.error("Error adding research paper:", error);
@@ -87,7 +107,7 @@ export async function addResearchPaper(
 
 export async function updateResearchPaper(
   paperId: string,
-  userId: string,
+  userId: string, // This is the UID of the user performing the edit (main author)
   data: { title: string; url: string; authors: Author[] }
 ): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
@@ -99,6 +119,7 @@ export async function updateResearchPaper(
     }
 
     const paperData = paperSnap.data() as ResearchPaper;
+    const oldAuthors = paperData.authors || [];
 
     if (paperData.mainAuthorUid !== userId) {
       return { success: false, error: "You do not have permission to edit this paper." };
@@ -112,6 +133,28 @@ export async function updateResearchPaper(
     };
 
     await paperRef.update(updatedData);
+
+    // Notify newly added co-authors
+    const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
+    const mainAuthorName = mainAuthorDoc.exists() ? mainAuthorDoc.data()?.name : 'A colleague';
+    const mainAuthorMisId = mainAuthorDoc.exists() ? mainAuthorDoc.data()?.misId : null;
+    const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
+
+    const notificationBatch = adminDb.batch();
+    data.authors.forEach(author => {
+      // Notify if the author is new, registered (has UID), and not the main author
+      if (author.uid && author.uid !== userId && !oldAuthorUids.has(author.uid)) {
+        const notificationRef = adminDb.collection('notifications').doc();
+        notificationBatch.set(notificationRef, {
+          uid: author.uid,
+          title: `${mainAuthorName} added you as a co-author on the paper: "${data.title}"`,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+        });
+      }
+    });
+    await notificationBatch.commit();
     
     return { success: true, paper: { ...paperData, ...updatedData, id: paperId } };
 
