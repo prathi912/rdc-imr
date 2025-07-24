@@ -6,7 +6,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection } from 'firebase-admin/firestore';
+import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection, query, where } from 'firebase-admin/firestore';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
@@ -53,7 +53,7 @@ export async function addResearchPaper(
 
     // AI Domain Suggestion
     try {
-      const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids).get();
+      const allPapersQuery = await adminDb.collection('papers').where('mainAuthorUid', '==', mainAuthorUid).get();
       const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
       const allTitles = [...new Set([title, ...existingTitles])];
       
@@ -84,26 +84,35 @@ export async function addResearchPaper(
 
 export async function checkUserOrStaff(email: string): Promise<{ success: boolean; name: string | null; uid: string | null }> {
     try {
-        const userRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/check-user-exists`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
-        });
-        const userData = await userRes.json();
-        if (userData.success && userData.user) {
-            return { success: true, name: userData.user.name, uid: userData.user.uid || null };
+        const lowercasedEmail = email.toLowerCase();
+
+        // 1. Check existing users in Firestore
+        const usersRef = adminDb.collection('users');
+        const userQuery = query(usersRef, where('email', '==', lowercasedEmail));
+        const userSnapshot = await userQuery.get();
+
+        if (!userSnapshot.empty) {
+            const userDoc = userSnapshot.docs[0];
+            const userData = userDoc.data();
+            return { success: true, name: userData.name, uid: userDoc.id };
         }
 
-        const staffRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/get-staff-name`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
-        });
-        const staffData = await staffRes.json();
-        if (staffData.success && staffData.name) {
-            return { success: true, name: staffData.name, uid: null };
+        // 2. Check staffdata.xlsx
+        const filePath = path.resolve(process.cwd(), 'staffdata.xlsx');
+        if (fs.existsSync(filePath)) {
+            const workbook = XLSX.readFile(filePath);
+            const sheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData: Array<Record<string, any>> = XLSX.utils.sheet_to_json(worksheet);
+
+            const staff = jsonData.find((row) => row['Email'] && row['Email'].toLowerCase() === lowercasedEmail);
+
+            if (staff && staff['Name']) {
+                return { success: true, name: staff['Name'], uid: null }; // No UID because they haven't signed up
+            }
         }
-        
+
+        // 3. Not found in either
         return { success: true, name: null, uid: null };
 
     } catch (error) {
@@ -2293,5 +2302,7 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
 }
+
+    
 
     
