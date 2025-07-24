@@ -1,0 +1,125 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSuperAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Super-admin';
+    }
+
+    function isAdmin() {
+      let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return userRole == 'admin' || userRole == 'Super-admin';
+    }
+    
+    function isCRO() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'CRO';
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isFaculty() {
+        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'faculty';
+    }
+    
+    function isEvaluator() {
+       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Evaluator';
+    }
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    match /users/{userId} {
+      // Users can create their own profile upon signup.
+      allow create: if isSignedIn();
+
+      // Users can read their own profile, Admins/Super-admins can read any profile.
+      allow read: if isOwner(userId) || isAdmin();
+      
+      // Users can update their own profile, but cannot change their role.
+      // Admins/Super-admins can update any user profile.
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin();
+
+      // Only Super-admins can delete users, but not themselves or the primary super admin.
+      allow delete: if isSuperAdmin() && request.auth.uid != userId && resource.data.email != 'rathipranav07@gmail.com';
+    }
+
+    match /projects/{projectId} {
+      // Any signed-in user can create a project (as a draft).
+      allow create: if isSignedIn();
+
+      // Read access: The PI, Co-PIs, assigned evaluators, and admins/CROs can read.
+      allow read: if isSignedIn() && (
+                    resource.data.pi_uid == request.auth.uid || 
+                    request.auth.uid in resource.data.coPiUids ||
+                    (resource.data.meetingDetails != null && request.auth.uid in resource.data.meetingDetails.assignedEvaluators) ||
+                    isAdmin() || isCRO()
+                  );
+      
+      // Update access: The PI can update their own project. Admins can update any project.
+      allow update: if isSignedIn() && (resource.data.pi_uid == request.auth.uid || isAdmin());
+      
+      // Delete access: Only admins can delete projects.
+      allow delete: if isAdmin();
+      
+      match /evaluations/{evaluationId} {
+        // Create/Update: Only assigned evaluators for this project can create or update an evaluation.
+        allow write: if isSignedIn() && request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.meetingDetails.assignedEvaluators;
+        // Read: The PI, Admins, and the evaluator who wrote it can read an evaluation.
+        allow read: if isSignedIn() && (isOwner(evaluationId) || isAdmin() || get(/databases/$(database)/documents/projects/$(projectId)).data.pi_uid == request.auth.uid);
+      }
+    }
+
+    match /incentiveClaims/{claimId} {
+        // Any signed-in user can create a claim.
+        allow create: if isSignedIn();
+        // Read: The user who created the claim or an admin/CRO can read it.
+        allow read: if isSignedIn() && (resource.data.uid == request.auth.uid || isAdmin() || isCRO());
+        // Update/Delete: Only admins can update or delete claims.
+        allow update, delete: if isAdmin();
+    }
+    
+    match /notifications/{notificationId} {
+        // Users can only read their own notifications.
+        allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+        // Users can update their own notifications (e.g., mark as read).
+        allow update: if isSignedIn() && resource.data.uid == request.auth.uid;
+        // Notifications are created by server-side actions, so no client-side creation.
+        allow create, delete: if false;
+    }
+    
+    match /fundingCalls/{callId} {
+      // All signed-in users can view funding calls.
+      allow read: if isSignedIn();
+      // Only Super-admins can create, update, or delete calls.
+      allow write: if isSuperAdmin();
+    }
+    
+    match /emrInterests/{interestId} {
+        // Users can create/delete their own interest registrations.
+        // Admins can delete any registration.
+        allow create, delete: if isSignedIn() && (isOwner(request.resource.data.userId) || isAdmin());
+        // Users can update their own registrations (e.g., upload PPT).
+        // Admins can update any registration (e.g., set status).
+        allow update: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+        // All signed-in users can read EMR interests.
+        allow read: if isSignedIn();
+        
+        match /evaluations/{evaluatorId} {
+            // Evaluators can write their own evaluation.
+            allow write: if isSignedIn() && isOwner(evaluatorId);
+            // Admins can read all evaluations.
+            allow read: if isSignedIn() && isAdmin();
+        }
+    }
+
+    // Health check collection is open for testing purposes.
+    match /_health_check/{docId} {
+      allow read, write: if true;
+    }
+  }
+}
