@@ -51,24 +51,25 @@ export async function addResearchPaper(
 
     const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
     
-    // AI Domain Suggestion
+    // AI Domain Suggestion - Wrapped in try/catch to prevent failure from blocking paper save
     try {
-      const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids.map(uid => ({ uid }))).get();
-      const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
-      const allTitles = [...new Set([title, ...existingTitles])];
-      
-      if (allTitles.length > 0) {
-        const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
-        paperData.domain = domainResult.domain;
-        
-        if (allAuthorUids.length > 0) {
+      if (allAuthorUids.length > 0) {
+          const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids.map(uid => ({ uid }))).get();
+          const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
+          const allTitles = [...new Set([title, ...existingTitles])];
+          
+          if (allTitles.length > 0) {
+            const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
+            paperData.domain = domainResult.domain;
+            
             const batch = adminDb.batch();
-            const userDocs = await adminDb.collection('users').where(FieldValue.documentId(), 'in', allAuthorUids).get();
-            userDocs.forEach(doc => {
+            const userDocsQuery = adminDb.collection('users').where(FieldValue.documentId(), 'in', allAuthorUids);
+            const userDocsSnapshot = await userDocsQuery.get();
+            userDocsSnapshot.forEach(doc => {
                 batch.update(doc.ref, { researchDomain: domainResult.domain });
             });
             await batch.commit();
-        }
+          }
       }
     } catch (aiError: any) {
       console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
@@ -81,22 +82,22 @@ export async function addResearchPaper(
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
-    const notificationBatch = adminDb.batch();
-    authors.forEach(author => {
-      // Notify only registered co-authors who are not the main author
-      if (author.uid && author.uid !== mainAuthorUid) {
-        const notificationRef = adminDb.collection('notifications').doc();
-        notificationBatch.set(notificationRef, {
-          uid: author.uid,
-          title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-          // Link to the main author's profile if MIS ID is available
-          projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+    if (authors && authors.length > 0) {
+        const notificationBatch = adminDb.batch();
+        authors.forEach(author => {
+            if (author.uid && author.uid !== mainAuthorUid) {
+                const notificationRef = adminDb.collection('notifications').doc();
+                notificationBatch.set(notificationRef, {
+                    uid: author.uid,
+                    title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
+                    projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+                });
+            }
         });
-      }
-    });
-    await notificationBatch.commit();
+        await notificationBatch.commit();
+    }
 
     return { success: true, paper: { id: paperRef.id, ...paperData } };
   } catch (error: any) {
@@ -140,21 +141,22 @@ export async function updateResearchPaper(
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
     const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
 
-    const notificationBatch = adminDb.batch();
-    data.authors.forEach(author => {
-      // Notify if the author is new, registered (has UID), and not the main author
-      if (author.uid && author.uid !== userId && !oldAuthorUids.has(author.uid)) {
-        const notificationRef = adminDb.collection('notifications').doc();
-        notificationBatch.set(notificationRef, {
-          uid: author.uid,
-          title: `${mainAuthorName} added you as a co-author on the paper: "${data.title}"`,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-          projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+    if (data.authors && data.authors.length > 0) {
+        const notificationBatch = adminDb.batch();
+        data.authors.forEach(author => {
+            if (author.uid && author.uid !== userId && !oldAuthorUids.has(author.uid)) {
+                const notificationRef = adminDb.collection('notifications').doc();
+                notificationBatch.set(notificationRef, {
+                uid: author.uid,
+                title: `${mainAuthorName} added you as a co-author on the paper: "${data.title}"`,
+                createdAt: new Date().toISOString(),
+                isRead: false,
+                projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+                });
+            }
         });
-      }
-    });
-    await notificationBatch.commit();
+        await notificationBatch.commit();
+    }
     
     return { success: true, paper: { ...paperData, ...updatedData, id: paperId } };
 
@@ -243,14 +245,32 @@ export async function checkUserOrStaff(email: string): Promise<{ success: boolea
 
 export async function fetchResearchPapersByUserUid(
   userUid: string,
+  userEmail: string
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
     const papersRef = collection(adminDb, "papers");
-    const q = query(papersRef, where("authors", "array-contains-any", [{uid: userUid}]));
     
-    const querySnapshot = await getDocs(q);
-    const papers = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as ResearchPaper))
+    const uidQuery = query(papersRef, where("authors", "array-contains-any", [{ uid: userUid }]));
+    const emailQuery = query(papersRef, where("authors", "array-contains-any", [{ email: userEmail }]));
+
+    const [uidSnapshot, emailSnapshot] = await Promise.all([
+        getDocs(uidQuery),
+        getDocs(emailQuery)
+    ]);
+    
+    const papersMap = new Map<string, ResearchPaper>();
+    
+    uidSnapshot.forEach(doc => {
+        papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper);
+    });
+    
+    emailSnapshot.forEach(doc => {
+        if (!papersMap.has(doc.id)) {
+            papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper);
+        }
+    });
+
+    const papers = Array.from(papersMap.values())
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return { success: true, papers };
@@ -2466,3 +2486,4 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+

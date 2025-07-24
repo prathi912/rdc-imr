@@ -152,13 +152,18 @@ export default function ProfilePage() {
             const res = await fetch(`/api/get-research-papers?userUid=${fetchedUser.uid}&userEmail=${fetchedUser.email}`);
             if (res.ok) {
                 const data = await res.json();
-                setResearchPapers(data.papers || []);
+                if (data.success) {
+                    setResearchPapers(data.papers || []);
+                } else {
+                    console.warn("API failed to fetch research papers:", data.error);
+                    setResearchPapers([]);
+                }
             } else {
-                console.warn("Failed to fetch research papers");
+                console.warn("HTTP error fetching research papers:", res.statusText);
                 setResearchPapers([]);
             }
         } catch (paperError) {
-            console.error("Error fetching research papers:", paperError);
+            console.error("Network error fetching research papers:", paperError);
             setResearchPapers([]);
         }
 
