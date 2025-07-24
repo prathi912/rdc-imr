@@ -6,7 +6,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection, query, where, getDoc } from 'firebase-admin/firestore';
+import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection, query, where, getDoc, orderBy } from 'firebase-admin/firestore';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
@@ -153,6 +153,7 @@ export async function deleteResearchPaper(paperId: string, userId: string): Prom
 export async function checkUserOrStaff(email: string): Promise<{ success: boolean; name: string | null; uid: string | null }> {
     try {
         const lowercasedEmail = email.toLowerCase();
+        const emailUsername = lowercasedEmail.split('@')[0];
 
         // 1. Check existing users in Firestore
         const usersRef = adminDb.collection('users');
@@ -173,7 +174,18 @@ export async function checkUserOrStaff(email: string): Promise<{ success: boolea
             const worksheet = workbook.Sheets[sheetName];
             const jsonData: Array<Record<string, any>> = XLSX.utils.sheet_to_json(worksheet);
 
-            const staff = jsonData.find((row) => row['Email'] && row['Email'].toLowerCase() === lowercasedEmail);
+            let staff = jsonData.find((row) => row['Email'] && row['Email'].toLowerCase() === lowercasedEmail);
+
+            // Fallback: If no exact match, try matching the username part of the email
+            if (!staff) {
+                staff = jsonData.find((row) => {
+                    if (row['Email']) {
+                        const staffEmailUsername = String(row['Email']).toLowerCase().split('@')[0];
+                        return staffEmailUsername === emailUsername;
+                    }
+                    return false;
+                });
+            }
 
             if (staff && staff['Name']) {
                 return { success: true, name: staff['Name'], uid: null }; // No UID because they haven't signed up
