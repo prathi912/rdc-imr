@@ -1,4 +1,4 @@
-'use client';
+  'use client';
 
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -26,6 +26,7 @@ import Link from 'next/link';
 import { Combobox } from '@/components/ui/combobox';
 
 const profileSetupSchema = z.object({
+  campus: z.string().min(1, 'Please select a campus.'),
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
   department: z.string().optional(),
@@ -49,6 +50,26 @@ const faculties = [
     "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
     "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
     "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
+];
+
+const campuses = ["Rajkot", "Ahmedabad", "Vadodara", "Goa"];
+
+const goaFaculties = [
+    "Faculty of Engineering, IT & CS",
+    "Faculty of Management Studies",
+    "Faculty of Pharmacy",
+    "Faculty of Applied and Health Sciences",
+    "Faculty of Nursing",
+    "Faculty of Physiotherapy"
+];
+
+const goaInstitutes = [
+    "Faculty of Engineering, IT & CS",
+    "Faculty of Management Studies",
+    "Faculty of Pharmacy",
+    "Faculty of Applied and Health Sciences",
+    "Faculty of Nursing",
+    "Faculty of Physiotherapy"
 ];
 
 const institutes = [
@@ -95,6 +116,7 @@ export default function ProfileSetupPage() {
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
     defaultValues: {
+      campus: '',
       faculty: '',
       institute: '',
       department: '',
@@ -108,26 +130,39 @@ export default function ProfileSetupPage() {
     },
   });
 
-  const prefillData = useCallback(async (misId: string) => {
-      if (!misId) return;
-      setIsPrefilling(true);
-      try {
-          const res = await fetch(`/api/get-staff-data?misId=${misId}`);
-          const result = await res.json();
-          if (result.success) {
-            form.reset(result.data);
-            setUserType(result.data.type);
-            toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
-          } else {
-             toast({ variant: 'destructive', title: 'Not Found', description: "Could not find your details using that MIS ID. Please enter them manually." });
+      const prefillData = useCallback(async (misId: string) => {
+          if (!misId) return;
+          setIsPrefilling(true);
+          try {
+              const res = await fetch(`/api/get-staff-data?misId=${misId}`);
+              const result = await res.json();
+              if (result.success) {
+                form.reset(result.data);
+                setUserType(result.data.type);
+                // Set campus if present in fetched data
+                if (result.data.campus) {
+                  form.setValue("campus", result.data.campus);
+                  // Adjust faculty and institute based on campus
+                  if (result.data.campus === "Goa") {
+                    if (!goaFaculties.includes(result.data.faculty)) {
+                      form.setValue("faculty", "");
+                    }
+                    if (!goaInstitutes.includes(result.data.institute)) {
+                      form.setValue("institute", "");
+                    }
+                  }
+                }
+                toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+              } else {
+                 toast({ variant: 'destructive', title: 'Not Found', description: "Could not find your details using that MIS ID. Please enter them manually." });
+              }
+          } catch (error) {
+              console.error("Failed to fetch prefill data", error);
+              toast({ variant: 'destructive', title: 'Error', description: "Could not fetch your data. Please try again or enter manually." });
+          } finally {
+              setIsPrefilling(false);
           }
-      } catch (error) {
-          console.error("Failed to fetch prefill data", error);
-          toast({ variant: 'destructive', title: 'Error', description: "Could not fetch your data. Please try again or enter manually." });
-      } finally {
-          setIsPrefilling(false);
-      }
-  }, [form, toast]);
+      }, [form, toast]);
 
 
   useEffect(() => {
@@ -190,68 +225,62 @@ export default function ProfileSetupPage() {
     }
   };
 
-  const onSubmit = async (data: ProfileSetupFormValues) => {
-    if (!user) return;
-    setIsSubmitting(true);
-    try {
-      if (data.misId) {
-        const misIdCheck = await checkMisIdExists(data.misId, user.uid);
-        if (misIdCheck.exists) {
-            form.setError("misId", {
-                type: "manual",
-                message: "This MIS ID is already registered. If you need help, contact helpdesk.rdc@paruluniversity.ac.in."
-            });
-            toast({
-            variant: 'destructive',
-            title: 'MIS ID Already Registered',
-            description: 'This MIS ID is already associated with another account.',
-            duration: 8000,
-            });
-            setIsSubmitting(false);
-            return;
-        }
+ const onSubmit = async (data: ProfileSetupFormValues) => {
+  if (!user) return;
+  setIsSubmitting(true);
+  try {
+    if (data.misId) {
+      const misIdCheck = await checkMisIdExists(data.misId, user.uid);
+      if (misIdCheck.exists) {
+        form.setError("misId", {
+          type: "manual",
+          message: "This MIS ID is already registered. If you need help, contact helpdesk.rdc@paruluniversity.ac.in."
+        });
+        toast({
+          variant: 'destructive',
+          title: 'MIS ID Already Registered',
+          description: 'This MIS ID is already associated with another account.',
+          duration: 8000,
+        });
+        setIsSubmitting(false);
+        return;
       }
-
-      const userDocRef = doc(db, 'users', user.uid);
-      let photoURL = user.photoURL || '';
-
-      if (profilePicFile) {
-        const dataUrl = await fileToDataUrl(profilePicFile);
-        const path = `profile-pictures/${user.uid}`;
-        const result = await uploadFileToServer(dataUrl, path);
-        if (!result.success || !result.url) {
-            throw new Error(result.error || "File upload failed");
-        }
-        photoURL = result.url;
-      }
-      
-      const updateData: Partial<User> = {
-        ...data,
-        photoURL: photoURL,
-        profileComplete: true,
-      };
-
-      // Sanitize data: Ensure optional fields that are empty strings are not sent as undefined
-      for (const key in updateData) {
-        if ((updateData as any)[key] === undefined) {
-          (updateData as any)[key] = null;
-        }
-      }
-
-      await updateDoc(userDocRef, updateData as any);
-      
-      const updatedUser = { ...user, ...updateData };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-
-      toast({ title: 'Profile Updated!', description: 'Redirecting to your dashboard.' });
-      router.push('/dashboard');
-    } catch (error: any) {
-      console.error('Profile update error:', error);
-      toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'Could not update your profile.' });
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+
+    let photoURL = user.photoURL || '';
+
+    if (profilePicFile) {
+      const dataUrl = await fileToDataUrl(profilePicFile);
+      const path = `profile-pictures/${user.uid}`;
+      const result = await uploadFileToServer(dataUrl, path);
+      if (!result.success || !result.url) {
+        throw new Error(result.error || "File upload failed");
+      }
+      photoURL = result.url;
+    }
+
+    const updateData: Partial<User> = {
+      ...data,
+      campus: data.campus,
+      photoURL: photoURL,
+      profileComplete: true,
+    };
+
+    await updateDoc(doc(db, 'users', user.uid), updateData as any);
+
+    const updatedUser = { ...user, ...updateData };
+    localStorage.setItem('user', JSON.stringify(updatedUser));
+
+    toast({ title: 'Profile Updated!', description: 'Redirecting to your dashboard.' });
+    router.push('/dashboard');
+  } catch (error: any) {
+    console.error('Profile update error:', error);
+    toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'Could not update your profile.' });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
   
   const handleFetchOrcid = async () => {
     const orcidId = form.getValues('orcidId');
@@ -349,13 +378,85 @@ export default function ProfileSetupPage() {
                       </p>
                   </div>
 
+                  <FormField name="campus" control={form.control} render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Campus</FormLabel>
+                      <Select
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          // Reset faculty if campus changes
+                          if (value === "Goa") {
+                            if (!goaFaculties.includes(form.getValues("faculty"))) {
+                              form.setValue("faculty", "");
+                            }
+                          }
+                        }}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your campus" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {campuses.map(campus => (
+                            <SelectItem key={campus} value={campus}>{campus}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField name="faculty" control={form.control} render={({ field }) => {
+                    const facultyOptions = form.getValues("campus") === "Goa" ? goaFaculties : faculties;
+                    return (
+                      <FormItem>
+                        <FormLabel>Faculty</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your faculty" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {facultyOptions.map(f => (
+                              <SelectItem key={f} value={f}>{f}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }} />
+                  <FormField name="institute" control={form.control} render={({ field }) => {
+                    const instituteOptions = form.getValues("campus") === "Goa" ? goaInstitutes : institutes;
+                    return (
+                      <FormItem>
+                        <FormLabel>Institute</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your institute" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {instituteOptions.map(i => (
+                              <SelectItem key={i} value={i}>{i}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }} />
+
                   <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
-                  <FormField name="faculty" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-                  )} />
-                  <FormField name="institute" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-                  )} />
+                   {/* Removed duplicate faculty field here since it's rendered conditionally above */}
+-                  <FormField name="institute" control={form.control} render={({ field }) => (
+-                    <FormItem><FormLabel>Institute</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your institute" /></SelectTrigger></FormControl><SelectContent>{institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+-                  )} />
++                  {/* Removed duplicate institute field here since it's rendered conditionally above */}
                   {userType !== 'Institutional' && (
                      <FormField
                       control={form.control}

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -35,9 +34,15 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     const [loadingDomain, setLoadingDomain] = useState(false);
     const [researchPapers, setResearchPapers] = useState<any[]>([]);
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [newPaperTitle, setNewPaperTitle] = useState('');
-    const [newCoAuthorEmail, setNewCoAuthorEmail] = useState('');
-    const [coAuthorEmails, setCoAuthorEmails] = useState<string[]>([]);
+const [newPaperTitle, setNewPaperTitle] = useState('');
+const [newCoAuthorEmail, setNewCoAuthorEmail] = useState('');
+const [newPaperUrl, setNewPaperUrl] = useState('');
+const [coAuthorEmails, setCoAuthorEmails] = useState<{
+  email: string;
+  name?: string | null;
+  authorType?: 'Co-Author' | 'First Author' | 'Corresponding Author';
+  isExternal?: boolean;
+}[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
 
@@ -86,44 +91,113 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         </div>
     );
 
-    const addCoAuthorEmail = () => {
-        const email = newCoAuthorEmail.trim().toLowerCase();
-        if (email && !coAuthorEmails.includes(email)) {
-            setCoAuthorEmails([...coAuthorEmails, email]);
-            setNewCoAuthorEmail('');
-        }
-    };
+type CoAuthor = {
+  email: string;
+  name?: string | null;
+  authorType?: 'Co-Author' | 'First Author' | 'Corresponding Author';
+  isExternal?: boolean;
+};
+
+const [coAuthorEmails, setCoAuthorEmails] = useState<CoAuthor[]>([]);
+
+const addCoAuthorEmail = async () => {
+  const email = newCoAuthorEmail.trim().toLowerCase();
+  if (!email) return;
+
+  // Check if already added
+  if (coAuthorEmails.find(ca => ca.email === email)) {
+    toast({ title: 'Co-author already added', variant: 'destructive' });
+    return;
+  }
+
+  // Check if email is internal or external
+  const isInternal = email.endsWith('@paruluniversity.ac.in');
+
+  if (!isInternal) {
+    // For external authors, ask for name explicitly
+    const externalName = prompt('Enter the name of the external co-author:');
+    if (!externalName || !externalName.trim()) {
+      toast({ title: 'Name is required for external authors', variant: 'destructive' });
+      return;
+    }
+    setCoAuthorEmails([...coAuthorEmails, { email, name: externalName.trim(), authorType: 'Co-Author', isExternal: true }]);
+    setNewCoAuthorEmail('');
+    return;
+  }
+
+  try {
+    // Check if user exists
+    const resUser = await fetch('/api/check-user-exists', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const dataUser = await resUser.json();
+
+    let name: string | null = null;
+    if (dataUser.success && dataUser.user) {
+      name = dataUser.user.name;
+    } else {
+      // Fetch name from staffdata
+      const resStaff = await fetch('/api/get-staff-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const dataStaff = await resStaff.json();
+      if (dataStaff.success && dataStaff.name) {
+        name = dataStaff.name;
+      }
+    }
+
+    setCoAuthorEmails([...coAuthorEmails, { email, name, authorType: 'Co-Author', isExternal: false }]);
+    setNewCoAuthorEmail('');
+  } catch (error) {
+    toast({ title: 'Error checking co-author', variant: 'destructive' });
+    console.error('Error checking co-author:', error);
+  }
+};
+
+const removeCoAuthorEmail = (email: string) => {
+  setCoAuthorEmails(coAuthorEmails.filter(ca => ca.email !== email));
+};
 
     const removeCoAuthorEmail = (email: string) => {
         setCoAuthorEmails(coAuthorEmails.filter(e => e !== email));
     };
 
-    const handleAddPaper = async () => {
-        if (!newPaperTitle.trim()) {
-            toast({ title: "Paper title is required", variant: "destructive" });
-            return;
-        }
-        setIsSubmitting(true);
-        try {
-            const result = await addResearchPaper(newPaperTitle.trim(), user.uid, coAuthorEmails);
-            if (result.success) {
-                toast({ title: "Research paper added successfully" });
-                // Optimistically update the UI
-                const newPaper = { id: result.paperId, title: newPaperTitle.trim(), coAuthorEmails };
-                setResearchPapers(prevPapers => [...prevPapers, newPaper]);
-                setNewPaperTitle('');
-                setCoAuthorEmails([]);
-                setIsAddDialogOpen(false);
-            } else {
-                toast({ title: "Failed to add research paper", description: result.error, variant: "destructive" });
-            }
-        } catch (error) {
-            toast({ title: "Error adding research paper", variant: "destructive" });
-            console.error("Error adding research paper:", error);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+const handleAddPaper = async () => {
+  if (!newPaperTitle.trim()) {
+    toast({ title: "Paper title is required", variant: "destructive" });
+    return;
+  }
+  if (!newPaperUrl.trim()) {
+    toast({ title: "Paper URL is required", variant: "destructive" });
+    return;
+  }
+  setIsSubmitting(true);
+  try {
+    // Send coAuthorEmails as array of objects with email, name, authorType, and isExternal
+    const result = await addResearchPaper(newPaperTitle.trim(), user.uid, coAuthorEmails, newPaperUrl.trim());
+    if (result.success) {
+      toast({ title: "Research paper added successfully" });
+      // Optimistically update the UI
+      const newPaper = { id: result.paperId, title: newPaperTitle.trim(), coAuthorEmails, url: newPaperUrl.trim() };
+      setResearchPapers(prevPapers => [...prevPapers, newPaper]);
+      setNewPaperTitle('');
+      setNewPaperUrl('');
+      setCoAuthorEmails([]);
+      setIsAddDialogOpen(false);
+    } else {
+      toast({ title: "Failed to add research paper", description: result.error, variant: "destructive" });
+    }
+  } catch (error) {
+    toast({ title: "Error adding research paper", variant: "destructive" });
+    console.error("Error adding research paper:", error);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
 
     return (
@@ -290,29 +364,39 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                                 className="mt-1 block w-full"
                             />
                         </div>
-                        <div>
-                            <label htmlFor="coAuthorEmail" className="block text-sm font-medium">Add Co-Author Email</label>
-                            <div className="flex gap-2 mt-1">
-                                <Input
-                                    id="coAuthorEmail"
-                                    value={newCoAuthorEmail}
-                                    onChange={(e) => setNewCoAuthorEmail(e.target.value)}
-                                    placeholder="Enter co-author email"
-                                    className="flex-grow"
-                                />
-                                <Button onClick={addCoAuthorEmail} variant="outline" size="icon" disabled={!newCoAuthorEmail.trim()}>
-                                    <UserPlus className="h-4 w-4" />
-                                </Button>
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {coAuthorEmails.map(email => (
-                                    <Badge key={email} variant="secondary" className="flex items-center gap-1">
-                                        {email}
-                                        <X className="cursor-pointer h-3 w-3" onClick={() => removeCoAuthorEmail(email)} />
-                                    </Badge>
-                                ))}
-                            </div>
-                        </div>
+<div>
+    <label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</label>
+    <Input
+        id="paperUrl"
+        value={newPaperUrl}
+        onChange={(e) => setNewPaperUrl(e.target.value)}
+        placeholder="Enter published paper URL"
+        className="mt-1 block w-full"
+    />
+</div>
+<div>
+    <label htmlFor="coAuthorEmail" className="block text-sm font-medium">Add Co-Author Email</label>
+    <div className="flex gap-2 mt-1">
+        <Input
+            id="coAuthorEmail"
+            value={newCoAuthorEmail}
+            onChange={(e) => setNewCoAuthorEmail(e.target.value)}
+            placeholder="Enter co-author email"
+            className="flex-grow"
+        />
+        <Button onClick={addCoAuthorEmail} variant="outline" size="icon" disabled={!newCoAuthorEmail.trim()}>
+            <UserPlus className="h-4 w-4" />
+        </Button>
+    </div>
+    <div className="mt-2 flex flex-wrap gap-2">
+        {coAuthorEmails.map(({ email, name, authorType }) => (
+            <Badge key={email} variant="secondary" className="flex items-center gap-1">
+                {name ? `${name} (${email})` : email} - <em>{authorType || 'Co-Author'}</em>
+                <X className="cursor-pointer h-3 w-3" onClick={() => removeCoAuthorEmail(email)} />
+            </Badge>
+        ))}
+    </div>
+</div>
                     </div>
                     <DialogFooter>
                         <Button onClick={handleAddPaper} disabled={isSubmitting}>
