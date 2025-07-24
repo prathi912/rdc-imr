@@ -53,7 +53,8 @@ export async function addResearchPaper(
 
     // AI Domain Suggestion
     try {
-      const allPapersQuery = await adminDb.collection('papers').where('mainAuthorUid', '==', mainAuthorUid).get();
+      // Get titles from all authors to create a more robust domain suggestion
+      const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids).get();
       const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
       const allTitles = [...new Set([title, ...existingTitles])];
       
@@ -61,20 +62,15 @@ export async function addResearchPaper(
         const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
         paperData.domain = domainResult.domain;
         
-        // Update all authors' profiles with the new domain
-        const batch = adminDb.batch();
-        const userRef = adminDb.collection('users').doc(mainAuthorUid);
-        batch.update(userRef, { researchDomain: domainResult.domain });
-        
-        const coAuthorUids = allAuthorUids.filter(uid => uid !== mainAuthorUid);
-        if (coAuthorUids.length > 0) {
-          const coAuthorDocs = await adminDb.collection('users').where(FieldValue.documentId(), 'in', coAuthorUids).get();
-          coAuthorDocs.forEach(doc => {
-            batch.update(doc.ref, { researchDomain: domainResult.domain });
-          });
+        // Update all internal authors' profiles with the new domain
+        if (allAuthorUids.length > 0) {
+            const batch = adminDb.batch();
+            const userDocs = await adminDb.collection('users').where(FieldValue.documentId(), 'in', allAuthorUids).get();
+            userDocs.forEach(doc => {
+                batch.update(doc.ref, { researchDomain: domainResult.domain });
+            });
+            await batch.commit();
         }
-        
-        await batch.commit();
       }
     } catch (aiError: any) {
       console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
@@ -207,7 +203,8 @@ export async function fetchResearchPapersByUserUid(
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
     const papersRef = adminDb.collection("papers")
-    const papersQuery = query(papersRef, where("mainAuthorUid", "==", userUid), orderBy("createdAt", "desc"));
+    // Query for papers where the user's UID is in the authors array.
+    const papersQuery = query(papersRef, where("authors", "array-contains", { uid: userUid }), orderBy("createdAt", "desc"));
     const papersSnapshot = await papersQuery.get()
 
     if (papersSnapshot.empty) {

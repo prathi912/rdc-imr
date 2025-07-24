@@ -390,12 +390,17 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                                     <Plus className="mr-2 h-4 w-4" /> Add Research Paper
                                 </Button>
                             )}
-                            {researchPapers.length > 0 ? researchPapers.map(paper => (
+                            {researchPapers.length > 0 ? researchPapers.map(paper => {
+                                const myRole = paper.authors.find((a: Author) => a.uid === user.uid)?.role;
+                                return (
                                 <Card key={paper.id}>
                                     <CardContent className="p-4 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <a href={paper.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">{paper.title}</a>
-                                            {isOwner && (
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex-1">
+                                                <a href={paper.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">{paper.title}</a>
+                                                {myRole && <Badge variant="secondary" className="ml-2">{myRole}</Badge>}
+                                            </div>
+                                            {isOwner && paper.mainAuthorUid === user.uid && (
                                                 <div className="flex gap-2">
                                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setPaperToEdit(paper); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4"/></Button>
                                                     <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPaperToDelete(paper)}><Trash2 className="h-4 w-4"/></Button>
@@ -404,14 +409,14 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                                         </div>
                                         <div className="flex flex-wrap gap-2 items-center">
                                             {paper.authors.map((author: Author) => (
-                                                <Badge key={author.email} variant={author.email === user.email ? 'default' : 'secondary'}>
-                                                    {author.name} ({author.role}) {author.isExternal && '(Ext)'}
+                                                <Badge key={author.email} variant={author.uid === user.uid ? 'default' : 'secondary'}>
+                                                    {author.name} {author.isExternal && '(Ext)'}
                                                 </Badge>
                                             ))}
                                         </div>
                                     </CardContent>
                                 </Card>
-                            )) : (
+                            )}) : (
                                 <Card><CardContent className="p-6 text-center text-muted-foreground">No research papers found.</CardContent></Card>
                             )}
                         </div>
