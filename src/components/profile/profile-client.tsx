@@ -39,7 +39,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     const [newCoAuthorEmail, setNewCoAuthorEmail] = useState('');
     const [coAuthorEmails, setCoAuthorEmails] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const toast = useToast();
+    const { toast } = useToast();
 
     useEffect(() => {
         const fetchPapers = async () => {
@@ -87,7 +87,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     );
 
     const addCoAuthorEmail = () => {
-        const email = newCoAuthorEmail.trim();
+        const email = newCoAuthorEmail.trim().toLowerCase();
         if (email && !coAuthorEmails.includes(email)) {
             setCoAuthorEmails([...coAuthorEmails, email]);
             setNewCoAuthorEmail('');
@@ -100,28 +100,31 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
 
     const handleAddPaper = async () => {
         if (!newPaperTitle.trim()) {
-            toast.toast({ title: "Paper title is required", variant: "destructive" });
+            toast({ title: "Paper title is required", variant: "destructive" });
             return;
         }
         setIsSubmitting(true);
         try {
             const result = await addResearchPaper(newPaperTitle.trim(), user.uid, coAuthorEmails);
             if (result.success) {
-                toast.toast({ title: "Research paper added successfully" });
-                setResearchPapers([...researchPapers, { id: result.paperId, title: newPaperTitle.trim(), coAuthorEmails }]);
+                toast({ title: "Research paper added successfully" });
+                // Optimistically update the UI
+                const newPaper = { id: result.paperId, title: newPaperTitle.trim(), coAuthorEmails };
+                setResearchPapers(prevPapers => [...prevPapers, newPaper]);
                 setNewPaperTitle('');
                 setCoAuthorEmails([]);
                 setIsAddDialogOpen(false);
             } else {
-                toast.toast({ title: "Failed to add research paper", variant: "destructive" });
+                toast({ title: "Failed to add research paper", description: result.error, variant: "destructive" });
             }
         } catch (error) {
-            toast.toast({ title: "Error adding research paper", variant: "destructive" });
+            toast({ title: "Error adding research paper", variant: "destructive" });
             console.error("Error adding research paper:", error);
         } finally {
             setIsSubmitting(false);
         }
     };
+
 
     return (
         <div className="flex flex-col items-center">
@@ -247,7 +250,8 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     </TabsContent>
                     <TabsContent value="papers">
                         <div className="space-y-4 mt-4">
-                            <Button onClick={() => setIsAddDialogOpen(true)} className="mb-4" variant="outline" size="sm" leftIcon={<Plus />}>
+                            <Button onClick={() => setIsAddDialogOpen(true)} className="mb-4" variant="outline" size="sm">
+                                <Plus className="mr-2 h-4 w-4" />
                                 Add Research Paper
                             </Button>
                             {researchPapers.length > 0 ? researchPapers.map(paper => (
@@ -277,7 +281,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     </DialogHeader>
                     <div className="space-y-4">
                         <div>
-                            <label htmlFor="paperTitle" className="block text-sm font-medium text-gray-700">Paper Title</label>
+                            <label htmlFor="paperTitle" className="block text-sm font-medium">Paper Title</label>
                             <Input
                                 id="paperTitle"
                                 value={newPaperTitle}
@@ -287,7 +291,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                             />
                         </div>
                         <div>
-                            <label htmlFor="coAuthorEmail" className="block text-sm font-medium text-gray-700">Add Co-Author Email</label>
+                            <label htmlFor="coAuthorEmail" className="block text-sm font-medium">Add Co-Author Email</label>
                             <div className="flex gap-2 mt-1">
                                 <Input
                                     id="coAuthorEmail"
@@ -296,15 +300,15 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                                     placeholder="Enter co-author email"
                                     className="flex-grow"
                                 />
-                                <Button onClick={addCoAuthorEmail} variant="outline" size="sm" disabled={!newCoAuthorEmail.trim()}>
-                                    <UserPlus />
+                                <Button onClick={addCoAuthorEmail} variant="outline" size="icon" disabled={!newCoAuthorEmail.trim()}>
+                                    <UserPlus className="h-4 w-4" />
                                 </Button>
                             </div>
                             <div className="mt-2 flex flex-wrap gap-2">
                                 {coAuthorEmails.map(email => (
                                     <Badge key={email} variant="secondary" className="flex items-center gap-1">
                                         {email}
-                                        <X className="cursor-pointer" onClick={() => removeCoAuthorEmail(email)} />
+                                        <X className="cursor-pointer h-3 w-3" onClick={() => removeCoAuthorEmail(email)} />
                                     </Badge>
                                 ))}
                             </div>
