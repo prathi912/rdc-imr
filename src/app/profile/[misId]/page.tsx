@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect } from "react"
@@ -20,7 +19,6 @@ export default function ProfilePage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [emrInterests, setEmrInterests] = useState<EmrInterest[]>([]);
   const [fundingCalls, setFundingCalls] = useState<FundingCall[]>([]);
-  const [papers, setPapers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [sessionUser, setSessionUser] = useState<User | null>(null)
@@ -64,10 +62,6 @@ export default function ProfilePage() {
         }
 
         setProfileUser(fetchedUser)
-
-        // Fetch user's papers
-        const userPapers = fetchedUser.papers || [];
-        setPapers(userPapers);
 
         // Fetch user's EMR interests (both as PI and Co-PI)
         const emrInterestsRef = collection(db, "emrInterests");

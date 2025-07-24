@@ -445,31 +445,6 @@ export default function ProfileSetupPage() {
                     </p>
                   </div>
 
-                  <FormField
-                    name="campus"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Campus</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select your campus" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {campuses.map((c) => (
-                              <SelectItem key={c} value={c}>
-                                {c}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
                   <FormField
                     name="faculty"
@@ -511,6 +486,30 @@ export default function ProfileSetupPage() {
                             {institutes.map((i) => (
                               <SelectItem key={i} value={i}>
                                 {i}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    name="campus"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Campus</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your campus" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {campuses.map((c) => (
+                              <SelectItem key={c} value={c}>
+                                {c}
                               </SelectItem>
                             ))}
                           </SelectContent>

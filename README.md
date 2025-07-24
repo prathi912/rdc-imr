@@ -58,16 +58,16 @@ Follow these instructions to get the project up and running on your local machin
 
 ### 1. Clone the Repository
 
-```bash
+\`\`\`bash
 git clone <your-repository-url>
 cd <repository-name>
-```
+\`\`\`
 
 ### 2. Install Dependencies
 
-```bash
+\`\`\`bash
 npm install
-```
+\`\`\`
 
 ### 3. Configure Environment Variables
 
@@ -81,7 +81,7 @@ This is the most critical step. The application will not run without the correct
 -   Go to your **Firebase Console** -> **Project Settings** (gear icon) -> **General**.
 -   Under "Your apps", find your web app and copy the `firebaseConfig` object values.
 
-```env
+\`\`\`env
 # .env.local
 NEXT_PUBLIC_FIREBASE_API="[API_KEY]"
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="[AUTH_DOMAIN]"
@@ -89,47 +89,47 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID="[PROJECT_ID]"
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="[STORAGE_BUCKET]"
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="[MESSAGING_SENDER_ID]"
 NEXT_PUBLIC_FIREBASE_APP_ID="[APP_ID]"
-```
+\`\`\`
 
 #### Firebase Admin (Server-Side) Keys
 -   Go to your **Firebase Console** -> **Project Settings** -> **Service accounts**.
 -   Click **"Generate new private key"**. A JSON file will be downloaded.
 -   Open the JSON file and copy the corresponding values.
 
-```env
+\`\`\`env
 # .env.local
 FIREBASE_CLIENT_EMAIL="[client_email_from_json]"
 FIREBASE_PRIVATE_KEY="[private_key_from_json]"
-```
+\`\`\`
 
 #### Email Service (Nodemailer)
 -   You'll need a Gmail account and an "App Password".
 -   Go to your **Google Account** -> **Security** -> **2-Step Verification** (must be enabled).
 -   Go to **App passwords**, create a new password for this app, and copy the 16-character password.
 
-```env
+\`\`\`env
 # .env.local
 GMAIL_USER="your-gmail-address@gmail.com"
 GMAIL_APP_PASSWORD="your-16-character-app-password"
-```
+\`\`\`
 
 #### Optional API Keys
 -   These are needed for fetching data from external academic sources. The application will function without them, but some features will be disabled.
 
-```env
+\`\`\`env
 # .env.local
 SCOPUS_API_KEY=""
 WOS_API_KEY=""
 SPRINGER_API_KEY=""
-```
+\`\`\`
 
 ### 4. Run the Development Server
 
 Once your `.env.local` file is configured, you can start the development server.
 
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 The application should now be running at [http://localhost:9002](http://localhost:9002).
 

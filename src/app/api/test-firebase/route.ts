@@ -1,4 +1,3 @@
-
 import { type NextRequest, NextResponse } from "next/server";
 import { adminDb, adminAuth, adminStorage } from "@/lib/admin";
 

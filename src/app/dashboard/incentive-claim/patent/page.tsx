@@ -1,4 +1,3 @@
-
 import { PageHeader } from '@/components/page-header';
 import { PatentForm } from '@/components/incentives/patent-form';
 

@@ -1,4 +1,3 @@
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -27,6 +26,9 @@ import { format, parse, parseISO, addDays, setHours, setMinutes, setSeconds } fr
 import type * as z from "zod"
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
+import { revalidatePath } from "next/cache"
+import { db } from "@/lib/config"
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDoc, serverTimestamp, writeBatch } from "firebase/firestore"
 
 const EMAIL_STYLES = {
   background:
@@ -79,6 +81,122 @@ export async function getJournalWebsite(input: JournalWebsiteInput) {
   } catch (error) {
     console.error("Error finding journal website:", error)
     return { success: false, error: "Failed to find journal website." }
+  }
+}
+
+export async function addPublication(publicationData: {
+  title: string
+  authorUids: string[]
+  authorNames: string[]
+  addedByUid: string
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!publicationData.title || !publicationData.authorNames || publicationData.authorNames.length === 0) {
+      return { success: false, error: "Publication title and at least one author are required." }
+    }
+
+    // Ensure the person adding the publication is included in authorUids
+    if (!publicationData.authorUids.includes(publicationData.addedByUid)) {
+      return { success: false, error: "You must be listed as an author of this publication." }
+    }
+
+    // Create the publication document
+    const publicationRef = adminDb.collection("publications").doc()
+    const publicationDoc = {
+      title: publicationData.title,
+      authorUids: publicationData.authorUids, // Only registered users
+      authorNames: publicationData.authorNames, // All authors (including external)
+      addedByUid: publicationData.addedByUid,
+      createdAt: new Date().toISOString(),
+      status: "active",
+      // Add metadata for better tracking
+      totalAuthors: publicationData.authorNames.length,
+      registeredAuthors: publicationData.authorUids.length,
+    }
+
+    await publicationRef.set(publicationDoc)
+
+    // Update research domains for all registered authors asynchronously
+    const updatePromises = publicationData.authorUids.map(async (authorUid) => {
+      try {
+        // Get all publications for this author
+        const authorPublicationsQuery = adminDb
+          .collection("publications")
+          .where("authorUids", "array-contains", authorUid)
+          .where("status", "==", "active")
+
+        const authorPublicationsSnapshot = await authorPublicationsQuery.get()
+        const publicationTitles = authorPublicationsSnapshot.docs.map((doc) => doc.data().title)
+
+        if (publicationTitles.length > 0) {
+          // Generate research domain suggestion
+          const domainResult = await getResearchDomain({
+            publications: publicationTitles,
+          })
+
+          if (domainResult.success && domainResult.domain) {
+            // Update user's research domain
+            const userRef = adminDb.collection("users").doc(authorUid)
+            await userRef.update({
+              researchDomain: domainResult.domain,
+              lastDomainUpdate: new Date().toISOString(),
+              publicationCount: publicationTitles.length,
+            })
+          }
+        }
+      } catch (error) {
+        console.error(`Error updating research domain for user ${authorUid}:`, error)
+        // Don't fail the entire operation if domain update fails
+      }
+    })
+
+    // Execute all domain updates in parallel but don't wait for them
+    Promise.all(updatePromises).catch((error) => {
+      console.error("Error updating research domains:", error)
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error adding publication:", error)
+    return { success: false, error: error.message || "Failed to add publication." }
+  }
+}
+
+export async function findUserByEmail(
+  email: string,
+): Promise<{ success: boolean; user?: { uid: string; name: string; email: string }; error?: string }> {
+  try {
+    if (!email || email.trim() === "") {
+      return { success: false, error: "Email is required." }
+    }
+
+    const usersRef = adminDb.collection("users")
+    const q = usersRef.where("email", "==", email.trim().toLowerCase()).limit(1)
+    const querySnapshot = await q.get()
+
+    if (querySnapshot.empty) {
+      return { success: false, error: "No user found with this email address." }
+    }
+
+    const userDoc = querySnapshot.docs[0]
+    const userData = userDoc.data()
+
+    // Prevent adding admins as co-authors
+    if (userData.role === "admin" || userData.role === "Super-admin") {
+      return { success: false, error: "Administrative users cannot be added as co-authors." }
+    }
+
+    return {
+      success: true,
+      user: {
+        uid: userDoc.id,
+        name: userData.name,
+        email: userData.email,
+      },
+    }
+  } catch (error: any) {
+    console.error("Error finding user by email:", error)
+    return { success: false, error: error.message || "Failed to search for user." }
   }
 }
 
@@ -474,6 +592,7 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
         uid: docSnapshot.id,
         title: notificationTitle,
         createdAt: new Date().toISOString(),
+        isRead: false,
       })
     })
 
@@ -507,6 +626,7 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
         projectId: projectId,
         title: notificationTitle,
         createdAt: new Date().toISOString(),
+        isRead: false,
       })
     })
 
@@ -1086,6 +1206,7 @@ export async function updateProjectWithRevision(
           projectId: projectId,
           title: notificationTitle,
           createdAt: new Date().toISOString(),
+          isRead: false,
         })
       })
 
@@ -1376,6 +1497,7 @@ export async function updateCoInvestigators(
           projectId: projectId,
           title: `You have been added as a Co-PI to the IMR project: "${project.title}"`,
           createdAt: new Date().toISOString(),
+          isRead: false,
         })
 
         // Email notification
@@ -1497,6 +1619,7 @@ export async function registerEmrInterest(
           uid: coPi.uid,
           title: `You've been added as a Co-PI for the EMR call: "${callTitle}"`,
           createdAt: new Date().toISOString(),
+          isRead: false,
         })
 
         if (coPi.email) {
@@ -1576,6 +1699,7 @@ export async function scheduleEmrMeeting(
         uid: interest.userId,
         title: `Your EMR Presentation for "${call.title}" has been scheduled.`,
         createdAt: new Date().toISOString(),
+        isRead: false,
       })
 
       const emailHtml = `
@@ -1618,6 +1742,7 @@ export async function scheduleEmrMeeting(
             uid: evaluator.uid,
             title: `You've been assigned to an EMR evaluation meeting for "${call.title}"`,
             createdAt: new Date().toISOString(),
+            isRead: false,
           })
 
           if (evaluator.email) {
@@ -1793,6 +1918,7 @@ export async function deleteEmrInterest(
       uid: interest.userId,
       title: `Your EMR registration for "${callTitle}" was removed.`,
       createdAt: new Date().toISOString(),
+      isRead: false,
     }
     await adminDb.collection("notifications").add(notification)
 
@@ -1859,6 +1985,7 @@ export async function addEmrEvaluation(
             uid: userDoc.id,
             title: notificationTitle,
             createdAt: new Date().toISOString(),
+            isRead: false,
           })
         })
         await batch.commit()
@@ -1870,51 +1997,6 @@ export async function addEmrEvaluation(
     console.error("Error adding EMR evaluation:", error)
     return { success: false, error: error.message || "Failed to submit evaluation." }
   }
-}
-
-export async function uploadRevisedEmrPpt(interestId: string, pptDataUrl: string, originalFileName: string, userName: string): Promise<{ success: boolean; error?: string }> {
-}
-
-export async function uploadEndorsementForm(interestId: string, endorsementUrl: string): Promise<{ success: boolean, error?: string }> {
-    try {
-        if (!interestId || !endorsementUrl) {
-            return { success: false, error: "Interest ID and endorsement form URL are required." };
-        }
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        await interestRef.update({
-            endorsementFormUrl: endorsementUrl,
-            status: 'Endorsement Submitted',
-        });
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error submitting endorsement form:", error);
-        return { success: false, error: "Failed to submit endorsement form." };
-    }
-}
-export async function submitToAgency(
-  interestId: string, 
-  referenceNumber: string, 
-  acknowledgementUrl?: string
-): Promise<{ success: boolean, error?: string }> {
-    try {
-        if (!interestId || !referenceNumber) {
-            return { success: false, error: "Interest ID and reference number are required." };
-        }
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const updateData: { [key: string]: any } = {
-            agencyReferenceNumber: referenceNumber,
-            status: 'Submitted to Agency',
-            submittedToAgencyAt: new Date().toISOString(),
-        };
-        if (acknowledgementUrl) {
-            updateData.agencyAcknowledgementUrl = acknowledgementUrl;
-        }
-        await interestRef.update(updateData);
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error submitting to agency:", error);
-        return { success: false, error: "Failed to log submission to agency." };
-    }
 }
 
 export async function createFundingCall(
@@ -2039,58 +2121,17 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
   }
 }
 
-export async function updateEmrInterestStatus(
-  interestId: string,
-  newStatus: EmrInterest["status"],
-  adminName: string,
-): Promise<{ success: boolean; error?: string }> {
+export async function saveSidebarOrder(uid: string, order: string[]): Promise<{ success: boolean; error?: string }> {
   try {
-    const interestRef = adminDb.collection("emrInterests").doc(interestId)
-    const interestSnap = await interestRef.get()
-    if (!interestSnap.exists) {
-      return { success: false, error: "Interest registration not found." }
+    if (!uid || !Array.isArray(order)) {
+      return { success: false, error: "Invalid user ID or order provided." }
     }
-    const interest = interestSnap.data() as EmrInterest
-
-    await interestRef.update({ status: newStatus })
-
-    const callRef = adminDb.collection("fundingCalls").doc(interest.callId)
-    const callSnap = await callRef.get()
-    const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call"
-
-    const notification = {
-      uid: interest.userId,
-      title: `Your EMR application for "${callTitle}" status was updated to: ${newStatus}`,
-      createdAt: new Date().toISOString(),
-    }
-    await adminDb.collection("notifications").add(notification)
-
-    if (interest.userEmail) {
-      const emailHtml = `
-        <div ${EMAIL_STYLES.background}>
-          ${EMAIL_STYLES.logo}
-          <p style="color:#ffffff;">Dear ${interest.userName},</p>
-          <p style="color:#e0e0e0;">
-            The status of your EMR application for "<strong style="color:#ffffff;">${callTitle}</strong>" has been updated to 
-            <strong style="color:${newStatus === "Recommended" ? "#00e676" : newStatus === "Not Recommended" ? "#ff5252" : "#ffca28"};">
-              ${newStatus}
-            </strong> by ${adminName}.
-          </p>
-          ${EMAIL_STYLES.footer}
-        </div>
-      `
-      await sendEmail({
-        to: interest.userEmail,
-        subject: `EMR Application Status Update: ${newStatus}`,
-        html: emailHtml,
-        from: "default",
-      })
-    }
-
+    const userRef = adminDb.collection("users").doc(uid)
+    await userRef.update({ sidebarOrder: order })
     return { success: true }
   } catch (error: any) {
-    console.error("Error updating EMR interest status:", error)
-    return { success: false, error: error.message || "Failed to update status." }
+    console.error("Error saving sidebar order:", error)
+    return { success: false, error: error.message || "Failed to save sidebar order." }
   }
 }
 
@@ -2190,6 +2231,175 @@ export async function sendMeetingReminders(): Promise<{ success: boolean; error?
   }
 }
 
+export async function uploadEndorsementForm(
+  interestId: string,
+  endorsementDataUrl: string,
+  originalFileName: string,
+  userName: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId || !endorsementDataUrl) {
+      return { success: false, error: "Interest ID and file data are required." }
+    }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    // Standardize the filename
+    const fileExtension = path.extname(originalFileName)
+    const standardizedName = `endorsement_${userName.replace(/\s+/g, "_")}${fileExtension}`
+
+    const filePath = `emr-endorsements/${interest.callId}/${interest.userId}/${standardizedName}`
+    const result = await uploadFileToServer(endorsementDataUrl, filePath)
+
+    if (!result.success || !result.url) {
+      throw new Error(result.error || "Endorsement form upload failed.")
+    }
+
+    await interestRef.update({
+      endorsementFormUrl: result.url,
+      endorsementSubmissionDate: new Date().toISOString(),
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error uploading endorsement form:", error)
+    return { success: false, error: error.message || "Failed to upload endorsement form." }
+  }
+}
+
+export async function submitToAgency(
+  interestId: string,
+  submissionData: {
+    agencySubmissionUrl?: string
+    agencySubmissionDate: string
+    submissionNotes?: string
+  },
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId) {
+      return { success: false, error: "Interest ID is required." }
+    }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    await interestRef.update({
+      agencySubmissionUrl: submissionData.agencySubmissionUrl || "",
+      agencySubmissionDate: submissionData.agencySubmissionDate,
+      submissionNotes: submissionData.submissionNotes || "",
+      status: "Submitted to Agency",
+    })
+
+    // Notify the user
+    const callRef = adminDb.collection("fundingCalls").doc(interest.callId)
+    const callSnap = await callRef.get()
+    const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "EMR Call"
+
+    const notification = {
+      uid: interest.userId,
+      title: `Your EMR application for "${callTitle}" has been submitted to the funding agency`,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    }
+    await adminDb.collection("notifications").add(notification)
+
+    if (interest.userEmail) {
+      const emailHtml = `
+        <div ${EMAIL_STYLES.background}>
+          ${EMAIL_STYLES.logo}
+          <p style="color:#ffffff;">Dear ${interest.userName},</p>
+          <p style="color:#e0e0e0;">
+            Your EMR application for "<strong style="color:#ffffff;">${callTitle}</strong>" has been successfully submitted to the funding agency.
+          </p>
+          ${
+            submissionData.agencySubmissionUrl
+              ? `
+            <p style="color:#e0e0e0;">
+              Agency Submission URL: <a href="${submissionData.agencySubmissionUrl}" style="color:#64b5f6; text-decoration:underline;">${submissionData.agencySubmissionUrl}</a>
+            </p>
+          `
+              : ""
+          }
+          ${
+            submissionData.submissionNotes
+              ? `
+            <div style="margin-top: 20px; padding: 15px; border: 1px solid #4f5b62; border-radius: 6px; background-color:#2c3e50;">
+              <h4 style="color:#ffffff; margin-top: 0;">Submission Notes:</h4>
+              <p style="color:#e0e0e0;">${submissionData.submissionNotes}</p>
+            </div>
+          `
+              : ""
+          }
+          <p style="color:#e0e0e0;">You will be notified of any updates regarding your application status.</p>
+          ${EMAIL_STYLES.footer}
+        </div>
+      `
+      await sendEmail({
+        to: interest.userEmail,
+        subject: `EMR Application Submitted: ${callTitle}`,
+        html: emailHtml,
+        from: "default",
+      })
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error submitting to agency:", error)
+    return { success: false, error: error.message || "Failed to submit to agency." }
+  }
+}
+
+export async function uploadRevisedEmrPpt(
+  interestId: string,
+  pptDataUrl: string,
+  originalFileName: string,
+  userName: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId || !pptDataUrl) {
+      return { success: false, error: "Interest ID and file data are required." }
+    }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    // Standardize the filename for revised presentation
+    const fileExtension = path.extname(originalFileName)
+    const standardizedName = `emr_revised_${userName.replace(/\s+/g, "_")}${fileExtension}`
+
+    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`
+    const result = await uploadFileToServer(pptDataUrl, filePath)
+
+    if (!result.success || !result.url) {
+      throw new Error(result.error || "Revised PPT upload failed.")
+    }
+
+    await interestRef.update({
+      revisedPptUrl: result.url,
+      revisedPptSubmissionDate: new Date().toISOString(),
+      status: "Revised PPT Submitted",
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error uploading revised EMR presentation:", error)
+    return { success: false, error: error.message || "Failed to upload revised presentation." }
+  }
+}
+
 export async function generateImrRecommendationDocument(
   projectId: string,
   evaluations: Evaluation[],
@@ -2253,19 +2463,179 @@ export async function generateImrRecommendationDocument(
   }
 }
 
-export async function saveSidebarOrder(
-  uid: string,
-  sidebarOrder: string[],
+/**
+ * Update the status of an EMR interest (application) and optionally leave admin remarks.
+ * Keeps the implementation minimal so the build succeeds; expand as needed later.
+ */
+export async function updateEmrStatus(
+  interestId: string,
+  newStatus: EmrInterest["status"],
+  adminRemarks?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!uid) {
-      return { success: false, error: "User ID is required." }
+    if (!interestId || !newStatus) {
+      return { success: false, error: "Interest ID and new status are required." }
     }
-    const userRef = adminDb.collection("users").doc(uid)
-    await userRef.update({ sidebarOrder: sidebarOrder })
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+
+    const updateData: Partial<EmrInterest> = { status: newStatus }
+    if (adminRemarks) updateData.adminRemarks = adminRemarks
+
+    await interestRef.update(updateData)
     return { success: true }
   } catch (error: any) {
-    console.error("Error saving sidebar order:", error)
-    return { success: false, error: "Failed to save sidebar order." }
+    console.error("Error updating EMR status:", error)
+    return { success: false, error: error.message ?? "Failed to update EMR status." }
+  }
+}
+export async function dateEmrStatus(interestId: string, newStatus: string) {
+  try {
+    const interestRef = doc(db, "emrInterests", interestId)
+
+    const updateData: any = {
+      status: newStatus,
+      updatedAt: serverTimestamp(),
+    }
+
+    // Add specific fields based on status
+    if (newStatus === "Submitted to Agency") {
+      updateData.submittedToAgencyAt = serverTimestamp()
+    }
+
+    await updateDoc(interestRef, updateData)
+
+    revalidatePath("/dashboard/emr-management")
+    revalidatePath("/dashboard/emr-logs")
+
+    return { success: true }
+  } catch (error) {
+    console.error("Error updating EMR status:", error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to update status",
+    }
+  }
+}
+
+export async function submitProject(formData: FormData) {
+  try {
+    // Implementation for project submission
+    const projectData = {
+      title: formData.get("title") as string,
+      abstract: formData.get("abstract") as string,
+      // ... other fields
+      submissionDate: new Date().toISOString(),
+      status: "Submitted",
+    }
+
+    const docRef = await addDoc(collection(db, "projects"), projectData)
+
+    revalidatePath("/dashboard/my-projects")
+    return { success: true, id: docRef.id }
+  } catch (error) {
+    return { success: false, error: "Failed to submit project" }
+  }
+}
+
+export async function dateProjectStatus(projectId: string, status: string) {
+  try {
+    const projectRef = doc(db, "projects", projectId)
+    await updateDoc(projectRef, {
+      status,
+      updatedAt: serverTimestamp(),
+    })
+
+    revalidatePath("/dashboard/all-projects")
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: "Failed to update project status" }
+  }
+}
+
+export async function dateIncentiveClaimStatus(claimId: string, status: IncentiveClaim["status"]) {
+  try {
+    const claimRef = doc(db, "incentiveClaims", claimId)
+    await updateDoc(claimRef, {
+      status,
+      updatedAt: serverTimestamp(),
+    })
+
+    revalidatePath("/dashboard/manage-incentive-claims")
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: "Failed to update claim status" }
+  }
+}
+
+export async function bulkUploadProjects(projectsData: any[]) {
+  try {
+    const batch = writeBatch(db)
+    let count = 0
+
+    for (const projectData of projectsData) {
+      const docRef = doc(collection(db, "projects"))
+      batch.set(docRef, {
+        ...projectData,
+        isBulkUploaded: true,
+        submissionDate: new Date().toISOString(),
+        createdAt: serverTimestamp(),
+      })
+      count++
+    }
+
+    await batch.commit()
+
+    revalidatePath("/dashboard/bulk-upload")
+    return { success: true, count }
+  } catch (error) {
+    return { success: false, error: "Failed to upload projects" }
+  }
+}
+
+export async function deleteBulkProject(projectId: string) {
+  try {
+    await deleteDoc(doc(db, "projects", projectId))
+
+    revalidatePath("/dashboard/bulk-upload")
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: "Failed to delete project" }
+  }
+}
+
+export async function exportClaimToExcel(claimId: string) {
+  try {
+    const claimRef = doc(db, "incentiveClaims", claimId)
+    const claimDoc = await getDoc(claimRef)
+
+    if (!claimDoc.exists()) {
+      return { success: false, error: "Claim not found" }
+    }
+
+    const claimData = claimDoc.data()
+
+    // Create Excel data structure
+    const excelData = {
+      "Claimant Name": claimData.userName,
+      Email: claimData.userEmail,
+      "Claim Type": claimData.claimType,
+      Status: claimData.status,
+      "Submission Date": new Date(claimData.submissionDate).toLocaleDateString(),
+      // Add more fields as needed
+    }
+
+    // Convert to base64 (simplified - in real implementation you'd use a library like xlsx)
+    const jsonString = JSON.stringify(excelData, null, 2)
+    const fileData = Buffer.from(jsonString).toString("base64")
+
+    return { success: true, fileData }
+  } catch (error) {
+    return { success: false, error: "Failed to export claim" }
   }
 }

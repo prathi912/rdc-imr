@@ -17,6 +17,7 @@ export interface User {
   photoURL?: string
   hasCompletedTutorial?: boolean
   bankDetails?: BankDetails
+  researchDomain?: string
 }
 
 export interface BankDetails {
@@ -245,4 +246,13 @@ export interface Module {
   route: string
   icon: string
   order: number
+}
+
+export interface Publication {
+  id: string
+  title: string
+  authorUids: string[]
+  authorNames: string[]
+  addedByUid: string
+  createdAt: string
 }

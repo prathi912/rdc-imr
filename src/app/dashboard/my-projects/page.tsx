@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
@@ -8,7 +7,7 @@ import type { Project, User, EmrInterest, FundingCall } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { db } from "@/lib/config"
-import { collection, getDocs, query, where, or, orderBy, doc, getDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, or, orderBy } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -66,7 +65,6 @@ export default function MyProjectsPage() {
   const [myProjects, setMyProjects] = useState<Project[]>([])
   const [myEmrInterests, setMyEmrInterests] = useState<EmrInterest[]>([])
   const [fundingCalls, setFundingCalls] = useState<FundingCall[]>([])
-  const [papers, setPapers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
@@ -84,55 +82,48 @@ export default function MyProjectsPage() {
   useEffect(() => {
     if (!user) return
 
-      const fetchAllData = async () => {
-        setLoading(true)
-        try {
-          // Fetch IMR Projects where the user is either PI or Co-PI
-          const projectsRef = collection(db, "projects")
-          const imrQuery = query(
-            projectsRef,
-            or(where("pi_uid", "==", user.uid), where("coPiUids", "array-contains", user.uid))
-          );
+    const fetchAllData = async () => {
+      setLoading(true)
+      try {
+        // Fetch IMR Projects where the user is either PI or Co-PI
+        const projectsRef = collection(db, "projects")
+        const imrQuery = query(
+          projectsRef,
+          or(where("pi_uid", "==", user.uid), where("coPiUids", "array-contains", user.uid))
+        );
 
-          // Fetch EMR Interests
-          const emrInterestsRef = collection(db, "emrInterests")
-          const emrQuery = query(emrInterestsRef, where("userId", "==", user.uid), orderBy("registeredAt", "desc"))
+        // Fetch EMR Interests
+        const emrInterestsRef = collection(db, "emrInterests")
+        const emrQuery = query(emrInterestsRef, where("userId", "==", user.uid), orderBy("registeredAt", "desc"))
 
-          // Fetch Funding Calls
-          const callsRef = collection(db, "fundingCalls")
-          const callsQuery = query(callsRef)
+        // Fetch Funding Calls
+        const callsRef = collection(db, "fundingCalls")
+        const callsQuery = query(callsRef)
 
-          // Fetch Papers from user document
-          const userDocRef = doc(db, "users", user.uid);
-          const userDocSnap = await getDoc(userDocRef);
-          const userData = userDocSnap.data();
-          const userPapers = userData?.papers || [];
+        const [imrSnapshot, emrSnapshot, callsSnapshot] = await Promise.all([
+          getDocs(imrQuery),
+          getDocs(emrQuery),
+          getDocs(callsQuery),
+        ])
 
-          const [imrSnapshot, emrSnapshot, callsSnapshot] = await Promise.all([
-            getDocs(imrQuery),
-            getDocs(emrQuery),
-            getDocs(callsQuery),
-          ])
+        const imrProjectList = imrSnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() } as Project))
+          .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
 
-          const imrProjectList = imrSnapshot.docs
-            .map((doc) => ({ id: doc.id, ...doc.data() } as Project))
-            .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
-
-          setMyProjects(imrProjectList)
-          setMyEmrInterests(emrSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as EmrInterest)))
-          setFundingCalls(callsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as FundingCall)))
-          setPapers(userPapers);
-        } catch (error: any) {
-          console.error("Error fetching user's projects:", error)
-          toast({
-            variant: "destructive",
-            title: "Error",
-            description: `Could not fetch your projects. ${error.message || "Please try again later."}`,
-          })
-        } finally {
-          setLoading(false)
-        }
+        setMyProjects(imrProjectList)
+        setMyEmrInterests(emrSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as EmrInterest)))
+        setFundingCalls(callsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as FundingCall)))
+      } catch (error: any) {
+        console.error("Error fetching user's projects:", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: `Could not fetch your projects. ${error.message || "Please try again later."}`,
+        })
+      } finally {
+        setLoading(false)
       }
+    }
 
     fetchAllData()
   }, [user, toast])
@@ -170,10 +161,9 @@ export default function MyProjectsPage() {
       <div className="mt-8">
         <Tabs defaultValue="imr" className="w-full">
           <div className="flex justify-between items-center mb-4">
-          <TabsList>
+            <TabsList>
               <TabsTrigger value="imr">Intramural Research (IMR)</TabsTrigger>
               <TabsTrigger value="emr">Extramural Research (EMR)</TabsTrigger>
-              <TabsTrigger value="papers">Paper Publications</TabsTrigger>
             </TabsList>
             <Input
               placeholder="Filter by title..."
@@ -195,33 +185,6 @@ export default function MyProjectsPage() {
           </TabsContent>
           <TabsContent value="emr">
             <EmrProjectList interests={myEmrInterests} calls={fundingCalls} />
-          </TabsContent>
-          <TabsContent value="papers">
-            {papers.length === 0 ? (
-              <Card>
-                <CardContent className="pt-6 text-center text-muted-foreground">
-                  You have not added any papers yet.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {papers.map((paper, index) => (
-                  <div key={index} className="border rounded-lg p-4">
-                    <h4 className="font-semibold text-sm line-clamp-2">{paper.title}</h4>
-                    {paper.coAuthors && paper.coAuthors.length > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Co-Authors: {paper.coAuthors.join(", ")}
-                      </p>
-                    )}
-                    {paper.createdAt && (
-                      <p className="text-xs text-muted-foreground">
-                        Published on: {new Date(paper.createdAt).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </TabsContent>
         </Tabs>
       </div>

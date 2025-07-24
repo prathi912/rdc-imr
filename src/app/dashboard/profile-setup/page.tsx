@@ -2,31 +2,35 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Logo } from "@/components/logo"
 import { useToast } from "@/hooks/use-toast"
-import { db, auth } from "@/lib/config"
-import { doc, updateDoc, getDoc } from "firebase/firestore"
-import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth"
-import { useRouter } from "next/navigation"
-import { uploadFileToServer, fetchOrcidData, linkHistoricalData } from "@/app/actions"
+import { auth, db } from "@/lib/config"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { uploadFileToServer, checkMisIdExists, fetchOrcidData } from "@/app/actions"
 import type { User } from "@/types"
+import { useState, useEffect, useCallback } from "react"
+import { onAuthStateChanged, type User as FirebaseUser } from "firebase/auth"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Bot, Loader2 } from "lucide-react"
+import { Separator } from "@/components/ui/separator"
+import { Bot, Loader2, Search } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import Link from "next/link"
 import { Combobox } from "@/components/ui/combobox"
 
-const profileSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters."),
+const profileSetupSchema = z.object({
+  campus: z.string().min(1, "Please select a campus."),
   faculty: z.string().min(1, "Please select a faculty."),
   institute: z.string().min(1, "Please select an institute."),
-  campus: z.string().min(1, "Please select a campus."),
   department: z.string().optional(),
   designation: z.string().min(2, "Designation is required."),
   misId: z.string().optional(),
@@ -34,10 +38,15 @@ const profileSchema = z.object({
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),
   googleScholarId: z.string().optional(),
-  phoneNumber: z.string().optional(),
+  phoneNumber: z
+    .string()
+    .min(10, "A valid 10-digit phone number is required.")
+    .max(10, "A valid 10-digit phone number is required."),
 })
 
-type ProfileFormValues = z.infer<typeof profileSchema>
+
+const campuses = ["Vadodara", "Ahmedabad", "Rajkot", "Goa"]
+type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>
 
 const faculties = [
   "Faculty of Engineering & Technology",
@@ -117,7 +126,21 @@ const institutes = [
   "Parul Aarogya Seva Mandal",
 ]
 
-const campuses = ["Vadodara Campus", "Ahmedabad Campus", "Rajkot Campus", "Surat Campus"]
+const campusFacultyMap: Record<string, string[]> = {
+  "Goa": [
+    "Faculty of Engineering, IT & CS",
+    "Faculty of Management Studies",
+    "Faculty of Pharmacy",
+    "Faculty of Applied and Health Sciences",
+    "Faculty of Nursing",
+    "Faculty of Physiotherapy",
+  ],
+  "Vadodara": faculties,
+  "Ahmedabad": faculties,
+  "Rajkot": faculties,
+}
+
+
 
 const fileToDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -129,22 +152,22 @@ const fileToDataUrl = (file: File): Promise<string> => {
 }
 
 export default function ProfileSetupPage() {
-  const { toast } = useToast()
   const router = useRouter()
+  const { toast } = useToast()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [isUploading, setIsUploading] = useState(false)
   const [isFetchingOrcid, setIsFetchingOrcid] = useState(false)
+  const [isPrefilling, setIsPrefilling] = useState(false)
+  const [misIdToFetch, setMisIdToFetch] = useState("")
+  const [userType, setUserType] = useState<"faculty" | "CRO" | "Institutional" | null>(null)
   const [departments, setDepartments] = useState<string[]>([])
-  const [staffData, setStaffData] = useState<any[]>([])
 
-  const form = useForm<ProfileFormValues>({
-    resolver: zodResolver(profileSchema),
+  const form = useForm<ProfileSetupFormValues>({
+    resolver: zodResolver(profileSetupSchema),
     defaultValues: {
-      name: "",
       faculty: "",
       institute: "",
       campus: "",
@@ -159,38 +182,78 @@ export default function ProfileSetupPage() {
     },
   })
 
+  const selectedCampus = form.watch("campus")
+  const availableFaculties = campusFacultyMap[selectedCampus] || []
+
+  const prefillData = useCallback(
+    async (misId: string) => {
+      if (!misId) return
+      setIsPrefilling(true)
+      try {
+        const res = await fetch(`/api/get-staff-data?misId=${misId}`)
+        const result = await res.json()
+        if (result.success) {
+          form.reset(result.data)
+          setUserType(result.data.type)
+          toast({
+            title: "Profile Pre-filled",
+            description: "Your information has been pre-filled. Please review and save.",
+          })
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Not Found",
+            description: "Could not find your details using that MIS ID. Please enter them manually.",
+          })
+        }
+      } catch (error) {
+        console.error("Failed to fetch prefill data", error)
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not fetch your data. Please try again or enter manually.",
+        })
+      } finally {
+        setIsPrefilling(false)
+      }
+    },
+    [form, toast],
+  )
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         const userDocRef = doc(db, "users", firebaseUser.uid)
-        const userDocSnap = await getDoc(userDocRef)
-        if (userDocSnap.exists()) {
-          const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User
+        const userDoc = await getDoc(userDocRef)
+        if (userDoc.exists()) {
+          const appUser = { uid: firebaseUser.uid, ...userDoc.data() } as User
+          if (appUser.profileComplete) {
+            router.replace("/dashboard")
+            return
+          }
           setUser(appUser)
           setPreviewUrl(appUser.photoURL || null)
 
-          form.reset({
-            name: appUser.name || "",
-            faculty: appUser.faculty || "",
-            institute: appUser.institute || "",
-            campus: appUser.campus || "",
-            department: appUser.department || "",
-            designation: appUser.designation || "",
-            misId: appUser.misId || "",
-            orcidId: appUser.orcidId || "",
-            scopusId: appUser.scopusId || "",
-            vidwanId: appUser.vidwanId || "",
-            googleScholarId: appUser.googleScholarId || "",
-            phoneNumber: appUser.phoneNumber || "",
-          })
+          // Pre-fetch user type based on email to determine if MIS ID is needed.
+          const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email!}`)
+          const staffResult = await staffRes.json()
+          if (staffResult.success) {
+            setUserType(staffResult.data.type || "faculty")
+          } else {
+            setUserType("faculty") // Default to faculty if not found
+          }
+        } else {
+          toast({ variant: "destructive", title: "Error", description: "Could not find user profile." })
+          router.replace("/login")
         }
+      } else {
+        router.replace("/login")
       }
       setLoading(false)
     })
 
     return () => unsubscribe()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [router, toast])
 
   useEffect(() => {
     async function fetchDepartments() {
@@ -207,85 +270,6 @@ export default function ProfileSetupPage() {
     fetchDepartments()
   }, [])
 
-  useEffect(() => {
-    async function fetchStaffData() {
-      try {
-        const res = await fetch("/api/get-staff-data")
-        const result = await res.json()
-        if (result.success) {
-          setStaffData(result.data)
-        }
-      } catch (error) {
-        console.error("Failed to fetch staff data", error)
-      }
-    }
-    fetchStaffData()
-  }, [])
-
-  const handleEmailMatch = (email: string) => {
-    const matchedStaff = staffData.find((staff) => staff.email && staff.email.toLowerCase() === email.toLowerCase())
-
-    if (matchedStaff) {
-      form.setValue("name", matchedStaff.name || "")
-      form.setValue("faculty", matchedStaff.faculty || "")
-      form.setValue("institute", matchedStaff.institute || "")
-      form.setValue("campus", matchedStaff.campus || "")
-      form.setValue("department", matchedStaff.department || "")
-      form.setValue("designation", matchedStaff.designation || "")
-      form.setValue("phoneNumber", matchedStaff.phoneNumber || "")
-
-      toast({
-        title: "Profile Pre-filled",
-        description: "Your profile has been pre-filled with data from the staff database.",
-      })
-    }
-  }
-
-  useEffect(() => {
-    if (user?.email && staffData.length > 0) {
-      handleEmailMatch(user.email)
-    }
-  }, [user?.email, staffData, form])
-
-  async function onSubmit(data: ProfileFormValues) {
-    if (!user) return
-    setIsSubmitting(true)
-    try {
-      const userDocRef = doc(db, "users", user.uid)
-
-      // Sanitize data: Ensure optional fields that are empty strings are not sent as undefined
-      for (const key in data) {
-        if ((data as any)[key] === undefined) {
-          ;(data as any)[key] = ""
-        }
-      }
-
-      await updateDoc(userDocRef, data)
-
-      const updatedUser = { ...user, ...data }
-      localStorage.setItem("user", JSON.stringify(updatedUser))
-      setUser(updatedUser)
-
-      // Link historical data
-      await linkHistoricalData({
-        uid: user.uid,
-        email: user.email,
-        institute: data.institute,
-        department: data.department,
-        phoneNumber: data.phoneNumber,
-        campus: data.campus,
-      })
-
-      toast({ title: "Profile setup completed successfully!" })
-      router.push("/dashboard")
-    } catch (error) {
-      console.error("Profile setup error:", error)
-      toast({ variant: "destructive", title: "Setup Failed", description: "Could not complete your profile setup." })
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
@@ -294,33 +278,70 @@ export default function ProfileSetupPage() {
     }
   }
 
-  const handlePictureUpdate = async () => {
-    if (!profilePicFile || !user) return
-    setIsUploading(true)
+  const onSubmit = async (data: ProfileSetupFormValues) => {
+    if (!user) return
+    setIsSubmitting(true)
     try {
-      const dataUrl = await fileToDataUrl(profilePicFile)
-      const path = `profile-pictures/${user.uid}`
-      const result = await uploadFileToServer(dataUrl, path)
-
-      if (!result.success || !result.url) {
-        throw new Error(result.error || "Upload failed")
+      if (data.misId) {
+        const misIdCheck = await checkMisIdExists(data.misId, user.uid)
+        if (misIdCheck.exists) {
+          form.setError("misId", {
+            type: "manual",
+            message: "This MIS ID is already registered. If you need help, contact helpdesk.rdc@paruluniversity.ac.in.",
+          })
+          toast({
+            variant: "destructive",
+            title: "MIS ID Already Registered",
+            description: "This MIS ID is already associated with another account.",
+            duration: 8000,
+          })
+          setIsSubmitting(false)
+          return
+        }
       }
-      const photoURL = result.url
 
       const userDocRef = doc(db, "users", user.uid)
-      await updateDoc(userDocRef, { photoURL })
+      let photoURL = user.photoURL || ""
 
-      const updatedUser = { ...user, photoURL }
-      setUser(updatedUser)
+      if (profilePicFile) {
+        const dataUrl = await fileToDataUrl(profilePicFile)
+        const path = `profile-pictures/${user.uid}`
+        const result = await uploadFileToServer(dataUrl, path)
+        if (!result.success || !result.url) {
+          throw new Error(result.error || "File upload failed")
+        }
+        photoURL = result.url
+      }
+
+      const updateData: Partial<User> = {
+        ...data,
+        photoURL: photoURL,
+        profileComplete: true,
+      }
+
+      // Sanitize data: Ensure optional fields that are empty strings are not sent as undefined
+      for (const key in updateData) {
+        if ((updateData as any)[key] === undefined) {
+          ;(updateData as any)[key] = null
+        }
+      }
+
+      await updateDoc(userDocRef, updateData as any)
+
+      const updatedUser = { ...user, ...updateData }
       localStorage.setItem("user", JSON.stringify(updatedUser))
 
-      toast({ title: "Profile picture updated!" })
-      setProfilePicFile(null)
-    } catch (error) {
-      console.error("Error updating profile picture: ", error)
-      toast({ variant: "destructive", title: "Update Failed", description: "Could not update your profile picture." })
+      toast({ title: "Profile Updated!", description: "Redirecting to your dashboard." })
+      router.push("/dashboard")
+    } catch (error: any) {
+      console.error("Profile update error:", error)
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message || "Could not update your profile.",
+      })
     } finally {
-      setIsUploading(false)
+      setIsSubmitting(false)
     }
   }
 
@@ -338,10 +359,9 @@ export default function ProfileSetupPage() {
     try {
       const result = await fetchOrcidData(orcidId)
       if (result.success && result.data) {
-        form.setValue("name", result.data.name, { shouldValidate: true })
-        toast({ title: "Success", description: "Your name has been pre-filled from your ORCID profile." })
+        toast({ title: "ORCID iD Verified", description: `Successfully verified ORCID iD for ${result.data.name}.` })
       } else {
-        toast({ variant: "destructive", title: "Fetch Failed", description: result.error })
+        toast({ variant: "destructive", title: "Verification Failed", description: result.error })
       }
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." })
@@ -350,217 +370,236 @@ export default function ProfileSetupPage() {
     }
   }
 
-  if (loading) {
+  if (loading || !user) {
     return (
-      <div className="container mx-auto py-10">
-        <div className="max-w-2xl mx-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>Complete Your Profile</CardTitle>
-              <CardDescription>Please provide your details to get started.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <main className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      </main>
     )
   }
 
   const departmentOptions = departments.map((dept) => ({ label: dept, value: dept }))
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>Complete Your Profile</CardTitle>
-            <CardDescription>Please provide your details to get started with the Research Portal.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Profile Picture Section */}
-            <div className="flex items-center gap-6">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={previewUrl || user?.photoURL || undefined} alt={user?.name || ""} />
-                <AvatarFallback>{user?.name?.[0].toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div className="space-y-2">
-                <Input
-                  id="picture"
-                  type="file"
-                  onChange={handleFileChange}
-                  accept="image/png, image/jpeg"
-                  className="max-w-xs"
-                />
-                <p className="text-xs text-muted-foreground">PNG or JPG. 2MB max.</p>
-                {profilePicFile && (
-                  <Button onClick={handlePictureUpdate} disabled={isUploading} size="sm">
-                    {isUploading ? "Uploading..." : "Save Picture"}
-                  </Button>
-                )}
+    <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
+      <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
+        <div className="w-full max-w-lg">
+          <Card className="shadow-xl">
+            <CardHeader className="text-center">
+              <div className="mx-auto mb-6 flex justify-center">
+                <Logo />
               </div>
-            </div>
-
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Your full name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  name="faculty"
-                  control={form.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Faculty</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your faculty" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {faculties.map((f) => (
-                            <SelectItem key={f} value={f}>
-                              {f}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  name="institute"
-                  control={form.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Institute</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your institute" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {institutes.map((i) => (
-                            <SelectItem key={i} value={i}>
-                              {i}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  name="campus"
-                  control={form.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Campus</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select your campus" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {campuses.map((c) => (
-                            <SelectItem key={c} value={c}>
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="department"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Department</FormLabel>
-                      <Combobox
-                        options={departmentOptions}
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        placeholder="Select your department"
-                        searchPlaceholder="Search departments..."
-                        emptyPlaceholder="No department found."
+              <CardTitle className="text-2xl font-bold">Complete Your Profile</CardTitle>
+              <CardDescription>Please provide the following details to continue.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {userType !== "Institutional" && (
+                <div className="space-y-4 mb-6 p-4 border rounded-lg bg-muted/50">
+                  <Label>Fetch Details with MIS ID (Optional)</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="Enter your MIS ID"
+                      value={misIdToFetch}
+                      onChange={(e) => setMisIdToFetch(e.target.value)}
+                    />
+                    <Button
+                      type="button"
+                      onClick={() => prefillData(misIdToFetch)}
+                      disabled={isPrefilling || !misIdToFetch}
+                    >
+                      {isPrefilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      <span className="ml-2 hidden sm:inline">Fetch My Details</span>
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    If your details are in our system, this will pre-fill the form for you.
+                  </p>
+                </div>
+              )}
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <div className="flex flex-col items-center space-y-4 pt-4 pb-6">
+                    <Avatar className="h-24 w-24">
+                      <AvatarImage src={previewUrl || undefined} alt={user.name} />
+                      <AvatarFallback>{user.name?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                    </Avatar>
+                    <FormControl>
+                      <Input
+                        id="picture"
+                        type="file"
+                        onChange={handleFileChange}
+                        accept="image/png, image/jpeg"
+                        className="max-w-xs"
                       />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    </FormControl>
+                  </div>
 
-                <FormField
-                  control={form.control}
-                  name="designation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Designation</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Professor, Assistant Professor" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <div className="space-y-2">
+                    <Label>Full Name</Label>
+                    <Input value={user.name} disabled />
+                    <p className="text-sm text-muted-foreground">
+                      This name was set from your sign-up details. It can be changed in Settings after setup.
+                    </p>
+                  </div>
 
-                <FormField
-                  control={form.control}
-                  name="phoneNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="e.g. 9876543210" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Academic & Researcher IDs (Optional)</h3>
-
+                  <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
                   <FormField
+                    name="campus"
                     control={form.control}
-                    name="misId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>MIS ID</FormLabel>
+                        <FormLabel>Campus</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your campus" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {campuses.map((c) => (
+                              <SelectItem key={c} value={c}>
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    name="faculty"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Faculty</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!selectedCampus}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your faculty" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableFaculties.map((f) => (
+                              <SelectItem key={f} value={f}>
+                                {f}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    name="institute"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Institute</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your institute" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {institutes.map((i) => (
+                              <SelectItem key={i} value={i}>
+                                {i}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {userType !== "Institutional" && (
+                    <FormField
+                      control={form.control}
+                      name="department"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <Combobox
+                            options={departmentOptions}
+                            value={field.value || ""}
+                            onChange={field.onChange}
+                            placeholder="Select your department"
+                            searchPlaceholder="Search departments..."
+                            emptyPlaceholder="No department found."
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                  <FormField
+                    control={form.control}
+                    name="designation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Designation</FormLabel>
                         <FormControl>
-                          <Input placeholder="Your MIS ID" {...field} />
+                          <Input placeholder="e.g., Professor" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phoneNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <Input type="tel" placeholder="e.g. 9876543210" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
+                  <Separator />
+                  <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
+
+                  {userType !== "Institutional" && (
+                    <FormField
+                      control={form.control}
+                      name="misId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>MIS ID (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Your MIS ID" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormField
                     control={form.control}
                     name="orcidId"
@@ -577,7 +616,7 @@ export default function ProfileSetupPage() {
                             size="icon"
                             onClick={handleFetchOrcid}
                             disabled={isFetchingOrcid}
-                            title="Fetch data from ORCID"
+                            title="Verify ORCID iD"
                           >
                             {isFetchingOrcid ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -590,13 +629,12 @@ export default function ProfileSetupPage() {
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="scopusId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Scopus ID</FormLabel>
+                        <FormLabel>Scopus ID (Optional)</FormLabel>
                         <FormControl>
                           <Input placeholder="Your Scopus Author ID" {...field} />
                         </FormControl>
@@ -604,13 +642,12 @@ export default function ProfileSetupPage() {
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="vidwanId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Vidwan ID</FormLabel>
+                        <FormLabel>Vidwan ID (Optional)</FormLabel>
                         <FormControl>
                           <Input placeholder="Your Vidwan-ID" {...field} />
                         </FormControl>
@@ -618,13 +655,12 @@ export default function ProfileSetupPage() {
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="googleScholarId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Google Scholar ID</FormLabel>
+                        <FormLabel>Google Scholar ID (Optional)</FormLabel>
                         <FormControl>
                           <Input placeholder="Your Google Scholar Profile ID" {...field} />
                         </FormControl>
@@ -632,17 +668,32 @@ export default function ProfileSetupPage() {
                       </FormItem>
                     )}
                   />
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-          <CardFooter>
-            <Button onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting} className="w-full">
-              {isSubmitting ? "Setting up..." : "Complete Setup"}
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+
+                  <Button type="submit" className="w-full !mt-8" disabled={isSubmitting}>
+                    {isSubmitting ? "Saving..." : "Save and Continue"}
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
+        <p className="text-xs text-muted-foreground">
+          &copy; {new Date().getFullYear()} Parul University. All rights reserved.
+        </p>
+        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
+          <Link className="text-xs hover:underline underline-offset-4" href="/help">
+            Help
+          </Link>
+          <Link className="text-xs hover:underline underline-offset-4" href="/terms-of-use">
+            Terms of Service
+          </Link>
+          <Link className="text-xs hover:underline underline-offset-4" href="/privacy-policy">
+            Privacy
+          </Link>
+        </nav>
+      </footer>
     </div>
   )
 }
