@@ -45,7 +45,7 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, leftIcon, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
-    const { leftIcon: _leftIcon, ...rest } = props as any; // Remove leftIcon from props passed to DOM
+    const { leftIcon: _leftIcon, ...rest } = props as any;
 
     return (
       <Comp
