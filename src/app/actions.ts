@@ -6,7 +6,8 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, doc, updateDoc, getFirestore, getDocs, collection, query, where, getDoc, orderBy } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, getDocs, collection, query, where } from 'firebase-admin/firestore';
+import admin from 'firebase-admin';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
 import { sendEmail } from "@/lib/email"
 import * as XLSX from "xlsx"
@@ -40,20 +41,20 @@ export async function addResearchPaper(
 ): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
     const paperRef = adminDb.collection('papers').doc();
+    const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
     const paperData: Omit<ResearchPaper, 'id'> = {
       title,
       url,
       mainAuthorUid,
       authors,
+      authorUids: allAuthorUids, // Added authorUids array field
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
-    
     // AI Domain Suggestion
     try {
-      const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids.map(uid => ({ uid }))).get();
+      const allPapersQuery = await adminDb.collection('papers').where('authorUids', 'array-contains-any', allAuthorUids).get();
       const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
       const allTitles = [...new Set([title, ...existingTitles])];
       
@@ -63,7 +64,7 @@ export async function addResearchPaper(
         
         if (allAuthorUids.length > 0) {
             const batch = adminDb.batch();
-            const userDocs = await adminDb.collection('users').where(FieldValue.documentId(), 'in', allAuthorUids).get();
+            const userDocs = await adminDb.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', allAuthorUids).get();
             userDocs.forEach(doc => {
                 batch.update(doc.ref, { researchDomain: domainResult.domain });
             });
@@ -125,10 +126,13 @@ export async function updateResearchPaper(
       return { success: false, error: "You do not have permission to edit this paper." };
     }
 
+    const allAuthorUids = data.authors.map(a => a.uid).filter(Boolean) as string[];
+
     const updatedData: Partial<ResearchPaper> = {
       title: data.title,
       url: data.url,
       authors: data.authors,
+      authorUids: allAuthorUids, // Added authorUids array field
       updatedAt: new Date().toISOString(),
     };
 
@@ -246,8 +250,7 @@ export async function fetchResearchPapersByUserUid(
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
     const papersRef = collection(adminDb, "papers");
-    const q = query(papersRef, where("authors", "array-contains-any", [{uid: userUid}]));
-    
+    const q = query(papersRef, where("authorUids", "array-contains", userUid));    
     const querySnapshot = await getDocs(q);
     const papers = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as ResearchPaper))
@@ -1552,7 +1555,7 @@ export async function updateCoInvestigators(
 
     if (newCoPis.length > 0) {
       const usersRef = adminDb.collection("users");
-      const usersQuery = usersRef.where(FieldValue.documentId(), "in", newCoPis);
+        const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", newCoPis);
       const newCoPiDocs = await usersQuery.get();
       
       const batch = adminDb.batch();
@@ -1667,7 +1670,7 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
         const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call";
 
         const usersRef = adminDb.collection("users");
-        const usersQuery = usersRef.where(FieldValue.documentId(), "in", coPis.map(p => p.uid));
+        const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", coPis.map(p => p.uid));
         const coPiDocs = await usersQuery.get();
         const batch = adminDb.batch();
 
