@@ -78,8 +78,8 @@ export async function addResearchPaper(
 
     // Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
-    const mainAuthorName = mainAuthorDoc.exists() ? mainAuthorDoc.data()?.name : 'A colleague';
-    const mainAuthorMisId = mainAuthorDoc.exists() ? mainAuthorDoc.data()?.misId : null;
+    const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
+    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
     const notificationBatch = adminDb.batch();
     authors.forEach(author => {
@@ -136,8 +136,8 @@ export async function updateResearchPaper(
 
     // Notify newly added co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
-    const mainAuthorName = mainAuthorDoc.exists() ? mainAuthorDoc.data()?.name : 'A colleague';
-    const mainAuthorMisId = mainAuthorDoc.exists() ? mainAuthorDoc.data()?.misId : null;
+    const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
+    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
     const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
 
     const notificationBatch = adminDb.batch();
@@ -243,29 +243,15 @@ export async function checkUserOrStaff(email: string): Promise<{ success: boolea
 
 export async function fetchResearchPapersByUserUid(
   userUid: string,
-  userEmail: string,
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
-    const papersRef = adminDb.collection("papers");
-    const papersMap = new Map<string, ResearchPaper>();
-
-    // Query by UID
-    const uidQuery = query(papersRef, where("authors", "array-contains-any", [{uid: userUid}]));
-    const uidSnapshot = await getDocs(uidQuery);
-    uidSnapshot.forEach(doc => {
-        papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper);
-    });
+    const papersRef = collection(adminDb, "papers");
+    const q = query(papersRef, where("authors", "array-contains-any", [{uid: userUid}]));
     
-    // Query by Email
-    const emailQuery = query(papersRef, where("authors", "array-contains-any", [{email: userEmail}]));
-    const emailSnapshot = await getDocs(emailQuery);
-    emailSnapshot.forEach(doc => {
-        papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper);
-    });
-
-    const papers = Array.from(papersMap.values()).sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    const querySnapshot = await getDocs(q);
+    const papers = querySnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as ResearchPaper))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return { success: true, papers };
   } catch (error: any) {
@@ -1678,7 +1664,7 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
      // Notify Co-PIs
     if (coPis && coPis.length > 0) {
         const callSnap = await adminDb.collection('fundingCalls').doc(callId).get();
-        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : "an EMR call";
+        const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call";
 
         const usersRef = adminDb.collection("users");
         const usersQuery = usersRef.where(FieldValue.documentId(), "in", coPis.map(p => p.uid));
