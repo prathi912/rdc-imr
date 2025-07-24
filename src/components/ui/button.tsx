@@ -45,17 +45,31 @@ export interface ButtonProps
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, leftIcon, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
-    const { leftIcon: _leftIcon, ...rest } = props as any;
+    
+    if (asChild) {
+      // If asChild is true, we must render a single child and clone its props.
+      // We cannot render the leftIcon here directly as it would violate the single child rule.
+      // The consumer must place the icon inside the child component. e.g., <Button asChild><Link> <Icon/> Text </Link></Button>
+      return (
+        <Slot
+          className={cn(buttonVariants({ variant, size, className }))}
+          ref={ref}
+          {...props}
+        >
+          {children}
+        </Slot>
+      )
+    }
 
     return (
-      <Comp
+      <button
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
-        {...rest}
+        {...props}
       >
         {leftIcon}
         {children}
-      </Comp>
+      </button>
     )
   }
 )
