@@ -1,5 +1,3 @@
-
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -31,6 +29,54 @@ const EMAIL_STYLES = {
         This is a system generated automatic email. If you feel this is an error, please report at the earliest.
     </p>`
 };
+
+
+export async function addResearchPaper(
+  title: string,
+  authorUid: string,
+  coAuthorEmails: string[]
+): Promise<{ success: boolean; paperId?: string; error?: string }> {
+  try {
+    // Fetch co-author UIDs by email
+    const usersRef = adminDb.collection("users")
+    const coAuthorUids: string[] = []
+
+    if (coAuthorEmails.length > 0) {
+      const usersQuery = await usersRef.where("email", "in", coAuthorEmails).get()
+      usersQuery.forEach(doc => {
+        coAuthorUids.push(doc.id)
+      })
+    }
+
+    // Combine main author and co-authors UIDs
+    const allAuthorUids = Array.from(new Set([authorUid, ...coAuthorUids]))
+
+    // Call AI domain detection with paper title
+    const domainResult = await getResearchDomainSuggestion({ paperTitles: [title] })
+    const detectedDomain = domainResult.domain || ""
+
+    // Create paper document in "papers" collection
+    const papersRef = adminDb.collection("papers")
+    const newPaperRef = papersRef.doc()
+
+    const paperData = {
+      title,
+      authorUids: allAuthorUids,
+      mainAuthorUid: authorUid,
+      coAuthorEmails,
+      domain: detectedDomain,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    await newPaperRef.set(paperData)
+
+    return { success: true, paperId: newPaperRef.id }
+  } catch (error: any) {
+    console.error("Error adding research paper:", error)
+    return { success: false, error: error.message || "Failed to add research paper." }
+  }
+}
 
 
 export async function getProjectSummary(input: SummarizeProjectInput) {
