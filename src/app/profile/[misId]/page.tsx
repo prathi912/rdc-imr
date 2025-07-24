@@ -147,20 +147,21 @@ export default function ProfilePage() {
           console.error("Error fetching projects:", projectsError)
           setProjects([])
         }
-
+        
         try {
-          const res = await fetch('/api/get-research-papers?userUid=' + fetchedUser.uid)
-          if (res.ok) {
-            const data = await res.json()
-            setResearchPapers(data.papers || [])
-          } else {
-            console.warn("Failed to fetch research papers")
-            setResearchPapers([])
-          }
+            const res = await fetch(`/api/get-research-papers?userUid=${fetchedUser.uid}&userEmail=${fetchedUser.email}`);
+            if (res.ok) {
+                const data = await res.json();
+                setResearchPapers(data.papers || []);
+            } else {
+                console.warn("Failed to fetch research papers");
+                setResearchPapers([]);
+            }
         } catch (paperError) {
-          console.error("Error fetching research papers:", paperError)
-          setResearchPapers([])
+            console.error("Error fetching research papers:", paperError);
+            setResearchPapers([]);
         }
+
       } catch (err: any) {
         if (err.code === "permission-denied") {
           setError("Access Denied: You do not have permission to view this profile.")

@@ -50,11 +50,11 @@ export async function addResearchPaper(
     };
 
     const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
-
+    
     // AI Domain Suggestion
     try {
       // Get titles from all authors to create a more robust domain suggestion
-      const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids).get();
+      const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids.map(uid => ({ uid }))).get();
       const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
       const allTitles = [...new Set([title, ...existingTitles])];
       
@@ -199,24 +199,35 @@ export async function checkUserOrStaff(email: string): Promise<{ success: boolea
 
 
 export async function fetchResearchPapersByUserUid(
-  userUid: string
+  userUid: string,
+  userEmail: string,
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
-    const papersRef = adminDb.collection("papers")
-    // Query for papers where the user's UID is in the authors array.
-    const papersQuery = query(papersRef, where("authors", "array-contains", { uid: userUid }), orderBy("createdAt", "desc"));
-    const papersSnapshot = await papersQuery.get()
+    const papersRef = adminDb.collection("papers");
+    const papersMap = new Map<string, ResearchPaper>();
 
-    if (papersSnapshot.empty) {
-      return { success: true, papers: [] }
-    }
+    // Query by UID
+    const uidQuery = query(papersRef, where("authors", "array-contains-any", [{uid: userUid}]));
+    const uidSnapshot = await getDocs(uidQuery);
+    uidSnapshot.forEach(doc => {
+        papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper);
+    });
+    
+    // Query by Email
+    const emailQuery = query(papersRef, where("authors", "array-contains-any", [{email: userEmail}]));
+    const emailSnapshot = await getDocs(emailQuery);
+    emailSnapshot.forEach(doc => {
+        papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper);
+    });
 
-    const papers = papersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    const papers = Array.from(papersMap.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
-    return { success: true, papers }
+    return { success: true, papers };
   } catch (error: any) {
-    console.error("Error fetching research papers:", error)
-    return { success: false, error: error.message || "Failed to fetch research papers." }
+    console.error("Error fetching research papers:", error);
+    return { success: false, error: error.message || "Failed to fetch research papers." };
   }
 }
 
