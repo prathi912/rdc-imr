@@ -38,7 +38,6 @@ export async function addResearchPaper(
   coAuthorEmails: string[]
 ): Promise<{ success: boolean; paperId?: string; error?: string }> {
   try {
-    // Fetch co-author UIDs by email
     const usersRef = adminDb.collection("users")
     const coAuthorUids: string[] = []
 
@@ -49,20 +48,28 @@ export async function addResearchPaper(
       })
     }
 
-    // Combine main author and co-authors UIDs
     const allAuthorUids = Array.from(new Set([authorUid, ...coAuthorUids]))
 
-    let detectedDomain = "";
+    let detectedDomain = ""
     try {
-      // Call AI domain detection with paper title
-      const domainResult = await getResearchDomainSuggestion({ paperTitles: [title] });
-      detectedDomain = domainResult.domain || "";
+      const domainResult = await getResearchDomainSuggestion({ paperTitles: [title] })
+      detectedDomain = domainResult.domain || ""
+
+      // If a domain was detected, update the profiles of all authors.
+      if (detectedDomain) {
+        const batch = adminDb.batch();
+        allAuthorUids.forEach(uid => {
+          const userRef = usersRef.doc(uid);
+          batch.update(userRef, { researchDomain: detectedDomain });
+        });
+        await batch.commit();
+        console.log(`Updated research domain to "${detectedDomain}" for ${allAuthorUids.length} authors.`);
+      }
     } catch (aiError: any) {
-      console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
+      console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message)
       // The paper will be saved without a domain if the AI call fails.
     }
     
-    // Create paper document in "papers" collection
     const papersRef = adminDb.collection("papers")
     const newPaperRef = papersRef.doc()
 
@@ -2266,5 +2273,4 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
   }
 }
 
-
-
+    
