@@ -44,18 +44,20 @@ export default function DashboardPage() {
       )
   }
 
-  const adminRoles: User['role'][] = ['admin', 'CRO', 'Super-admin'];
+  const adminRoles: User['role'][] = ['admin', 'Super-admin'];
   // A user is a standard faculty if their role is 'faculty' AND their designation is NOT 'Principal' or 'HOD'.
   const isStandardFaculty = user.role === 'faculty' && user.designation !== 'Principal' && user.designation !== 'HOD';
   // An admin view is for admin roles OR for Principals/HODs.
-  const showAdminView = adminRoles.includes(user.role) || user.designation === 'Principal' || user.designation === 'HOD';
+  const showAdminView = adminRoles.includes(user.role) || user.designation === 'Principal' || user.designation === 'HOD' || user.role === 'CRO';
+  // A faculty view is for standard faculty OR for CROs (who are also faculty).
+  const showFacultyView = isStandardFaculty || user.role === 'CRO';
 
 
   return (
     <div className="animate-in fade-in-0 duration-500">
       {user && user.hasCompletedTutorial === false && <WelcomeTutorial user={user} />}
       {showAdminView && <AdminDashboard />}
-      {isStandardFaculty && <FacultyDashboard user={user} />}
+      {showFacultyView && <FacultyDashboard user={user} />}
     </div>
   );
 }
