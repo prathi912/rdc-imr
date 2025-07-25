@@ -1332,31 +1332,51 @@ export async function updateProjectEvaluators(
 
 export async function findUserByMisId(
   misId: string,
-): Promise<{ success: boolean; user?: { uid: string; name: string; email: string; }; error?: string }> {
+): Promise<{ 
+  success: boolean; 
+  user?: { uid: string; name: string; email: string; }; 
+  staff?: { name: string; email: string; };
+  error?: string 
+}> {
   try {
     if (!misId || misId.trim() === "") {
-      return { success: false, error: "MIS ID is required." }
-    }
-    const usersRef = adminDb.collection("users")
-    const q = usersRef.where("misId", "==", misId).limit(1)
-    const querySnapshot = await q.get()
-
-    if (querySnapshot.empty) {
-      return { success: false, error: "No user found with this MIS ID." }
+      return { success: false, error: "MIS ID is required." };
     }
 
-    const userDoc = querySnapshot.docs[0]
-    const userData = userDoc.data() as User;
+    // 1. Check registered users in Firestore
+    const usersRef = adminDb.collection("users");
+    const q = usersRef.where("misId", "==", misId).limit(1);
+    const querySnapshot = await q.get();
 
-    // Prevent adding admins as Co-PIs
-    if (userData.role === "admin" || userData.role === "Super-admin") {
-      return { success: false, error: "Administrative users cannot be added as Co-PIs." }
+    if (!querySnapshot.empty) {
+      const userDoc = querySnapshot.docs[0];
+      const userData = userDoc.data() as User;
+      if (userData.role === "admin" || userData.role === "Super-admin") {
+        return { success: false, error: "Administrative users cannot be added as Co-PIs." };
+      }
+      return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email } };
     }
 
-    return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email } }
+    // 2. Fallback to staffdata.xlsx
+    const filePath = path.resolve(process.cwd(), 'staffdata.xlsx');
+    if (fs.existsSync(filePath)) {
+        const workbook = XLSX.readFile(filePath);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: Array<Record<string, any>> = XLSX.utils.sheet_to_json(worksheet);
+
+        const staff = jsonData.find((row) => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
+        
+        if (staff && staff['Name'] && staff['Email']) {
+            return { success: true, staff: { name: staff['Name'], email: staff['Email'] }};
+        }
+    }
+
+    return { success: false, error: "No registered user or staff member found with this MIS ID. Please ask them to sign up for the portal." };
+
   } catch (error: any) {
-    console.error("Error finding user by MIS ID:", error)
-    return { success: false, error: error.message || "Failed to search for user." }
+    console.error("Error finding user by MIS ID:", error);
+    return { success: false, error: error.message || "Failed to search for user." };
   }
 }
 
@@ -2462,6 +2482,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+
 
 
 

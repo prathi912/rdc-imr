@@ -57,7 +57,7 @@ function AddEditPaperDialog({
     
     // State for adding co-authors
     const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-    const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string; email: string } | null>(null);
+    const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string; email: string; isRegistered: boolean } | null>(null);
     const [isSearching, setIsSearching] = useState(false);
     const [externalAuthorName, setExternalAuthorName] = useState('');
     const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
@@ -82,8 +82,12 @@ function AddEditPaperDialog({
         setFoundCoPi(null);
         try {
             const result = await findUserByMisId(coPiSearchTerm);
-            if (result.success && result.user) {
-                setFoundCoPi(result.user);
+            if (result.success) {
+                if (result.user) {
+                    setFoundCoPi({ ...result.user, isRegistered: true });
+                } else if (result.staff) {
+                    setFoundCoPi({ ...result.staff, uid: '', isRegistered: false });
+                }
             } else {
                 toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
             }
@@ -95,8 +99,18 @@ function AddEditPaperDialog({
     };
     
     const addInternalAuthor = () => {
-        if (foundCoPi && !authors.some(a => a.uid === foundCoPi.uid)) {
-            setAuthors([...authors, { uid: foundCoPi.uid, name: foundCoPi.name, email: foundCoPi.email, role: 'Co-Author', isExternal: false }]);
+        if (foundCoPi && !authors.some(a => a.email === foundCoPi.email)) {
+            if (user && foundCoPi.email === user.email) {
+                toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
+                return;
+            }
+            setAuthors([...authors, { 
+                uid: foundCoPi.isRegistered ? foundCoPi.uid : undefined, 
+                name: foundCoPi.name, 
+                email: foundCoPi.email, 
+                role: 'Co-Author', 
+                isExternal: false 
+            }]);
             setFoundCoPi(null);
             setCoPiSearchTerm('');
         }
@@ -198,7 +212,10 @@ function AddEditPaperDialog({
                             </div>
                             {foundCoPi && (
                                 <div className="flex items-center justify-between p-2 border rounded-md mt-2">
-                                    <p className="text-sm">{foundCoPi.name}</p>
+                                    <div>
+                                        <p className="text-sm">{foundCoPi.name}</p>
+                                        {!foundCoPi.isRegistered && <p className="text-xs text-muted-foreground">Not registered, but found in staff data.</p>}
+                                    </div>
                                     <Button size="sm" onClick={addInternalAuthor}>Add</Button>
                                 </div>
                             )}
