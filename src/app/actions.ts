@@ -42,6 +42,7 @@ export async function addResearchPaper(
   try {
     const paperRef = adminDb.collection('papers').doc();
     const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
+    console.log("addResearchPaper - allAuthorUids:", allAuthorUids);
     const paperData: Omit<ResearchPaper, 'id'> = {
       title,
       url,
@@ -76,6 +77,7 @@ export async function addResearchPaper(
     }
     
     await paperRef.set(paperData);
+    console.log(`Research paper titled "${title}" added with ID: ${paperRef.id}`);
 
     // Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
@@ -84,8 +86,12 @@ export async function addResearchPaper(
 
     const notificationBatch = adminDb.batch();
     authors.forEach(author => {
+      if (!author.uid) {
+        console.log(`Skipping notification for author without UID: ${author.email}`);
+      }
       // Notify only registered co-authors who are not the main author
       if (author.uid && author.uid !== mainAuthorUid) {
+        console.log(`Creating notification for co-author UID: ${author.uid}`);
         const notificationRef = adminDb.collection('notifications').doc();
         notificationBatch.set(notificationRef, {
           uid: author.uid,
@@ -98,6 +104,7 @@ export async function addResearchPaper(
       }
     });
     await notificationBatch.commit();
+    console.log(`Notifications committed for co-authors of paper titled: "${title}"`);
 
     return { success: true, paper: { id: paperRef.id, ...paperData } };
   } catch (error: any) {
@@ -126,7 +133,9 @@ export async function updateResearchPaper(
       return { success: false, error: "You do not have permission to edit this paper." };
     }
 
-    const allAuthorUids = data.authors.map(a => a.uid).filter(Boolean) as string[];
+    const allAuthorUids = data.aut
+    hors.map(a => a.uid).filter(Boolean) as string[];
+    console.log("updateResearchPaper - allAuthorUids:", allAuthorUids);
 
     const updatedData: Partial<ResearchPaper> = {
       title: data.title,
@@ -137,6 +146,7 @@ export async function updateResearchPaper(
     };
 
     await paperRef.update(updatedData);
+    console.log(`Research paper titled "${data.title}" updated with ID: ${paperId}`);
 
     // Notify newly added co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
@@ -146,8 +156,12 @@ export async function updateResearchPaper(
 
     const notificationBatch = adminDb.batch();
     data.authors.forEach(author => {
+      if (!author.uid) {
+        console.log(`Skipping notification for author without UID: ${author.email}`);
+      }
       // Notify if the author is new, registered (has UID), and not the main author
       if (author.uid && author.uid !== userId && !oldAuthorUids.has(author.uid)) {
+        console.log(`Creating notification for new co-author UID: ${author.uid}`);
         const notificationRef = adminDb.collection('notifications').doc();
         notificationBatch.set(notificationRef, {
           uid: author.uid,
@@ -159,6 +173,7 @@ export async function updateResearchPaper(
       }
     });
     await notificationBatch.commit();
+    console.log(`Notifications committed for newly added co-authors of paper titled: "${data.title}"`);
     
     return { success: true, paper: { ...paperData, ...updatedData, id: paperId } };
 
@@ -249,11 +264,20 @@ export async function fetchResearchPapersByUserUid(
   userUid: string,
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
-    const papersRef = collection(adminDb, "papers");
-    const q = query(papersRef, where("authorUids", "array-contains", userUid));    
-    const querySnapshot = await getDocs(q);
+    const papersRef = adminDb.collection("papers");
+    const q = papersRef.where("authorUids", "array-contains", userUid);
+    const querySnapshot = await q.get();
+    if (querySnapshot.empty) {
+      console.warn(`No research papers found for user UID: ${userUid}`);
+    }
     const papers = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as ResearchPaper))
+        .map(doc => {
+          const data = doc.data();
+          if (!data.authorUids) {
+            console.warn(`Paper document ${doc.id} missing 'authorUids' field.`);
+          }
+          return { id: doc.id, ...data } as ResearchPaper;
+        })
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return { success: true, papers };
