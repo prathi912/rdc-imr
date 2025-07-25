@@ -42,23 +42,25 @@ export async function addResearchPaper(
     const paperRef = adminDb.collection('papers').doc();
     const now = new Date().toISOString();
     
+    // Create an array of UIDs for efficient querying
+    const authorUids = authors.map((a) => a.uid).filter(Boolean) as string[];
+
     const paperData: Omit<ResearchPaper, 'id'> = {
       title,
       url,
       mainAuthorUid,
       authors,
+      authorUids, // Add the new field
       createdAt: now,
       updatedAt: now,
     };
     
-    const allAuthorUids = authors.map((a) => a.uid).filter(Boolean) as string[];
-
     // 1. AI Domain Suggestion
     try {
-      if (allAuthorUids.length > 0) {
+      if (authorUids.length > 0) {
         const allPapersQuery = await adminDb
           .collection('papers')
-          .where('authors.uid', 'in', allAuthorUids)
+          .where('authorUids', 'array-contains-any', authorUids) // Use array-contains-any for better performance
           .get();
         const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
         const allTitles = [...new Set([title, ...existingTitles])];
@@ -70,7 +72,7 @@ export async function addResearchPaper(
           const batch = adminDb.batch();
           const userDocs = await adminDb
             .collection('users')
-            .where(admin.firestore.FieldPath.documentId(), 'in', allAuthorUids)
+            .where(admin.firestore.FieldPath.documentId(), 'in', authorUids)
             .get();
             
           userDocs.forEach(doc => {
@@ -135,10 +137,13 @@ export async function updateResearchPaper(
       return { success: false, error: "You do not have permission to edit this paper." };
     }
     
+    const authorUids = data.authors.map((a) => a.uid).filter(Boolean) as string[];
+
     const updatedData: Partial<ResearchPaper> = {
       title: data.title,
       url: data.url,
       authors: data.authors,
+      authorUids: authorUids, // Update the UIDs array as well
       updatedAt: new Date().toISOString(),
     };
 
@@ -2457,6 +2462,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+
 
 
 

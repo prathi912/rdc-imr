@@ -244,7 +244,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         
         const fetchPapers = async () => {
             try {
-                const res = await fetch(`/api/get-research-papers?userUid=${user.uid}&userEmail=${user.email}`);
+                const res = await fetch(`/api/get-research-papers?userUid=${user.uid}`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.success) {
