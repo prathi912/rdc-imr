@@ -42,6 +42,7 @@ export async function addResearchPaper(
   try {
     const paperRef = adminDb.collection('papers').doc();
     const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
+    console.log("addResearchPaper - allAuthorUids:", allAuthorUids);
     const paperData: Omit<ResearchPaper, 'id'> = {
       title,
       url,
@@ -96,28 +97,29 @@ export async function addResearchPaper(
     }
     
     await paperRef.set(paperData);
+    console.log(`Research paper titled "${title}" added with ID: ${paperRef.id}`);
 
     // Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
-    if (authors && authors.length > 0) {
-        const notificationBatch = adminDb.batch();
-        authors.forEach(author => {
-            if (author.uid && author.uid !== mainAuthorUid) {
-                const notificationRef = adminDb.collection('notifications').doc();
-                notificationBatch.set(notificationRef, {
-                    uid: author.uid,
-                    title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
-                    createdAt: new Date().toISOString(),
-                    isRead: false,
-                    projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
-                });
-            }
+    const notificationBatch = adminDb.batch();
+    authors.forEach(author => {
+      // Notify only registered co-authors who are not the main author
+      if (author.uid && author.uid !== mainAuthorUid) {
+        const notificationRef = adminDb.collection('notifications').doc();
+        notificationBatch.set(notificationRef, {
+          uid: author.uid,
+          title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          // Link to the main author's profile if MIS ID is available
+          projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
         });
-        await notificationBatch.commit();
-    }
+      }
+    });
+    await notificationBatch.commit();
 
     return { success: true, paper: { id: paperRef.id, ...paperData } };
   } catch (error: any) {
@@ -146,7 +148,9 @@ export async function updateResearchPaper(
       return { success: false, error: "You do not have permission to edit this paper." };
     }
 
-    const allAuthorUids = data.authors.map(a => a.uid).filter(Boolean) as string[];
+    const allAuthorUids = data.aut
+    hors.map(a => a.uid).filter(Boolean) as string[];
+    console.log("updateResearchPaper - allAuthorUids:", allAuthorUids);
 
     const updatedData: Partial<ResearchPaper> = {
       title: data.title,
@@ -157,6 +161,7 @@ export async function updateResearchPaper(
     };
 
     await paperRef.update(updatedData);
+    console.log(`Research paper titled "${data.title}" updated with ID: ${paperId}`);
 
     // Notify newly added co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
@@ -164,22 +169,21 @@ export async function updateResearchPaper(
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
     const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
 
-    if (data.authors && data.authors.length > 0) {
-        const notificationBatch = adminDb.batch();
-        data.authors.forEach(author => {
-            if (author.uid && author.uid !== userId && !oldAuthorUids.has(author.uid)) {
-                const notificationRef = adminDb.collection('notifications').doc();
-                notificationBatch.set(notificationRef, {
-                uid: author.uid,
-                title: `${mainAuthorName} added you as a co-author on the paper: "${data.title}"`,
-                createdAt: new Date().toISOString(),
-                isRead: false,
-                projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
-                });
-            }
+    const notificationBatch = adminDb.batch();
+    data.authors.forEach(author => {
+      // Notify if the author is new, registered (has UID), and not the main author
+      if (author.uid && author.uid !== userId && !oldAuthorUids.has(author.uid)) {
+        const notificationRef = adminDb.collection('notifications').doc();
+        notificationBatch.set(notificationRef, {
+          uid: author.uid,
+          title: `${mainAuthorName} added you as a co-author on the paper: "${data.title}"`,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
         });
-        await notificationBatch.commit();
-    }
+      }
+    });
+    await notificationBatch.commit();
     
     return { success: true, paper: { ...paperData, ...updatedData, id: paperId } };
 
@@ -272,35 +276,10 @@ export async function fetchResearchPapersByUserUid(
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
     const papersRef = collection(adminDb, "papers");
-<<<<<<< HEAD
-    
-    const uidQuery = query(papersRef, where("authors", "array-contains-any", [{ uid: userUid }]));
-    const emailQuery = query(papersRef, where("authors", "array-contains-any", [{ email: userEmail }]));
-
-    const [uidSnapshot, emailSnapshot] = await Promise.all([
-        getDocs(uidQuery),
-        getDocs(emailQuery)
-    ]);
-    
-    const papersMap = new Map<string, ResearchPaper>();
-    
-    uidSnapshot.forEach(doc => {
-        papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper);
-    });
-    
-    emailSnapshot.forEach(doc => {
-        if (!papersMap.has(doc.id)) {
-            papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper);
-        }
-    });
-
-    const papers = Array.from(papersMap.values())
-=======
     const q = query(papersRef, where("authorUids", "array-contains", userUid));    
     const querySnapshot = await getDocs(q);
     const papers = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as ResearchPaper))
->>>>>>> ea9596513024c36fad52c882db3d1a8efd68bfa9
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return { success: true, papers };
