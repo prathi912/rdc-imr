@@ -83,10 +83,7 @@ function AddEditPaperDialog({
         try {
             const result = await findUserByMisId(coPiSearchTerm);
             if (result.success && result.user) {
-                const userDoc = await checkUserOrStaff(result.user.email);
-                if (userDoc.success) {
-                    setFoundCoPi({ ...result.user, email: userDoc.email! });
-                }
+                setFoundCoPi(result.user);
             } else {
                 toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
             }

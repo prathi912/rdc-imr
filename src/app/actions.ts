@@ -1327,7 +1327,7 @@ export async function updateProjectEvaluators(
 
 export async function findUserByMisId(
   misId: string,
-): Promise<{ success: boolean; user?: { uid: string; name: string }; error?: string }> {
+): Promise<{ success: boolean; user?: { uid: string; name: string; email: string; }; error?: string }> {
   try {
     if (!misId || misId.trim() === "") {
       return { success: false, error: "MIS ID is required." }
@@ -1341,14 +1341,14 @@ export async function findUserByMisId(
     }
 
     const userDoc = querySnapshot.docs[0]
-    const userData = userDoc.data()
+    const userData = userDoc.data() as User;
 
     // Prevent adding admins as Co-PIs
     if (userData.role === "admin" || userData.role === "Super-admin") {
       return { success: false, error: "Administrative users cannot be added as Co-PIs." }
     }
 
-    return { success: true, user: { uid: userDoc.id, name: userData.name } }
+    return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email } }
   } catch (error: any) {
     console.error("Error finding user by MIS ID:", error)
     return { success: false, error: error.message || "Failed to search for user." }
@@ -2457,6 +2457,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+
 
 
 
