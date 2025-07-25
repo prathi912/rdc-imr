@@ -70,7 +70,7 @@ function AddEditPaperDialog({
         const email = coAuthorEmail.trim().toLowerCase();
         if (!email) return;
 
-        if (authors.find(ca => ca.email === email)) {
+        if (authors.some(ca => ca.email === email)) {
             toast({ title: 'Co-author already added', variant: 'destructive' });
             return;
         }
@@ -200,16 +200,18 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         
         const fetchPapers = async () => {
             try {
-                const result = await fetchResearchPapersByUserUid(user.uid);
-                if (result.success) {
-                    setResearchPapers(result.papers as ResearchPaper[] || []);
+                const result = await fetchResearchPapersByUserUid(user.uid, user.email);
+                if (result.success && result.papers) {
+                    setResearchPapers(result.papers);
+                } else {
+                    console.warn("Failed to fetch papers:", result.error);
                 }
             } catch (error) {
                 console.error("Error fetching research papers:", error);
             }
         };
         fetchPapers();
-    }, [user.uid]);
+    }, [user.uid, user.email]);
 
     useEffect(() => {
         const fetchDomain = async () => {

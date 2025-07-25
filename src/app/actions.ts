@@ -5,7 +5,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, getFirestore } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, collection, query, where, getDocs } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
 import { sendEmail } from "@/lib/email"
@@ -31,30 +31,47 @@ const EMAIL_STYLES = {
     </p>`
 };
 
-export async function addResearchPaper(data: any) {
+export async function addResearchPaper(
+  title: string,
+  url: string,
+  mainAuthorUid: string,
+  authors: Author[]
+): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
-    const { authors, mainAuthorUid, title, paperRef, paperData } = data;
-    const allAuthorUids = authors.map((a: any) => a.uid).filter(Boolean);
+    const paperRef = adminDb.collection('papers').doc();
+    const now = new Date().toISOString();
+    
+    const paperData: Omit<ResearchPaper, 'id'> = {
+      title,
+      url,
+      mainAuthorUid,
+      authors,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    const allAuthorUids = authors.map((a) => a.uid).filter(Boolean) as string[];
 
     // 1. AI Domain Suggestion
     try {
-      const allPapersQuery = await adminDb
-        .collection('papers')
-        .where('authorUids', 'array-contains-any', allAuthorUids)
-        .get();
-      const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
-      const allTitles = [...new Set([title, ...existingTitles])];
+      if (allAuthorUids.length > 0) {
+        const allPapersQuery = await adminDb
+          .collection('papers')
+          .where('authors.uid', 'in', allAuthorUids)
+          .get();
+        const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
+        const allTitles = [...new Set([title, ...existingTitles])];
 
-      if (allTitles.length > 0) {
-        const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
-        paperData.domain = domainResult.domain;
+        if (allTitles.length > 0) {
+          const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
+          paperData.domain = domainResult.domain;
 
-        if (allAuthorUids.length > 0) {
           const batch = adminDb.batch();
           const userDocs = await adminDb
             .collection('users')
             .where(admin.firestore.FieldPath.documentId(), 'in', allAuthorUids)
             .get();
+            
           userDocs.forEach(doc => {
             batch.update(doc.ref, { researchDomain: domainResult.domain });
           });
@@ -75,7 +92,7 @@ export async function addResearchPaper(data: any) {
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
     const notificationBatch = adminDb.batch();
-    authors.forEach((author: any) => {
+    authors.forEach((author) => {
       if (author.uid && author.uid !== mainAuthorUid) {
         const notificationRef = adminDb.collection('notifications').doc();
         notificationBatch.set(notificationRef, {
@@ -116,15 +133,11 @@ export async function updateResearchPaper(
     if (paperData.mainAuthorUid !== userId) {
       return { success: false, error: "You do not have permission to edit this paper." };
     }
-
-    const allAuthorUids = data.authors.map(a => a.uid).filter(Boolean) as string[];
-    console.log("updateResearchPaper - allAuthorUids:", allAuthorUids);
-
+    
     const updatedData: Partial<ResearchPaper> = {
       title: data.title,
       url: data.url,
       authors: data.authors,
-      // authorUids: allAuthorUids, // Removed because not in ResearchPaper type
       updatedAt: new Date().toISOString(),
     };
 
@@ -161,9 +174,6 @@ export async function updateResearchPaper(
   }
 }
 
-// Other functions remain unchanged (not shown here for brevity)
-
-
 export async function deleteResearchPaper(paperId: string, userId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const paperRef = adminDb.collection('papers').doc(paperId);
@@ -197,7 +207,7 @@ export async function checkUserOrStaff(email: string): Promise<{ success: boolea
         // 1. Check existing users in Firestore
         const usersRef = adminDb.collection('users');
         const userQuery = query(usersRef, where('email', '==', lowercasedEmail));
-        const userSnapshot = await userQuery.get();
+        const userSnapshot = await getDocs(userQuery);
 
         if (!userSnapshot.empty) {
             const userDoc = userSnapshot.docs[0];
@@ -247,11 +257,20 @@ export async function fetchResearchPapersByUserUid(
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
     const papersRef = collection(adminDb, "papers");
-    const q = query(papersRef, where("authorUids", "array-contains", userUid));    
-    const querySnapshot = await getDocs(q);
-    const papers = querySnapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as ResearchPaper))
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const byUidQuery = query(papersRef, where("authors", "array-contains", { uid: userUid }));
+    const byEmailQuery = query(papersRef, where("authors", "array-contains", { email: userEmail }));
+    
+    const [byUidSnapshot, byEmailSnapshot] = await Promise.all([
+      getDocs(byUidQuery),
+      getDocs(byEmailQuery),
+    ]);
+    
+    const papersMap = new Map<string, ResearchPaper>();
+    byUidSnapshot.forEach(doc => papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper));
+    byEmailSnapshot.forEach(doc => papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper));
+
+    const papers = Array.from(papersMap.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return { success: true, papers };
   } catch (error: any) {
