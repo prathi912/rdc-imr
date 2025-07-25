@@ -3,12 +3,12 @@
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author } from '@/types';
-import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper } from '@/app/actions';
+import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2 } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -16,6 +16,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Label } from '../ui/label';
+import { Separator } from '../ui/separator';
 
 function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
@@ -50,52 +52,75 @@ function AddEditPaperDialog({
     const { toast } = useToast();
     const [title, setTitle] = useState('');
     const [url, setUrl] = useState('');
-    const [coAuthorEmail, setCoAuthorEmail] = useState('');
     const [authors, setAuthors] = useState<Author[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     
+    // State for adding co-authors
+    const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+    const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string; email: string } | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
+    const [externalAuthorName, setExternalAuthorName] = useState('');
+    const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
+    
     useEffect(() => {
-        if (existingPaper) {
-            setTitle(existingPaper.title);
-            setUrl(existingPaper.url);
-            setAuthors(existingPaper.authors);
-        } else {
-            setTitle('');
-            setUrl('');
-            setAuthors([{ email: user.email, name: user.name, role: 'First Author', isExternal: false, uid: user.uid }]);
+        if (isOpen) {
+            if (existingPaper) {
+                setTitle(existingPaper.title);
+                setUrl(existingPaper.url);
+                setAuthors(existingPaper.authors);
+            } else {
+                setTitle('');
+                setUrl('');
+                setAuthors([{ email: user.email, name: user.name, role: 'First Author', isExternal: false, uid: user.uid }]);
+            }
         }
-    }, [existingPaper, user]);
+    }, [isOpen, existingPaper, user]);
 
-    const addCoAuthor = async () => {
-        const email = coAuthorEmail.trim().toLowerCase();
-        if (!email) return;
+    const handleSearchCoPi = async () => {
+        if (!coPiSearchTerm) return;
+        setIsSearching(true);
+        setFoundCoPi(null);
+        try {
+            const result = await findUserByMisId(coPiSearchTerm);
+            if (result.success && result.user) {
+                const userDoc = await checkUserOrStaff(result.user.email);
+                if (userDoc.success) {
+                    setFoundCoPi({ ...result.user, email: userDoc.email! });
+                }
+            } else {
+                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+        } finally {
+            setIsSearching(false);
+        }
+    };
+    
+    const addInternalAuthor = () => {
+        if (foundCoPi && !authors.some(a => a.uid === foundCoPi.uid)) {
+            setAuthors([...authors, { uid: foundCoPi.uid, name: foundCoPi.name, email: foundCoPi.email, role: 'Co-Author', isExternal: false }]);
+            setFoundCoPi(null);
+            setCoPiSearchTerm('');
+        }
+    };
 
-        if (authors.some(ca => ca.email === email)) {
-            toast({ title: 'Co-author already added', variant: 'destructive' });
+    const addExternalAuthor = () => {
+        const name = externalAuthorName.trim();
+        const email = externalAuthorEmail.trim().toLowerCase();
+        if (!name || !email) {
+            toast({ title: 'Name and email are required for external authors', variant: 'destructive' });
             return;
         }
-
-        const isExternal = !email.endsWith('@paruluniversity.ac.in');
-        let name: string | null = null;
-        let uid: string | null = null;
-
-        if (isExternal) {
-            name = prompt('Enter the name of the external co-author:');
-            if (!name || !name.trim()) {
-                toast({ title: 'Name is required for external authors', variant: 'destructive' });
-                return;
-            }
-        } else {
-            const result = await checkUserOrStaff(email);
-            if (result.success) {
-                name = result.name;
-                uid = result.uid;
-            }
+         if (authors.some(a => a.email === email)) {
+            toast({ title: 'Author already added', variant: 'destructive' });
+            return;
         }
-
-        setAuthors([...authors, { email, name: name || email, role: 'Co-Author', isExternal, uid: uid || undefined }]);
-        setCoAuthorEmail('');
+        setAuthors([...authors, { name, email, role: 'Co-Author', isExternal: true }]);
+        setExternalAuthorName('');
+        setExternalAuthorEmail('');
     };
+
 
     const removeAuthor = (email: string) => {
         if (email === user.email) {
@@ -146,10 +171,10 @@ function AddEditPaperDialog({
                     <DialogDescription>Add the title, URL, and authors of your published paper.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
-                    <div><label htmlFor="paperTitle" className="block text-sm font-medium">Paper Title</label><Input id="paperTitle" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter paper title" className="mt-1"/></div>
-                    <div><label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</label><Input id="paperUrl" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://doi.org/..." className="mt-1"/></div>
+                    <div><Label htmlFor="paperTitle" className="block text-sm font-medium">Paper Title</Label><Input id="paperTitle" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter paper title" className="mt-1"/></div>
+                    <div><Label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</Label><Input id="paperUrl" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://doi.org/..." className="mt-1"/></div>
                     
-                    <div><label className="block text-sm font-medium mb-1">Authors</label>
+                    <div><Label className="block text-sm font-medium mb-1">Authors</Label>
                         <div className="space-y-2">
                             {authors.map((author) => (
                                 <div key={author.email} className="flex items-center gap-2 p-2 border rounded-md">
@@ -166,8 +191,30 @@ function AddEditPaperDialog({
                             ))}
                         </div>
                     </div>
-                    
-                    <div><label htmlFor="coAuthorEmail" className="block text-sm font-medium">Add Co-Author</label><div className="flex gap-2 mt-1"><Input id="coAuthorEmail" value={coAuthorEmail} onChange={(e) => setCoAuthorEmail(e.target.value)} placeholder="Enter co-author's @paruluniversity.ac.in email or external email"/><Button onClick={addCoAuthor} variant="outline" size="icon" disabled={!coAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button></div></div>
+                    <Separator />
+                    <div className="space-y-4">
+                        <div>
+                            <Label htmlFor="internal-author" className="text-sm font-medium">Add Internal Co-Author</Label>
+                            <div className="flex gap-2 mt-1">
+                                <Input id="internal-author" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} placeholder="Search by MIS ID"/>
+                                <Button onClick={handleSearchCoPi} variant="outline" size="icon" disabled={!coPiSearchTerm.trim() || isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}</Button>
+                            </div>
+                            {foundCoPi && (
+                                <div className="flex items-center justify-between p-2 border rounded-md mt-2">
+                                    <p className="text-sm">{foundCoPi.name}</p>
+                                    <Button size="sm" onClick={addInternalAuthor}>Add</Button>
+                                </div>
+                            )}
+                        </div>
+                        <div>
+                            <Label className="text-sm font-medium">Add External Co-Author</Label>
+                             <div className="flex gap-2 mt-1">
+                                <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
+                                <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                                <Button onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <DialogFooter>
                     <Button onClick={() => onOpenChange(false)} variant="outline">Cancel</Button>
