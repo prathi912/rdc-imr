@@ -15,31 +15,19 @@ export async function GET(request: NextRequest) {
 
         const papersRef = adminDb.collection("papers");
 
-        // Note: Firestore does not support 'OR' queries on different fields directly in this complex way.
-        // We perform two separate queries and merge the results. This is the correct approach.
-        // The previous implementation using a single `array-contains` was flawed because it cannot match
-        // fields within objects inside an array.
-
-        const byUidQuery = papersRef.where("authors", "array-contains-any", [
-            { uid: userUid, name: 'First Author', role: 'First Author', isExternal: false, email: userEmail },
-            { uid: userUid, name: 'Corresponding Author', role: 'Corresponding Author', isExternal: false, email: userEmail },
-            { uid: userUid, name: 'Co-Author', role: 'Co-Author', isExternal: false, email: userEmail }
-        ]);
-
-        const byEmailQuery = papersRef.where("authors", "array-contains-any", [
-            { email: userEmail, name: 'First Author', role: 'First Author', isExternal: false },
-            { email: userEmail, name: 'Corresponding Author', role: 'Corresponding Author', isExternal: false },
-            { email: userEmail, name: 'Co-Author', role: 'Co-Author', isExternal: false },
-            { email: userEmail, name: 'First Author', role: 'First Author', isExternal: true },
-            { email: userEmail, name: 'Corresponding Author', role: 'Corresponding Author', isExternal: true },
-            { email: userEmail, name: 'Co-Author', role: 'Co-Author', isExternal: true }
-        ]);
+        // Firestore cannot query for a value within an object inside an array with a simple 'array-contains'.
+        // The correct approach is to query on individual fields within the array of objects.
+        // We perform two separate queries and merge the results client-side.
+        
+        const byUidQuery = papersRef.where('authors.uid', '==', userUid);
+        const byEmailQuery = papersRef.where('authors.email', '==', userEmail);
 
         const [byUidSnapshot, byEmailSnapshot] = await Promise.all([
-            papersRef.where('authors.uid', '==', userUid).get(),
-            papersRef.where('authors.email', '==', userEmail).get(),
+            byUidQuery.get(),
+            byEmailQuery.get(),
         ]);
         
+        // Use a Map to automatically handle duplicates. If a paper is found by both UID and email, it will only be added once.
         const papersMap = new Map<string, ResearchPaper>();
         
         byUidSnapshot.forEach(doc => {
