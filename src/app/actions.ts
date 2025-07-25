@@ -1,3 +1,4 @@
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -5,7 +6,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, getFirestore, collection, query, where, getDocs } from 'firebase-admin/firestore';
+import { FieldValue } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
 import { sendEmail } from "@/lib/email"
@@ -206,8 +207,8 @@ export async function checkUserOrStaff(email: string): Promise<{ success: boolea
 
         // 1. Check existing users in Firestore
         const usersRef = adminDb.collection('users');
-        const userQuery = query(usersRef, where('email', '==', lowercasedEmail));
-        const userSnapshot = await getDocs(userQuery);
+        const userQuery = usersRef.where('email', '==', lowercasedEmail);
+        const userSnapshot = await userQuery.get();
 
         if (!userSnapshot.empty) {
             const userDoc = userSnapshot.docs[0];
@@ -256,14 +257,14 @@ export async function fetchResearchPapersByUserUid(
   userEmail: string
 ): Promise<{ success: boolean; papers?: any[]; error?: string }> {
   try {
-    const papersRef = collection(adminDb, "papers");
+    const papersRef = adminDb.collection("papers");
 
-    const byUidQuery = query(papersRef, where("authors", "array-contains", { uid: userUid }));
-    const byEmailQuery = query(papersRef, where("authors", "array-contains", { email: userEmail }));
+    const byUidQuery = papersRef.where("authors", "array-contains", { uid: userUid });
+    const byEmailQuery = papersRef.where("authors", "array-contains", { email: userEmail });
     
     const [byUidSnapshot, byEmailSnapshot] = await Promise.all([
-      getDocs(byUidQuery),
-      getDocs(byEmailQuery),
+      byUidQuery.get(),
+      byEmailQuery.get(),
     ]);
     
     const papersMap = new Map<string, ResearchPaper>();
@@ -1646,7 +1647,7 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
     }
 
     // Use a transaction to get the next sequential ID
-    const newInterest = await getFirestore().runTransaction(async (transaction) => {
+    const newInterest = await adminDb.runTransaction(async (transaction) => {
       const counterRef = adminDb.collection('counters').doc('emrInterest');
       const counterDoc = await transaction.get(counterRef);
 
@@ -2087,7 +2088,7 @@ export async function createFundingCall(
         }
         
         // Transaction to generate a new sequential ID
-        const newCallData = await getFirestore().runTransaction(async (transaction) => {
+        const newCallData = await adminDb.runTransaction(async (transaction) => {
             const counterRef = adminDb.collection('counters').doc('emrCall');
             const counterDoc = await transaction.get(counterRef);
 
@@ -2389,8 +2390,8 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
     
-    const evaluationsRef = collection(projectRef, 'evaluations');
-    const evaluationsSnap = await getDocs(evaluationsRef);
+    const evaluationsRef = projectRef.collection('evaluations');
+    const evaluationsSnap = await evaluationsRef.get();
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
     
     const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
@@ -2445,17 +2446,17 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
 
     // IMR Projects
     const imrProjectsRef = adminDb.collection('projects');
-    const imrPiQuery = query(imrProjectsRef, where('pi_uid', '==', targetUserUid), where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), where('meetingDetails.date', '==', today));
-    const imrCoPiQuery = query(imrProjectsRef, where('coPiUids', 'array-contains', targetUserUid), where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), where('meetingDetails.date', '==', today));
+    const imrPiQuery = imrProjectsRef.where('pi_uid', '==', targetUserUid).where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid).where('meetingDetails.date', '==', today);
+    const imrCoPiQuery = imrProjectsRef.where('coPiUids', 'array-contains', targetUserUid).where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid).where('meetingDetails.date', '==', today);
 
     // EMR Projects
     const fundingCallsRef = adminDb.collection('fundingCalls');
-    const emrCallsQuery = query(fundingCallsRef, where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), where('meetingDetails.date', '==', today));
+    const emrCallsQuery = fundingCallsRef.where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid).where('meetingDetails.date', '==', today);
 
     const [imrPiSnapshot, imrCoPiSnapshot, emrCallsSnapshot] = await Promise.all([
-      getDocs(imrPiQuery),
-      getDocs(imrCoPiQuery),
-      getDocs(emrCallsQuery),
+      imrPiQuery.get(),
+      imrCoPiQuery.get(),
+      emrCallsQuery.get(),
     ]);
 
     const imrProjects = new Map<string, Project>();
@@ -2469,8 +2470,8 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     if (emrCalls.length > 0) {
         const callIds = emrCalls.map(c => c.id);
         const interestsRef = adminDb.collection('emrInterests');
-        const interestsQuery = query(interestsRef, where('callId', 'in', callIds), where('userId', '==', targetUserUid));
-        const interestsSnapshot = await getDocs(interestsQuery);
+        const interestsQuery = interestsRef.where('callId', 'in', callIds).where('userId', '==', targetUserUid);
+        const interestsSnapshot = await interestsQuery.get();
         const relevantCallIds = new Set(interestsSnapshot.docs.map(d => d.data().callId));
         relevantEmrCalls = emrCalls.filter(c => relevantCallIds.has(c.id));
     }
@@ -2485,4 +2486,5 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+
 
