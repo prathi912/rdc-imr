@@ -86,11 +86,15 @@ export default function MyProjectsPage() {
     const fetchAllData = async () => {
       setLoading(true)
       try {
-        // Fetch IMR Projects where the user is either PI or Co-PI
+        // Fetch IMR Projects where the user is PI, Co-PI, or PI by email (for historical data)
         const projectsRef = collection(db, "projects")
         const imrQuery = query(
           projectsRef,
-          or(where("pi_uid", "==", user.uid), where("coPiUids", "array-contains", user.uid))
+          or(
+            where("pi_uid", "==", user.uid), 
+            where("coPiUids", "array-contains", user.uid),
+            where("pi_email", "==", user.email) // Added for historical data
+          )
         );
 
         // Fetch EMR Interests
