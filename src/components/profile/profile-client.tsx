@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author } from '@/types';
-import { getResearchDomain, addResearchPaper, fetchResearchPapersByUserUid, checkUserOrStaff, updateResearchPaper, deleteResearchPaper } from '@/app/actions';
+import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -200,14 +200,22 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         
         const fetchPapers = async () => {
             try {
-                const result = await fetchResearchPapersByUserUid(user.uid, user.email);
-                if (result.success && result.papers) {
-                    setResearchPapers(result.papers);
+                const res = await fetch(`/api/get-research-papers?userUid=${user.uid}&userEmail=${user.email}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success) {
+                        setResearchPapers(data.papers || []);
+                    } else {
+                        console.warn("API failed to fetch research papers:", data.error);
+                        setResearchPapers([]);
+                    }
                 } else {
-                    console.warn("Failed to fetch papers:", result.error);
+                    console.warn("HTTP error fetching research papers:", res.statusText);
+                    setResearchPapers([]);
                 }
-            } catch (error) {
-                console.error("Error fetching research papers:", error);
+            } catch (paperError) {
+                console.error("Network error fetching research papers:", paperError);
+                setResearchPapers([]);
             }
         };
         fetchPapers();
