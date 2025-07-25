@@ -235,7 +235,7 @@ export default function SignupPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
-      <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4 dark:bg-transparent">
+      <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <div className="w-full max-w-md">
           <Card className="shadow-xl">
             <CardHeader className="text-center">
