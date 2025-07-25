@@ -1,4 +1,3 @@
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -6,7 +5,7 @@ import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, getFirestore, getDocs, collection, query, where } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
 import { sendEmail } from "@/lib/email"
@@ -32,81 +31,51 @@ const EMAIL_STYLES = {
     </p>`
 };
 
-
-export async function addResearchPaper(
-  title: string,
-  url: string,
-  mainAuthorUid: string,
-  authors: Author[]
-): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
+export async function addResearchPaper(data: any) {
   try {
-    const paperRef = adminDb.collection('papers').doc();
-    const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
-    console.log("addResearchPaper - allAuthorUids:", allAuthorUids);
-    const paperData: Omit<ResearchPaper, 'id'> = {
-      title,
-      url,
-      mainAuthorUid,
-      authors,
-      authorUids: allAuthorUids, // Added authorUids array field
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const { authors, mainAuthorUid, title, paperRef, paperData } = data;
+    const allAuthorUids = authors.map((a: any) => a.uid).filter(Boolean);
 
-<<<<<<< HEAD
-    const allAuthorUids = authors.map(a => a.uid).filter(Boolean) as string[];
-    
-    // AI Domain Suggestion - Wrapped in try/catch to prevent failure from blocking paper save
+    // 1. AI Domain Suggestion
     try {
-      if (allAuthorUids.length > 0) {
-          const allPapersQuery = await adminDb.collection('papers').where('authors', 'array-contains-any', allAuthorUids.map(uid => ({ uid }))).get();
-          const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
-          const allTitles = [...new Set([title, ...existingTitles])];
-          
-          if (allTitles.length > 0) {
-            const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
-            paperData.domain = domainResult.domain;
-            
-            const batch = adminDb.batch();
-            const userDocsQuery = adminDb.collection('users').where(FieldValue.documentId(), 'in', allAuthorUids);
-            const userDocsSnapshot = await userDocsQuery.get();
-            userDocsSnapshot.forEach(doc => {
-=======
-    // AI Domain Suggestion
-    try {
-      const allPapersQuery = await adminDb.collection('papers').where('authorUids', 'array-contains-any', allAuthorUids).get();
+      const allPapersQuery = await adminDb
+        .collection('papers')
+        .where('authorUids', 'array-contains-any', allAuthorUids)
+        .get();
       const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
       const allTitles = [...new Set([title, ...existingTitles])];
-      
+
       if (allTitles.length > 0) {
         const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
         paperData.domain = domainResult.domain;
-        
+
         if (allAuthorUids.length > 0) {
-            const batch = adminDb.batch();
-            const userDocs = await adminDb.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', allAuthorUids).get();
-            userDocs.forEach(doc => {
->>>>>>> ea9596513024c36fad52c882db3d1a8efd68bfa9
-                batch.update(doc.ref, { researchDomain: domainResult.domain });
-            });
-            await batch.commit();
-          }
+          const batch = adminDb.batch();
+          const userDocs = await adminDb
+            .collection('users')
+            .where(admin.firestore.FieldPath.documentId(), 'in', allAuthorUids)
+            .get();
+          userDocs.forEach(doc => {
+            batch.update(doc.ref, { researchDomain: domainResult.domain });
+          });
+          await batch.commit();
+        }
       }
     } catch (aiError: any) {
       console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
     }
-    
+
+    // 2. Save paper
     await paperRef.set(paperData);
     console.log(`Research paper titled "${title}" added with ID: ${paperRef.id}`);
 
-    // Notify co-authors
+    // 3. Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
     const notificationBatch = adminDb.batch();
-    authors.forEach(author => {
-      // Notify only registered co-authors who are not the main author
+    authors.forEach((author: any) => {
       if (author.uid && author.uid !== mainAuthorUid) {
         const notificationRef = adminDb.collection('notifications').doc();
         notificationBatch.set(notificationRef, {
@@ -114,7 +83,6 @@ export async function addResearchPaper(
           title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
           createdAt: new Date().toISOString(),
           isRead: false,
-          // Link to the main author's profile if MIS ID is available
           projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
         });
       }
@@ -122,6 +90,7 @@ export async function addResearchPaper(
     await notificationBatch.commit();
 
     return { success: true, paper: { id: paperRef.id, ...paperData } };
+
   } catch (error: any) {
     console.error("Error adding research paper:", error);
     return { success: false, error: error.message || "Failed to add research paper." };
@@ -148,15 +117,14 @@ export async function updateResearchPaper(
       return { success: false, error: "You do not have permission to edit this paper." };
     }
 
-    const allAuthorUids = data.aut
-    hors.map(a => a.uid).filter(Boolean) as string[];
+    const allAuthorUids = data.authors.map(a => a.uid).filter(Boolean) as string[];
     console.log("updateResearchPaper - allAuthorUids:", allAuthorUids);
 
     const updatedData: Partial<ResearchPaper> = {
       title: data.title,
       url: data.url,
       authors: data.authors,
-      authorUids: allAuthorUids, // Added authorUids array field
+      // authorUids: allAuthorUids, // Removed because not in ResearchPaper type
       updatedAt: new Date().toISOString(),
     };
 
@@ -192,6 +160,9 @@ export async function updateResearchPaper(
     return { success: false, error: error.message || "Failed to update paper." };
   }
 }
+
+// Other functions remain unchanged (not shown here for brevity)
+
 
 export async function deleteResearchPaper(paperId: string, userId: string): Promise<{ success: boolean; error?: string }> {
   try {
