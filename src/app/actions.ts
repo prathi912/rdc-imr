@@ -252,35 +252,6 @@ export async function checkUserOrStaff(email: string): Promise<{ success: boolea
 }
 
 
-export async function fetchResearchPapersByUserUid(
-  userUid: string,
-  userEmail: string
-): Promise<{ success: boolean; papers?: any[]; error?: string }> {
-  try {
-    const papersRef = adminDb.collection("papers");
-
-    const byUidQuery = papersRef.where("authors", "array-contains", { uid: userUid });
-    const byEmailQuery = papersRef.where("authors", "array-contains", { email: userEmail });
-    
-    const [byUidSnapshot, byEmailSnapshot] = await Promise.all([
-      byUidQuery.get(),
-      byEmailQuery.get(),
-    ]);
-    
-    const papersMap = new Map<string, ResearchPaper>();
-    byUidSnapshot.forEach(doc => papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper));
-    byEmailSnapshot.forEach(doc => papersMap.set(doc.id, { id: doc.id, ...doc.data() } as ResearchPaper));
-
-    const papers = Array.from(papersMap.values()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return { success: true, papers };
-  } catch (error: any) {
-    console.error("Error fetching research papers:", error);
-    return { success: false, error: error.message || "Failed to fetch research papers." };
-  }
-}
-
-
 export async function getProjectSummary(input: SummarizeProjectInput) {
   try {
     const result = await summarizeProject(input)
@@ -2456,7 +2427,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     const [imrPiSnapshot, imrCoPiSnapshot, emrCallsSnapshot] = await Promise.all([
       imrPiQuery.get(),
       imrCoPiQuery.get(),
-      emrCallsQuery.get(),
+      emrCallsSnapshot.get(),
     ]);
 
     const imrProjects = new Map<string, Project>();
@@ -2486,5 +2457,6 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+
 
 
