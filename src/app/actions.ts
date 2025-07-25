@@ -2427,7 +2427,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     const [imrPiSnapshot, imrCoPiSnapshot, emrCallsSnapshot] = await Promise.all([
       imrPiQuery.get(),
       imrCoPiQuery.get(),
-      emrCallsSnapshot.get(),
+      emrCallsQuery.get(),
     ]);
 
     const imrProjects = new Map<string, Project>();
@@ -2457,6 +2457,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+
 
 
 
