@@ -1,6 +1,6 @@
 # Research & Development Portal - Parul University
 
-This is a comprehensive, full-stack web application designed to streamline and manage the entire research lifecycle at Parul University. It serves as a central hub for faculty, evaluators, and administrators to handle Intramural Research (IMR) project proposals, and user management.
+This is a comprehensive, full-stack web application designed to streamline and manage the entire research lifecycle at Parul University. It serves as a central hub for faculty, evaluators, and administrators to handle Intramural (IMR) and Extramural (EMR) research projects, user management, and grant tracking.
 
 The portal is built with a modern tech stack, leveraging the power of Next.js for the frontend and backend, Firebase for its powerful suite of backend services, and Google's Genkit for integrating cutting-edge AI features.
 
@@ -8,28 +8,40 @@ The portal is built with a modern tech stack, leveraging the power of Next.js fo
 
 ### 1. Role-Based Access Control (RBAC)
 The portal provides a tailored experience for each user role, ensuring users only see what's relevant to them.
--   **Faculty:** The primary users of the portal. They can submit and track their own research projects, manage their public profile, and file for various publication incentives.
+-   **Faculty:** The primary users of the portal. They can submit and track their own research projects, manage their public profile including a list of their publications, and register for external funding calls.
 -   **Evaluators:** Assigned to review project proposals. They have access to a dedicated queue of projects assigned for review, can use AI-assisted tools for scoring, and submit structured feedback.
 -   **CRO (Chief Research Officer):** Have oversight of all projects within their specific faculty. They can manage user roles, schedule meetings, and access faculty-specific analytics.
--   **Admin:** Have broad oversight of the entire system, including user management, project and claim status updates, and system monitoring.
+-   **Admin:** Have broad oversight of the entire system, including user management, project status updates, and system monitoring.
 -   **Super-admin:** Has complete control over the entire system, including all admin privileges plus the ability to dynamically manage module access for all other users.
 
 ### 2. Intramural Research (IMR) Project Management
-A complete workflow for managing research project funding from submission to completion.
+A complete workflow for managing internal research project funding from submission to completion.
 -   **Guided Proposal Submission:** A multi-step form for submitting detailed project proposals, including team information, abstracts, and necessary file uploads (proposal PDF, team CVs, ethics approvals).
--   **Status Tracking:** Real-time tracking of project status (Draft, Submitted, Under Review, Recommended, Not Recommended, Completed, etc.).
+-   **Status Tracking:** Real-time tracking of project status (Draft, Submitted, Under Review, Recommended, Not Recommended, In Progress, Completed, etc.).
 -   **AI-Assisted Evaluation:** AI-generated prompts to help evaluators assess projects based on key criteria like relevance, methodology, feasibility, and innovation.
 -   **Meeting Scheduling:** Admins and CROs can schedule IMR evaluation meetings for multiple submitted projects at once and automatically notify the Principal Investigators (PIs) via email.
--   **Grant Management:** A system for awarding grants, tracking fund utilization through transaction logging, and managing the disbursement process.
+-   **Grant Management:** A system for awarding grants, tracking fund utilization through transaction logging, and managing the disbursement process in phases.
 
-### 3. AI Integration (Powered by Google Genkit)
+### 3. Extramural Research (EMR) Management
+A dedicated module to manage the lifecycle of externally funded research opportunities.
+-   **EMR Calendar:** A central calendar listing all available external funding calls, complete with deadlines and details.
+-   **Interest Registration:** Faculty can register their interest in a call and add Co-PIs to their team directly through the portal.
+-   **Presentation Workflow:** A streamlined process for scheduling presentation slots, assigning evaluators, and allowing faculty to upload their presentation files before a hard deadline.
+-   **Admin Oversight:** Super-admins can manage the entire EMR lifecycle, from adding new funding calls to tracking evaluation outcomes.
+
+### 4. User Profiles & Publication Tracking
+-   **Public Profiles:** Faculty can maintain a public-facing profile showcasing their research contributions, projects, and a comprehensive list of their publications.
+-   **Publication Management:** A dedicated system for faculty to add, edit, and delete their research papers. The system intelligently handles co-authors, ensuring a single paper entry appears on the profiles of all its authors to reduce data redundancy.
+-   **Automated Co-Author Linking:** When adding a paper, the system automatically checks for existing users or staff members by their university email, linking profiles and fetching names to streamline the process.
+
+### 5. AI Integration (Powered by Google Genkit)
 -   **Project Summarization:** Instantly generate concise summaries of complex project proposals to aid in quick reviews.
 -   **Research Domain Suggestion:** AI analyzes a faculty member's publication history to suggest their core research domain for their public profile.
 -   **Journal Website Finder:** An AI tool to find the official website of an academic journal based on its name, helping to verify publication sources.
 
-### 4. User & System Management
--   **User Profiles:** Public-facing profiles for faculty to showcase their research contributions, publications, and projects, enhancing visibility within the university.
--   **Module Management:** A Super-admin exclusive feature to dynamically assign access to different parts of the portal (e.g., "Manage Users", "Analytics") for each user.
+### 6. System Administration
+-   **User Management:** Admins can manage user roles and permissions, including assigning CROs to specific faculties.
+-   **Module Management:** A Super-admin exclusive feature to dynamically assign access to different parts of the portal for each user.
 -   **System Health Dashboard:** A dedicated page to monitor the connectivity and status of all integrated Firebase services (Firestore, Auth, Storage) in real-time.
 -   **Bulk Data Upload:** Admins can upload historical project data from a formatted Excel file to integrate past records into the system.
 
@@ -136,7 +148,7 @@ The application should now be running at [http://localhost:9002](http://localhos
 ## 📁 Project Structure
 
 -   `src/app/`: Next.js App Router pages, layouts, and route handlers.
--   `src/components/`: Reusable React components, organized by feature (e.g., `projects`, `incentives`) and UI primitives (`ui`).
+-   `src/components/`: Reusable React components, organized by feature (e.g., `projects`, `emr`) and UI primitives (`ui`).
 -   `src/lib/`: Core logic, including Firebase configuration (`config.ts`, `admin.ts`), security modules (`modules.ts`), and utility functions.
 -   `src/ai/`: Contains all Genkit flows for AI-powered features.
 -   `public/`: Static assets like images and logos.
