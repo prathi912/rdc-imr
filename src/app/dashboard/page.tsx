@@ -34,12 +34,12 @@ export default function DashboardPage() {
       return (
           <div className="space-y-6">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Skeleton className="h-28" />
-                <Skeleton className="h-28" />
-                <Skeleton className="h-28" />
-                <Skeleton className="h-28" />
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="h-28 w-full" />
+                <Skeleton className="h-28 w-full" />
               </div>
-              <Skeleton className="h-96" />
+              <Skeleton className="h-96 w-full" />
           </div>
       )
   }

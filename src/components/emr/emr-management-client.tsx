@@ -1,3 +1,4 @@
+
 // src/components/emr/emr-management-client.tsx
 'use client';
 
@@ -163,13 +164,13 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     </div>
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="overflow-x-auto">
                  {interests.length > 0 ? (
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead>PI</TableHead>
-                                <TableHead>Status</TableHead>
+                                <TableHead className="hidden sm:table-cell">Status</TableHead>
                                 <TableHead>Docs</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
@@ -189,7 +190,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                             )}
                                             <div className="text-xs text-muted-foreground">{interest.interestId}</div>
                                         </TableCell>
-                                        <TableCell>
+                                        <TableCell className="hidden sm:table-cell">
                                             <Badge variant={interest.status === 'Recommended' ? 'default' : 'secondary'}>{interest.status}</Badge>
                                         </TableCell>
                                         <TableCell>

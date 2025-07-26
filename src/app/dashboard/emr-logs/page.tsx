@@ -183,54 +183,56 @@ export default function EmrLogsPage() {
                                 <Skeleton className="h-10 w-full" />
                             </div>
                         ) : filteredLogs.length > 0 ? (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>PI</TableHead>
-                                        <TableHead>Institute</TableHead>
-                                        <TableHead>Department</TableHead>
-                                        <TableHead>Faculty</TableHead>
-                                        <TableHead>Funding Call</TableHead>
-                                        <TableHead>Reference No.</TableHead>
-                                        <TableHead>Submission Logged On</TableHead>
-                                        <TableHead>Acknowledgement</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredLogs.map(log => {
-                                        const user = users.get(log.userId);
-                                        return (
-                                            <TableRow key={log.id}>
-                                                <TableCell className="font-medium">
-                                                    <div>
-                                                        {user?.misId ? (
-                                                            <Link href={`/profile/${user.misId}`} className="text-primary hover:underline" target="_blank">
-                                                                {log.userName}
-                                                            </Link>
-                                                        ) : (
-                                                            log.userName
-                                                        )}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">{log.userEmail}</div>
-                                                </TableCell>
-                                                <TableCell>{user?.institute || 'N/A'}</TableCell>
-                                                <TableCell>{user?.department || 'N/A'}</TableCell>
-                                                <TableCell>{user?.faculty || log.faculty}</TableCell>
-                                                <TableCell>{getCall(log.callId)?.title || 'Loading...'}</TableCell>
-                                                <TableCell>{log.agencyReferenceNumber || 'N/A'}</TableCell>
-                                                <TableCell>{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
-                                                <TableCell>
-                                                    {log.agencyAcknowledgementUrl ? (
-                                                        <Button asChild variant="link" className="p-0 h-auto">
-                                                            <Link href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View PDF</Link>
-                                                        </Button>
-                                                    ) : 'Not Provided'}
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>PI</TableHead>
+                                            <TableHead className="hidden md:table-cell">Institute</TableHead>
+                                            <TableHead className="hidden lg:table-cell">Department</TableHead>
+                                            <TableHead className="hidden xl:table-cell">Faculty</TableHead>
+                                            <TableHead>Funding Call</TableHead>
+                                            <TableHead className="hidden sm:table-cell">Reference No.</TableHead>
+                                            <TableHead>Logged On</TableHead>
+                                            <TableHead>Acknowledgement</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredLogs.map(log => {
+                                            const user = users.get(log.userId);
+                                            return (
+                                                <TableRow key={log.id}>
+                                                    <TableCell className="font-medium">
+                                                        <div>
+                                                            {user?.misId ? (
+                                                                <Link href={`/profile/${user.misId}`} className="text-primary hover:underline" target="_blank">
+                                                                    {log.userName}
+                                                                </Link>
+                                                            ) : (
+                                                                log.userName
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs text-muted-foreground">{log.userEmail}</div>
+                                                    </TableCell>
+                                                    <TableCell className="hidden md:table-cell">{user?.institute || 'N/A'}</TableCell>
+                                                    <TableCell className="hidden lg:table-cell">{user?.department || 'N/A'}</TableCell>
+                                                    <TableCell className="hidden xl:table-cell">{user?.faculty || log.faculty}</TableCell>
+                                                    <TableCell>{getCall(log.callId)?.title || 'Loading...'}</TableCell>
+                                                    <TableCell className="hidden sm:table-cell">{log.agencyReferenceNumber || 'N/A'}</TableCell>
+                                                    <TableCell>{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
+                                                    <TableCell>
+                                                        {log.agencyAcknowledgementUrl ? (
+                                                            <Button asChild variant="link" className="p-0 h-auto">
+                                                                <Link href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View PDF</Link>
+                                                            </Button>
+                                                        ) : 'Not Provided'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         ) : (
                             <div className="text-center text-muted-foreground py-8">
                                 No submissions have been logged yet for your scope or current filter.

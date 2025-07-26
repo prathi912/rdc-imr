@@ -374,7 +374,7 @@ export default function AllProjectsPage() {
             onChange={(event) => setSearchTerm(event.target.value)}
             className="w-full sm:max-w-xs"
         />
-        <div className="w-full sm:w-auto flex items-center gap-2 sm:gap-4">
+        <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="w-full sm:w-[220px]">
                     <SelectValue placeholder="Filter by status" />

@@ -1,3 +1,4 @@
+
 // src/app/dashboard/emr-evaluations/page.tsx
 'use client';
 
@@ -236,10 +237,10 @@ export default function EmrEvaluationsPage() {
             <div className="mt-8">
                 {loading ? ( <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
                 ) : interests.length > 0 ? (
-                    <Card><CardContent className="pt-6"><Table>
+                    <Card><CardContent className="pt-6 overflow-x-auto"><Table>
                         <TableHeader><TableRow>
                             <TableHead>Applicant</TableHead>
-                            <TableHead>Funding Call</TableHead>
+                            <TableHead className="hidden sm:table-cell">Funding Call</TableHead>
                             <TableHead>Presentation</TableHead>
                             <TableHead>My Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
@@ -251,7 +252,7 @@ export default function EmrEvaluationsPage() {
                             return (
                             <TableRow key={interest.id}>
                                 <TableCell className="font-medium"><div>{interest.userName}</div><div className="text-xs text-muted-foreground">{interest.userDetails?.department}, {interest.userDetails?.institute}</div></TableCell>
-                                <TableCell>{getCallTitle(interest.callId)}</TableCell>
+                                <TableCell className="hidden sm:table-cell">{getCallTitle(interest.callId)}</TableCell>
                                 <TableCell>{interest.pptUrl ? (<Button asChild variant="link" className="p-0 h-auto"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><FileText className="h-4 w-4 mr-1"/> View</a></Button>) : "Not Submitted"}</TableCell>
                                 <TableCell>{myEvaluation ? <Badge variant="default"><UserCheck className="h-3 w-3 mr-1"/> Submitted</Badge> : <Badge variant="secondary"><UserX className="h-3 w-3 mr-1"/> Pending</Badge>}</TableCell>
                                 <TableCell className="text-right">
@@ -268,7 +269,7 @@ export default function EmrEvaluationsPage() {
                                             size="sm" 
                                             onClick={() => { setSelectedInterest(interest); setIsEvaluationFormOpen(true); }}
                                         >
-                                            <Eye className="h-4 w-4 mr-2"/> {myEvaluation ? "View Evaluation" : "Evaluate"}
+                                            <Eye className="h-4 w-4 md:mr-2"/> <span className="hidden md:inline">{myEvaluation ? "View" : "Evaluate"}</span>
                                         </Button>
                                     )}
                                 </TableCell>

@@ -233,7 +233,7 @@ export default function AnalyticsPage() {
     return (
       <div className="container mx-auto py-10">
         <PageHeader title="Analytics" description="Loading data..." />
-        <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-3">
              <Card className="lg:col-span-1"><CardHeader><Skeleton className="h-6 w-32" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
              <Card className="lg:col-span-2"><CardHeader><Skeleton className="h-6 w-48" /></CardHeader><CardContent><Skeleton className="h-[250px] w-full" /></CardContent></Card>
         </div>
@@ -250,7 +250,7 @@ export default function AnalyticsPage() {
       <PageHeader title={getPageTitle()} description={getPageDescription()}>
           {isCro && user.faculties && user.faculties.length > 1 && (
             <Select value={facultyFilter} onValueChange={setFacultyFilter}>
-                <SelectTrigger className="w-[280px]">
+                <SelectTrigger className="w-full sm:w-[280px]">
                     <SelectValue placeholder="Filter by faculty" />
                 </SelectTrigger>
                 <SelectContent>
@@ -299,7 +299,7 @@ export default function AnalyticsPage() {
       <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
               <div>
                 <CardTitle>Submissions Over Time</CardTitle>
                 <CardDescription>
@@ -309,7 +309,7 @@ export default function AnalyticsPage() {
                 </CardDescription>
               </div>
               <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Select time range" />
                 </SelectTrigger>
                 <SelectContent>

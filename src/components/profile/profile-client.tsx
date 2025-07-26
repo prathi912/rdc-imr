@@ -28,7 +28,7 @@ function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: st
             </div>
             <div>
                 <p className="text-sm font-medium">{label}</p>
-                <p className="text-sm text-muted-foreground">{value}</p>
+                <p className="text-sm text-muted-foreground break-all">{value}</p>
             </div>
         </div>
     );
