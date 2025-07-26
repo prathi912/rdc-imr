@@ -195,7 +195,7 @@ export default function BulkUploadPage() {
               <FileWarning className="h-4 w-4" />
               <AlertTitle>Important: File Format</AlertTitle>
               <AlertDescription>
-                Your Excel file must contain the following columns: 
+                Your Excel file must contain these columns: 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">pi_email</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">project_title</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">status</code>, 
@@ -205,6 +205,7 @@ export default function BulkUploadPage() {
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Faculty</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Institute</code>, and
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">sanction_number</code>.
+                The <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">Department</code> column is optional and can be left blank.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
@@ -339,5 +340,3 @@ export default function BulkUploadPage() {
     </div>
   );
 }
-
-    
