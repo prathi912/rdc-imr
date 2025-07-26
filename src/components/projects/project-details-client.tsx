@@ -966,10 +966,24 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       <DialogTitle>Submit Completion Documents</DialogTitle>
                       <DialogDescription>
                         To request project closure, please upload the final 'Project outcome-cum-completion report' and
-                        the 'Utilization Certificate'.
+                        the 'Utilization Certificate'. You can download the templates below.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
+                    <div className="space-y-4 py-4">
+                        <div className="flex items-center justify-center gap-4">
+                            <Button variant="secondary" asChild>
+                                <a href="/templates/COMPLETION_REPORT_TEMPLATE.docx" download>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Completion Report Template
+                                </a>
+                            </Button>
+                             <Button variant="secondary" asChild>
+                                <a href="/templates/UTILIZATION_CERTIFICATE_TEMPLATE.docx" download>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Utilization Certificate Template
+                                </a>
+                            </Button>
+                        </div>
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="completion-report" className="text-right">
                           Completion Report (PDF)
