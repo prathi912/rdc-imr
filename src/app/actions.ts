@@ -35,16 +35,22 @@ const EMAIL_STYLES = {
 export async function linkPapersToNewUser(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
   try {
     if (!uid || !email) {
-      return { success: false, error: 'User ID and email are required.' };
+      return { success: false, count: 0, error: 'User ID and email are required.' };
     }
 
+    const lowercasedEmail = email.toLowerCase();
     const papersRef = adminDb.collection('papers');
-    const papersQuery = papersRef.where('authors', 'array-contains', { email: email.toLowerCase() });
+    
+    // This is the correct way to query for a value within an array.
+    const papersQuery = papersRef.where('authorEmails', 'array-contains', lowercasedEmail);
     
     const snapshot = await papersQuery.get();
     if (snapshot.empty) {
+      console.log(`No papers found to link for new user: ${email}`);
       return { success: true, count: 0 };
     }
+
+    console.log(`Found ${snapshot.docs.length} papers to link for new user: ${email}`);
 
     const batch = adminDb.batch();
     let updatedCount = 0;
@@ -54,15 +60,17 @@ export async function linkPapersToNewUser(uid: string, email: string): Promise<{
       let needsUpdate = false;
       
       const updatedAuthors = paper.authors.map(author => {
-        if (author.email.toLowerCase() === email.toLowerCase() && !author.uid) {
+        // Find the author entry that matches the new user's email and doesn't have a UID yet.
+        if (author.email.toLowerCase() === lowercasedEmail && !author.uid) {
           needsUpdate = true;
-          return { ...author, uid: uid };
+          return { ...author, uid: uid, isExternal: false }; // Update UID and mark as internal
         }
         return author;
       });
 
       if (needsUpdate) {
         const paperRef = doc.ref;
+        // Add the new UID to the authorUids array for future queries.
         const updatedAuthorUids = [...new Set([...(paper.authorUids || []), uid])];
         batch.update(paperRef, { authors: updatedAuthors, authorUids: updatedAuthorUids });
         updatedCount++;
@@ -71,12 +79,13 @@ export async function linkPapersToNewUser(uid: string, email: string): Promise<{
 
     if (updatedCount > 0) {
       await batch.commit();
+      console.log(`Successfully committed updates for ${updatedCount} papers for user ${email}.`);
     }
 
     return { success: true, count: updatedCount };
   } catch (error: any) {
     console.error("Error linking papers to new user:", error);
-    return { success: false, error: error.message || 'Failed to link papers.' };
+    return { success: false, count: 0, error: error.message || 'Failed to link papers.' };
   }
 }
 
@@ -91,15 +100,17 @@ export async function addResearchPaper(
     const paperRef = adminDb.collection('papers').doc();
     const now = new Date().toISOString();
     
-    // Create an array of UIDs for efficient querying
+    // Create an array of UIDs and emails for efficient querying
     const authorUids = authors.map((a) => a.uid).filter(Boolean) as string[];
+    const authorEmails = authors.map((a) => a.email.toLowerCase());
 
     const paperData: Omit<ResearchPaper, 'id'> = {
       title,
       url,
       mainAuthorUid,
       authors,
-      authorUids, // Add the new field
+      authorUids,
+      authorEmails,
       createdAt: now,
       updatedAt: now,
     };
@@ -109,7 +120,7 @@ export async function addResearchPaper(
       if (authorUids.length > 0) {
         const allPapersQuery = await adminDb
           .collection('papers')
-          .where('authorUids', 'array-contains-any', authorUids) // Use array-contains-any for better performance
+          .where('authorUids', 'array-contains-any', authorUids)
           .get();
         const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
         const allTitles = [...new Set([title, ...existingTitles])];
@@ -187,12 +198,15 @@ export async function updateResearchPaper(
     }
     
     const authorUids = data.authors.map((a) => a.uid).filter(Boolean) as string[];
+    const authorEmails = data.authors.map((a) => a.email.toLowerCase());
+
 
     const updatedData: Partial<ResearchPaper> = {
       title: data.title,
       url: data.url,
       authors: data.authors,
-      authorUids: authorUids, // Update the UIDs array as well
+      authorUids: authorUids,
+      authorEmails: authorEmails,
       updatedAt: new Date().toISOString(),
     };
 
@@ -2506,7 +2520,6 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
 }
     
 
-    
 
 
 

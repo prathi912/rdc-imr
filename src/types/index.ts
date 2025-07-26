@@ -48,7 +48,8 @@ export type ResearchPaper = {
   url: string;
   mainAuthorUid: string;
   authors: Author[];
-  authorUids: string[]; // For efficient querying
+  authorUids: string[]; // For efficient querying by UID
+  authorEmails: string[]; // For efficient querying by email before sign-up
   domain?: string;
   createdAt: string; // ISO String
   updatedAt: string; // ISO String

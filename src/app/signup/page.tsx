@@ -142,7 +142,7 @@ export default function SignupPage() {
       await notifySuperAdminsOnNewUser(user.name, notifyRole);
     }
     
-    // Back-fill pi_uid for migrated projects using a server action
+    // Back-fill pi_uid for migrated projects and link papers using server actions
     try {
       const historicalResult = await linkHistoricalData(user);
       if (historicalResult.success && historicalResult.count > 0) {
