@@ -54,7 +54,7 @@ export default function BulkUploadPapersPage() {
                 variant: 'destructive',
                 title: 'Invalid File Format',
                 description: `The file must contain columns: ${requiredColumns.join(', ')}.`,
-                duration: 8000
+                duration: 6000
             });
             setData([]);
             setFileName('');
