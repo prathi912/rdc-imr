@@ -18,25 +18,32 @@ This is the base role for all teaching and research staff.
 **Key Responsibilities:**
 -   Submitting Intramural research project proposals (IMR).
 -   Registering interest in Extramural research funding calls (EMR).
+-   Maintaining a public researcher profile and managing publications.
+
+### Profile & Settings
+1.  **First-Time Login (Profile Setup):**
+    -   On your first login, you will be guided to the **Profile Setup** page. This is a critical step.
+    -   You can pre-fill your academic details by entering your MIS ID and clicking "Fetch My Details". Review the information for accuracy.
+    -   Upload a professional profile picture.
+    -   Complete all required fields, including your Faculty, Institute, Department, and Designation.
+
+2.  **Settings Page:**
+    -   Navigate to **Settings** from the sidebar at any time to update your profile.
+    -   **Crucially, you must complete your salary bank account details**. This information is required for any grant disbursal or incentive claim if your project is approved. The portal will not allow you to submit projects until this is complete.
+    -   You can also update your researcher IDs (ORCID, Scopus, etc.) and change your password from this page.
 
 ### IMR Workflow (Intramural Research)
-
-1.  **Profile Setup (First-time Login):**
-    -   On your first login, you will be prompted to complete your profile. This is a critical step.
-    -   Navigate to **Settings** from the sidebar at any time to update your information.
-    -   **Crucially, you must complete your salary bank account details**. This information is required for any grant disbursal if your project is approved.
-
-2.  **New Project Submission:**
+1.  **New Project Submission:**
     -   Navigate to **New Submission** from the sidebar.
     -   The submission form is divided into four steps:
         1.  **Project Details:** Enter the title, abstract, and category. You can also align your project with UN Sustainable Development Goals (SDGs).
-        2.  **Team Info:** Add Co-PIs by searching for their MIS ID. List any student members involved. Upload a single ZIP file containing the CVs of all team members.
+        2.  **Team Info:** Add Co-PIs by searching for their MIS ID. They must be registered on the portal. List any student members involved. Upload a single ZIP file containing the CVs of all team members.
         3.  **File Uploads:** Upload your main Project Proposal (PDF) and, if applicable, your Ethics Approval document (PDF).
         4.  **Timeline & Outcomes:** Detail the project timeline and the expected outcomes or impact.
     -   At any step, you can click **Save as Draft**. Drafts are accessible from the **My Projects** page to be completed later.
     -   On the final step, you must agree to the guidelines before the "Submit Project" button becomes active.
 
-3.  **Project Tracking ("My Projects" Page):**
+2.  **Project Tracking ("My Projects" Page):**
     -   Go to the **My Projects** page to view a list of all IMR projects you are associated with (either as a Principal Investigator or a Co-PI).
     -   Monitor the status of your projects. The statuses mean:
         -   `Draft`: You have saved the project but not yet submitted it. You can still edit it.
@@ -50,7 +57,6 @@ This is the base role for all teaching and research staff.
         -   `Completed`: The project has been officially marked as completed.
 
 ### EMR Workflow (Extramural Research)
-
 1.  **Browse Opportunities:**
     -   Navigate to the **EMR Calendar**. This page lists all available external funding opportunities.
     -   Review the details of each call, including deadlines and attached documents.
@@ -72,13 +78,18 @@ This is the base role for all teaching and research staff.
 5.  **Manage Uploads:**
     -   Before the deadline, you can view, replace, or remove your uploaded presentation using the "Manage PPT" button on your application card.
 
+### Public Profile & Publications
+-   Any user can view your public profile by accessing `/profile/[your-mis-id]`.
+-   This page displays your academic details and a comprehensive list of your research papers.
+-   You are responsible for adding and maintaining your list of publications.
+-   When adding a paper, you can add co-authors by their university email. If they are registered, the system links them automatically. If not, the paper will link to their account when they sign up.
+
 ---
 
 ## 2. Evaluator
 This role is assigned to reviewers of IMR or EMR proposals.
 
 ### IMR Evaluation Workflow
-
 1.  **Receive Assignment:**
     -   You will receive an email and in-app notification when you are assigned to an IMR evaluation committee for a scheduled meeting.
 
@@ -96,7 +107,6 @@ This role is assigned to reviewers of IMR or EMR proposals.
     -   The **My IMR Evaluations** page shows a complete record of all IMR projects you have previously reviewed.
 
 ### EMR Evaluation Workflow
-
 1.  **Receive Assignment:**
     -   You will be notified when you are assigned to an EMR evaluation committee.
 
@@ -172,7 +182,6 @@ A department-level administrative role with oversight of all activities within t
 These roles have the highest level of access for managing the entire portal.
 
 ### IMR Management
-
 1.  **Full Oversight:**
     -   **All Projects:** View, search, and manage all projects across all faculties and institutes.
     -   **Pending Reviews:** A dedicated page to see all projects currently `Under Review` or `Pending Completion Approval`.
@@ -185,11 +194,11 @@ These roles have the highest level of access for managing the entire portal.
     -   Assign a committee of evaluators from the user list.
     -   Clicking "Schedule" will update the project statuses to `Under Review` and automatically notify all selected PIs and evaluators via email and in-app notifications.
 
-3.  **Status Updates:**
+3.  **Status Updates & Grant Management:**
     -   From any project's details page, you can manually update its status at any time. This is useful for making final decisions after a review meeting.
+    -   If a project is `Recommended`, you can award a grant, set the sanction number, and manage disbursement in phases.
 
 ### EMR Management (Super-admin)
-
 1.  **Manage Calls:**
     -   Navigate to the **EMR Calendar**.
     -   Click "Add New Call" to create a new funding opportunity. You can add a title, agency, description, deadlines, and attachments.
@@ -211,7 +220,6 @@ These roles have the highest level of access for managing the entire portal.
     -   From the **EMR Evaluations** page, you can view all feedback and recommendations submitted by the committee for each applicant and make a final decision on their status.
 
 ### System Administration
-
 1.  **User Management:**
     -   Navigate to **Manage Users**.
     -   View all registered users, search, and filter by role.
@@ -219,7 +227,8 @@ These roles have the highest level of access for managing the entire portal.
     -   For CROs, you can assign them to one or more specific faculties.
 
 2.  **Bulk Data Management:**
-    -   Use the **Bulk Upload** feature to import historical project data from a formatted Excel file. This is useful for integrating past records into the system.
+    -   **Bulk Upload Projects**: Import historical IMR project data from a formatted Excel file.
+    -   **Bulk Upload Papers**: Import historical research paper data from a formatted Excel file to populate user profiles.
 
 3.  **System Health:**
     -   The **System Health** dashboard allows you to monitor the connectivity and status of all integrated Firebase services (Firestore, Auth, Storage) in real-time.

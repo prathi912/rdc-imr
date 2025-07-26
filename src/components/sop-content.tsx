@@ -23,23 +23,35 @@ const sopContent = `
 <ul>
     <li>Submitting Intramural research project proposals (IMR).</li>
     <li>Registering interest in Extramural research funding calls (EMR).</li>
+    <li>Maintaining a public researcher profile and managing publications.</li>
 </ul>
-<h3>IMR Workflow (Intramural Research)</h3>
+<h3>Profile & Settings</h3>
 <ol>
-    <li><strong>Profile Setup (First-time Login):</strong>
+    <li><strong>First-Time Login (Profile Setup):</strong>
         <ul>
-            <li>On your first login, you will be prompted to complete your profile. This is a critical step.</li>
-            <li>Navigate to <strong>Settings</strong> from the sidebar at any time to update your information.</li>
-            <li><strong>Crucially, you must complete your salary bank account details</strong>. This information is required for any grant disbursal if your project is approved.</li>
+            <li>On your first login, you will be guided to the <strong>Profile Setup</strong> page. This is a critical step.</li>
+            <li>You can pre-fill your academic details by entering your MIS ID and clicking "Fetch My Details". Review the information for accuracy.</li>
+            <li>Upload a professional profile picture.</li>
+            <li>Complete all required fields, including your Faculty, Institute, Department, and Designation.</li>
         </ul>
     </li>
+    <li><strong>Settings Page:</strong>
+        <ul>
+            <li>Navigate to <strong>Settings</strong> from the sidebar at any time to update your profile.</li>
+            <li><strong>Crucially, you must complete your salary bank account details</strong>. This information is required for any grant disbursal or incentive claim if your project is approved. The portal will not allow you to submit projects until this is complete.</li>
+            <li>You can also update your researcher IDs (ORCID, Scopus, etc.) and change your password from this page.</li>
+        </ul>
+    </li>
+</ol>
+<h3>IMR Workflow (Intramural Research)</h3>
+<ol>
     <li><strong>New Project Submission:</strong>
         <ul>
             <li>Navigate to <strong>New Submission</strong> from the sidebar.</li>
             <li>The submission form is divided into four steps:
                 <ol>
                     <li><strong>Project Details:</strong> Enter the title, abstract, and category. You can also align your project with UN Sustainable Development Goals (SDGs).</li>
-                    <li><strong>Team Info:</strong> Add Co-PIs by searching for their MIS ID. List any student members involved. Upload a single ZIP file containing the CVs of all team members.</li>
+                    <li><strong>Team Info:</strong> Add Co-PIs by searching for their MIS ID. They must be registered on the portal. List any student members involved. Upload a single ZIP file containing the CVs of all team members.</li>
                     <li><strong>File Uploads:</strong> Upload your main Project Proposal (PDF) and, if applicable, your Ethics Approval document (PDF).</li>
                     <li><strong>Timeline & Outcomes:</strong> Detail the project timeline and the expected outcomes or impact.</li>
                 </ol>
@@ -101,6 +113,13 @@ const sopContent = `
         </ul>
     </li>
 </ol>
+<h3>Public Profile & Publications</h3>
+<ul>
+    <li>Any user can view your public profile by accessing <code>/profile/[your-mis-id]</code>.</li>
+    <li>This page displays your academic details and a comprehensive list of your research papers.</li>
+    <li>You are responsible for adding and maintaining your list of publications.</li>
+    <li>When adding a paper, you can add co-authors by their university email. If they are registered, the system links them automatically. If not, the paper will link to their account when they sign up.</li>
+</ul>
 <hr>
 <h2 id="2-evaluator">2. Evaluator</h2>
 <p>This role is assigned to reviewers of IMR or EMR proposals.</p>
@@ -249,9 +268,10 @@ const sopContent = `
             <li>Clicking "Schedule" will update the project statuses to <code>Under Review</code> and automatically notify all selected PIs and evaluators via email and in-app notifications.</li>
         </ul>
     </li>
-    <li><strong>Status Updates:</strong>
+    <li><strong>Status Updates & Grant Management:</strong>
         <ul>
             <li>From any project's details page, you can manually update its status at any time. This is useful for making final decisions after a review meeting.</li>
+            <li>If a project is <code>Recommended</code>, you can award a grant, set the sanction number, and manage disbursement in phases.</li>
         </ul>
     </li>
 </ol>
@@ -298,7 +318,8 @@ const sopContent = `
     </li>
     <li><strong>Bulk Data Management:</strong>
         <ul>
-            <li>Use the <strong>Bulk Upload</strong> feature to import historical project data from a formatted Excel file. This is useful for integrating past records into the system.</li>
+            <li><strong>Bulk Upload Projects</strong>: Import historical IMR project data from a formatted Excel file.</li>
+            <li><strong>Bulk Upload Papers</strong>: Import historical research paper data from a formatted Excel file to populate user profiles.</li>
         </ul>
     </li>
     <li><strong>System Health:</strong>
