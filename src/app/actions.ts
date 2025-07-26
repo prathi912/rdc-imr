@@ -2562,12 +2562,13 @@ export async function bulkUploadPapers(
         for (const author of data.authors) {
             const userQuery = await usersRef.where('email', '==', author.email).limit(1).get();
             if (userQuery.empty) {
-                // If user not found, add as external but still save the paper
+                // User is not yet registered, but is an internal author.
+                // Save them without a UID. The linking will happen on signup.
                 authors.push({
                     email: author.email,
                     name: author.email.split('@')[0], // Placeholder name
                     role: author.type as Author['role'],
-                    isExternal: true,
+                    isExternal: false, // All authors from this upload are internal
                 });
                 authorEmails.push(author.email.toLowerCase());
                 failedAuthorLinks.push({ title, email: author.email, reason: 'User not registered on the portal.' });
@@ -2582,7 +2583,7 @@ export async function bulkUploadPapers(
                 email: userData.email,
                 name: userData.name,
                 role: author.type as Author['role'],
-                isExternal: false,
+                isExternal: false, // All authors are internal
             });
 
             authorUids.push(userDoc.id);
@@ -2598,7 +2599,7 @@ export async function bulkUploadPapers(
             if (!mainAuthorUid && authorUids.length > 0) {
                 mainAuthorUid = authorUids[0];
             }
-            // If still no main author (all external), we cannot save.
+            // If still no main author (all are unregistered), we cannot save.
             if (!mainAuthorUid) {
                 data.authors.forEach(author => {
                     if (!failedAuthorLinks.some(f => f.email === author.email && f.title === title)) {
@@ -2642,5 +2643,6 @@ export async function bulkUploadPapers(
   }
 }
     
+
 
 
