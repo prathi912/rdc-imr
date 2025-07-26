@@ -46,7 +46,7 @@ export type ResearchPaper = {
   id: string;
   title: string;
   url: string;
-  mainAuthorUid: string;
+  mainAuthorUid?: string;
   authors: Author[];
   authorUids: string[]; // For efficient querying by UID
   authorEmails: string[]; // For efficient querying by email before sign-up
@@ -342,3 +342,5 @@ export type EmrEvaluation = {
   recommendation: 'Recommended' | 'Not Recommended' | 'Revision is needed';
   comments: string;
 };
+
+    

@@ -2541,7 +2541,6 @@ export async function bulkUploadPapers(
   const failedAuthorLinks: { title: string; email: string; reason: string }[] = [];
 
   try {
-    // Group authors by paper title
     const papersMap = new Map<string, { url: string, authors: { email: string, type: string }[] }>();
     for (const row of papersData) {
         if (!papersMap.has(row.paper_title)) {
@@ -2558,70 +2557,64 @@ export async function bulkUploadPapers(
         const authorUids: string[] = [];
         const authorEmails: string[] = [];
         let mainAuthorUid: string | undefined;
+        let firstAuthorFound: Author | undefined;
 
         for (const author of data.authors) {
             const userQuery = await usersRef.where('email', '==', author.email).limit(1).get();
+            const authorData: Author = {
+                email: author.email,
+                name: author.email.split('@')[0],
+                role: author.type as Author['role'],
+                isExternal: false,
+            };
+
             if (userQuery.empty) {
-                // User is not yet registered, but is an internal author.
-                // Save them without a UID. The linking will happen on signup.
-                authors.push({
-                    email: author.email,
-                    name: author.email.split('@')[0], // Placeholder name
-                    role: author.type as Author['role'],
-                    isExternal: false, // All authors from this upload are internal
-                });
-                authorEmails.push(author.email.toLowerCase());
                 failedAuthorLinks.push({ title, email: author.email, reason: 'User not registered on the portal.' });
-                continue;
+            } else {
+                const userDoc = userQuery.docs[0];
+                const userData = userDoc.data() as User;
+                authorData.uid = userDoc.id;
+                authorData.name = userData.name;
+                authorUids.push(userDoc.id);
             }
             
-            const userDoc = userQuery.docs[0];
-            const userData = userDoc.data() as User;
-            
-            authors.push({
-                uid: userDoc.id,
-                email: userData.email,
-                name: userData.name,
-                role: author.type as Author['role'],
-                isExternal: false, // All authors are internal
-            });
+            authors.push(authorData);
+            authorEmails.push(author.email.toLowerCase());
 
-            authorUids.push(userDoc.id);
-            authorEmails.push(userData.email.toLowerCase());
-
-            if (author.type === 'First Author' || !mainAuthorUid) {
-                mainAuthorUid = userDoc.id;
+            if (author.type === 'First Author') {
+                firstAuthorFound = authorData;
+                if (authorData.uid) {
+                    mainAuthorUid = authorData.uid;
+                }
             }
         }
-
+        
         if (authors.length > 0) {
-             // If no registered user is a First Author, assign the first registered user as main author
-            if (!mainAuthorUid && authorUids.length > 0) {
-                mainAuthorUid = authorUids[0];
-            }
-            // If still no main author (all are unregistered), we cannot save.
             if (!mainAuthorUid) {
-                data.authors.forEach(author => {
-                    if (!failedAuthorLinks.some(f => f.email === author.email && f.title === title)) {
-                        failedAuthorLinks.push({ title, email: author.email, reason: 'Could not save paper as no registered authors were found for it.' });
-                    }
-                });
-                continue;
+                if (firstAuthorFound) {
+                    mainAuthorUid = firstAuthorFound.uid; // Will be undefined, but that's ok now
+                } else if (authorUids.length > 0) {
+                    mainAuthorUid = authorUids[0]; // Fallback to first registered author
+                }
             }
-
+            
             const paperRef = adminDb.collection('papers').doc();
             const now = new Date().toISOString();
             
             const paperData: Omit<ResearchPaper, 'id'> = {
                 title,
                 url: data.url,
-                mainAuthorUid,
                 authors,
                 authorUids,
                 authorEmails,
                 createdAt: now,
                 updatedAt: now,
             };
+
+            if (mainAuthorUid) {
+                paperData.mainAuthorUid = mainAuthorUid;
+            }
+            
             batch.set(paperRef, paperData);
             successfulPapers.push({ title, authors: authors.map(a => a.name) });
         }
@@ -2646,3 +2639,6 @@ export async function bulkUploadPapers(
 
 
 
+
+
+    
