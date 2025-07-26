@@ -32,6 +32,55 @@ const EMAIL_STYLES = {
     </p>`
 };
 
+export async function linkPapersToNewUser(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    if (!uid || !email) {
+      return { success: false, error: 'User ID and email are required.' };
+    }
+
+    const papersRef = adminDb.collection('papers');
+    const papersQuery = papersRef.where('authors', 'array-contains', { email: email.toLowerCase() });
+    
+    const snapshot = await papersQuery.get();
+    if (snapshot.empty) {
+      return { success: true, count: 0 };
+    }
+
+    const batch = adminDb.batch();
+    let updatedCount = 0;
+
+    snapshot.forEach(doc => {
+      const paper = doc.data() as ResearchPaper;
+      let needsUpdate = false;
+      
+      const updatedAuthors = paper.authors.map(author => {
+        if (author.email.toLowerCase() === email.toLowerCase() && !author.uid) {
+          needsUpdate = true;
+          return { ...author, uid: uid };
+        }
+        return author;
+      });
+
+      if (needsUpdate) {
+        const paperRef = doc.ref;
+        const updatedAuthorUids = [...new Set([...(paper.authorUids || []), uid])];
+        batch.update(paperRef, { authors: updatedAuthors, authorUids: updatedAuthorUids });
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      await batch.commit();
+    }
+
+    return { success: true, count: updatedCount };
+  } catch (error: any) {
+    console.error("Error linking papers to new user:", error);
+    return { success: false, error: error.message || 'Failed to link papers.' };
+  }
+}
+
+
 export async function addResearchPaper(
   title: string,
   url: string,
@@ -2458,6 +2507,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+
 
 
 

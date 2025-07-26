@@ -32,7 +32,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
-import { linkHistoricalData, notifySuperAdminsOnNewUser } from '@/app/actions';
+import { linkHistoricalData, notifySuperAdminsOnNewUser, linkPapersToNewUser } from '@/app/actions';
 import { Eye, EyeOff } from 'lucide-react';
 
 const signupSchema = z.object({
@@ -144,15 +144,24 @@ export default function SignupPage() {
     
     // Back-fill pi_uid for migrated projects using a server action
     try {
-      const result = await linkHistoricalData(user);
-      if (result.success && result.count > 0) {
-        console.log(`Successfully linked ${result.count} historical projects for new user ${user.email}.`);
+      const historicalResult = await linkHistoricalData(user);
+      if (historicalResult.success && historicalResult.count > 0) {
+        console.log(`Successfully linked ${historicalResult.count} historical projects for new user ${user.email}.`);
       }
-      if (!result.success) {
-          console.error("Failed to link historical projects:", result.error);
+      if (!historicalResult.success) {
+          console.error("Failed to link historical projects:", historicalResult.error);
       }
+      
+      const paperResult = await linkPapersToNewUser(user.uid, user.email);
+      if (paperResult.success && paperResult.count > 0) {
+          console.log(`Successfully linked ${paperResult.count} research papers for new user ${user.email}.`);
+      }
+      if (!paperResult.success) {
+          console.error("Failed to link research papers:", paperResult.error);
+      }
+
     } catch (e) {
-      console.error("Error calling linkHistoricalData action:", e);
+      console.error("Error calling linking actions:", e);
     }
 
     if (typeof window !== 'undefined') {
