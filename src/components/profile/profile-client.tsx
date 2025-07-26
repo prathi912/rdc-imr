@@ -480,7 +480,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                                         </div>
                                         <div className="flex flex-wrap gap-2 items-center">
                                             {paper.authors.map((author: Author) => (
-                                                <Badge key={author.email} variant={author.uid === user.uid ? 'default' : 'secondary'}>
+                                                <Badge key={author.email} variant={author.role === 'First Author' ? 'default' : 'secondary'}>
                                                     {author.name} {author.isExternal && '(Ext)'}
                                                 </Badge>
                                             ))}
