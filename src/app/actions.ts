@@ -1,4 +1,5 @@
 
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -2518,14 +2519,127 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     return { success: false, error: "Failed to fetch project data for permission check." };
   }
 }
+
+type PaperUploadData = {
+  paper_title: string;
+  author_email: string;
+  author_type: 'First Author' | 'Corresponding Author' | 'Co-Author';
+  url: string;
+};
     
+export async function bulkUploadPapers(
+  papersData: PaperUploadData[],
+): Promise<{ 
+    success: boolean; 
+    data: {
+        successfulPapers: { title: string; authors: string[] }[];
+        failedAuthorLinks: { title: string; email: string; reason: string }[];
+    };
+    error?: string 
+}> {
+  const successfulPapers: { title: string; authors: string[] }[] = [];
+  const failedAuthorLinks: { title: string; email: string; reason: string }[] = [];
 
+  try {
+    // Group authors by paper title
+    const papersMap = new Map<string, { url: string, authors: { email: string, type: string }[] }>();
+    for (const row of papersData) {
+        if (!papersMap.has(row.paper_title)) {
+            papersMap.set(row.paper_title, { url: row.url, authors: [] });
+        }
+        papersMap.get(row.paper_title)!.authors.push({ email: row.author_email, type: row.author_type });
+    }
+    
+    const usersRef = adminDb.collection('users');
+    const batch = adminDb.batch();
 
+    for (const [title, data] of papersMap.entries()) {
+        const authors: Author[] = [];
+        const authorUids: string[] = [];
+        const authorEmails: string[] = [];
+        let mainAuthorUid: string | undefined;
 
+        for (const author of data.authors) {
+            const userQuery = await usersRef.where('email', '==', author.email).limit(1).get();
+            if (userQuery.empty) {
+                // If user not found, add as external but still save the paper
+                authors.push({
+                    email: author.email,
+                    name: author.email.split('@')[0], // Placeholder name
+                    role: author.type as Author['role'],
+                    isExternal: true,
+                });
+                authorEmails.push(author.email.toLowerCase());
+                failedAuthorLinks.push({ title, email: author.email, reason: 'User not registered on the portal.' });
+                continue;
+            }
+            
+            const userDoc = userQuery.docs[0];
+            const userData = userDoc.data() as User;
+            
+            authors.push({
+                uid: userDoc.id,
+                email: userData.email,
+                name: userData.name,
+                role: author.type as Author['role'],
+                isExternal: false,
+            });
 
+            authorUids.push(userDoc.id);
+            authorEmails.push(userData.email.toLowerCase());
 
+            if (author.type === 'First Author' || !mainAuthorUid) {
+                mainAuthorUid = userDoc.id;
+            }
+        }
 
+        if (authors.length > 0) {
+             // If no registered user is a First Author, assign the first registered user as main author
+            if (!mainAuthorUid && authorUids.length > 0) {
+                mainAuthorUid = authorUids[0];
+            }
+            // If still no main author (all external), we cannot save.
+            if (!mainAuthorUid) {
+                data.authors.forEach(author => {
+                    if (!failedAuthorLinks.some(f => f.email === author.email && f.title === title)) {
+                        failedAuthorLinks.push({ title, email: author.email, reason: 'Could not save paper as no registered authors were found for it.' });
+                    }
+                });
+                continue;
+            }
 
+            const paperRef = adminDb.collection('papers').doc();
+            const now = new Date().toISOString();
+            
+            const paperData: Omit<ResearchPaper, 'id'> = {
+                title,
+                url: data.url,
+                mainAuthorUid,
+                authors,
+                authorUids,
+                authorEmails,
+                createdAt: now,
+                updatedAt: now,
+            };
+            batch.set(paperRef, paperData);
+            successfulPapers.push({ title, authors: authors.map(a => a.name) });
+        }
+    }
 
+    await batch.commit();
 
+    return { 
+        success: true, 
+        data: { successfulPapers, failedAuthorLinks }
+    };
+  } catch (error: any) {
+    console.error("Error during bulk paper upload:", error);
+    return { 
+        success: false, 
+        error: error.message || "Failed to upload papers.",
+        data: { successfulPapers, failedAuthorLinks }
+    };
+  }
+}
+    
 
