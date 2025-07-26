@@ -1012,7 +1012,7 @@ export async function bulkUploadProjects(
       let pi_name = project.Name_of_staff
       let faculty = project.Faculty
       let institute = project.Institute
-      let departmentName = project.Department || null // Handle blank/missing department
+      let departmentName = project.Department || null
 
       // Find user by email to get UID and profile data
       const userQuery = await usersRef.where("email", "==", project.pi_email).limit(1).get()
@@ -1065,7 +1065,7 @@ export async function bulkUploadProjects(
         timelineAndOutcomes: "Historical data, outcomes not available.",
         submissionDate: submissionDate,
         isBulkUploaded: true,
-      }
+      };
 
       if (project.grant_amount && project.grant_amount > 0) {
         const firstPhase: GrantPhase = {
@@ -2643,4 +2643,5 @@ export async function bulkUploadPapers(
 
 
     
+
 
