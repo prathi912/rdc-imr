@@ -206,54 +206,36 @@ export async function deleteResearchPaper(paperId: string, userId: string): Prom
 
 
 export async function checkUserOrStaff(email: string): Promise<{ success: boolean; name: string | null; uid: string | null }> {
-    try {
-        const lowercasedEmail = email.toLowerCase();
-        const emailUsername = lowercasedEmail.split('@')[0];
+  try {
+    const lowercasedEmail = email.toLowerCase();
 
-        // 1. Check existing users in Firestore
-        const usersRef = adminDb.collection('users');
-        const userQuery = usersRef.where('email', '==', lowercasedEmail);
-        const userSnapshot = await userQuery.get();
+    // 1. Check existing users in Firestore
+    const usersRef = adminDb.collection('users');
+    const userQuery = usersRef.where('email', '==', lowercasedEmail);
+    const userSnapshot = await userQuery.get();
 
-        if (!userSnapshot.empty) {
-            const userDoc = userSnapshot.docs[0];
-            const userData = userDoc.data();
-            return { success: true, name: userData.name, uid: userDoc.id };
-        }
-
-        // 2. Check staffdata.xlsx
-        const filePath = path.resolve(process.cwd(), 'staffdata.xlsx');
-        if (fs.existsSync(filePath)) {
-            const workbook = XLSX.readFile(filePath);
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData: Array<Record<string, any>> = XLSX.utils.sheet_to_json(worksheet);
-
-            let staff = jsonData.find((row) => row['Email'] && row['Email'].toLowerCase() === lowercasedEmail);
-
-            // Fallback: If no exact match, try matching the username part of the email
-            if (!staff) {
-                staff = jsonData.find((row) => {
-                    if (row['Email']) {
-                        const staffEmailUsername = String(row['Email']).toLowerCase().split('@')[0];
-                        return staffEmailUsername === emailUsername;
-                    }
-                    return false;
-                });
-            }
-
-            if (staff && staff['Name']) {
-                return { success: true, name: staff['Name'], uid: null }; // No UID because they haven't signed up
-            }
-        }
-
-        // 3. Not found in either
-        return { success: true, name: null, uid: null };
-
-    } catch (error) {
-        console.error("Error checking user/staff:", error);
-        return { success: false, name: null, uid: null };
+    if (!userSnapshot.empty) {
+      const userDoc = userSnapshot.docs[0];
+      const userData = userDoc.data();
+      return { success: true, name: userData.name, uid: userDoc.id };
     }
+
+    // 2. Check staffdata via API route
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
+    const response = await fetch(`${baseUrl}/api/get-staff-data?email=${encodeURIComponent(lowercasedEmail)}`);
+    const staffResult = await response.json();
+    
+    if (staffResult.success && staffResult.data) {
+      return { success: true, name: staffResult.data.name, uid: null }; // No UID because they haven't signed up
+    }
+
+    // 3. Not found in either
+    return { success: true, name: null, uid: null };
+
+  } catch (error) {
+    console.error("Error checking user/staff:", error);
+    return { success: false, name: null, uid: null };
+  }
 }
 
 
@@ -1357,19 +1339,13 @@ export async function findUserByMisId(
       return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email } };
     }
 
-    // 2. Fallback to staffdata.xlsx
-    const filePath = path.resolve(process.cwd(), 'staffdata.xlsx');
-    if (fs.existsSync(filePath)) {
-        const workbook = XLSX.readFile(filePath);
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData: Array<Record<string, any>> = XLSX.utils.sheet_to_json(worksheet);
+    // 2. Fallback to staffdata.xlsx via API route
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
+    const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}`);
+    const staffResult = await response.json();
 
-        const staff = jsonData.find((row) => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
-        
-        if (staff && staff['Name'] && staff['Email']) {
-            return { success: true, staff: { name: staff['Name'], email: staff['Email'] }};
-        }
+    if (staffResult.success && staffResult.data) {
+        return { success: true, staff: { name: staffResult.data.name, email: staffResult.data.email } };
     }
 
     return { success: false, error: "No registered user or staff member found with this MIS ID. Please ask them to sign up for the portal." };
@@ -2482,6 +2458,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     
 
     
+
 
 
 

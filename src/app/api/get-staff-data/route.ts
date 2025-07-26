@@ -87,6 +87,6 @@ export async function GET(request: NextRequest) {
     }
   } catch (error: any) {
     console.error('Error fetching or processing staff data file:', error);
-    return NextResponse.json({ success: false, error: 'Failed to process staff data.' }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message || 'Failed to process staff data.' }, { status: 500 });
   }
 }
