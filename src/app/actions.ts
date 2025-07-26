@@ -2569,7 +2569,8 @@ export async function bulkUploadPapers(
             };
 
             if (userQuery.empty) {
-                failedAuthorLinks.push({ title, email: author.email, reason: 'User not registered on the portal.' });
+                // This is expected for unregistered users, so we don't add it to failedAuthorLinks.
+                // It will be linked upon their registration.
             } else {
                 const userDoc = userQuery.docs[0];
                 const userData = userDoc.data() as User;
@@ -2590,9 +2591,9 @@ export async function bulkUploadPapers(
         }
         
         if (authors.length > 0) {
-            if (!mainAuthorUid) {
-                if (firstAuthorFound) {
-                    mainAuthorUid = firstAuthorFound.uid; // Will be undefined, but that's ok now
+             if (!mainAuthorUid) {
+                if (firstAuthorFound?.uid) {
+                    mainAuthorUid = firstAuthorFound.uid;
                 } else if (authorUids.length > 0) {
                     mainAuthorUid = authorUids[0]; // Fallback to first registered author
                 }
