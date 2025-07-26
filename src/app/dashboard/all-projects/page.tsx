@@ -367,37 +367,39 @@ export default function AllProjectsPage() {
         )}
       </PageHeader>
       
-      <div className="flex items-center py-4 gap-4">
+      <div className="flex flex-col sm:flex-row items-center py-4 gap-2 sm:gap-4">
         <Input
             placeholder="Filter by title or PI..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="max-w-sm"
+            className="w-full sm:max-w-xs"
         />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                {STATUSES.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-        {isCro && user && user.faculties && user.faculties.length > 1 && (
-             <Select value={facultyFilter} onValueChange={setFacultyFilter}>
-                <SelectTrigger className="w-[280px]">
-                    <SelectValue placeholder="Filter by faculty" />
+        <div className="w-full sm:w-auto flex items-center gap-2 sm:gap-4">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[220px]">
+                    <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">All Assigned Faculties</SelectItem>
-                    {user.faculties.map(faculty => (
-                        <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    {STATUSES.map(status => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
                     ))}
                 </SelectContent>
             </Select>
-        )}
+            {isCro && user && user.faculties && user.faculties.length > 1 && (
+                 <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                    <SelectTrigger className="w-full sm:w-[280px]">
+                        <SelectValue placeholder="Filter by faculty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Assigned Faculties</SelectItem>
+                        {user.faculties.map(faculty => (
+                            <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
+        </div>
       </div>
 
       <div className="mt-4">

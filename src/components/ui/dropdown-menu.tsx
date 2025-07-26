@@ -106,6 +106,10 @@ const DropdownMenuCheckboxItem = React.forwardRef<
       className
     )}
     checked={checked}
+    onSelect={(event) => {
+        event.preventDefault(); // This is the key change to prevent the menu from closing
+        (props as any).onCheckedChange?.(!checked);
+    }}
     {...props}
   >
     <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">

@@ -296,15 +296,15 @@ export default function ManageUsersPage() {
     <div className="container mx-auto py-10">
       <PageHeader title="Manage Users" description="View and manage user roles and permissions." />
       
-      <div className="flex items-center py-4 gap-4">
+      <div className="flex flex-col sm:flex-row items-center py-4 gap-2 sm:gap-4">
           <Input
               placeholder="Filter by name or email..."
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
-              className="max-w-sm"
+              className="w-full sm:max-w-xs"
           />
           <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
               <SelectContent>
@@ -318,7 +318,7 @@ export default function ManageUsersPage() {
 
       <div className="mt-4">
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -327,7 +327,7 @@ export default function ManageUsersPage() {
                         Name <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                  <TableHead className="hidden sm:table-cell">
+                  <TableHead className="hidden md:table-cell">
                      <Button variant="ghost" onClick={() => requestSort('email')}>
                         Email <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
@@ -337,7 +337,7 @@ export default function ManageUsersPage() {
                         Role <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
                   </TableHead>
-                   <TableHead>
+                   <TableHead className="hidden lg:table-cell">
                      <Button variant="ghost" onClick={() => requestSort('faculty')}>
                         Faculty <ArrowUpDown className="ml-2 h-4 w-4" />
                     </Button>
@@ -362,11 +362,11 @@ export default function ManageUsersPage() {
                             user.name
                         )}
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell">{user.email}</TableCell>
+                      <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                       <TableCell>
                         <Badge variant={user.role === 'admin' || user.role === 'Super-admin' ? 'default' : 'secondary'}>{user.role}</Badge>
                       </TableCell>
-                       <TableCell className="hidden sm:table-cell">{user.faculty || 'N/A'}</TableCell>
+                       <TableCell className="hidden lg:table-cell">{user.faculty || 'N/A'}</TableCell>
                       <TableCell className="text-right">
                          <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -398,7 +398,7 @@ export default function ManageUsersPage() {
                                 <DropdownMenuSub>
                                     <DropdownMenuSubTrigger>Assign Faculties</DropdownMenuSubTrigger>
                                     <DropdownMenuPortal>
-                                        <DropdownMenuSubContent>
+                                        <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
                                             <DropdownMenuLabel>Faculties</DropdownMenuLabel>
                                             <DropdownMenuSeparator />
                                             {faculties.map(faculty => (

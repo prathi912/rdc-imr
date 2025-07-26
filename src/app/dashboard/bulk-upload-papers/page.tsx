@@ -124,7 +124,7 @@ export default function BulkUploadPapersPage() {
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-              <Input id="file-upload" type="file" accept=".xlsx" onChange={handleFileUpload} className="max-w-xs" />
+              <Input id="file-upload" type="file" accept=".xlsx" onChange={handleFileUpload} className="w-full sm:max-w-xs" />
               <Button onClick={handleUpload} disabled={isLoading || data.length === 0}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 Upload {data.length > 0 ? `${data.length} Rows` : ''}
@@ -141,16 +141,16 @@ export default function BulkUploadPapersPage() {
               <CardDescription>Review the data before uploading.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="max-h-96 overflow-y-auto">
+                <div className="max-h-96 overflow-x-auto">
                     <Table>
                         <TableHeader><TableRow><TableHead>Paper Title</TableHead><TableHead>Author Email</TableHead><TableHead>Author Type</TableHead><TableHead>URL</TableHead></TableRow></TableHeader>
                         <TableBody>
                         {data.map((row, index) => (
                             <TableRow key={index}>
-                            <TableCell className="font-medium">{row.paper_title}</TableCell>
+                            <TableCell className="font-medium whitespace-nowrap">{row.paper_title}</TableCell>
                             <TableCell>{row.author_email}</TableCell>
                             <TableCell>{row.author_type}</TableCell>
-                            <TableCell>{row.url}</TableCell>
+                            <TableCell className="whitespace-nowrap">{row.url}</TableCell>
                             </TableRow>
                         ))}
                         </TableBody>
