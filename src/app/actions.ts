@@ -1012,7 +1012,7 @@ export async function bulkUploadProjects(
       let pi_name = project.Name_of_staff
       let faculty = project.Faculty
       let institute = project.Institute
-      let departmentName = project.Department
+      let departmentName = project.Department || null // Handle blank/missing department
 
       // Find user by email to get UID and profile data
       const userQuery = await usersRef.where("email", "==", project.pi_email).limit(1).get()
@@ -1023,7 +1023,7 @@ export async function bulkUploadProjects(
         pi_name = userData.name || pi_name
         faculty = userData.faculty || faculty
         institute = userData.institute || institute
-        departmentName = userData.department || department
+        departmentName = userData.department || departmentName
       }
 
       const projectRef = adminDb.collection("projects").doc()
@@ -2643,3 +2643,4 @@ export async function bulkUploadPapers(
 
 
     
+
