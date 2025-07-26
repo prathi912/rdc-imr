@@ -236,3 +236,5 @@ These roles have the highest level of access for managing the entire portal.
 4.  **Module Management (Super-admin only):**
     -   The Super-admin has exclusive access to the **Module Management** page.
     -   This powerful feature allows you to dynamically grant or revoke access to any part of the portal (e.g., "Manage Users", "Analytics") for any user, providing fine-grained permission control beyond the default roles.
+
+    
