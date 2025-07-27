@@ -891,44 +891,46 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         the 'Utilization Certificate'. You can download the templates below.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                            <Button variant="secondary" asChild>
-                                <a href="/templates/COMPLETION_REPORT_TEMPLATE.docx" download>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Completion Report Template
-                                </a>
-                            </Button>
-                             <Button variant="secondary" asChild>
-                                <a href="/templates/UTILIZATION_CERTIFICATE_TEMPLATE.docx" download>
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Utilization Certificate Template
-                                </a>
-                            </Button>
-                        </div>
-                      <div className="flex flex-col sm:grid sm:grid-cols-4 sm:items-center gap-4">
-                        <Label htmlFor="completion-report" className="sm:text-right">
-                          Completion Report (PDF)
-                        </Label>
-                        <Input
-                          id="completion-report"
-                          type="file"
-                          accept=".pdf"
-                          onChange={handleCompletionFileChange}
-                          className="col-span-3"
-                        />
+                    <div className="space-y-6 py-4">
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                          <Button variant="secondary" asChild>
+                              <a href="/templates/COMPLETION_REPORT_TEMPLATE.docx" download>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Completion Report Template
+                              </a>
+                          </Button>
+                           <Button variant="secondary" asChild>
+                              <a href="/templates/UTILIZATION_CERTIFICATE_TEMPLATE.docx" download>
+                                  <Download className="mr-2 h-4 w-4" />
+                                  Utilization Certificate Template
+                              </a>
+                          </Button>
                       </div>
-                      <div className="flex flex-col sm:grid sm:grid-cols-4 sm:items-center gap-4">
-                        <Label htmlFor="utilization-certificate" className="sm:text-right">
-                          Utilization Certificate (PDF)
-                        </Label>
-                        <Input
-                          id="utilization-certificate"
-                          type="file"
-                          accept=".pdf"
-                          onChange={handleCertificateFileChange}
-                          className="col-span-3"
-                        />
+                      <div className="grid gap-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="completion-report" className="text-right col-span-1">
+                            Completion Report (PDF)
+                          </Label>
+                          <Input
+                            id="completion-report"
+                            type="file"
+                            accept=".pdf"
+                            onChange={handleCompletionFileChange}
+                            className="col-span-3"
+                          />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="utilization-certificate" className="text-right col-span-1">
+                            Utilization Certificate (PDF)
+                          </Label>
+                          <Input
+                            id="utilization-certificate"
+                            type="file"
+                            accept=".pdf"
+                            onChange={handleCertificateFileChange}
+                            className="col-span-3"
+                          />
+                        </div>
                       </div>
                     </div>
                     <DialogFooter>
