@@ -121,23 +121,18 @@ const chatAgent = ai.definePrompt({
 
 
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  const { history, user, fileDataUri } = input;
+  const { history, user } = input;
 
   // Reconstruct the prompt history from the client-side format
-  const promptHistory: Part[] = history.flatMap(msg => {
-    // Convert each message's content parts into the format Genkit expects
-    const parts = msg.content.map(part => {
-        if (part.text) {
-            return { text: part.text };
-        }
-        if (part.media) {
-            return { media: { url: part.media.url, contentType: part.media.contentType } };
-        }
-        return null;
-    }).filter((p): p is Part => p !== null);
-
-    return { role: msg.role, content: parts };
-  });
+  const promptHistory: Part[] = history.map(msg => ({
+    role: msg.role,
+    content: msg.content.map(part => {
+        if (part.text) return { text: part.text };
+        if (part.media) return { media: { url: part.media.url, contentType: part.media.contentType } };
+        // This filter is important to handle any unexpected content parts
+        return { text: '' }; 
+    }).filter(p => p.text || p.media)
+  }));
 
   // Call the agent with the reconstructed history
   const result = await chatAgent(
