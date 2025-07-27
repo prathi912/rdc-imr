@@ -121,19 +121,22 @@ const chatAgent = ai.definePrompt({
 
 
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  const { history, user } = input;
+  const { history, user, fileDataUri } = input;
 
-  // Reconstruct the prompt history from the client-side format
   const promptHistory: Part[] = history.map(msg => ({
     role: msg.role,
-    content: msg.content.map(part => {
-        if (part.text) return { text: part.text };
-        if (part.media) return { media: { url: part.media.url, contentType: part.media.contentType } };
-        return { text: '' }; 
-    }).filter(p => p.text || p.media)
+    content: msg.content,
   }));
 
-  // Call the agent with the reconstructed history
+  // Add the current user's message, which may include a file, to the end of the history for the AI to process.
+  // The last message in the `history` from the client is the one we want to process.
+  if (fileDataUri && promptHistory.length > 0) {
+      const lastMessage = promptHistory[promptHistory.length - 1];
+      if (lastMessage.role === 'user' && Array.isArray(lastMessage.content)) {
+          lastMessage.content.push({ media: { url: fileDataUri } });
+      }
+  }
+
   const result = await chatAgent(
     { history: promptHistory },
     { context: { user: user } }
