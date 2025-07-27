@@ -38,13 +38,14 @@ export async function sendEmail(options: { to: string; subject: string; html: st
     return await sendEmailUtility(options);
 }
 
-export async function runChatAgent(input: ChatInput) {
+export async function runChatAgent(input: ChatInput): Promise<string> {
     try {
         const result = await chatAgent(input);
-        return { success: true, response: result };
+        // Ensure we always return a string from the flow.
+        return result.text || "I'm sorry, I couldn't generate a response.";
     } catch (error: any) {
         console.error("Error running chat agent:", error);
-        return { success: false, error: error.message || "Failed to get response from AI agent." };
+        return `Sorry, I encountered an error: ${error.message || "Failed to get response from AI agent."}`;
     }
 }
 
@@ -2506,7 +2507,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
         const callIds = emrCalls.map(c => c.id);
         const interestsRef = adminDb.collection('emrInterests');
         const interestsQuery = interestsRef.where('callId', 'in', callIds).where('userId', '==', targetUserUid);
-        const interestsSnapshot = await interestsQuery.get();
+        const interestsSnapshot = await getDocs(interestsQuery);
         const relevantCallIds = new Set(interestsSnapshot.docs.map(d => d.data().callId));
         relevantEmrCalls = emrCalls.filter(c => relevantCallIds.has(c.id));
     }
@@ -2639,6 +2640,7 @@ export async function bulkUploadPapers(
 
 
     
+
 
 
 
