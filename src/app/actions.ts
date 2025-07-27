@@ -6,6 +6,7 @@ import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flow
 import { summarizeProject, type SummarizeProjectInput } from "@/ai/flows/project-summarization"
 import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flows/evaluation-prompts"
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
+import { chat as chatAgent, type ChatInput } from "@/ai/flows/chat-agent"
 import { adminDb, adminStorage } from "@/lib/admin"
 import { FieldValue } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
@@ -35,6 +36,16 @@ const EMAIL_STYLES = {
 
 export async function sendEmail(options: { to: string; subject: string; html: string; from: 'default' | 'rdc' }) {
     return await sendEmailUtility(options);
+}
+
+export async function runChatAgent(input: ChatInput) {
+    try {
+        const result = await chatAgent(input);
+        return { success: true, response: result };
+    } catch (error: any) {
+        console.error("Error running chat agent:", error);
+        return { success: false, error: error.message || "Failed to get response from AI agent." };
+    }
 }
 
 export async function linkPapersToNewUser(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
@@ -2628,6 +2639,7 @@ export async function bulkUploadPapers(
 
 
     
+
 
 
 
