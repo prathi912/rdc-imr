@@ -23,6 +23,7 @@ import {
   notifyAdminsOnCompletionRequest,
   findUserByMisId,
   updateCoInvestigators,
+  sendEmail,
 } from "@/app/actions"
 import { generatePresentationNoting } from "@/app/document-actions"
 import { useToast } from "@/hooks/use-toast"
@@ -442,6 +443,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
       await updateDoc(projectRef, { grant: newGrant })
 
+      // In-app notification
       await addDoc(collection(db, "notifications"), {
         uid: project.pi_uid,
         title: `Congratulations! Your project "${project.title}" has been awarded a grant.`,
@@ -449,6 +451,34 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         createdAt: new Date().toISOString(),
         isRead: false,
       })
+      
+      // Email notification
+      if (project.pi_email) {
+          const emailHtml = `
+            <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                <h2>Congratulations, ${project.pi}!</h2>
+                <p>We are pleased to inform you that your Intramural Research (IMR) project, <strong>"${project.title}"</strong>, has been recommended and a grant has been awarded.</p>
+                <h3>Grant Details:</h3>
+                <ul>
+                    <li><strong>Sanction Number:</strong> ${newGrant.sanctionNumber}</li>
+                    <li><strong>Total Amount:</strong> ₹${newGrant.totalAmount.toLocaleString('en-IN')}</li>
+                    <li><strong>Initial Phase:</strong> ${newPhase.name} (₹${newPhase.amount.toLocaleString('en-IN')})</li>
+                </ul>
+                <p>The first phase amount will be disbursed to your registered bank account shortly. You can now log your project expenses through the grant management section on the portal.</p>
+                <p>Thank you for your valuable contribution to research at Parul University.</p>
+                <br/>
+                <p>Best Regards,</p>
+                <p><strong>The R&D Cell Team</strong></p>
+            </div>
+          `;
+          await sendEmail({
+              to: project.pi_email,
+              subject: `Grant Awarded for Your IMR Project: ${project.title}`,
+              html: emailHtml,
+              from: 'default'
+          });
+      }
+
 
       setProject({ ...project, grant: newGrant })
       toast({
