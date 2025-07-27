@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -73,6 +72,7 @@ import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/fire
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { saveSidebarOrder } from '@/app/actions';
 import { SopDialog } from '@/components/sop-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface NavItem {
   id: string;
@@ -127,6 +127,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [menuItems, setMenuItems] = useState<NavItem[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -202,6 +203,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       } else {
         localStorage.removeItem('user');
+        sessionStorage.clear(); // Clear session storage on logout
         router.replace('/login');
         setUser(null);
         setLoading(false);
@@ -255,8 +257,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      localStorage.removeItem('user');
-      router.push('/login');
+      // localStorage is cleared by onAuthStateChanged listener
       toast({ title: 'Logged out successfully.' });
     } catch (error) {
       console.error('Logout error:', error);
@@ -268,6 +269,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   };
   
+  const attemptLogout = () => {
+    if (sessionStorage.getItem('chatSessionActive')) {
+        setIsLogoutConfirmOpen(true);
+    } else {
+        handleLogout();
+    }
+  };
+
   const getPageTitle = () => {
       const segments = pathname.split('/');
       const lastSegment = segments.pop() || 'dashboard';
@@ -346,6 +355,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
+    <>
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
@@ -394,7 +404,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex items-center gap-4">
             <SopDialog />
             <ThemeToggle />
-            <UserNav user={user} onLogout={handleLogout} />
+            <UserNav user={user} onLogout={attemptLogout} />
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
@@ -402,5 +412,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
       </SidebarInset>
     </SidebarProvider>
+    <AlertDialog open={isLogoutConfirmOpen} onOpenChange={setIsLogoutConfirmOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure you want to log out?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Logging out will permanently delete your current AI chat history. This action cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleLogout}>Log Out</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

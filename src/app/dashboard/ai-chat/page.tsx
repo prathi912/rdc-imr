@@ -45,14 +45,28 @@ export default function AiChatPage() {
     if (storedUser) {
       setSessionUser(JSON.parse(storedUser));
     }
-    setMessages([
-      {
-        id: 'welcome-message',
-        role: 'model',
-        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about project or user data, or upload a file for analysis." }],
-      },
-    ]);
+    
+    // Load messages from sessionStorage or set initial welcome message
+    const savedMessages = sessionStorage.getItem('chatMessages');
+    if (savedMessages) {
+      setMessages(JSON.parse(savedMessages));
+    } else {
+      setMessages([
+        {
+          id: 'welcome-message',
+          role: 'model',
+          content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about project or user data, or upload a file for analysis." }],
+        },
+      ]);
+    }
   }, []);
+
+  useEffect(() => {
+    // Save messages to sessionStorage whenever they change
+    if(messages.length > 1) { // Don't save initial state
+      sessionStorage.setItem('chatMessages', JSON.stringify(messages));
+    }
+  }, [messages]);
   
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -88,6 +102,9 @@ export default function AiChatPage() {
     e.preventDefault();
     if ((!input.trim() && !file) || isLoading || !sessionUser) return;
 
+    // Mark that a chat session has started
+    sessionStorage.setItem('chatSessionActive', 'true');
+
     const userMessageContent: Message['content'] = [];
     if (file && filePreview) {
         userMessageContent.push({ media: { url: filePreview, contentType: file.type } });
@@ -110,7 +127,7 @@ export default function AiChatPage() {
 
     try {
         const historyForAgent = newMessages
-          .filter(m => m.role && Array.isArray(m.content)) // Ensure message has role and content is an array
+          .filter(m => m.role && Array.isArray(m.content) && m.content.length > 0)
           .map(m => ({
             role: m.role,
             content: m.content.map(part => {
@@ -119,7 +136,7 @@ export default function AiChatPage() {
               return { text: '' };
             }).filter(p => p.text || p.media),
           }))
-          .filter(m => m.content.length > 0); // Ensure content is not empty after filtering
+          .filter(m => m.content.length > 0);
 
         const fileDataUri = file ? await fileToDataUrl(file) : undefined;
 
