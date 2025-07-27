@@ -28,7 +28,7 @@ export default function RootLayout({
         <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`} suppressHydrationWarning>
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
+            defaultTheme="dark"
             enableSystem
             disableTransitionOnChange
           >
@@ -44,7 +44,7 @@ export default function RootLayout({
       <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >

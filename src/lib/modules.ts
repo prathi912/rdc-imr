@@ -7,18 +7,15 @@ export const ALL_MODULES = [
   { id: 'my-projects', label: 'My Projects' },
   { id: 'emr-calendar', label: 'EMR Calendar' },
   { id: 'incentive-claim', label: 'Incentive Claims' },
-  { id: 'evaluator-dashboard', label: 'IMR Evaluation Queue' },
+  { id: 'evaluator-dashboard', label: 'Evaluation Queue' },
   { id: 'my-evaluations', label: 'My IMR Evaluations' },
-  { id: 'emr-evaluations', label: 'EMR Evaluations' },
   { id: 'schedule-meeting', label: 'Schedule Meeting' },
   { id: 'pending-reviews', label: 'Pending Reviews' },
   { id: 'completed-reviews', label: 'Completed Reviews' },
   { id: 'all-projects', label: 'All Projects' },
   { id: 'emr-management', label: 'EMR Management' },
-  { id: 'emr-logs', label: 'EMR Logs'},
   { id: 'analytics', label: 'Analytics' },
   { id: 'manage-users', label: 'Manage Users' },
-  { id: 'manage-institutes', label: 'Manage Institutes' },
   { id: 'manage-incentive-claims', label: 'Manage Incentive Claims' },
   { id: 'bulk-upload', label: 'Bulk Upload Projects' },
   { id: 'bulk-upload-papers', label: 'Bulk Upload Papers' },
@@ -32,13 +29,13 @@ const facultyCoreModules = ['new-submission', 'my-projects'];
 const hierarchyCoreModules = ['analytics', 'ai-chat'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'emr-evaluations', 'ai-chat'];
-const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'bulk-upload', 'emr-logs', 'emr-management'];
-const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes', 'bulk-upload-papers'];
+const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'ai-chat'];
+const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'bulk-upload', 'emr-management'];
+const superAdminDefaults = [...adminDefaults, 'module-management', 'bulk-upload-papers'];
 
 // Default modules for special designations who are otherwise 'faculty' role
-const principalDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects', 'emr-logs'];
-const hodDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects','emr-logs'];
+const principalDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects'];
+const hodDefaults = [...coreModules, ...hierarchyCoreModules, 'all-projects'];
 
 export function getDefaultModulesForRole(role: User['role'], designation?: User['designation']): string[] {
   if (role === 'faculty') {
@@ -52,7 +49,7 @@ export function getDefaultModulesForRole(role: User['role'], designation?: User[
   }
   
   if (role === 'Evaluator') {
-    return [...coreModules, 'evaluator-dashboard', 'my-evaluations', 'emr-evaluations'];
+    return [...coreModules, 'evaluator-dashboard', 'my-evaluations'];
   }
   
   switch (role) {
