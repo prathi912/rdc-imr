@@ -46,7 +46,6 @@ export default function AiChatPage() {
       setSessionUser(JSON.parse(storedUser));
     }
     
-    // Load messages from sessionStorage or set initial welcome message
     const savedMessages = sessionStorage.getItem('chatMessages');
     if (savedMessages) {
       setMessages(JSON.parse(savedMessages));
@@ -54,7 +53,7 @@ export default function AiChatPage() {
       const welcomeMessage: Message = {
         id: 'welcome-message',
         role: 'model',
-        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about project data within your purview, or upload a file for analysis." }],
+        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about project or user data within your purview, or upload a file for analysis." }],
       };
       setMessages([welcomeMessage]);
       sessionStorage.setItem('chatMessages', JSON.stringify([welcomeMessage]));
@@ -62,9 +61,8 @@ export default function AiChatPage() {
   }, []);
 
   useEffect(() => {
-    // Save messages to sessionStorage whenever they change, if there's more than the initial message
-    if (messages.length > 1) {
-      sessionStorage.setItem('chatMessages', JSON.stringify(messages));
+    if (messages.length > 1 || sessionStorage.getItem('chatSessionActive')) {
+        sessionStorage.setItem('chatMessages', JSON.stringify(messages));
     }
   }, [messages]);
   
@@ -102,7 +100,6 @@ export default function AiChatPage() {
     e.preventDefault();
     if ((!input.trim() && !file) || isLoading || !sessionUser) return;
 
-    // Mark that a chat session has started
     sessionStorage.setItem('chatSessionActive', 'true');
 
     const userMessageContent: Message['content'] = [];
@@ -121,24 +118,22 @@ export default function AiChatPage() {
     
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
+    const textInput = input;
     setInput('');
     removeFile();
     setIsLoading(true);
 
     try {
+        const fileDataUri = file ? await fileToDataUrl(file) : undefined;
+        
+        // CRITICAL FIX: Filter history to prevent malformed data from being sent to the AI.
+        // This ensures only valid 'user' and 'model' roles with proper content are included.
         const historyForAgent = newMessages
-          .filter(m => m.role && Array.isArray(m.content) && m.content.length > 0)
+          .filter(m => (m.role === 'user' || m.role === 'model') && Array.isArray(m.content))
           .map(m => ({
             role: m.role,
-            content: m.content.map(part => {
-              if (part.text) return { text: part.text };
-              if (part.media) return { media: { url: part.media.url, contentType: part.media.contentType } };
-              return { text: '' };
-            }).filter(p => p.text || p.media),
-          }))
-          .filter(m => m.content.length > 0);
-
-        const fileDataUri = file ? await fileToDataUrl(file) : undefined;
+            content: m.content.filter(part => part.text || part.media),
+          }));
 
         const result = await runChatAgent({
             history: historyForAgent,
@@ -152,8 +147,9 @@ export default function AiChatPage() {
             },
             fileDataUri: fileDataUri,
         });
-
-        if (result.success && result.response) {
+        
+        // CRITICAL FIX: Add a safeguard to ensure the response is a string before creating the message.
+        if (result.success && typeof result.response === 'string') {
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'model',
@@ -161,7 +157,7 @@ export default function AiChatPage() {
             };
             setMessages(prev => [...prev, assistantMessage]);
         } else {
-            throw new Error(result.error);
+            throw new Error(result.error || "Received an invalid response from the AI agent.");
         }
 
     } catch (error: any) {
@@ -187,37 +183,42 @@ export default function AiChatPage() {
         <CardContent className="flex-1 flex flex-col p-0">
           <ScrollArea className="flex-1 p-4" ref={scrollAreaRef as any}>
             <div className="space-y-6">
-              {messages.map((message) => (
-                <div key={message.id} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
-                  {message.role === 'model' && (
-                    <Avatar className="h-8 w-8 border">
-                      <AvatarFallback><Bot className="h-5 w-5"/></AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div className={`rounded-lg p-3 max-w-xl ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    <div className="flex flex-col gap-2">
-                        {message.content.map((part, index) => (
-                            part.media ? (
-                                <Image key={index} src={part.media.url} alt="Uploaded content" width={200} height={200} className="rounded-md" />
-                            ) : (
-                                <p key={index} className="text-sm whitespace-pre-wrap">{part.text}</p>
-                            )
-                        ))}
+              {messages.map((message) => {
+                // Safeguard against rendering malformed messages
+                if (!message || !Array.isArray(message.content)) return null;
+
+                return (
+                  <div key={message.id} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
+                    {message.role === 'model' && (
+                      <Avatar className="h-8 w-8 border">
+                        <AvatarFallback><Bot className="h-5 w-5"/></AvatarFallback>
+                      </Avatar>
+                    )}
+                    <div className={`rounded-lg p-3 max-w-xl ${
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted'
+                      }`}
+                    >
+                      <div className="flex flex-col gap-2">
+                          {message.content.map((part, index) => (
+                              part.media ? (
+                                  <Image key={index} src={part.media.url} alt="Uploaded content" width={200} height={200} className="rounded-md" />
+                              ) : (
+                                  <p key={index} className="text-sm whitespace-pre-wrap">{part.text}</p>
+                              )
+                          ))}
+                      </div>
                     </div>
+                     {message.role === 'user' && sessionUser && (
+                      <Avatar className="h-8 w-8 border">
+                         <AvatarImage src={sessionUser.photoURL || undefined} alt={sessionUser.name} />
+                         <AvatarFallback>{sessionUser.name?.[0].toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
-                   {message.role === 'user' && sessionUser && (
-                    <Avatar className="h-8 w-8 border">
-                       <AvatarImage src={sessionUser.photoURL || undefined} alt={sessionUser.name} />
-                       <AvatarFallback>{sessionUser.name?.[0].toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
-              ))}
+                );
+              })}
               {isLoading && (
                  <div className="flex items-start gap-3">
                     <Avatar className="h-8 w-8 border">

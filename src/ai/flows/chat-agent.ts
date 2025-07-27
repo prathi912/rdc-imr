@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { adminDb } from '@/lib/admin';
 import type { Project, User } from '@/types';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { Part } from 'genkit';
+import { type Part } from 'genkit';
 
 const ChatInputSchema = z.object({
   history: z.array(z.object({
@@ -61,7 +61,6 @@ const getProjectsData = ai.defineTool(
     })),
   },
   async (input, context) => {
-    // The context here is passed from the `chat` function's call to the prompt.
     const user = (context as any).user;
     if (!user) {
         throw new Error("User context is missing. Cannot perform role-based data fetching.");
@@ -70,7 +69,6 @@ const getProjectsData = ai.defineTool(
     const projectsCol = collection(adminDb, 'projects');
     const constraints: any[] = [];
 
-    // Apply role-based filtering
     if (user.role === 'CRO' && user.faculties && user.faculties.length > 0) {
       constraints.push(where('faculty', 'in', user.faculties));
     } else if (user.designation === 'Principal' && user.institute) {
@@ -78,8 +76,7 @@ const getProjectsData = ai.defineTool(
     } else if (user.designation === 'HOD' && user.department && user.institute) {
       constraints.push(where('departmentName', '==', user.department), where('institute', '==', user.institute));
     }
-    // For Admins/Super-admins, no extra constraints are added, so they see all projects.
-
+    
     if (input.status) {
       constraints.push(where('status', '==', input.status));
     }
@@ -128,8 +125,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     content: msg.content,
   }));
 
-  // Add the current user's message, which may include a file, to the end of the history for the AI to process.
-  // The last message in the `history` from the client is the one we want to process.
   if (fileDataUri && promptHistory.length > 0) {
       const lastMessage = promptHistory[promptHistory.length - 1];
       if (lastMessage.role === 'user' && Array.isArray(lastMessage.content)) {
@@ -142,6 +137,7 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     { context: { user: user } }
   );
   
-  // Ensure the final output is a simple string.
+  // CRITICAL FIX: Ensure only the text response is returned to the frontend.
+  // The 'result' object contains more than just the text, which caused the previous errors.
   return result.text;
 }
