@@ -33,6 +33,8 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 
 interface WelcomeTutorialProps {
   user: User;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const tutorialSteps = {
@@ -177,20 +179,26 @@ const tutorialSteps = {
   ]
 };
 
-
-export function WelcomeTutorial({ user }: WelcomeTutorialProps) {
-  const [open, setOpen] = useState(true);
+export function WelcomeTutorial({ user, isOpen, onOpenChange }: WelcomeTutorialProps) {
+  // If isOpen is provided, this is a controlled dialog. Otherwise, it's self-controlled for the first login.
+  const [internalOpen, setInternalOpen] = useState(isOpen === undefined ? true : isOpen);
   const { toast } = useToast();
 
+  const open = isOpen === undefined ? internalOpen : isOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+  
   const handleFinish = async () => {
     setOpen(false);
-    const result = await updateUserTutorialStatus(user.uid);
-    if (!result.success) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: result.error,
-      });
+    // Only mark tutorial as completed if it was the initial auto-popup, not a manually triggered one.
+    if (isOpen === undefined) { 
+        const result = await updateUserTutorialStatus(user.uid);
+        if (!result.success) {
+        toast({
+            variant: 'destructive',
+            title: 'Error',
+            description: result.error,
+        });
+        }
     }
   };
 

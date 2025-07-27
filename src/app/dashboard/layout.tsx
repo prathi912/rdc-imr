@@ -71,7 +71,7 @@ import { useToast } from '@/hooks/use-toast';
 import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { saveSidebarOrder } from '@/app/actions';
-import { SopDialog } from '@/components/sop-dialog';
+import { TutorialDialog } from '@/components/tutorial-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 interface NavItem {
@@ -402,7 +402,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
           </div>
           <div className="flex items-center gap-4">
-            <SopDialog />
+            <TutorialDialog user={user} />
             <ThemeToggle />
             <UserNav user={user} onLogout={attemptLogout} />
           </div>
