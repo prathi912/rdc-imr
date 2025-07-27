@@ -49,7 +49,7 @@ export default function AiChatPage() {
       {
         id: 'welcome-message',
         role: 'model',
-        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about projects or upload a file for analysis." }],
+        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about project or user data, or upload a file for analysis." }],
       },
     ]);
   }, []);
@@ -109,11 +109,18 @@ export default function AiChatPage() {
     setIsLoading(true);
 
     try {
-        const historyForAgent = newMessages.map(m => ({
+        const historyForAgent = newMessages
+          .filter(m => m.role && Array.isArray(m.content)) // Ensure message has role and content is an array
+          .map(m => ({
             role: m.role,
-            content: m.content,
-        }));
-        
+            content: m.content.map(part => {
+              if (part.text) return { text: part.text };
+              if (part.media) return { media: { url: part.media.url, contentType: part.media.contentType } };
+              return { text: '' };
+            }).filter(p => p.text || p.media),
+          }))
+          .filter(m => m.content.length > 0); // Ensure content is not empty after filtering
+
         const fileDataUri = file ? await fileToDataUrl(file) : undefined;
 
         const result = await runChatAgent({
@@ -156,7 +163,7 @@ export default function AiChatPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <PageHeader
         title="AI Chat Agent"
-        description="Ask questions about project data within your perview, or upload files for analysis."
+        description="Ask questions about project or user data within your perview, or upload files for analysis."
         showBackButton={false}
       />
       <Card className="mt-4 flex-1 flex flex-col">
