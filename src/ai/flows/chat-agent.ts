@@ -52,10 +52,14 @@ const getProjectsData = ai.defineTool(
     })),
   },
   async (input, context) => {
-    const user = (context as ChatInput).user;
+    // The context here is passed from the `chat` function's call to the prompt.
+    const user = (context as any).user;
+    if (!user) {
+        throw new Error("User context is missing. Cannot perform role-based data fetching.");
+    }
 
     const projectsCol = collection(adminDb, 'projects');
-    const constraints = [];
+    const constraints: any[] = [];
 
     // Apply role-based filtering
     if (user.role === 'CRO' && user.faculties && user.faculties.length > 0) {
@@ -107,13 +111,10 @@ const chatAgent = ai.definePrompt({
 
 
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  const result = await chatAgent({
-    history: input.history,
-    // Provide the user object in the context for the tools to use
-    context: { user: input.user },
-  }, {
-    // Pass the user object to the model as well, so it has context
-    context: { user: input.user }
-  });
+  // Pass the user object in the context for the tools to use
+  const result = await chatAgent(
+    { history: input.history },
+    { context: { user: input.user } }
+  );
   return result.text;
 }

@@ -110,7 +110,7 @@ export default function AiChatPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <PageHeader
         title="AI Chat Agent"
-        description="Ask questions about your data. The AI can access project and user information."
+        description="Ask questions about project data within your perview. Support for file uploads is coming soon."
         showBackButton={false}
       />
       <Card className="mt-4 flex-1 flex flex-col">
@@ -154,14 +154,14 @@ export default function AiChatPage() {
           </ScrollArea>
           <div className="p-4 border-t">
             <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-              <Button type="button" variant="outline" size="icon" disabled>
+              <Button type="button" variant="outline" size="icon">
                   <Paperclip className="h-4 w-4"/>
                   <span className="sr-only">Attach file</span>
               </Button>
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about projects or users..."
+                placeholder="Ask about projects..."
                 disabled={isLoading}
               />
               <Button type="submit" disabled={isLoading || !input.trim()}>
