@@ -51,19 +51,19 @@ export default function AiChatPage() {
     if (savedMessages) {
       setMessages(JSON.parse(savedMessages));
     } else {
-      setMessages([
-        {
-          id: 'welcome-message',
-          role: 'model',
-          content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about project or user data, or upload a file for analysis." }],
-        },
-      ]);
+      const welcomeMessage: Message = {
+        id: 'welcome-message',
+        role: 'model',
+        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about project data within your purview, or upload a file for analysis." }],
+      };
+      setMessages([welcomeMessage]);
+      sessionStorage.setItem('chatMessages', JSON.stringify([welcomeMessage]));
     }
   }, []);
 
   useEffect(() => {
-    // Save messages to sessionStorage whenever they change
-    if(messages.length > 1) { // Don't save initial state
+    // Save messages to sessionStorage whenever they change, if there's more than the initial message
+    if (messages.length > 1) {
       sessionStorage.setItem('chatMessages', JSON.stringify(messages));
     }
   }, [messages]);
@@ -153,8 +153,8 @@ export default function AiChatPage() {
             fileDataUri: fileDataUri,
         });
 
-        if (result.success) {
-             const assistantMessage: Message = {
+        if (result.success && result.response) {
+            const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: 'model',
                 content: [{ text: result.response }],
@@ -180,7 +180,7 @@ export default function AiChatPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <PageHeader
         title="AI Chat Agent"
-        description="Ask questions about project or user data within your perview, or upload files for analysis."
+        description="Ask questions about project or user data within your purview, or upload files for analysis."
         showBackButton={false}
       />
       <Card className="mt-4 flex-1 flex flex-col">

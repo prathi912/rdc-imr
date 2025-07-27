@@ -129,7 +129,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     content: msg.content.map(part => {
         if (part.text) return { text: part.text };
         if (part.media) return { media: { url: part.media.url, contentType: part.media.contentType } };
-        // This filter is important to handle any unexpected content parts
         return { text: '' }; 
     }).filter(p => p.text || p.media)
   }));
@@ -140,5 +139,6 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     { context: { user: user } }
   );
   
+  // Ensure the final output is a simple string.
   return result.text;
 }
