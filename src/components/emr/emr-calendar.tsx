@@ -68,6 +68,9 @@ const callSchema = z.object({
   detailsUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   attachments: z.any().optional(),
   notifyAllStaff: z.boolean().default(false).optional(),
+}).refine(data => data.interestDeadline <= data.applyDeadline, {
+  message: 'Interest deadline must be on or before the agency application deadline.',
+  path: ['interestDeadline'],
 });
 
 function AddEditCallDialog({

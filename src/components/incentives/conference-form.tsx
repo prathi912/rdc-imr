@@ -78,7 +78,11 @@ const conferenceSchema = z
   .refine(data => data.claimType !== 'Conference Presentations' || data.conferenceSelfDeclaration === true, { message: 'You must agree to the self-declaration.', path: ['conferenceSelfDeclaration']})
   .refine(data => !(data.conferenceVenue && data.conferenceVenue !== 'India') || (!!data.govtFundingRequestProof && data.govtFundingRequestProof.length > 0), { message: 'Proof of government funding request is required for conferences outside India.', path: ['govtFundingRequestProof']})
   .refine(data => !(data.wonPrize) || (!!data.prizeDetails && data.prizeDetails.length > 2), { message: 'Prize details are required if you won a prize.', path: ['prizeDetails']})
-  .refine(data => !(data.wonPrize) || (!!data.prizeProof && data.prizeProof.length > 0), { message: 'Proof of prize is required if you won a prize.', path: ['prizeProof']});
+  .refine(data => !(data.wonPrize) || (!!data.prizeProof && data.prizeProof.length > 0), { message: 'Proof of prize is required if you won a prize.', path: ['prizeProof']})
+  .refine(data => !data.conferenceDate || !data.presentationDate || new Date(data.presentationDate) >= new Date(data.conferenceDate), {
+    message: 'Presentation date must be on or after the conference start date.',
+    path: ['presentationDate'],
+  });
 
 type ConferenceFormValues = z.infer<typeof conferenceSchema>;
 
@@ -242,7 +246,7 @@ export function ConferenceForm() {
                         <FormField name="organizerName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Organizer Name</FormLabel><FormControl><Input placeholder="Name of Institution/Organisation" {...field} /></FormControl><FormMessage /></FormItem> )} />
                          <FormField name="eventWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Event Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <FormField name="conferenceDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                           <FormField name="conferenceDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Start Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
                            <FormField name="presentationDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Your Presentation Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
