@@ -61,8 +61,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -108,19 +106,12 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | 
   Completed: "outline",
 }
 
-const scheduleSchema = z.object({
-  date: z.date({ required_error: "A meeting date is required." }),
-  time: z.string().min(1, "Meeting time is required."),
-  venue: z.string().min(1, "Meeting venue is required."),
-})
-type ScheduleFormData = z.infer<typeof scheduleSchema>
-
 const durationSchema = z
   .object({
-    startDate: z.date({ required_error: "A start date is required." }),
-    endDate: z.date({ required_error: "An end date is required." }),
+    startDate: z.string().min(1, "A start date is required."),
+    endDate: z.string().min(1, "An end date is required."),
   })
-  .refine((data) => data.endDate > data.startDate, {
+  .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
     message: "End date must be after start date.",
     path: ["endDate"],
   })
@@ -168,7 +159,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false)
   const [revisedProposalFile, setRevisedProposalFile] = useState<File | null>(null)
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false)
-  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false)
   const [isDurationDialogOpen, setIsDurationDialogOpen] = useState(false)
   const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false)
   const [isRevisionCommentDialogOpen, setIsRevisionCommentDialogOpen] = useState(false)
@@ -181,10 +171,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isSavingCoPis, setIsSavingCoPis] = useState(false)
-
-  const scheduleForm = useForm<ScheduleFormData>({
-    resolver: zodResolver(scheduleSchema),
-  })
 
   const durationForm = useForm<DurationFormData>({
     resolver: zodResolver(durationSchema),
@@ -250,21 +236,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }, [project.coPiUids])
 
   useEffect(() => {
-    if (project.meetingDetails) {
-      scheduleForm.reset({
-        date: project.meetingDetails.date ? parseISO(project.meetingDetails.date) : undefined,
-        time: project.meetingDetails.time,
-        venue: project.meetingDetails.venue,
-      })
-    }
     durationForm.reset({
-      startDate: project.projectStartDate ? new Date(project.projectStartDate) : undefined,
-      endDate: project.projectEndDate ? new Date(project.projectEndDate) : undefined,
+      startDate: project.projectStartDate ? format(new Date(project.projectStartDate), 'yyyy-MM-dd') : '',
+      endDate: project.projectEndDate ? format(new Date(project.projectEndDate), 'yyyy-MM-dd') : '',
     })
     evaluatorForm.reset({
       evaluatorUids: project.meetingDetails?.assignedEvaluators || [],
     })
-  }, [project, scheduleForm, durationForm, evaluatorForm])
+  }, [project, durationForm, evaluatorForm])
 
   const isPI = user?.uid === project.pi_uid || user?.email === project.pi_email
   const isAdmin = user && ["Super-admin", "admin", "CRO"].includes(user.role)
@@ -366,44 +345,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       toast({ variant: "destructive", title: "Error", description: result.error })
     }
     setIsSavingCoPis(false)
-  }
-
-  const handleScheduleUpdate = async (data: ScheduleFormData) => {
-    setIsUpdating(true)
-    try {
-      const projectRef = doc(db, "projects", project.id)
-      const newMeetingDetails = {
-        date: format(data.date, "yyyy-MM-dd"),
-        time: data.time,
-        venue: data.venue,
-      }
-
-      await updateDoc(projectRef, {
-        "meetingDetails.date": newMeetingDetails.date,
-        "meetingDetails.time": newMeetingDetails.time,
-        "meetingDetails.venue": newMeetingDetails.venue,
-      })
-
-      await addDoc(collection(db, "notifications"), {
-        uid: project.pi_uid,
-        title: `MEETING RESCHEDULED for your project: "${project.title}"`,
-        projectId: project.id,
-        createdAt: new Date().toISOString(),
-        isRead: false,
-      })
-
-      setProject({
-        ...project,
-        meetingDetails: { ...project.meetingDetails, ...newMeetingDetails } as Project["meetingDetails"],
-      })
-      toast({ title: "Success", description: `Meeting schedule has been updated.` })
-      setIsScheduleDialogOpen(false)
-    } catch (error) {
-      console.error("Error updating schedule:", error)
-      toast({ variant: "destructive", title: "Error", description: "Failed to update meeting schedule." })
-    } finally {
-      setIsUpdating(false)
-    }
   }
 
   const handleAwardGrant = async () => {
@@ -621,13 +562,13 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const handleDurationSubmit = async (data: DurationFormData) => {
     setIsUpdating(true)
-    const result = await updateProjectDuration(project.id, data.startDate.toISOString(), data.endDate.toISOString())
+    const result = await updateProjectDuration(project.id, new Date(data.startDate).toISOString(), new Date(data.endDate).toISOString())
     if (result.success) {
       toast({ title: "Success", description: "Project duration has been updated." })
       setProject((prev) => ({
         ...prev,
-        projectStartDate: data.startDate.toISOString(),
-        projectEndDate: data.endDate.toISOString(),
+        projectStartDate: new Date(data.startDate).toISOString(),
+        projectEndDate: new Date(data.endDate).toISOString(),
       }))
       setIsDurationDialogOpen(false)
     } else {
@@ -712,14 +653,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       setIsPrinting(false)
     }
   }
-
-  const availableStatuses: Project["status"][] = [
-    "Submitted",
-    "Under Review",
-    "In Progress",
-    "Completed",
-    "Pending Completion Approval",
-  ]
 
   return (
     <>
@@ -849,32 +782,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                           name="startDate"
                           control={durationForm.control}
                           render={({ field }) => (
-                            <FormItem className="flex flex-col">
+                            <FormItem>
                               <FormLabel>Start Date</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant={"outline"}
-                                      className={cn(
-                                        "w-full pl-3 text-left font-normal",
-                                        !field.value && "text-muted-foreground",
-                                      )}
-                                    >
-                                      {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -883,33 +795,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                           name="endDate"
                           control={durationForm.control}
                           render={({ field }) => (
-                            <FormItem className="flex flex-col">
+                            <FormItem>
                               <FormLabel>End Date</FormLabel>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button
-                                      variant={"outline"}
-                                      className={cn(
-                                        "w-full pl-3 text-left font-normal",
-                                        !field.value && "text-muted-foreground",
-                                      )}
-                                    >
-                                      {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                      <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={field.value}
-                                    onSelect={field.onChange}
-                                    disabled={(date) => date < (durationForm.getValues("startDate") || new Date())}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
@@ -1062,175 +952,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
                 <div className="flex justify-between items-start flex-wrap gap-2">
                   <h3 className="font-semibold text-lg">IMR Evaluation Meeting Details</h3>
-                  <div className="flex items-center gap-2">
-                    {isSuperAdmin && (
-                      <Dialog open={isEvaluatorDialogOpen} onOpenChange={setIsEvaluatorDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <UserCog className="mr-2 h-4 w-4" />
-                            Update Evaluators
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Update Assigned Evaluators</DialogTitle>
-                            <DialogDescription>Modify the evaluation committee for this project.</DialogDescription>
-                          </DialogHeader>
-                          <Form {...evaluatorForm}>
-                            <form
-                              id="evaluator-form"
-                              onSubmit={evaluatorForm.handleSubmit(handleEvaluatorSubmit)}
-                              className="space-y-4 py-4"
-                            >
-                              <FormField
-                                control={evaluatorForm.control}
-                                name="evaluatorUids"
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-col">
-                                    <FormLabel>Assigned Evaluators</FormLabel>
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between bg-transparent">
-                                          {field.value?.length > 0
-                                            ? `${field.value.length} selected`
-                                            : "Select evaluators"}
-                                          <ChevronDown className="h-4 w-4 opacity-50" />
-                                        </Button>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                                        {allUsers
-                                          .filter((u) => ["faculty", "CRO", "admin", "Super-admin"].includes(u.role))
-                                          .map((evaluator) => (
-                                            <DropdownMenuCheckboxItem
-                                              key={evaluator.uid}
-                                              checked={field.value?.includes(evaluator.uid)}
-                                              onCheckedChange={(checked) => {
-                                                return checked
-                                                  ? field.onChange([...(field.value || []), evaluator.uid])
-                                                  : field.onChange(field.value?.filter((id) => id !== evaluator.uid))
-                                              }}
-                                            >
-                                              {evaluator.name}
-                                            </DropdownMenuCheckboxItem>
-                                          ))}
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </form>
-                          </Form>
-                          <DialogFooter>
-                            <Button type="submit" form="evaluator-form" disabled={isUpdating}>
-                              {isUpdating ? "Saving..." : "Save Evaluators"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                    {isAdmin && (
-                      <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit Schedule
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit Meeting Schedule</DialogTitle>
-                            <DialogDescription>Update the date, time, or venue for this meeting.</DialogDescription>
-                          </DialogHeader>
-                          <Form {...scheduleForm}>
-                            <form
-                              id="schedule-edit-form"
-                              onSubmit={scheduleForm.handleSubmit(handleScheduleUpdate)}
-                              className="space-y-4 py-4"
-                            >
-                              <FormField
-                                control={scheduleForm.control}
-                                name="date"
-                                render={({ field }) => (
-                                  <FormItem className="flex flex-col">
-                                    <FormLabel>New Meeting Date</FormLabel>
-                                    <Popover>
-                                      <PopoverTrigger asChild>
-                                        <FormControl>
-                                          <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                              "w-full pl-3 text-left font-normal",
-                                              !field.value && "text-muted-foreground",
-                                            )}
-                                          >
-                                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                          </Button>
-                                        </FormControl>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-auto p-0" align="start">
-                                        <Calendar
-                                          mode="single"
-                                          selected={field.value}
-                                          onSelect={field.onChange}
-                                          disabled={(date) => date < startOfToday()}
-                                          initialFocus
-                                        />
-                                      </PopoverContent>
-                                    </Popover>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={scheduleForm.control}
-                                name="time"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>New Meeting Time</FormLabel>
-                                    <FormControl>
-                                      <Input type="time" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={scheduleForm.control}
-                                name="venue"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>New Venue</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                      <FormControl>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Select a venue" />
-                                        </SelectTrigger>
-                                      </FormControl>
-                                      <SelectContent>
-                                        {venues.map((venue) => (
-                                          <SelectItem key={venue} value={venue}>
-                                            {venue}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </form>
-                          </Form>
-                          <DialogFooter>
-                            <Button type="submit" form="schedule-edit-form" disabled={isUpdating}>
-                              {isUpdating ? "Saving..." : "Save Changes"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                   <p>
