@@ -96,22 +96,26 @@ export default function NotificationsPage() {
                         !notification.isRead ? "bg-accent/50" : ""
                       }`}
                     >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary mt-1">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 flex-shrink-0">
                         <Icon className="h-5 w-5" />
                       </div>
-                      <div className="flex-1">
-                        <Link href={`/dashboard/project/${notification.projectId}`} className="hover:underline">
-                            <p className="font-semibold">{notification.title}</p>
-                        </Link>
-                        <p className="text-sm text-muted-foreground">
-                            {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
-                        </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                           <div className="flex-1">
+                             <Link href={`/dashboard/project/${notification.projectId}`} className="hover:underline">
+                                 <p className="font-semibold break-words">{notification.title}</p>
+                             </Link>
+                             <p className="text-sm text-muted-foreground mt-1">
+                                 {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                             </p>
+                           </div>
+                           {!notification.isRead && (
+                             <Button variant="ghost" size="sm" onClick={() => handleMarkAsRead(notification.id)} className="self-start sm:self-center flex-shrink-0">
+                                 Mark as read
+                             </Button>
+                           )}
+                        </div>
                       </div>
-                      {!notification.isRead && (
-                        <Button variant="ghost" size="sm" onClick={() => handleMarkAsRead(notification.id)}>
-                            Mark as read
-                        </Button>
-                      )}
                     </div>
                   );
                 })}
