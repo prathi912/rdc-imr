@@ -56,12 +56,12 @@ export default function AiChatPage() {
         content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me questions about project or user data within your purview, or upload a file for analysis." }],
       };
       setMessages([welcomeMessage]);
-      sessionStorage.setItem('chatMessages', JSON.stringify([welcomeMessage]));
     }
   }, []);
 
   useEffect(() => {
-    if (messages.length > 1 || sessionStorage.getItem('chatSessionActive')) {
+    // Save messages to session storage whenever they change, but only if a session is active
+    if (sessionStorage.getItem('chatSessionActive')) {
         sessionStorage.setItem('chatMessages', JSON.stringify(messages));
     }
   }, [messages]);
@@ -118,7 +118,6 @@ export default function AiChatPage() {
     
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
-    const textInput = input;
     setInput('');
     removeFile();
     setIsLoading(true);
@@ -126,8 +125,6 @@ export default function AiChatPage() {
     try {
         const fileDataUri = file ? await fileToDataUrl(file) : undefined;
         
-        // CRITICAL FIX: Filter history to prevent malformed data from being sent to the AI.
-        // This ensures only valid 'user' and 'model' roles with proper content are included.
         const historyForAgent = newMessages
           .filter(m => (m.role === 'user' || m.role === 'model') && Array.isArray(m.content))
           .map(m => ({
@@ -148,7 +145,6 @@ export default function AiChatPage() {
             fileDataUri: fileDataUri,
         });
         
-        // CRITICAL FIX: Add a safeguard to ensure the response is a string before creating the message.
         if (result.success && typeof result.response === 'string') {
             const assistantMessage: Message = {
                 id: (Date.now() + 1).toString(),
@@ -184,7 +180,6 @@ export default function AiChatPage() {
           <ScrollArea className="flex-1 p-4" ref={scrollAreaRef as any}>
             <div className="space-y-6">
               {messages.map((message) => {
-                // Safeguard against rendering malformed messages
                 if (!message || !Array.isArray(message.content)) return null;
 
                 return (

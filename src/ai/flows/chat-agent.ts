@@ -137,7 +137,5 @@ export async function chat(input: ChatInput): Promise<ChatOutput> {
     { context: { user: user } }
   );
   
-  // CRITICAL FIX: Ensure only the text response is returned to the frontend.
-  // The 'result' object contains more than just the text, which caused the previous errors.
-  return result.text;
+  return result.text || "I'm sorry, I couldn't generate a response.";
 }
