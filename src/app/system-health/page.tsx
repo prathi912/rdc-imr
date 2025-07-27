@@ -102,7 +102,11 @@ export default function SystemHealthPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="System Health" description="Monitor the health and connectivity of Firebase services" />
+      <PageHeader 
+        title="System Health" 
+        description="Monitor the health and connectivity of Firebase services"
+        showBackButton={false}
+      />
 
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">

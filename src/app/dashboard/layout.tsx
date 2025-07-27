@@ -32,7 +32,6 @@ import {
   GanttChartSquare,
   Home,
   LineChart,
-  Server,
   Settings,
   ShieldCheck,
   Upload,
@@ -155,7 +154,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'bulk-upload', href: '/dashboard/bulk-upload', tooltip: 'Bulk Upload Projects', icon: Upload, label: 'Bulk Upload Projects' },
     { id: 'bulk-upload-papers', href: '/dashboard/bulk-upload-papers', tooltip: 'Bulk Upload Papers', icon: BookUp, label: 'Bulk Upload Papers' },
     { id: 'module-management', href: '/dashboard/module-management', tooltip: 'Module Management', icon: ShieldCheck, label: 'Module Management' },
-    { id: 'system-health', href: '/dashboard/system-health', tooltip: 'System Health', icon: Server, label: 'System Health' },
     { id: 'notifications', href: '/dashboard/notifications', tooltip: 'Notifications', icon: Bell, label: 'Notifications', badge: unreadCount, condition: true },
     { id: 'settings', href: '/dashboard/settings', tooltip: 'Settings', icon: Settings, label: 'Settings', condition: true },
   ], [unreadCount]);

@@ -24,7 +24,6 @@ export const ALL_MODULES = [
   { id: 'bulk-upload', label: 'Bulk Upload Projects' },
   { id: 'bulk-upload-papers', label: 'Bulk Upload Papers' },
   { id: 'module-management', label: 'Module Management' },
-  { id: 'system-health', label: 'System Health' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'settings', label: 'Settings' },
 ];
@@ -35,7 +34,7 @@ const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
 const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'emr-evaluations'];
-const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'system-health', 'bulk-upload', 'emr-logs', 'emr-management'];
+const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'bulk-upload', 'emr-logs', 'emr-management'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes', 'bulk-upload-papers'];
 
 // Default modules for special designations who are otherwise 'faculty' role
