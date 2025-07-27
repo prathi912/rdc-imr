@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -33,7 +34,7 @@ export default function AiChatPage() {
       {
         id: 'welcome-message',
         role: 'model',
-        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me about project and user data." }],
+        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me about project data." }],
       },
     ]);
   }, []);
@@ -63,14 +64,15 @@ export default function AiChatPage() {
     setIsLoading(true);
 
     try {
+        const historyForAgent = newMessages
+          .filter(m => m.content && Array.isArray(m.content) && m.content.every(c => typeof c.text === 'string'))
+          .map(m => ({
+            role: m.role,
+            content: m.content,
+        }));
+
         const result = await runChatAgent({
-            history: newMessages
-              // Filter out any messages that might not have content, which was causing the error.
-              .filter(m => m.content) 
-              .map(m => ({
-                role: m.role,
-                content: m.content,
-            })),
+            history: historyForAgent,
             user: {
                 uid: sessionUser.uid,
                 role: sessionUser.role,
