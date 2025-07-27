@@ -29,7 +29,6 @@ import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
 const EXPORT_COLUMNS = [
-  { id: 'id', label: 'Project ID' },
   { id: 'title', label: 'Project Title' },
   { id: 'type', label: 'Category' },
   { id: 'submissionDate', label: 'Submission Date' },
@@ -39,10 +38,10 @@ const EXPORT_COLUMNS = [
   { id: 'pi_phoneNumber', label: 'PI Phone' },
   { id: 'misId', label: 'MIS ID' },
   { id: 'designation', label: 'Designation' },
-  { id: 'faculty', label: 'Faculty' },
   { id: 'institute', label: 'Institute' },
   { id: 'departmentName', label: 'Department' },
   { id: 'status', label: 'Status' },
+  { id: 'coPiNames', label: 'Co-PI Names' },
 ];
 
 export default function AllProjectsPage() {
@@ -246,12 +245,16 @@ export default function AllProjectsPage() {
       return;
     }
     
-    const userDetailsMap = new Map(users.map(u => [u.uid, { misId: u.misId || '', designation: u.designation || '' }]));
+    const usersMap = new Map(users.map(u => [u.uid, u]));
     
     const dataToExport = projectsToExport.map(p => {
-      const userDetails = userDetailsMap.get(p.pi_uid);
+      const userDetails = usersMap.get(p.pi_uid);
+      const coPiNames = (p.coPiUids || [])
+        .map(uid => usersMap.get(uid)?.name)
+        .filter(Boolean)
+        .join(', ');
+
       const projectData: { [key: string]: any } = {
-        id: p.id,
         title: p.title,
         type: p.type,
         submissionDate: new Date(p.submissionDate).toLocaleDateString(),
@@ -261,10 +264,10 @@ export default function AllProjectsPage() {
         pi_phoneNumber: p.pi_phoneNumber || 'N/A',
         misId: userDetails?.misId || 'N/A',
         designation: userDetails?.designation || 'N/A',
-        faculty: p.faculty,
         institute: p.institute,
         departmentName: p.departmentName,
         status: p.status,
+        coPiNames: coPiNames || 'N/A',
       };
 
       const row: { [key: string]: any } = {};
