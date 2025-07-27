@@ -19,6 +19,7 @@ import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, set
 import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import { getDoc } from "firebase-admin/firestore"
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -839,6 +840,40 @@ export async function checkMisIdExists(misId: string, currentUid: string): Promi
     // Rethrow to let the client know something went wrong with the check.
     throw new Error("Failed to verify MIS ID due to a server error. Please try again.")
   }
+}
+
+export async function checkHODUniqueness(department: string, institute: string, currentUid: string): Promise<{ exists: boolean }> {
+    try {
+        if (!department || !institute) {
+            return { exists: false }; // Cannot check if required fields are missing
+        }
+        const usersRef = adminDb.collection("users");
+        const q = usersRef
+            .where("designation", "==", "HOD")
+            .where("department", "==", department)
+            .where("institute", "==", institute)
+            .limit(1);
+
+        const querySnapshot = await q.get();
+
+        if (querySnapshot.empty) {
+            return { exists: false };
+        }
+
+        const foundUserDoc = querySnapshot.docs[0];
+        // If the found HOD is the same as the user being updated, it's not a conflict.
+        if (foundUserDoc.id === currentUid) {
+            return { exists: false };
+        }
+        
+        // A different user is already the HOD for this department/institute.
+        return { exists: true };
+    } catch (error: any) {
+        console.error("Error checking HOD uniqueness:", error);
+        await logActivity('ERROR', 'Failed to check HOD uniqueness', { department, institute, error: error.message, stack: error.stack });
+        // Rethrow to ensure the client-side operation fails and informs the user.
+        throw new Error("A server error occurred while verifying the HOD designation. Please try again.");
+    }
 }
 
 export async function fetchScopusDataByUrl(
@@ -2638,7 +2673,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
         const callIds = emrCalls.map(c => c.id);
         const interestsRef = adminDb.collection('emrInterests');
         const interestsQuery = interestsRef.where('callId', 'in', callIds).where('userId', '==', targetUserUid);
-        const interestsSnapshot = await getDocs(interestsQuery);
+        const interestsSnapshot = await getDocs(interestsRef);
         const relevantCallIds = new Set(interestsSnapshot.docs.map(d => d.data().callId));
         relevantEmrCalls = emrCalls.filter(c => relevantCallIds.has(c.id));
     }
@@ -2774,6 +2809,7 @@ export async function bulkUploadPapers(
 
 
     
+
 
 
 

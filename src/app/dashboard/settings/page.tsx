@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -15,7 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db, auth } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { uploadFileToServer, fetchOrcidData } from '@/app/actions';
+import { uploadFileToServer, fetchOrcidData, checkHODUniqueness } from '@/app/actions';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
@@ -190,7 +191,7 @@ export default function SettingsPage() {
       if (firebaseUser) {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists) {
+        if (userDocSnap.exists()) {
           const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
@@ -240,6 +241,20 @@ export default function SettingsPage() {
     if (!user) return;
     setIsSubmittingProfile(true);
     try {
+        if (data.designation === 'HOD' && data.department && data.institute) {
+            const hodCheck = await checkHODUniqueness(data.department, data.institute, user.uid);
+            if (hodCheck.exists) {
+                toast({
+                    variant: 'destructive',
+                    title: 'HOD Already Exists',
+                    description: 'An HOD for this department and institute is already assigned. Please check internally or raise a query on the help page.',
+                    duration: 10000,
+                });
+                setIsSubmittingProfile(false);
+                return;
+            }
+        }
+        
       const userDocRef = doc(db, 'users', user.uid);
       const { email, ...updateData } = data;
       for (const key in updateData) {
@@ -252,9 +267,9 @@ export default function SettingsPage() {
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
       toast({ title: 'Profile updated successfully!' });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Profile update error:", error);
-      toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update your profile.' });
+      toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'Could not update your profile.' });
     } finally {
       setIsSubmittingProfile(false);
     }
@@ -576,7 +591,7 @@ export default function SettingsPage() {
                 <FormField control={profileForm.control} name="designation" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Designation</FormLabel>
-                    <FormControl><Input placeholder="e.g., Professor" {...field} disabled={isAcademicInfoLocked} /></FormControl>
+                    <FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
