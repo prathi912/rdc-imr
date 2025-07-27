@@ -182,7 +182,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
   });
 
   return (
-    <div className="border rounded-md">
+    <div>
       <Toolbar editor={editor} />
       <EditorContent editor={editor} />
     </div>
