@@ -376,32 +376,32 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>UN Sustainable Development Goals (SDGs)</FormLabel>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                           <Button variant="outline" className="w-full justify-between">
-                             {field.value?.length > 0 ? `${field.value.length} selected` : "Select relevant goals"}
-                             <ChevronDown className="h-4 w-4 opacity-50" />
-                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-60 overflow-y-auto">
-                            <DropdownMenuLabel>Select all that apply</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {sdgGoalsList.map((goal) => (
-                               <DropdownMenuCheckboxItem
-                                 key={goal}
-                                 checked={field.value?.includes(goal)}
-                                 onCheckedChange={(checked) => {
-                                   return checked
-                                     ? field.onChange([...(field.value || []), goal])
-                                     : field.onChange(field.value?.filter((value) => value !== goal));
-                                 }}
-                                 onSelect={(e) => e.preventDefault()}
-                               >
-                                 {goal}
-                               </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between font-normal">
+                              {field.value?.length > 0 ? `${field.value.length} selected` : "Select relevant goals"}
+                              <ChevronDown className="h-4 w-4 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-60 overflow-y-auto">
+                              <DropdownMenuLabel>Select all that apply</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {sdgGoalsList.map((goal) => (
+                                <DropdownMenuCheckboxItem
+                                  key={goal}
+                                  checked={field.value?.includes(goal)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...(field.value || []), goal])
+                                      : field.onChange(field.value?.filter((value) => value !== goal));
+                                  }}
+                                  onSelect={(e) => e.preventDefault()}
+                                >
+                                  {goal}
+                                </DropdownMenuCheckboxItem>
+                              ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                        <FormMessage />
                     </FormItem>
                   )}

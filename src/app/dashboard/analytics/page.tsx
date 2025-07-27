@@ -284,14 +284,16 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent>
             <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
-                <PieChart>
-                    <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
-                    <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
-                        {statusDistributionData.map((entry, index) => (
-                           <Cell key={`cell-${index}`} fill={statusDistributionConfig[entry.name]?.color || '#8884d8'} />
-                        ))}
-                    </Pie>
-                </PieChart>
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
+                        <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                            {statusDistributionData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={statusDistributionConfig[entry.name]?.color || '#8884d8'} />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
         </Card>

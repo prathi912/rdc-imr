@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -1003,7 +1002,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
-                        <div className="flex items-center justify-center gap-4">
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Button variant="secondary" asChild>
                                 <a href="/templates/COMPLETION_REPORT_TEMPLATE.docx" download>
                                     <Download className="mr-2 h-4 w-4" />
@@ -1017,8 +1016,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                                 </a>
                             </Button>
                         </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="completion-report" className="text-right">
+                      <div className="flex flex-col sm:grid sm:grid-cols-4 sm:items-center gap-4">
+                        <Label htmlFor="completion-report" className="sm:text-right">
                           Completion Report (PDF)
                         </Label>
                         <Input
@@ -1029,8 +1028,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                           className="col-span-3"
                         />
                       </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="utilization-certificate" className="text-right">
+                      <div className="flex flex-col sm:grid sm:grid-cols-4 sm:items-center gap-4">
+                        <Label htmlFor="utilization-certificate" className="sm:text-right">
                           Utilization Certificate (PDF)
                         </Label>
                         <Input
