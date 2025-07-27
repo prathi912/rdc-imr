@@ -892,7 +892,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-6 py-4">
-                      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 flex-wrap">
                           <Button variant="secondary" asChild>
                               <a href="/templates/COMPLETION_REPORT_TEMPLATE.docx" download>
                                   <Download className="mr-2 h-4 w-4" />
