@@ -154,6 +154,20 @@ export default function AnalyticsPage() {
     submissions: { label: 'Submissions', color: 'hsl(var(--primary))' },
   } satisfies ChartConfig;
 
+  const submissionsByYearData = useMemo(() => {
+    if (filteredProjects.length === 0) return [];
+    
+    const yearCounts = filteredProjects.reduce((acc, project) => {
+      const year = getYear(parseISO(project.submissionDate));
+      acc[year] = (acc[year] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(yearCounts)
+      .map(([year, count]) => ({ year, submissions: count }))
+      .sort((a, b) => parseInt(a.year) - parseInt(b.year));
+  }, [filteredProjects]);
+
   const { aggregationKey, aggregationLabel } = useMemo(() => {
     if (user?.role === 'CRO') {
         return { aggregationKey: 'institute', aggregationLabel: 'Institute' };
@@ -298,8 +312,8 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-2">
-        <Card>
+      <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
               <div>
@@ -335,6 +349,25 @@ export default function AnalyticsPage() {
             </ChartContainer>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Submissions by Year</CardTitle>
+            <CardDescription>Total projects submitted each year.</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
+              <BarChart accessibilityLayer data={submissionsByYearData}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis allowDecimals={false}/>
+                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                <Bar dataKey="submissions" fill="var(--color-submissions)" radius={4} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="mt-8 grid gap-6 md:grid-cols-1">
         <Card>
           <CardHeader>
             <CardTitle>Projects by {aggregationLabel}</CardTitle>
