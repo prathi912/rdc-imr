@@ -1524,6 +1524,16 @@ export async function addGrantPhase(
     await projectRef.update({ grant: updatedGrant })
     await logActivity('INFO', 'Grant phase added', { projectId, phaseName, amount });
 
+    // Add notification for new grant phase
+    const notification = {
+      uid: project.pi_uid,
+      projectId: projectId,
+      title: `A new grant phase "${phaseName}" has been added to your project "${project.title}".`,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    }
+    await adminDb.collection("notifications").add(notification)
+
     const updatedProject = { ...project, grant: updatedGrant }
     return { success: true, updatedProject }
   } catch (error: any) {
@@ -1647,6 +1657,16 @@ export async function updatePhaseStatus(
     const updatedGrant = { ...project.grant, phases: updatedPhases }
     await projectRef.update({ grant: updatedGrant })
     await logActivity('INFO', 'Grant phase status updated', { projectId, phaseId, newStatus });
+
+    // Add notification for grant phase status update
+    const notification = {
+      uid: project.pi_uid,
+      projectId: projectId,
+      title: `The status of grant phase has been updated to "${newStatus}" for your project "${project.title}".`,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    }
+    await adminDb.collection("notifications").add(notification)
 
     const updatedProject = { ...project, grant: updatedGrant }
     return { success: true, updatedProject }
