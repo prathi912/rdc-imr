@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -11,11 +12,18 @@ import { z } from 'zod';
 import { adminDb } from '@/lib/admin';
 import type { Project, User } from '@/types';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { Part } from 'genkit';
 
 const ChatInputSchema = z.object({
   history: z.array(z.object({
     role: z.enum(['user', 'model']),
-    content: z.array(z.object({ text: z.string() })),
+    content: z.array(z.object({ 
+        text: z.string().optional(),
+        media: z.object({
+            url: z.string(),
+            contentType: z.string().optional(),
+        }).optional()
+    })),
   })),
   user: z.object({
     uid: z.string(),
@@ -25,6 +33,7 @@ const ChatInputSchema = z.object({
     department: z.string().optional(),
     faculties: z.array(z.string()).optional(),
   }),
+  fileDataUri: z.string().optional(),
 });
 export type ChatInput = z.infer<typeof ChatInputSchema>;
 
@@ -100,8 +109,9 @@ const getProjectsData = ai.defineTool(
 const chatAgent = ai.definePrompt({
     name: 'chatAgentPrompt',
     system: `You are a helpful AI assistant for the Parul University Research & Development Portal.
-    Your capabilities include querying project data.
-    You MUST use the provided tools to answer questions about data. Do not make up data.
+    Your capabilities include querying project data and analyzing uploaded files.
+    You MUST use the provided tools to answer questions about project data. Do not make up data.
+    If the user uploads a file (image, PDF, Excel), analyze its content to answer their questions.
     When a user asks a question, use the available tools to find the information.
     If a user asks for "all projects", you can assume they mean the most recent ones and apply a reasonable limit unless they specify otherwise.
     Based on the user's role, the data you can access is already filtered. For example, a Principal of an institute will only see projects from their institute. Do not mention this filtering unless it's relevant to their question.
@@ -111,10 +121,29 @@ const chatAgent = ai.definePrompt({
 
 
 export async function chat(input: ChatInput): Promise<ChatOutput> {
-  // Pass the user object in the context for the tools to use
+  const { history, user, fileDataUri } = input;
+
+  // Reconstruct the prompt history from the client-side format
+  const promptHistory: Part[] = history.flatMap(msg => {
+    // Convert each message's content parts into the format Genkit expects
+    const parts = msg.content.map(part => {
+        if (part.text) {
+            return { text: part.text };
+        }
+        if (part.media) {
+            return { media: { url: part.media.url, contentType: part.media.contentType } };
+        }
+        return null;
+    }).filter((p): p is Part => p !== null);
+
+    return { role: msg.role, content: parts };
+  });
+
+  // Call the agent with the reconstructed history
   const result = await chatAgent(
-    { history: input.history },
-    { context: { user: input.user } }
+    { history: promptHistory },
+    { context: { user: user } }
   );
+  
   return result.text;
 }
