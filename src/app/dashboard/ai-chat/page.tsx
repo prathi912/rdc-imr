@@ -33,7 +33,7 @@ export default function AiChatPage() {
       {
         id: 'welcome-message',
         role: 'model',
-        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me about project data, user information, and more." }],
+        content: [{ text: "Hello! I am your AI Research Assistant. How can I help you today? You can ask me about project and user data." }],
       },
     ]);
   }, []);
@@ -64,7 +64,10 @@ export default function AiChatPage() {
 
     try {
         const result = await runChatAgent({
-            history: newMessages.map(m => ({
+            history: newMessages
+              // Filter out any messages that might not have content, which was causing the error.
+              .filter(m => m.content) 
+              .map(m => ({
                 role: m.role,
                 content: m.content,
             })),
@@ -105,7 +108,7 @@ export default function AiChatPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <PageHeader
         title="AI Chat Agent"
-        description="Ask questions about your data. The AI can access project, user, and incentive information."
+        description="Ask questions about your data. The AI can access project and user information."
         showBackButton={false}
       />
       <Card className="mt-4 flex-1 flex flex-col">
@@ -156,7 +159,7 @@ export default function AiChatPage() {
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about projects, funding, or users..."
+                placeholder="Ask about projects or users..."
                 disabled={isLoading}
               />
               <Button type="submit" disabled={isLoading || !input.trim()}>
