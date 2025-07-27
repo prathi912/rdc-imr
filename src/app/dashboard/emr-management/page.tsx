@@ -1,7 +1,7 @@
 // src/app/dashboard/emr-management/page.tsx
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from '@/lib/config';
 import { collection, query, orderBy, onSnapshot, where, getDocs } from 'firebase/firestore';
@@ -19,7 +19,7 @@ import { Eye, Download } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 
-function EmrLogsTab() {
+function EmrLogsTab({ user }: { user: User | null }) {
     const [logs, setLogs] = useState<EmrInterest[]>([]);
     const [calls, setCalls] = useState<Map<string, FundingCall>>(new Map());
     const [users, setUsers] = useState<Map<string, User>>(new Map());
@@ -27,36 +27,62 @@ function EmrLogsTab() {
     const [searchTerm, setSearchTerm] = useState('');
     const { toast } = useToast();
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            try {
-                const logsQuery = query(collection(db, 'emrInterests'), where('status', '==', 'Submitted to Agency'), orderBy('submittedToAgencyAt', 'desc'));
-                const logsSnapshot = await getDocs(logsQuery);
-                const fetchedLogs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
-                setLogs(fetchedLogs);
+    const fetchData = useCallback(async () => {
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
+        try {
+            let logsQuery;
+            const baseQuery = query(collection(db, 'emrInterests'), where('status', '==', 'Submitted to Agency'), orderBy('submittedToAgencyAt', 'desc'));
 
-                const callIds = [...new Set(fetchedLogs.map(log => log.callId))];
-                if (callIds.length > 0) {
-                    const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
-                    const callsSnapshot = await getDocs(callsQuery);
-                    setCalls(new Map(callsSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as FundingCall])));
-                }
+            const isSuperAdminOrAdmin = user.role === 'Super-admin' || user.role === 'admin';
+            const isCro = user.role === 'CRO';
+            const isPrincipal = user.designation === 'Principal';
+            const isHod = user.designation === 'HOD';
 
-                const userIds = [...new Set(fetchedLogs.map(log => log.userId))];
-                if (userIds.length > 0) {
-                    const usersQuery = query(collection(db, 'users'), where('__name__', 'in', userIds));
-                    const usersSnapshot = await getDocs(usersQuery);
-                    setUsers(new Map(usersSnapshot.docs.map(doc => [doc.id, { uid: doc.id, ...doc.data() } as User])));
-                }
-            } catch (error) {
-                toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch EMR logs.' });
-            } finally {
+            if (isSuperAdminOrAdmin) {
+                logsQuery = baseQuery;
+            } else if (isCro && user.faculties && user.faculties.length > 0) {
+                logsQuery = query(baseQuery, where('faculty', 'in', user.faculties));
+            } else if (isPrincipal && user.institute) {
+                logsQuery = query(baseQuery, where('faculty', 'in', user.faculties || [])); // Assuming Principals are tied to a faculty that contains their institute
+            } else if (isHod && user.department && user.institute) {
+                logsQuery = query(baseQuery, where('department', '==', user.department), where('faculty', '==', user.faculty));
+            } else {
+                setLogs([]);
                 setLoading(false);
+                return;
             }
-        };
+
+            const logsSnapshot = await getDocs(logsQuery);
+            const fetchedLogs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+            setLogs(fetchedLogs);
+
+            const callIds = [...new Set(fetchedLogs.map(log => log.callId))];
+            if (callIds.length > 0) {
+                const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
+                const callsSnapshot = await getDocs(callsQuery);
+                setCalls(new Map(callsSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() } as FundingCall])));
+            }
+
+            const userIds = [...new Set(fetchedLogs.map(log => log.userId))];
+            if (userIds.length > 0) {
+                const usersQuery = query(collection(db, 'users'), where('__name__', 'in', userIds));
+                const usersSnapshot = await getDocs(usersQuery);
+                setUsers(new Map(usersSnapshot.docs.map(doc => [doc.id, { uid: doc.id, ...doc.data() } as User])));
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch EMR logs.' });
+        } finally {
+            setLoading(false);
+        }
+    }, [toast, user]);
+
+    useEffect(() => {
         fetchData();
-    }, [toast]);
+    }, [fetchData]);
 
     const filteredLogs = useMemo(() => {
         if (!searchTerm) return logs;
@@ -92,6 +118,8 @@ function EmrLogsTab() {
         XLSX.writeFile(workbook, `emr_submission_logs_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
+    const canViewFullDetails = user?.role === 'Super-admin' || user?.role === 'admin';
+
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -108,6 +136,7 @@ function EmrLogsTab() {
                                 <TableHead className="hidden md:table-cell">Funding Call</TableHead>
                                 <TableHead className="hidden sm:table-cell">Reference No.</TableHead>
                                 <TableHead>Logged On</TableHead>
+                                <TableHead>Acknowledgement</TableHead>
                             </TableRow></TableHeader>
                             <TableBody>{filteredLogs.map(log => (
                                 <TableRow key={log.id}>
@@ -115,6 +144,15 @@ function EmrLogsTab() {
                                     <TableCell className="hidden md:table-cell">{calls.get(log.callId)?.title || 'Loading...'}</TableCell>
                                     <TableCell className="hidden sm:table-cell">{log.agencyReferenceNumber || 'N/A'}</TableCell>
                                     <TableCell>{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
+                                    <TableCell>
+                                        {log.agencyAcknowledgementUrl ? (
+                                            <Button asChild variant="link" className="p-0 h-auto">
+                                                <a href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View</a>
+                                            </Button>
+                                        ) : (
+                                            "Not Provided"
+                                        )}
+                                    </TableCell>
                                 </TableRow>
                             ))}</TableBody>
                         </Table>
@@ -129,6 +167,14 @@ export default function EmrManagementOverviewPage() {
     const [calls, setCalls] = useState<FundingCall[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
+    const [user, setUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
+        }
+    }, []);
 
     useEffect(() => {
         const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
@@ -204,7 +250,7 @@ export default function EmrManagementOverviewPage() {
                         </Card>
                     </TabsContent>
                     <TabsContent value="logs" className="mt-4">
-                        <EmrLogsTab />
+                        <EmrLogsTab user={user} />
                     </TabsContent>
                 </Tabs>
             </div>
