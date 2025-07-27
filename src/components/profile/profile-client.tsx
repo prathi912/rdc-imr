@@ -343,7 +343,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     <div className="flex flex-col md:flex-row items-center gap-6">
                         <div className="flex-shrink-0">
                             <Avatar className="h-28 w-28 md:h-32 md:w-32 border-4 border-background shadow-lg">
-                                <AvatarImage src={user.photoURL || undefined} alt={user.name} />
+                                <AvatarImage src={user.photoURL || undefined} alt={user.name} className="object-cover" />
                                 <AvatarFallback className="text-4xl">{user.name?.[0].toUpperCase()}</AvatarFallback>
                             </Avatar>
                         </div>
