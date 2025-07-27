@@ -10,7 +10,7 @@ import { adminDb, adminStorage } from "@/lib/admin"
 import { FieldValue } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
-import { sendEmail } from "@/lib/email"
+import { sendEmail as sendEmailUtility } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
@@ -32,6 +32,10 @@ const EMAIL_STYLES = {
         This is a system generated automatic email. If you feel this is an error, please report at the earliest.
     </p>`
 };
+
+export async function sendEmail(options: { to: string; subject: string; html: string; from: 'default' | 'rdc' }) {
+    return await sendEmailUtility(options);
+}
 
 export async function linkPapersToNewUser(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
   try {
@@ -402,7 +406,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     </div>`
 
     if (project.pi_email) {
-      await sendEmail({
+      await sendEmailUtility({
         to: project.pi_email,
         subject: `Project Status Update: ${project.title}`,
         html: emailHtml,
@@ -448,7 +452,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
     await adminDb.collection("notifications").add(notification)
 
     if (claim.userEmail) {
-      await sendEmail({
+      await sendEmailUtility({
         to: claim.userEmail,
         subject: `Incentive Claim Status Update: ${newStatus}`,
         html: `
@@ -515,7 +519,7 @@ export async function scheduleMeeting(
       })
 
       if (projectData.pi_email) {
-        await sendEmail({
+        await sendEmailUtility({
           to: projectData.pi_email,
           subject: `IMR Meeting Scheduled for Your Project: ${projectData.title}`,
           html: `
@@ -565,7 +569,7 @@ export async function scheduleMeeting(
           })
 
           if (evaluator.email) {
-            await sendEmail({
+            await sendEmailUtility({
               to: evaluator.email,
               subject: "IMR Evaluation Committee Assignment",
               html: `
@@ -1620,7 +1624,7 @@ export async function updateCoInvestigators(
               <p style="color:#e0e0e0;">You can view the project details on the PU Research Portal.</p>
               ${EMAIL_STYLES.footer}
             </div>`;
-          await sendEmail({
+          await sendEmailUtility({
               to: coPi.email,
               subject: `You've been added to an IMR Project`,
               html: emailHtml,
@@ -1722,7 +1726,7 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
             });
 
             if (coPi.email) {
-                await sendEmail({
+                await sendEmailUtility({
                     to: coPi.email,
                     subject: `You've been added to an EMR Application `,
                     html: `
@@ -1819,7 +1823,7 @@ export async function scheduleEmrMeeting(
       `;
       
       if (interest.userEmail) {
-          emailPromises.push(sendEmail({
+          emailPromises.push(sendEmailUtility({
               to: interest.userEmail,
               subject: `Your EMR Presentation Slot for: ${call.title}`,
               html: emailHtml,
@@ -1847,7 +1851,7 @@ export async function scheduleEmrMeeting(
           });
 
           if (evaluator.email) {
-            emailPromises.push(sendEmail({
+            emailPromises.push(sendEmailUtility({
               to: evaluator.email,
               subject: `EMR Evaluation Assignment: ${call.title}`,
               html: `
@@ -2014,7 +2018,7 @@ export async function deleteEmrInterest(interestId: string, remarks: string, adm
         await adminDb.collection("notifications").add(notification);
 
         if (interest.userEmail) {
-            await sendEmail({
+            await sendEmailUtility({
                 to: interest.userEmail,
                 subject: `Update on your EMR Interest for: ${callTitle}`,
                 html: `
@@ -2188,7 +2192,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
       </div>
     `;
 
-    await sendEmail({
+    await sendEmailUtility({
       to: allStaffEmail,
       subject: `New Funding Call: ${call.title}`,
       html: emailHtml,
@@ -2267,7 +2271,7 @@ export async function updateEmrStatus(
 
         emailHtml += `<p style="color:#e0e0e0;">Please check the portal for more details.</p>${EMAIL_STYLES.footer}</div>`
 
-        await sendEmail({
+        await sendEmailUtility({
           to: interest.userEmail,
           subject: `Update on your EMR Application`,
           html: emailHtml,
@@ -2624,6 +2628,7 @@ export async function bulkUploadPapers(
 
 
     
+
 
 
 

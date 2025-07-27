@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import type React from "react"
@@ -65,6 +66,7 @@ import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 import {
   Check,
@@ -172,6 +174,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false)
   const [isRevisionCommentDialogOpen, setIsRevisionCommentDialogOpen] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
+  const isMobile = useIsMobile();
 
   // Co-PI management state
   const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
