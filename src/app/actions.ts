@@ -987,115 +987,99 @@ function excelDateToJSDate(serial: number) {
 
 export async function bulkUploadProjects(
   projectsData: any[],
-): Promise<{ success: boolean; count: number; error?: string }> {
-  try {
-    const batch = adminDb.batch()
-    const usersRef = adminDb.collection("users")
-    let projectCount = 0
+): Promise<{ 
+    success: boolean; 
+    data: {
+        successfulCount: number;
+        failures: { projectTitle: string; piName: string; error: string }[];
+    };
+    error?: string 
+}> {
+  const usersRef = adminDb.collection("users");
+  let successfulCount = 0;
+  const failures: { projectTitle: string; piName: string; error: string }[] = [];
 
-    for (const project of projectsData) {
-      // Basic validation
-      if (
-        !project.pi_email ||
-        !project.project_title ||
-        !project.status ||
-        !project.sanction_number ||
-        !project.Name_of_staff ||
-        !project.Faculty ||
-        !project.Institute
-      ) {
-        console.warn("Skipping incomplete project record:", project)
-        continue
-      }
+  for (const project of projectsData) {
+      try {
+          const projectTitle = project.project_title || 'Untitled';
+          const piName = project.Name_of_staff || 'Unknown PI';
 
-      let pi_uid = ""
-      let pi_name = project.Name_of_staff
-      let faculty = project.Faculty
-      let institute = project.Institute
-      let departmentName = project.Department || null
-
-      // Find user by email to get UID and profile data
-      const userQuery = await usersRef.where("email", "==", project.pi_email).limit(1).get()
-      if (!userQuery.empty) {
-        const userDoc = userQuery.docs[0]
-        const userData = userDoc.data()
-        pi_uid = userDoc.id
-        pi_name = userData.name || pi_name
-        faculty = userData.faculty || faculty
-        institute = userData.institute || institute
-        departmentName = userData.department || departmentName
-      }
-
-      const projectRef = adminDb.collection("projects").doc()
-
-      let submissionDate
-      if (project.sanction_date) {
-        if (project.sanction_date instanceof Date) {
-          submissionDate = project.sanction_date.toISOString()
-        } else if (typeof project.sanction_date === "number") {
-          // Handle Excel serial date format
-          submissionDate = excelDateToJSDate(project.sanction_date).toISOString()
-        } else if (typeof project.sanction_date === "string") {
-          // Attempt to parse various string formats
-          const parsedDate = new Date(project.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'))
-          if (!isNaN(parsedDate.getTime())) {
-            submissionDate = parsedDate.toISOString()
-          } else {
-            submissionDate = new Date().toISOString() // Fallback
+          // Basic validation
+          if (
+              !project.pi_email || !project.project_title || !project.status || !project.sanction_number ||
+              !project.Name_of_staff || !project.Faculty || !project.Institute
+          ) {
+              failures.push({ projectTitle, piName, error: 'Missing required columns in the Excel file.' });
+              continue;
           }
-        } else {
-          submissionDate = new Date().toISOString() // Fallback
-        }
-      } else {
-        submissionDate = new Date().toISOString() // Fallback
+
+          let pi_uid = "";
+          let faculty = project.Faculty;
+          let institute = project.Institute;
+          let departmentName = project.Department || null;
+
+          const userQuery = await usersRef.where("email", "==", project.pi_email).limit(1).get();
+          if (!userQuery.empty) {
+              const userDoc = userQuery.docs[0];
+              const userData = userDoc.data();
+              pi_uid = userDoc.id;
+              faculty = userData.faculty || faculty;
+              institute = userData.institute || institute;
+              departmentName = userData.department || departmentName;
+          }
+          
+          let submissionDate;
+          if (project.sanction_date) {
+            if (project.sanction_date instanceof Date) {
+              submissionDate = project.sanction_date.toISOString();
+            } else if (typeof project.sanction_date === "number") {
+              submissionDate = excelDateToJSDate(project.sanction_date).toISOString();
+            } else if (typeof project.sanction_date === "string") {
+              const parsedDate = new Date(project.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'));
+              submissionDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : new Date().toISOString();
+            } else {
+              submissionDate = new Date().toISOString();
+            }
+          } else {
+            submissionDate = new Date().toISOString();
+          }
+
+          const newProjectData: Partial<Project> = {
+              title: project.project_title, pi_email: project.pi_email, status: project.status,
+              pi_uid: pi_uid, pi: piName, abstract: "Historical data migrated from bulk upload.",
+              type: "Research", faculty: faculty, institute: institute, departmentName: departmentName,
+              teamInfo: "Historical data, team info not available.",
+              timelineAndOutcomes: "Historical data, outcomes not available.",
+              submissionDate: submissionDate, isBulkUploaded: true,
+          };
+
+          if (project.grant_amount && project.grant_amount > 0) {
+              const firstPhase: GrantPhase = {
+                  id: new Date().toISOString(), name: "Phase 1", amount: project.grant_amount,
+                  status: "Disbursed", disbursementDate: submissionDate, transactions: [],
+              };
+              newProjectData.grant = {
+                  totalAmount: project.grant_amount, status: "Awarded",
+                  sanctionNumber: project.sanction_number || "", phases: [firstPhase],
+              };
+          }
+
+          await adminDb.collection("projects").add(newProjectData as Project);
+          successfulCount++;
+
+      } catch (error: any) {
+          console.error("Error processing a single project during bulk upload:", error);
+          failures.push({ 
+              projectTitle: project.project_title || 'Untitled', 
+              piName: project.Name_of_staff || 'Unknown PI', 
+              error: error.message || "An unknown error occurred during saving." 
+          });
       }
-
-      const newProjectData: Partial<Project> = {
-        title: project.project_title,
-        pi_email: project.pi_email,
-        status: project.status,
-        pi_uid: pi_uid,
-        pi: pi_name,
-        abstract: "Historical data migrated from bulk upload.",
-        type: "Research", // Default type
-        faculty: faculty,
-        institute: institute,
-        departmentName: departmentName,
-        teamInfo: "Historical data, team info not available.",
-        timelineAndOutcomes: "Historical data, outcomes not available.",
-        submissionDate: submissionDate,
-        isBulkUploaded: true,
-      };
-
-      if (project.grant_amount && project.grant_amount > 0) {
-        const firstPhase: GrantPhase = {
-          id: new Date().toISOString(),
-          name: "Phase 1",
-          amount: project.grant_amount,
-          status: "Disbursed",
-          disbursementDate: submissionDate,
-          transactions: [],
-        }
-        const grant: GrantDetails = {
-          totalAmount: project.grant_amount,
-          status: "Awarded",
-          sanctionNumber: project.sanction_number || "",
-          phases: [firstPhase],
-        }
-        newProjectData.grant = grant
-      }
-
-      batch.set(projectRef, newProjectData as Project)
-      projectCount++
-    }
-
-    await batch.commit()
-    return { success: true, count: projectCount }
-  } catch (error: any) {
-    console.error("Error during bulk upload:", error)
-    return { success: false, count: 0, error: error.message || "Failed to upload projects." }
   }
+
+  return { success: true, data: { successfulCount, failures } };
 }
+
 
 export async function deleteBulkProject(projectId: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -2605,16 +2589,13 @@ export async function bulkUploadPapers(
             const paperData: Omit<ResearchPaper, 'id'> = {
                 title,
                 url: data.url,
+                mainAuthorUid: mainAuthorUid,
                 authors,
                 authorUids,
                 authorEmails,
                 createdAt: now,
                 updatedAt: now,
             };
-
-            if (mainAuthorUid) {
-                paperData.mainAuthorUid = mainAuthorUid;
-            }
             
             batch.set(paperRef, paperData);
             successfulPapers.push({ title, authors: authors.map(a => a.name) });
@@ -2643,5 +2624,6 @@ export async function bulkUploadPapers(
 
 
     
+
 
 

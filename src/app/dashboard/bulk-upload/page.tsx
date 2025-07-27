@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { FileWarning, Upload, Loader2, Trash2, Download } from 'lucide-react';
+import { FileWarning, Upload, Loader2, Trash2, Download, XCircle, CheckCircle } from 'lucide-react';
 import { bulkUploadProjects, deleteBulkProject } from '@/app/actions';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/config';
@@ -38,12 +38,19 @@ type ProjectData = {
   Faculty: string;
   Institute: string;
   sanction_number: string;
+  Department?: string;
+};
+
+type UploadResult = {
+  successfulCount: number;
+  failures: { projectTitle: string; piName: string; error: string }[];
 };
 
 export default function BulkUploadPage() {
   const [data, setData] = useState<ProjectData[]>([]);
   const [fileName, setFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const { toast } = useToast();
 
   const [history, setHistory] = useState<Project[]>([]);
@@ -75,6 +82,7 @@ export default function BulkUploadPage() {
     if (!file) return;
 
     setFileName(file.name);
+    setUploadResult(null);
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -109,6 +117,7 @@ export default function BulkUploadPage() {
           Faculty: String(row.Faculty || ''),
           Institute: String(row.Institute || ''),
           sanction_number: String(row.sanction_number || ''),
+          Department: String(row.Department || ''),
         }));
         setData(formattedData);
       } catch (error) {
@@ -125,10 +134,22 @@ export default function BulkUploadPage() {
       return;
     }
     setIsLoading(true);
+    setUploadResult(null);
     try {
         const result = await bulkUploadProjects(data);
         if (result.success) {
-            toast({ title: 'Upload Successful', description: `${result.count} projects have been added.` });
+            setUploadResult({
+              successfulCount: result.data.successfulCount,
+              failures: result.data.failures
+            });
+
+            if (result.data.successfulCount > 0) {
+              toast({ title: 'Upload Processed', description: `${result.data.successfulCount} projects have been added successfully.` });
+            }
+            if (result.data.failures.length > 0) {
+              toast({ variant: 'destructive', title: 'Some Uploads Failed', description: `Failed to upload ${result.data.failures.length} projects. See details below.` });
+            }
+            
             setData([]);
             setFileName('');
             fetchHistory(); // Refresh history after upload
@@ -219,7 +240,37 @@ export default function BulkUploadPage() {
           </CardContent>
         </Card>
 
-        {data.length > 0 && (
+        {uploadResult && (
+          <Card>
+            <CardHeader>
+                <CardTitle>Upload Report</CardTitle>
+                <CardDescription>Summary of the bulk upload process.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <div>
+                    <h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" /> Successfully Added Projects ({uploadResult.successfulCount})</h3>
+                    {uploadResult.successfulCount === 0 && <p className="text-sm text-muted-foreground mt-2">No new projects were added.</p>}
+                </div>
+                 {uploadResult.failures.length > 0 && (
+                     <Alert variant="destructive">
+                        <XCircle className="h-5 w-5" />
+                        <AlertTitle>Failed Uploads ({uploadResult.failures.length})</AlertTitle>
+                        <AlertDescription>
+                            <ul className="mt-2 list-disc pl-5 text-sm">
+                                {uploadResult.failures.map((f, i) => (
+                                    <li key={i}>
+                                        <strong>{f.projectTitle}</strong> (PI: {f.piName}) - <span className="italic">{f.error}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </AlertDescription>
+                    </Alert>
+                 )}
+            </CardContent>
+          </Card>
+        )}
+
+        {data.length > 0 && !uploadResult && (
           <Card>
             <CardHeader>
               <CardTitle>Preview Data</CardTitle>
