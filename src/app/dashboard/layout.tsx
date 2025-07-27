@@ -46,6 +46,7 @@ import {
   Loader2,
   Briefcase,
   BookUp,
+  MessageCircle,
 } from 'lucide-react';
 
 import {
@@ -134,6 +135,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   
   const allNavItems = useMemo((): NavItem[] => [
     { id: 'dashboard', href: '/dashboard', tooltip: 'Dashboard', icon: Home, label: 'Dashboard', condition: true },
+    { id: 'ai-chat', href: '/dashboard/ai-chat', tooltip: 'AI Chat', icon: MessageCircle, label: 'AI Chat Agent' },
     { id: 'new-submission', href: '/dashboard/new-submission', tooltip: 'New Submission', icon: FilePlus2, label: 'New Submission' },
     { id: 'my-projects', href: '/dashboard/my-projects', tooltip: 'My Projects', icon: Book, label: 'My Projects' },
     { id: 'emr-calendar', href: '/dashboard/emr-calendar', tooltip: 'EMR Calendar', icon: Calendar, label: 'EMR Calendar' },

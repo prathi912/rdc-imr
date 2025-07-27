@@ -4,6 +4,7 @@ import type { User } from '@/types';
 
 export const ALL_MODULES = [
   { id: 'dashboard', label: 'Dashboard' },
+  { id: 'ai-chat', label: 'AI Chat Agent'},
   { id: 'new-submission', label: 'New Submission' },
   { id: 'my-projects', label: 'My Projects' },
   { id: 'emr-calendar', label: 'EMR Calendar' },
@@ -30,10 +31,10 @@ export const ALL_MODULES = [
 
 const coreModules = ['dashboard', 'notifications', 'settings', 'emr-calendar'];
 const facultyCoreModules = ['new-submission', 'my-projects'];
-const hierarchyCoreModules = ['analytics'];
+const hierarchyCoreModules = ['analytics', 'ai-chat'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'emr-evaluations'];
+const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'emr-evaluations', 'ai-chat'];
 const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'bulk-upload', 'emr-logs', 'emr-management'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'manage-institutes', 'bulk-upload-papers'];
 
