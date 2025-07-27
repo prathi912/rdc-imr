@@ -20,6 +20,29 @@ import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 
+// --- Centralized Logging Service ---
+type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
+
+async function logActivity(level: LogLevel, message: string, context: Record<string, any> = {}) {
+  try {
+    if (!message) {
+      console.error("Log message is empty or undefined.");
+      return;
+    }
+    
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      ...context,
+    };
+    await adminDb.collection('logs').add(logEntry);
+  } catch (error) {
+    console.error("FATAL: Failed to write to logs collection.", error);
+    console.error("Original Log Entry:", { level, message, context });
+  }
+}
+
 
 const EMAIL_STYLES = {
   background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
@@ -38,16 +61,17 @@ export async function sendEmail(options: { to: string; subject: string; html: st
     return await sendEmailUtility(options);
 }
 
-export async function runChatAgent(input: ChatInput): Promise<string> {
+export async function runChatAgent(input: ChatInput): Promise<{ success: boolean, response?: string, error?: string }> {
     try {
         const result = await chatAgent(input);
-        // Ensure we always return a string from the flow.
-        return result.text || "I'm sorry, I couldn't generate a response.";
+        return { success: true, response: result };
     } catch (error: any) {
         console.error("Error running chat agent:", error);
-        return `Sorry, I encountered an error: ${error.message || "Failed to get response from AI agent."}`;
+        await logActivity('ERROR', 'Error in runChatAgent', { userId: input.user.uid, error: error.message, stack: error.stack });
+        return { success: false, error: error.message || "Failed to get response from AI agent." };
     }
 }
+
 
 export async function linkPapersToNewUser(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
   try {
@@ -102,6 +126,7 @@ export async function linkPapersToNewUser(uid: string, email: string): Promise<{
     return { success: true, count: updatedCount };
   } catch (error: any) {
     console.error("Error linking papers to new user:", error);
+    await logActivity('ERROR', 'Failed to link papers to new user', { uid, email, error: error.message, stack: error.stack });
     return { success: false, count: 0, error: error.message || 'Failed to link papers.' };
   }
 }
@@ -160,11 +185,12 @@ export async function addResearchPaper(
       }
     } catch (aiError: any) {
       console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
+      await logActivity('WARNING', 'AI domain suggestion failed during paper creation', { paperTitle: title, error: aiError.message });
     }
 
     // 2. Save paper
     await paperRef.set(paperData);
-    console.log(`Research paper titled "${title}" added with ID: ${paperRef.id}`);
+    await logActivity('INFO', 'Research paper added', { paperId: paperRef.id, title, mainAuthorUid });
 
     // 3. Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
@@ -190,6 +216,7 @@ export async function addResearchPaper(
 
   } catch (error: any) {
     console.error("Error adding research paper:", error);
+    await logActivity('ERROR', 'Failed to add research paper', { title, mainAuthorUid, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to add research paper." };
   }
 }
@@ -228,7 +255,7 @@ export async function updateResearchPaper(
     };
 
     await paperRef.update(updatedData);
-    console.log(`Research paper titled "${data.title}" updated with ID: ${paperId}`);
+    await logActivity('INFO', 'Research paper updated', { paperId, userId, title: data.title });
 
     // Notify newly added co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
@@ -256,6 +283,7 @@ export async function updateResearchPaper(
 
   } catch (error: any) {
     console.error("Error updating research paper:", error);
+    await logActivity('ERROR', 'Failed to update research paper', { paperId, userId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to update paper." };
   }
 }
@@ -276,10 +304,12 @@ export async function deleteResearchPaper(paperId: string, userId: string): Prom
     }
 
     await paperRef.delete();
+    await logActivity('INFO', 'Research paper deleted', { paperId, userId, title: paperData.title });
     return { success: true };
 
   } catch (error: any) {
     console.error("Error deleting research paper:", error);
+    await logActivity('ERROR', 'Failed to delete research paper', { paperId, userId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to delete paper." };
   }
 }
@@ -325,6 +355,7 @@ export async function getProjectSummary(input: SummarizeProjectInput) {
     return { success: true, summary: result.summary }
   } catch (error) {
     console.error("Error summarizing project:", error)
+    await logActivity('ERROR', 'Failed to summarize project', { title: input.title, error: (error as Error).message });
     return { success: false, error: "Failed to generate summary." }
   }
 }
@@ -335,6 +366,7 @@ export async function getEvaluationPrompts(input: EvaluationPromptsInput) {
     return { success: true, prompts: result }
   } catch (error) {
     console.error("Error generating evaluation prompts:", error)
+    await logActivity('ERROR', 'Failed to generate evaluation prompts', { title: input.title, error: (error as Error).message });
     return { success: false, error: "Failed to generate prompts." }
   }
 }
@@ -345,6 +377,7 @@ export async function getResearchDomain(input: ResearchDomainInput) {
     return { success: true, domain: result.domain }
   } catch (error) {
     console.error("Error getting research domain:", error)
+    await logActivity('ERROR', 'Failed to get research domain suggestion', { error: (error as Error).message });
     return { success: false, error: "Failed to get research domain." }
   }
 }
@@ -355,6 +388,7 @@ export async function getJournalWebsite(input: JournalWebsiteInput) {
     return { success: true, url: result.websiteUrl }
   } catch (error) {
     console.error("Error finding journal website:", error)
+    await logActivity('ERROR', 'Failed to find journal website', { journalName: input.journalName, error: (error as Error).message });
     return { success: false, error: "Failed to find journal website." }
   }
 }
@@ -375,6 +409,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     }
 
     await projectRef.update(updateData)
+    await logActivity('INFO', 'Project status updated', { projectId, newStatus, piUid: project.pi_uid });
 
     const notification = {
       uid: project.pi_uid,
@@ -429,6 +464,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     return { success: true }
   } catch (error: any) {
     console.error("Error updating project status:", error)
+    await logActivity('ERROR', 'Failed to update project status', { projectId, newStatus, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to update status." }
   }
 }
@@ -444,6 +480,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
     const claim = claimSnap.data() as IncentiveClaim
 
     await claimRef.update({ status: newStatus })
+    await logActivity('INFO', 'Incentive claim status updated', { claimId, newStatus, userId: claim.uid });
 
     const claimTitle =
       claim.paperTitle ||
@@ -494,6 +531,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
     return { success: true }
   } catch (error: any) {
     console.error("Error updating incentive claim status:", error)
+    await logActivity('ERROR', 'Failed to update incentive claim status', { claimId, newStatus, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to update status." }
   }
 }
@@ -615,9 +653,11 @@ export async function scheduleMeeting(
     }
 
     await batch.commit()
+    await logActivity('INFO', 'IMR meeting scheduled', { projectIds: projectsToSchedule.map(p => p.id), meetingDate: meetingDetails.date });
     return { success: true }
   } catch (error: any) {
     console.error("Error scheduling meeting:", error)
+    await logActivity('ERROR', 'Failed to schedule IMR meeting', { error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to schedule meeting." }
   }
 }
@@ -665,6 +705,7 @@ export async function uploadFileToServer(
     return { success: true, url: downloadUrl }
   } catch (error: any) {
     console.error("Error uploading file via admin:", error)
+    await logActivity('ERROR', 'File upload failed', { path, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to upload file." }
   }
 }
@@ -697,9 +738,11 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
     })
 
     await batch.commit()
+    await logActivity('INFO', 'New project submission notification sent to admins', { projectId, projectTitle });
     return { success: true }
   } catch (error: any) {
     console.error("Error notifying admins:", error)
+    await logActivity('ERROR', 'Failed to notify admins on project submission', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to notify admins." }
   }
 }
@@ -727,9 +770,11 @@ export async function notifySuperAdminsOnEvaluation(projectId: string, projectNa
     })
 
     await batch.commit()
+    await logActivity('INFO', 'Evaluation submission notification sent to super-admins', { projectId, projectName, evaluatorName });
     return { success: true }
   } catch (error: any) {
     console.error("Error notifying Super-admins:", error)
+    await logActivity('ERROR', 'Failed to notify super-admins on evaluation', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to notify Super-admins." }
   }
 }
@@ -761,9 +806,11 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
     })
 
     await batch.commit()
+    await logActivity('INFO', 'Completion request notification sent to admins', { projectId, projectTitle });
     return { success: true }
   } catch (error: any) {
     console.error("Error notifying admins on completion request:", error)
+    await logActivity('ERROR', 'Failed to notify admins on completion request', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to notify admins." }
   }
 }
@@ -788,6 +835,7 @@ export async function checkMisIdExists(misId: string, currentUid: string): Promi
     return { exists: true }
   } catch (error: any) {
     console.error("Error checking MIS ID uniqueness:", error)
+    await logActivity('ERROR', 'Failed to check MIS ID existence', { misId, error: error.message, stack: error.stack });
     // Rethrow to let the client know something went wrong with the check.
     throw new Error("Failed to verify MIS ID due to a server error. Please try again.")
   }
@@ -897,6 +945,7 @@ export async function fetchScopusDataByUrl(
     }
   } catch (error: any) {
     console.error("Error calling Scopus API:", error)
+    await logActivity('ERROR', 'Failed to fetch Scopus data', { url, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "An unexpected error occurred while fetching Scopus data." }
   }
 }
@@ -977,6 +1026,7 @@ export async function fetchWosDataByUrl(
     }
   } catch (error: any) {
     console.error("Error calling Web of Science API:", error)
+    await logActivity('ERROR', 'Failed to fetch WoS data', { url, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "An unexpected error occurred while fetching WoS data." }
   }
 }
@@ -1092,6 +1142,11 @@ export async function bulkUploadProjects(
           });
       }
   }
+  
+  await logActivity('INFO', 'Bulk project upload completed', { successfulCount, failureCount: failures.length });
+  if (failures.length > 0) {
+      await logActivity('WARNING', 'Some projects failed during bulk upload', { failures });
+  }
 
   return { success: true, data: { successfulCount, failures } };
 }
@@ -1104,9 +1159,11 @@ export async function deleteBulkProject(projectId: string): Promise<{ success: b
     }
     const projectRef = adminDb.collection("projects").doc(projectId)
     await projectRef.delete()
+    await logActivity('INFO', 'Bulk uploaded project deleted', { projectId });
     return { success: true }
   } catch (error: any) {
     console.error("Error deleting project:", error)
+    await logActivity('ERROR', 'Failed to delete bulk uploaded project', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to delete the project." }
   }
 }
@@ -1156,6 +1213,7 @@ export async function fetchOrcidData(
     }
   } catch (error: any) {
     console.error("Error calling ORCID API:", error)
+    await logActivity('ERROR', 'Failed to fetch ORCID data', { orcidId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "An unexpected error occurred while fetching ORCID data." }
   }
 }
@@ -1237,6 +1295,7 @@ export async function exportClaimToExcel(
     return { success: true, fileData: outputBuffer }
   } catch (error: any) {
     console.error("Error exporting claim to Excel:", error)
+    await logActivity('ERROR', 'Failed to export claim to Excel', { claimId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to export data." }
   }
 }
@@ -1271,10 +1330,11 @@ export async function linkHistoricalData(
 
     await batch.commit()
 
-    console.log(`Linked and updated ${projectsSnapshot.size} historical projects for user ${email} (UID: ${uid})`)
+    await logActivity('INFO', 'Linked historical data for new user', { uid, email, count: projectsSnapshot.size });
     return { success: true, count: projectsSnapshot.size }
   } catch (error: any) {
     console.error("Error linking historical project data:", error)
+    await logActivity('ERROR', 'Failed to link historical data', { uid: userData.uid, email: userData.email, error: error.message, stack: error.stack });
     return { success: false, count: 0, error: error.message || "Failed to link historical data." }
   }
 }
@@ -1324,10 +1384,12 @@ export async function updateProjectWithRevision(
 
       await batch.commit()
     }
-
+    
+    await logActivity('INFO', 'Project revision submitted', { projectId, title: project.title, piUid: project.pi_uid });
     return { success: true }
   } catch (error: any) {
     console.error("Error submitting project revision:", error)
+    await logActivity('ERROR', 'Failed to submit project revision', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to submit revision." }
   }
 }
@@ -1346,9 +1408,11 @@ export async function updateProjectDuration(
       projectStartDate: startDate,
       projectEndDate: endDate,
     })
+    await logActivity('INFO', 'Project duration updated', { projectId, startDate, endDate });
     return { success: true }
   } catch (error: any) {
     console.error("Error updating project duration:", error)
+    await logActivity('ERROR', 'Failed to update project duration', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: "Failed to update project duration." }
   }
 }
@@ -1369,9 +1433,11 @@ export async function updateProjectEvaluators(
     await projectRef.update({
       "meetingDetails.assignedEvaluators": evaluatorUids,
     })
+    await logActivity('INFO', 'Project evaluators updated', { projectId, evaluatorUids });
     return { success: true }
   } catch (error: any) {
     console.error("Error updating project evaluators:", error)
+    await logActivity('ERROR', 'Failed to update project evaluators', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: "Failed to update project evaluators." }
   }
 }
@@ -1416,6 +1482,7 @@ export async function findUserByMisId(
 
   } catch (error: any) {
     console.error("Error finding user by MIS ID:", error);
+    await logActivity('ERROR', 'Failed to find user by MIS ID', { misId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to search for user." };
   }
 }
@@ -1455,11 +1522,13 @@ export async function addGrantPhase(
     }
 
     await projectRef.update({ grant: updatedGrant })
+    await logActivity('INFO', 'Grant phase added', { projectId, phaseName, amount });
 
     const updatedProject = { ...project, grant: updatedGrant }
     return { success: true, updatedProject }
   } catch (error: any) {
     console.error("Error adding grant phase:", error)
+    await logActivity('ERROR', 'Failed to add grant phase', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to add grant phase." }
   }
 }
@@ -1535,11 +1604,13 @@ export async function addTransaction(
 
     const updatedGrant = { ...project.grant, phases: updatedPhases }
     await projectRef.update({ grant: updatedGrant })
+    await logActivity('INFO', 'Grant transaction added', { projectId, phaseId, amount: newTransaction.amount });
 
     const updatedProject = { ...project, grant: updatedGrant }
     return { success: true, updatedProject }
   } catch (error: any) {
     console.error("Error adding transaction:", error)
+    await logActivity('ERROR', 'Failed to add grant transaction', { projectId, phaseId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to add transaction." }
   }
 }
@@ -1575,11 +1646,13 @@ export async function updatePhaseStatus(
 
     const updatedGrant = { ...project.grant, phases: updatedPhases }
     await projectRef.update({ grant: updatedGrant })
+    await logActivity('INFO', 'Grant phase status updated', { projectId, phaseId, newStatus });
 
     const updatedProject = { ...project, grant: updatedGrant }
     return { success: true, updatedProject }
   } catch (error: any) {
     console.error("Error updating phase status:", error)
+    await logActivity('ERROR', 'Failed to update grant phase status', { projectId, phaseId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to update phase status." }
   }
 }
@@ -1646,10 +1719,11 @@ export async function updateCoInvestigators(
       }
       await batch.commit();
     }
-    
+    await logActivity('INFO', 'Co-investigators updated', { projectId, coPiUids });
     return { success: true }
   } catch (error: any) {
     console.error("Error updating Co-PIs:", error)
+    await logActivity('ERROR', 'Failed to update co-investigators', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: "Failed to update Co-PIs." }
   }
 }
@@ -1661,9 +1735,11 @@ export async function updateUserTutorialStatus(uid: string): Promise<{ success: 
     }
     const userRef = adminDb.collection('users').doc(uid);
     await userRef.update({ hasCompletedTutorial: true });
+    await logActivity('INFO', 'User completed tutorial', { uid });
     return { success: true };
   } catch (error: any) {
     console.error("Error updating tutorial status:", error);
+    await logActivity('ERROR', 'Failed to update user tutorial status', { uid, error: error.message, stack: error.stack });
     return { success: false, error: "Failed to update tutorial status." };
   }
 }
@@ -1754,12 +1830,13 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
         }
         await batch.commit();
     }
-
-
+    
+    await logActivity('INFO', 'EMR interest registered', { callId, userId: user.uid });
     return { success: true };
 
   } catch (error: any) {
     console.error("Error registering EMR interest:", error);
+    await logActivity('ERROR', 'Failed to register EMR interest', { callId, userId: user.uid, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to register interest." };
   }
 }
@@ -1887,10 +1964,12 @@ export async function scheduleEmrMeeting(
 
     await batch.commit();
     await Promise.all(emailPromises);
+    await logActivity('INFO', 'EMR meeting scheduled', { callId, applicantUids, meetingDate: meetingDetails.date });
 
     return { success: true };
   } catch (error: any) {
     console.error("Error scheduling EMR meeting:", error);
+    await logActivity('ERROR', 'Failed to schedule EMR meeting', { callId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to schedule EMR meeting." };
   }
 }
@@ -1925,10 +2004,12 @@ export async function uploadEmrPpt(interestId: string, pptDataUrl: string, origi
       pptSubmissionDate: new Date().toISOString(),
       status: 'PPT Submitted',
     });
-
+    
+    await logActivity('INFO', 'EMR presentation uploaded', { interestId, userId: interest.userId });
     return { success: true };
   } catch (error: any) {
     console.error("Error uploading EMR presentation:", error);
+    await logActivity('ERROR', 'Failed to upload EMR presentation', { interestId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to upload presentation." };
   }
 }
@@ -1967,10 +2048,11 @@ export async function removeEmrPpt(interestId: string): Promise<{ success: boole
             pptUrl: FieldValue.delete(),
             pptSubmissionDate: FieldValue.delete()
         });
-
+        await logActivity('INFO', 'EMR presentation removed', { interestId, userId: interest.userId });
         return { success: true };
     } catch (error: any) {
         console.error("Error removing EMR presentation:", error);
+        await logActivity('ERROR', 'Failed to remove EMR presentation', { interestId, error: error.message, stack: error.stack });
         return { success: false, error: error.message || "Failed to remove presentation." };
     }
 }
@@ -1996,10 +2078,13 @@ export async function withdrawEmrInterest(interestId: string): Promise<{ success
         
         // Delete the interest document from Firestore.
         await interestRef.delete();
-
+        await logActivity('INFO', 'User withdrew EMR interest', { interestId, userId: interest.userId, callId: interest.callId });
         return { success: true };
     } catch (error: any) {
         console.error("Error withdrawing EMR interest:", error);
+        const interestSnap = await adminDb.collection('emrInterests').doc(interestId).get();
+        const interest = interestSnap.exists() ? interestSnap.data() as EmrInterest : null;
+        await logActivity('ERROR', 'Failed to withdraw EMR interest', { interestId, userId: interest?.userId, callId: interest?.callId, error: error.message, stack: error.stack });
         return { success: false, error: error.message || "Failed to withdraw interest." };
     }
 }
@@ -2049,10 +2134,11 @@ export async function deleteEmrInterest(interestId: string, remarks: string, adm
                 from: 'default'
             });
         }
-        
+        await logActivity('INFO', 'Admin deleted EMR interest', { interestId, userId: interest.userId, callId: interest.callId, adminName, remarks });
         return { success: true };
     } catch (error: any) {
         console.error("Error deleting EMR interest:", error);
+        await logActivity('ERROR', 'Failed to delete EMR interest', { interestId, adminName, error: error.message, stack: error.stack });
         return { success: false, error: error.message || "Failed to delete interest." };
     }
 }
@@ -2073,6 +2159,7 @@ export async function addEmrEvaluation(
     };
     
     await evaluationRef.set(newEvaluation, { merge: true });
+    await logActivity('INFO', 'EMR evaluation added', { interestId, evaluatorUid: evaluator.uid });
 
     // Notify Super Admins
     const interestSnap = await adminDb.collection('emrInterests').doc(interestId).get();
@@ -2098,6 +2185,7 @@ export async function addEmrEvaluation(
     return { success: true };
   } catch(error: any) {
     console.error("Error adding EMR evaluation:", error);
+    await logActivity('ERROR', 'Failed to add EMR evaluation', { interestId, evaluatorUid: evaluator.uid, error: error.message, stack: error.stack });
     return { success: false, error: error.message || 'Failed to submit evaluation.' };
   }
 }
@@ -2159,10 +2247,12 @@ export async function createFundingCall(
         if (callData.notifyAllStaff) {
             await announceEmrCall(newCallData.id);
         }
+        await logActivity('INFO', 'New funding call created', { callId: newCallData.id, title: newCallData.title });
 
         return { success: true };
     } catch (error: any) {
         console.error("Error creating funding call:", error);
+        await logActivity('ERROR', 'Failed to create funding call', { title: callData.title, error: error.message, stack: error.stack });
         return { success: false, error: error.message || "Failed to create funding call." };
     }
 }
@@ -2214,10 +2304,12 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     
     // Mark the call as announced
     await callRef.update({ isAnnounced: true });
+    await logActivity('INFO', 'EMR call announced', { callId, title: call.title });
 
     return { success: true };
   } catch (error: any) {
     console.error("Error announcing EMR call:", error);
+    await logActivity('ERROR', 'Failed to announce EMR call', { callId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to send announcement." };
   }
 }
@@ -2243,11 +2335,12 @@ export async function updateEmrStatus(
     }
 
     await interestRef.update(updateData)
+    const interestSnap = await interestRef.get()
+    const interest = interestSnap.data() as EmrInterest;
+    await logActivity('INFO', 'EMR interest status updated', { interestId, userId: interest.userId, newStatus: status });
 
     // Notify user
-    const interestSnap = await interestRef.get()
     if (interestSnap.exists) {
-      const interest = interestSnap.data() as EmrInterest
       const notification = {
         uid: interest.userId,
         title: `Your EMR application status has been updated to: ${status}`,
@@ -2294,6 +2387,7 @@ export async function updateEmrStatus(
     return { success: true }
   } catch (error: any) {
     console.error("Error updating EMR status:", error)
+    await logActivity('ERROR', 'Failed to update EMR status', { interestId, status, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to update status." }
   }
 }
@@ -2322,10 +2416,14 @@ export async function uploadRevisedEmrPpt(interestId: string, pptDataUrl: string
       revisedPptUrl: result.url,
       status: 'Revision Submitted',
     });
-
+    
+    const interestSnap = await interestRef.get();
+    const interest = interestSnap.data() as EmrInterest;
+    await logActivity('INFO', 'Revised EMR presentation uploaded', { interestId, userId: interest.userId });
     return { success: true };
   } catch (error: any) {
     console.error("Error uploading revised EMR presentation:", error);
+    await logActivity('ERROR', 'Failed to upload revised EMR presentation', { interestId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to upload presentation." };
   }
 }
@@ -2352,9 +2450,11 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
     });
 
     await batch.commit();
+    await logActivity('INFO', 'New user notification sent to super-admins', { userName, role });
     return { success: true };
   } catch (error: any) {
     console.error("Error notifying Super-admins about new user:", error);
+    await logActivity('ERROR', 'Failed to notify super-admins about new user', { userName, role, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to notify Super-admins." };
   }
 }
@@ -2366,9 +2466,11 @@ export async function saveSidebarOrder(uid: string, order: string[]): Promise<{ 
     }
     const userRef = adminDb.collection('users').doc(uid);
     await userRef.update({ sidebarOrder: order });
+    await logActivity('INFO', 'User sidebar order saved', { uid });
     return { success: true };
   } catch (error: any) {
     console.error('Error saving sidebar order:', error);
+    await logActivity('ERROR', 'Failed to save sidebar order', { uid, error: error.message, stack: error.stack });
     return { success: false, error: error.message || 'Failed to save sidebar order.' };
   }
 }
@@ -2383,9 +2485,13 @@ export async function uploadEndorsementForm(interestId: string, endorsementUrl: 
             endorsementFormUrl: endorsementUrl,
             status: 'Endorsement Submitted',
         });
+        const interestSnap = await interestRef.get();
+        const interest = interestSnap.data() as EmrInterest;
+        await logActivity('INFO', 'EMR endorsement form uploaded', { interestId, userId: interest.userId });
         return { success: true };
     } catch (error: any) {
         console.error("Error submitting endorsement form:", error);
+        await logActivity('ERROR', 'Failed to upload EMR endorsement form', { interestId, error: error.message, stack: error.stack });
         return { success: false, error: "Failed to submit endorsement form." };
     }
 }
@@ -2410,9 +2516,13 @@ export async function submitToAgency(
             updateData.agencyAcknowledgementUrl = acknowledgementUrl;
         }
         await interestRef.update(updateData);
+        const interestSnap = await interestRef.get();
+        const interest = interestSnap.data() as EmrInterest;
+        await logActivity('INFO', 'EMR application submitted to agency', { interestId, userId: interest.userId, referenceNumber });
         return { success: true };
     } catch (error: any) {
         console.error("Error submitting to agency:", error);
+        await logActivity('ERROR', 'Failed to log EMR submission to agency', { interestId, error: error.message, stack: error.stack });
         return { success: false, error: "Failed to log submission to agency." };
     }
 }
@@ -2420,14 +2530,14 @@ export async function submitToAgency(
 export async function generateRecommendationForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
-    const projectSnap = await projectRef.get();
-    if (!projectSnap.exists) {
+    const projectSnap = await getDoc(projectRef);
+    if (!projectSnap.exists()) {
       return { success: false, error: 'Project not found.' };
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
     
     const evaluationsRef = projectRef.collection('evaluations');
-    const evaluationsSnap = await evaluationsRef.get();
+    const evaluationsSnap = await getDocs(evaluationsRef);
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
     
     const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
@@ -2472,6 +2582,7 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     return { success: true, fileData: base64 };
   } catch (error: any) {
     console.error('Error generating recommendation form:', error);
+    await logActivity('ERROR', 'Failed to generate recommendation form', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
 }
@@ -2516,6 +2627,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
 
   } catch (error: any) {
     console.error("Error fetching projects for evaluator:", error);
+    await logActivity('ERROR', 'Failed to fetch evaluator projects for user', { evaluatorUid, targetUserUid, error: error.message, stack: error.stack });
     return { success: false, error: "Failed to fetch project data for permission check." };
   }
 }
@@ -2619,6 +2731,7 @@ export async function bulkUploadPapers(
     }
 
     await batch.commit();
+    await logActivity('INFO', 'Bulk paper upload completed', { successfulCount: successfulPapers.length, failedCount: failedAuthorLinks.length });
 
     return { 
         success: true, 
@@ -2626,6 +2739,7 @@ export async function bulkUploadPapers(
     };
   } catch (error: any) {
     console.error("Error during bulk paper upload:", error);
+    await logActivity('ERROR', 'Failed during bulk paper upload', { error: error.message, stack: error.stack });
     return { 
         success: false, 
         error: error.message || "Failed to upload papers.",
@@ -2640,6 +2754,7 @@ export async function bulkUploadPapers(
 
 
     
+
 
 
 
