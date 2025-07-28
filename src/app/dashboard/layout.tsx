@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@d-kit/utilities';
+import { CSS } from '@dnd-kit/utilities';
 
 import {
   Award,
@@ -366,7 +366,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SidebarContent>
            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={menuItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
-              <SidebarMenu className="flex-1">
+              <SidebarMenu>
                 {menuItems.map((item) => (
                   isRearrangeEnabled ? (
                     <SortableSidebarMenuItem key={item.id} item={item} />
@@ -387,7 +387,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </SidebarMenu>
             </SortableContext>
           </DndContext>
-            <SidebarFooter className="hidden md:flex group-data-[collapsible=icon]:hidden">
+            <SidebarFooter className="hidden md:flex mt-auto group-data-[collapsible=icon]:hidden">
                 <Image
                     src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/PU-WATERMARK.svg"
                     alt="Parul University Logo"
