@@ -326,26 +326,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setIsSaving(false);
   };
   
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [showFooter, setShowFooter] = useState(true);
-
-  const checkOverflow = useCallback(() => {
-    if (contentRef.current) {
-        const { scrollHeight, clientHeight } = contentRef.current;
-        setShowFooter(scrollHeight <= clientHeight);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkOverflow();
-    const resizeObserver = new ResizeObserver(() => checkOverflow());
-    if (contentRef.current) {
-        resizeObserver.observe(contentRef.current);
-    }
-    return () => resizeObserver.disconnect();
-  }, [checkOverflow, menuItems]);
-
-
   if (loading || !user) {
     return (
        <div className="flex min-h-screen">
@@ -383,7 +363,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <SidebarHeader>
           <Logo />
         </SidebarHeader>
-        <SidebarContent ref={contentRef}>
+        <SidebarContent>
            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={menuItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
               <SidebarMenu>
@@ -407,7 +387,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </SidebarMenu>
             </SortableContext>
           </DndContext>
-           {showFooter && (
             <SidebarFooter className="mt-auto hidden md:flex group-data-[collapsible=icon]:hidden">
                 <Image
                     src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/PU-WATERMARK.svg"
@@ -417,7 +396,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     className="mx-auto"
                 />
             </SidebarFooter>
-           )}
         </SidebarContent>
         {isRearrangeEnabled && isDirty && (
           <SidebarHeader>
