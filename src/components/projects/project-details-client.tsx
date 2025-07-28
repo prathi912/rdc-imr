@@ -976,8 +976,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             <p className="text-muted-foreground">{project.abstract}</p>
           </div>
           <Separator />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <div className="space-y-4 md:col-span-2">
               <h3 className="font-semibold text-lg">Project Details</h3>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <dt className="font-medium text-muted-foreground">Category</dt>
@@ -1008,7 +1008,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 </>
               )}
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 md:col-span-3">
               <h3 className="font-semibold text-lg">Submitter Information</h3>
               <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <dt className="font-medium text-muted-foreground">Principal Investigator</dt>
