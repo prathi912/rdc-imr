@@ -90,7 +90,7 @@ export function ProjectList({ projects, userRole, allUsers = [] }: ProjectListPr
 
   return (
     <Card>
-      <CardContent className="pt-0">
+      <CardContent className="pt-6 overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -144,8 +144,8 @@ export function ProjectList({ projects, userRole, allUsers = [] }: ProjectListPr
 
               return (
                 <TableRow key={project.id}>
-                  <TableCell className="font-medium">{project.title}</TableCell>
-                  <TableCell className="hidden sm:table-cell">
+                  <TableCell className="font-medium whitespace-nowrap">{project.title}</TableCell>
+                  <TableCell className="hidden sm:table-cell whitespace-nowrap">
                     {piUser?.misId ? (
                         <Link href={`/profile/${piUser.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
                             {project.pi}
@@ -154,7 +154,7 @@ export function ProjectList({ projects, userRole, allUsers = [] }: ProjectListPr
                         project.pi
                     )}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">{new Date(displayDate).toLocaleDateString()}</TableCell>
+                  <TableCell className="hidden sm:table-cell whitespace-nowrap">{new Date(displayDate).toLocaleDateString()}</TableCell>
                   <TableCell className="hidden md:table-cell">
                     <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
                   </TableCell>

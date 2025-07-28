@@ -1,3 +1,4 @@
+
 // src/app/dashboard/emr-management/page.tsx
 'use client';
 
@@ -130,32 +131,34 @@ function EmrLogsTab({ user }: { user: User | null }) {
                 <CardContent className="pt-6">
                      {loading ? ( <Skeleton className="h-48 w-full" /> ) : 
                      filteredLogs.length > 0 ? (
-                        <Table>
-                            <TableHeader><TableRow>
-                                <TableHead>PI</TableHead>
-                                <TableHead className="hidden md:table-cell">Funding Call</TableHead>
-                                <TableHead className="hidden sm:table-cell">Reference No.</TableHead>
-                                <TableHead>Logged On</TableHead>
-                                <TableHead>Acknowledgement</TableHead>
-                            </TableRow></TableHeader>
-                            <TableBody>{filteredLogs.map(log => (
-                                <TableRow key={log.id}>
-                                    <TableCell>{users.get(log.userId)?.name || log.userName}</TableCell>
-                                    <TableCell className="hidden md:table-cell">{calls.get(log.callId)?.title || 'Loading...'}</TableCell>
-                                    <TableCell className="hidden sm:table-cell">{log.agencyReferenceNumber || 'N/A'}</TableCell>
-                                    <TableCell>{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
-                                    <TableCell>
-                                        {log.agencyAcknowledgementUrl ? (
-                                            <Button asChild variant="link" className="p-0 h-auto">
-                                                <a href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View</a>
-                                            </Button>
-                                        ) : (
-                                            "Not Provided"
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                            ))}</TableBody>
-                        </Table>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader><TableRow>
+                                    <TableHead>PI</TableHead>
+                                    <TableHead className="hidden md:table-cell">Funding Call</TableHead>
+                                    <TableHead className="hidden sm:table-cell">Reference No.</TableHead>
+                                    <TableHead>Logged On</TableHead>
+                                    <TableHead>Acknowledgement</TableHead>
+                                </TableRow></TableHeader>
+                                <TableBody>{filteredLogs.map(log => (
+                                    <TableRow key={log.id}>
+                                        <TableCell className="whitespace-nowrap">{users.get(log.userId)?.name || log.userName}</TableCell>
+                                        <TableCell className="hidden md:table-cell">{calls.get(log.callId)?.title || 'Loading...'}</TableCell>
+                                        <TableCell className="hidden sm:table-cell">{log.agencyReferenceNumber || 'N/A'}</TableCell>
+                                        <TableCell className="whitespace-nowrap">{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
+                                        <TableCell>
+                                            {log.agencyAcknowledgementUrl ? (
+                                                <Button asChild variant="link" className="p-0 h-auto">
+                                                    <a href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View</a>
+                                                </Button>
+                                            ) : (
+                                                "Not Provided"
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}</TableBody>
+                            </Table>
+                        </div>
                     ) : ( <div className="text-center text-muted-foreground py-8">No submissions have been logged.</div> )}
                 </CardContent>
             </Card>
@@ -221,28 +224,30 @@ export default function EmrManagementOverviewPage() {
                                         <Skeleton className="h-10 w-full" />
                                     </div>
                                 ) : calls.length > 0 ? (
-                                    <Table>
-                                        <TableHeader><TableRow>
-                                            <TableHead>Call Title</TableHead>
-                                            <TableHead>Agency</TableHead>
-                                            <TableHead>Interest Deadline</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow></TableHeader>
-                                        <TableBody>{calls.map(call => (
-                                            <TableRow key={call.id}>
-                                                <TableCell className="font-medium">{call.title}</TableCell>
-                                                <TableCell>{call.agency}</TableCell>
-                                                <TableCell>{format(parseISO(call.interestDeadline), 'PPp')}</TableCell>
-                                                <TableCell>{getStatusBadge(call)}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button asChild variant="outline" size="sm">
-                                                        <Link href={`/dashboard/emr-management/${call.id}`}><Eye className="mr-2 h-4 w-4" /> Manage</Link>
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}</TableBody>
-                                    </Table>
+                                    <div className="overflow-x-auto">
+                                        <Table>
+                                            <TableHeader><TableRow>
+                                                <TableHead>Call Title</TableHead>
+                                                <TableHead>Agency</TableHead>
+                                                <TableHead>Interest Deadline</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow></TableHeader>
+                                            <TableBody>{calls.map(call => (
+                                                <TableRow key={call.id}>
+                                                    <TableCell className="font-medium whitespace-nowrap">{call.title}</TableCell>
+                                                    <TableCell className="whitespace-nowrap">{call.agency}</TableCell>
+                                                    <TableCell className="whitespace-nowrap">{format(parseISO(call.interestDeadline), 'PPp')}</TableCell>
+                                                    <TableCell>{getStatusBadge(call)}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button asChild variant="outline" size="sm">
+                                                            <Link href={`/dashboard/emr-management/${call.id}`}><Eye className="mr-2 h-4 w-4" /> Manage</Link>
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}</TableBody>
+                                        </Table>
+                                    </div>
                                 ) : (
                                     <div className="text-center text-muted-foreground py-8">No funding calls have been created.</div>
                                 )}

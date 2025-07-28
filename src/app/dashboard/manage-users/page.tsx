@@ -353,7 +353,7 @@ export default function ManageUsersPage() {
 
                    return (
                     <TableRow key={user.uid}>
-                      <TableCell className="font-medium">
+                      <TableCell className="font-medium whitespace-nowrap">
                         {user.misId ? (
                             <Link href={`/profile/${user.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
                                 {user.name}

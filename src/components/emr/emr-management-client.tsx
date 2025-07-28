@@ -180,7 +180,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                 const interestedUser = userMap.get(interest.userId);
                                 return (
                                     <TableRow key={interest.id}>
-                                        <TableCell className="font-medium">
+                                        <TableCell className="font-medium whitespace-nowrap">
                                             {interestedUser?.misId ? (
                                                 <Link href={`/profile/${interestedUser.misId}`} target="_blank" className="text-primary hover:underline">
                                                     {interest.userName}

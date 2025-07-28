@@ -1,3 +1,4 @@
+
 // src/components/emr/emr-evaluation-list.tsx
 'use client';
 
@@ -58,7 +59,7 @@ export function EmrEvaluationList({ interests, calls, user, onActionComplete }: 
                                 const myEvaluation = interest.evaluations.find((e: EmrEvaluation) => e.evaluatorUid === user?.uid);
                                 return (
                                     <TableRow key={interest.id}>
-                                        <TableCell className="font-medium">{interest.userName}</TableCell>
+                                        <TableCell className="font-medium whitespace-nowrap">{interest.userName}</TableCell>
                                         <TableCell className="hidden sm:table-cell">{getCallTitle(interest.callId)}</TableCell>
                                         <TableCell>
                                             {interest.pptUrl ? (

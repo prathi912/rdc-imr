@@ -469,74 +469,76 @@ export default function ManageIncentiveClaimsPage() {
   };
   
   const renderTable = () => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>
-             <Button variant="ghost" onClick={() => requestSort('userName')}>
-                Claimant <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          </TableHead>
-          <TableHead className="hidden md:table-cell">
-             <Button variant="ghost" onClick={() => requestSort('paperTitle')}>
-                Title <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          </TableHead>
-          <TableHead className="hidden lg:table-cell">
-            <Button variant="ghost" onClick={() => requestSort('claimType')}>
-                Claim Type <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          </TableHead>
-          <TableHead>
-             <Button variant="ghost" onClick={() => requestSort('submissionDate')}>
-                Date <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          </TableHead>
-          <TableHead>
-             <Button variant="ghost" onClick={() => requestSort('status')}>
-                Status <ArrowUpDown className="ml-2 h-4 w-4" />
-            </Button>
-          </TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sortedAndFilteredClaims.map((claim) => (
-            <TableRow key={claim.id}>
-              <TableCell className="font-medium">{claim.userName}</TableCell>
-              <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle}</TableCell>
-              <TableCell className="hidden lg:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
-              <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
-              <TableCell>
-                <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
-              </TableCell>
-              <TableCell className="text-right">
-                  <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button aria-haspopup="true" size="icon" variant="ghost">
-                      <MoreHorizontal className="h-4 w-4" />
-                      <span className="sr-only">Toggle menu</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => setSelectedClaim(claim)}>View Details</DropdownMenuItem>
-                    <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                      {STATUSES.map(status => (
-                        <DropdownMenuItem 
-                            key={status} 
-                            onClick={() => handleStatusChange(claim.id, status)}
-                            disabled={claim.status === status}
-                        >
-                            {status}
-                        </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-      </TableBody>
-    </Table>
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>
+               <Button variant="ghost" onClick={() => requestSort('userName')}>
+                  Claimant <ArrowUpDown className="ml-2 h-4 w-4" />
+              </Button>
+            </TableHead>
+            <TableHead className="hidden md:table-cell">
+               <Button variant="ghost" onClick={() => requestSort('paperTitle')}>
+                  Title <ArrowUpDown className="ml-2 h-4 w-4" />
+              </Button>
+            </TableHead>
+            <TableHead className="hidden lg:table-cell">
+              <Button variant="ghost" onClick={() => requestSort('claimType')}>
+                  Claim Type <ArrowUpDown className="ml-2 h-4 w-4" />
+              </Button>
+            </TableHead>
+            <TableHead>
+               <Button variant="ghost" onClick={() => requestSort('submissionDate')}>
+                  Date <ArrowUpDown className="ml-2 h-4 w-4" />
+              </Button>
+            </TableHead>
+            <TableHead>
+               <Button variant="ghost" onClick={() => requestSort('status')}>
+                  Status <ArrowUpDown className="ml-2 h-4 w-4" />
+              </Button>
+            </TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sortedAndFilteredClaims.map((claim) => (
+              <TableRow key={claim.id}>
+                <TableCell className="font-medium whitespace-nowrap">{claim.userName}</TableCell>
+                <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle}</TableCell>
+                <TableCell className="hidden lg:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
+                <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
+                <TableCell>
+                  <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                    <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button aria-haspopup="true" size="icon" variant="ghost">
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Toggle menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setSelectedClaim(claim)}>View Details</DropdownMenuItem>
+                      <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                        {STATUSES.map(status => (
+                          <DropdownMenuItem 
+                              key={status} 
+                              onClick={() => handleStatusChange(claim.id, status)}
+                              disabled={claim.status === status}
+                          >
+                              {status}
+                          </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 
   const pageTitle = currentUser?.role === 'CRO' 
