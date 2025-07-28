@@ -75,9 +75,12 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [statusToUpdate, setStatusToUpdate] = useState<EmrInterest['status'] | null>(null);
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
     const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
         resolver: zodResolver(deleteRegistrationSchema),
+        defaultValues: { remarks: '' },
     });
     
     const remarksForm = useForm<z.infer<typeof adminRemarksSchema>>({
@@ -91,6 +94,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
             const result = await deleteEmrInterest(interestToUpdate.id, values.remarks, currentUser.name);
             if (result.success) {
                 toast({ title: "Registration Deleted", description: "The user has been notified." });
+                setIsDeleteDialogOpen(false);
                 setInterestToUpdate(null);
                 onActionComplete();
             } else {
@@ -99,6 +103,12 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         } finally {
             setIsDeleting(false);
         }
+    };
+
+    const handleOpenDeleteDialog = (interest: EmrInterest) => {
+        setInterestToUpdate(interest);
+        deleteForm.reset({ remarks: '' });
+        setIsDeleteDialogOpen(true);
     };
     
     const handleStatusUpdate = async (interestId: string, newStatus: EmrInterest['status'], remarks?: string) => {
@@ -219,7 +229,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                             <DropdownMenuSeparator />
                                                         </>
                                                     )}
-                                                    <DropdownMenuItem className="text-destructive" onClick={() => { setInterestToUpdate(interest); deleteForm.reset(); }}>
+                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleOpenDeleteDialog(interest)}>
                                                         <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
@@ -237,7 +247,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 )}
             </CardContent>
 
-             <AlertDialog open={!!interestToUpdate && !isRemarksDialogOpen} onOpenChange={() => setInterestToUpdate(null)}>
+             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Registration for {interestToUpdate?.userName}?</AlertDialogTitle>
