@@ -178,6 +178,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                         <TableBody>
                             {interests.map(interest => {
                                 const interestedUser = userMap.get(interest.userId);
+                                const isMeetingScheduled = !!interest.meetingSlot;
                                 return (
                                     <TableRow key={interest.id}>
                                         <TableCell className="font-medium whitespace-nowrap">
@@ -206,14 +207,18 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                     <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Actions</span></Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Update Status</DropdownMenuLabel>
+                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                     <DropdownMenuSeparator />
-                                                     <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
-                                                     <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Pending')}>Endorsement Pending</DropdownMenuItem>
-                                                     <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Endorsement Signed</DropdownMenuItem>
-                                                     <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
-                                                     <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
+                                                    {isMeetingScheduled && (
+                                                        <>
+                                                            <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Pending')}>Endorsement Pending</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Endorsement Signed</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                        </>
+                                                    )}
                                                     <DropdownMenuItem className="text-destructive" onClick={() => { setInterestToUpdate(interest); deleteForm.reset(); }}>
                                                         <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
                                                     </DropdownMenuItem>
