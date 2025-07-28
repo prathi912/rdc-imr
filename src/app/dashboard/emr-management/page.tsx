@@ -208,7 +208,7 @@ export default function EmrManagementOverviewPage() {
 
     return (
         <div className="container mx-auto py-10">
-            <PageHeader title="EMR Management" description="Manage funding calls and view submission logs." />
+            <PageHeader title="Extramural Research (EMR)" description="Manage funding calls and view submission logs." />
             <div className="mt-8">
                 <Tabs defaultValue="calls">
                     <TabsList>

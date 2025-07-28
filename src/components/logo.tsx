@@ -7,13 +7,13 @@ interface LogoProps {
 export function Logo({ variant = 'public' }: LogoProps) {
   if (variant === 'dashboard') {
     return (
-      <div className="flex items-center justify-center p-2" style={{ minHeight: 49 }}>
+      <div className="flex items-center justify-center p-6" style={{ maxHeight: 40 }}>
         {/* Expanded Light mode logo */}
         <Image
           src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20b.svg"
           alt="Parul Research Portal Logo"
-          width={350}
-          height={100}
+          width={250}
+          height={70}
           className="block dark:hidden group-data-[collapsible=icon]:hidden"
           priority
         />
@@ -21,8 +21,8 @@ export function Logo({ variant = 'public' }: LogoProps) {
         <Image
           src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20W.svg"
           alt="Parul Research Portal Logo"
-          width={350}
-          height={100}
+          width={250}
+          height={70}
           className="hidden dark:block group-data-[collapsible=icon]:hidden"
           priority
         />

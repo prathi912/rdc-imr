@@ -284,9 +284,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const lastSegment = segments.pop() || 'dashboard';
 
       if(lastSegment === 'project' && segments.includes('dashboard')) return "Project Details";
-      if(lastSegment === 'incentive-claim' && segments.includes('dashboard')) return "Incentive Claims";
+      if(pathname.includes('/dashboard/incentive-claim')) return "Incentive Claims";
       if(pathname.includes('/dashboard/manage-incentive-claims')) return "Manage Incentive Claims";
-
+      if(pathname.includes('/dashboard/emr-management')) return "EMR Management";
+      if(pathname.includes('/dashboard/profile-setup')) return "Profile Setup";
 
       if (lastSegment === 'dashboard') return 'Dashboard';
       return lastSegment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
