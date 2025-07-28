@@ -780,8 +780,32 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         onSubmit={durationForm.handleSubmit(handleDurationSubmit)}
                         className="space-y-4 py-4"
                       >
-                         <FormField name="startDate" control={durationForm.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Start Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString())} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
-                         <FormField name="endDate" control={durationForm.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>End Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString())} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                         <FormField name="startDate" control={durationForm.control} render={({ field }) => ( 
+                           <FormItem className="flex flex-col">
+                             <FormLabel>Start Date</FormLabel>
+                             {isMobile ? (
+                                <FormControl>
+                                  <Input type="date" value={field.value} onChange={(e) => field.onChange(e.target.value)} />
+                                </FormControl>
+                             ) : (
+                                <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString())} initialFocus /></PopoverContent></Popover>
+                             )}
+                             <FormMessage />
+                           </FormItem> 
+                         )} />
+                         <FormField name="endDate" control={durationForm.control} render={({ field }) => ( 
+                          <FormItem className="flex flex-col">
+                            <FormLabel>End Date</FormLabel>
+                             {isMobile ? (
+                                <FormControl>
+                                  <Input type="date" value={field.value} onChange={(e) => field.onChange(e.target.value)} />
+                                </FormControl>
+                             ) : (
+                              <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString())} initialFocus /></PopoverContent></Popover>
+                             )}
+                            <FormMessage />
+                          </FormItem> 
+                         )} />
                       </form>
                     </Form>
                     <DialogFooter>
