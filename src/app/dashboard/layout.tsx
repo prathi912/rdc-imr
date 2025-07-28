@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import {
   DndContext,
   closestCenter,
@@ -58,6 +59,7 @@ import {
   SidebarProvider,
   SidebarInset,
   SidebarTrigger,
+  SidebarFooter,
 } from '@/components/ui/sidebar';
 import { UserNav } from '@/components/user-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -386,6 +388,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </SortableContext>
           </DndContext>
         </SidebarContent>
+        <SidebarFooter className="mt-auto hidden md:flex group-data-[collapsible=icon]:hidden">
+            <Image
+                src="https://www.paruluniversity.ac.in/images/logo-pu.svg"
+                alt="Parul University Logo"
+                width={150}
+                height={50}
+                className="mx-auto"
+            />
+        </SidebarFooter>
         {isRearrangeEnabled && isDirty && (
           <SidebarHeader>
             <Button onClick={handleSaveOrder} disabled={isSaving}>
