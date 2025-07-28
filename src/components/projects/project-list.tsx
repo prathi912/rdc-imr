@@ -159,7 +159,7 @@ export function ProjectList({ projects, userRole, allUsers = [] }: ProjectListPr
 
                 return (
                   <TableRow key={project.id}>
-                    <TableCell className="font-medium whitespace-nowrap">{project.title}</TableCell>
+                    <TableCell className="font-medium">{project.title}</TableCell>
                     <TableCell className="hidden sm:table-cell whitespace-nowrap">
                       {piUser?.misId ? (
                           <Link href={`/profile/${piUser.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
