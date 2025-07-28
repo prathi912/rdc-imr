@@ -64,7 +64,7 @@ export function ScheduleMeetingForm() {
       
       const evaluatorsQuery = query(
         collection(db, 'users'), 
-        where('role', 'in', ['faculty', 'CRO', 'admin', 'Super-admin'])
+        where('role', 'in', ['CRO', 'admin', 'Super-admin'])
       );
 
       const [projectsSnapshot, evaluatorsSnapshot] = await Promise.all([
