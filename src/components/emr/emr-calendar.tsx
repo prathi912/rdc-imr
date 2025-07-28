@@ -451,7 +451,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                     <div key={day} className="text-center font-semibold p-2 border-b border-r text-sm text-muted-foreground">{day}</div>
                                 ))}
                                 {Array.from({ length: startingDayIndex }).map((_, i) => (
-                                    <div key={`empty-${i}`} className="border-b border-r min-h-[6rem]"></div>
+                                    <div key={`empty-${i}`} className="border-b border-r min-h-[5rem] sm:min-h-[6rem]"></div>
                                 ))}
                                 {daysInMonth.map(day => {
                                     const dateStr = format(day, 'yyyy-MM-dd');
@@ -462,7 +462,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                     return (
                                         <div 
                                             key={dateStr} 
-                                            className={cn("min-h-[6rem] border-b border-r p-2 flex flex-col hover:bg-muted/50 transition-colors", eventsOnDay.length > 0 ? "cursor-pointer" : "cursor-default")}
+                                            className={cn("min-h-[5rem] sm:min-h-[6rem] border-b border-r p-1 sm:p-2 flex flex-col hover:bg-muted/50 transition-colors", eventsOnDay.length > 0 ? "cursor-pointer" : "cursor-default")}
                                             onClick={() => eventsOnDay.length > 0 && handleDateClick(dateStr)}
                                         >
                                             <span className="font-semibold">{format(day, 'd')}</span>
