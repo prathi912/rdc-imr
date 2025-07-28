@@ -68,9 +68,12 @@ export async function saveProjectSubmission(
 ): Promise<{ success: boolean; projectId?: string; error?: string }> {
   try {
     let projectId = existingProjectId;
-    const projectToSave = { ...projectData };
-
-    if (!projectId) {
+    
+    if (projectId) {
+      // Existing submission: Just update the document
+      const projectRef = adminDb.collection('projects').doc(projectId);
+      await projectRef.set(projectData, { merge: true });
+    } else {
       // New submission: Generate a sequential ID in a transaction
       const newProjectRef = await adminDb.runTransaction(async (transaction) => {
         const counterRef = adminDb.collection('counters').doc('imrProjects');
@@ -80,29 +83,29 @@ export async function saveProjectSubmission(
         if (counterDoc.exists) {
           newCount = counterDoc.data()!.current + 1;
         }
-        transaction.set(counterRef, { current: newCount }, { merge: true });
-
+        
         const newProjectId = `RDC/IMR/APPL/${String(newCount).padStart(5, '0')}`;
         const newDocRef = adminDb.collection('projects').doc(newProjectId);
         
-        // Add the projectId field to the data being saved
-        (projectToSave as Project).projectId = newProjectId;
+        // Add the generated projectId to the data before setting it
+        const projectToSave: Omit<Project, 'id'> = {
+          ...projectData,
+          projectId: newProjectId,
+        };
+
+        transaction.set(counterRef, { current: newCount }, { merge: true });
         transaction.set(newDocRef, projectToSave);
         return newDocRef;
       });
       projectId = newProjectRef.id;
-    } else {
-      // Existing submission: Just update the document
-      const projectRef = adminDb.collection('projects').doc(projectId);
-      await projectRef.set(projectToSave, { merge: true });
     }
 
     // Notify admins only on final submission, not on saving drafts
-    if (projectToSave.status === 'Submitted') {
-      await notifyAdminsOnProjectSubmission(projectId, projectToSave.title, projectToSave.pi);
+    if (projectData.status === 'Submitted') {
+      await notifyAdminsOnProjectSubmission(projectId, projectData.title, projectData.pi);
     }
     
-    await logActivity('INFO', `Project ${projectToSave.status}`, { projectId, title: projectToSave.title });
+    await logActivity('INFO', `Project ${projectData.status}`, { projectId, title: projectData.title });
     return { success: true, projectId };
 
   } catch (error: any) {
@@ -2868,3 +2871,6 @@ export async function bulkUploadPapers(
 
 
 
+
+
+    
