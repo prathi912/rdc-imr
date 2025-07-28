@@ -174,7 +174,7 @@ export function RichTextEditor({ value, onChange }: RichTextEditorProps) {
     editorProps: {
       attributes: {
         class: cn(
-          'prose dark:prose-invert prose-sm sm:prose-base m-5 focus:outline-none max-w-none',
+          'prose dark:prose-invert prose-sm sm:prose-base focus:outline-none max-w-none',
           'min-h-[150px] w-full rounded-b-md border-x border-b border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50'
         ),
       },

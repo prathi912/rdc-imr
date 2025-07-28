@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { format, isAfter, isBefore, startOfToday } from 'date-fns';
+import { format, isAfter, isBefore, startOfToday, parseISO } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
@@ -53,6 +54,7 @@ export default function AllProjectsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [facultyFilter, setFacultyFilter] = useState('all');
+  const isMobile = useIsMobile();
 
   // State for export dialog
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -233,10 +235,11 @@ export default function AllProjectsPage() {
   const handleConfirmExport = () => {
     let projectsToExport = [...filteredProjects];
 
-    if (exportDateRange?.from && exportDateRange?.to) {
+    if (exportDateRange?.from) {
       projectsToExport = projectsToExport.filter(p => {
-        const submissionDate = new Date(p.submissionDate);
-        return isAfter(submissionDate, exportDateRange.from!) && isBefore(submissionDate, exportDateRange.to!);
+        const submissionDate = parseISO(p.submissionDate);
+        // If there's an end date, check the range. Otherwise just check 'after from'.
+        return isAfter(submissionDate, exportDateRange.from!) && (!exportDateRange.to || isBefore(submissionDate, exportDateRange.to!));
       });
     }
 
@@ -309,38 +312,46 @@ export default function AllProjectsPage() {
                     <div className="grid gap-6 py-4">
                         <div>
                             <Label>Filter by Submission Date</Label>
-                             <Popover>
-                                <PopoverTrigger asChild>
-                                <Button
-                                    id="date"
-                                    variant={"outline"}
-                                    className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}
-                                >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {exportDateRange?.from ? (
-                                    exportDateRange.to ? (
-                                        <>
-                                        {format(exportDateRange.from, "LLL dd, y")} -{" "}
-                                        {format(exportDateRange.to, "LLL dd, y")}
-                                        </>
-                                    ) : (
-                                        format(exportDateRange.from, "LLL dd, y")
-                                    )
-                                    ) : (
-                                    <span>Pick a date range</span>
-                                    )}
-                                </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar
-                                    initialFocus
-                                    mode="range"
-                                    defaultMonth={exportDateRange?.from}
-                                    selected={exportDateRange}
-                                    onSelect={setExportDateRange}
-                                />
-                                </PopoverContent>
-                            </Popover>
+                             {isMobile ? (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <Input type="date" value={exportDateRange?.from ? format(exportDateRange.from, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, from: e.target.value ? parseISO(e.target.value) : undefined }))} />
+                                  <span>-</span>
+                                  <Input type="date" value={exportDateRange?.to ? format(exportDateRange.to, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, to: e.target.value ? parseISO(e.target.value) : undefined }))} />
+                                </div>
+                             ) : (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                    <Button
+                                        id="date"
+                                        variant={"outline"}
+                                        className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}
+                                    >
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {exportDateRange?.from ? (
+                                        exportDateRange.to ? (
+                                            <>
+                                            {format(exportDateRange.from, "LLL dd, y")} -{" "}
+                                            {format(exportDateRange.to, "LLL dd, y")}
+                                            </>
+                                        ) : (
+                                            format(exportDateRange.from, "LLL dd, y")
+                                        )
+                                        ) : (
+                                        <span>Pick a date range</span>
+                                        )}
+                                    </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                        initialFocus
+                                        mode="range"
+                                        defaultMonth={exportDateRange?.from}
+                                        selected={exportDateRange}
+                                        onSelect={setExportDateRange}
+                                    />
+                                    </PopoverContent>
+                                </Popover>
+                             )}
                         </div>
                         <div>
                             <Label>Select Columns to Export</Label>
