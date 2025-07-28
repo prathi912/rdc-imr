@@ -105,6 +105,7 @@ export type Evaluation = {
 
 export type Project = {
   id: string;
+  projectId?: string; // Human-readable sequential ID like RDC/IMR/APPL/0001
   title: string;
   abstract: string;
   type: string;
