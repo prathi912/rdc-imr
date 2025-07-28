@@ -18,7 +18,7 @@ import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, set
 import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import { getDoc } from "firebase-admin/firestore"
+import { getDoc, getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -218,7 +218,7 @@ export async function addResearchPaper(
     // 3. Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
-    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
+    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorMisId = mainAuthorDoc.data()?.misId : null;
 
     const notificationBatch = adminDb.batch();
     authors.forEach((author) => {
@@ -283,7 +283,7 @@ export async function updateResearchPaper(
     // Notify newly added co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
-    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
+    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorMisId = mainAuthorDoc.data()?.misId : null;
     const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
 
     const notificationBatch = adminDb.batch();
@@ -2459,6 +2459,10 @@ export async function updateEmrStatus(
                 ${adminRemarks ? `<div style="margin-top:20px; padding:15px; border:1px solid #4f5b62; border-radius:6px; background-color:#2c3e50;"><h4 style="color:#ffffff; margin-top:0;">Admin Remarks:</h4><p style="color:#e0e0e0;">${adminRemarks}</p></div>` : ""}
         `;
         
+        if (status === 'Recommended') {
+            emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Congratulations! Your application has been recommended. The next step is to submit your endorsement form, which you can do from the EMR Calendar page on the portal.</p>`
+        }
+        
         if (status === 'Endorsement Signed') {
             emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Your endorsement letter has been signed and is ready for collection from the RDC office. You may now submit your proposal to the funding agency. Once submitted, please log the Agency Reference Number and Acknowledgement on the portal.</p>`
         }
@@ -2638,7 +2642,7 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
     
     const evaluationsRef = projectRef.collection('evaluations');
-    const evaluationsSnap = await getDocs(evaluationsRef);
+    const evaluationsSnap = await adminGetDocs(evaluationsRef);
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
     
     const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
@@ -2693,18 +2697,18 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     const today = format(new Date(), 'yyyy-MM-dd');
 
     // IMR Projects
-    const imrProjectsRef = adminDb.collection('projects');
-    const imrPiQuery = imrProjectsRef.where('pi_uid', '==', targetUserUid).where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid).where('meetingDetails.date', '==', today);
-    const imrCoPiQuery = imrProjectsRef.where('coPiUids', 'array-contains', targetUserUid).where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid).where('meetingDetails.date', '==', today);
+    const imrProjectsRef = adminCollection(adminDb, 'projects');
+    const imrPiQuery = adminQuery(imrProjectsRef, adminWhere('pi_uid', '==', targetUserUid), adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), adminWhere('meetingDetails.date', '==', today));
+    const imrCoPiQuery = adminQuery(imrProjectsRef, adminWhere('coPiUids', 'array-contains', targetUserUid), adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), adminWhere('meetingDetails.date', '==', today));
 
     // EMR Projects
-    const fundingCallsRef = adminDb.collection('fundingCalls');
-    const emrCallsQuery = fundingCallsRef.where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid).where('meetingDetails.date', '==', today);
+    const fundingCallsRef = adminCollection(adminDb, 'fundingCalls');
+    const emrCallsQuery = adminQuery(fundingCallsRef, adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), adminWhere('meetingDetails.date', '==', today));
 
     const [imrPiSnapshot, imrCoPiSnapshot, emrCallsSnapshot] = await Promise.all([
       imrPiQuery.get(),
       imrCoPiQuery.get(),
-      emrCallsSnapshot.get(),
+      emrCallsQuery.get(),
     ]);
 
     const imrProjects = new Map<string, Project>();
@@ -2717,9 +2721,9 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     let relevantEmrCalls: FundingCall[] = [];
     if (emrCalls.length > 0) {
         const callIds = emrCalls.map(c => c.id);
-        const interestsRef = adminDb.collection('emrInterests');
-        const interestsQuery = interestsRef.where('callId', 'in', callIds).where('userId', '==', targetUserUid);
-        const interestsSnapshot = await getDocs(interestsRef);
+        const interestsRef = adminCollection(adminDb, 'emrInterests');
+        const interestsQuery = adminQuery(interestsRef, adminWhere('callId', 'in', callIds), adminWhere('userId', '==', targetUserUid));
+        const interestsSnapshot = await adminGetDocs(interestsQuery);
         const relevantCallIds = new Set(interestsSnapshot.docs.map(d => d.data().callId));
         relevantEmrCalls = emrCalls.filter(c => relevantCallIds.has(c.id));
     }
@@ -2847,340 +2851,4 @@ export async function bulkUploadPapers(
         data: { successfulPapers, failedAuthorLinks }
     };
   }
-}
-    
-
-
-
-
-
-```
-  </change>
-  <change>
-    <file>/src/components/emr/emr-management-client.tsx</file>
-    <content><![CDATA[
-// src/components/emr/emr-management-client.tsx
-'use client';
-
-import { useState } from 'react';
-import type { FundingCall, User, EmrInterest } from '@/types';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import Link from 'next/link';
-import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon } from 'lucide-react';
-import * as XLSX from 'xlsx';
-import { Textarea } from '../ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '../ui/form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrStatus } from '@/app/actions';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
-import { ScheduleMeetingDialog } from './schedule-meeting-dialog';
-
-interface EmrManagementClientProps {
-    call: FundingCall;
-    interests: EmrInterest[];
-    allUsers: User[];
-    currentUser: User;
-    onActionComplete: () => void;
-}
-
-const deleteRegistrationSchema = z.object({
-    remarks: z.string().min(10, "Please provide a reason for deleting the registration."),
-});
-
-const adminRemarksSchema = z.object({
-    remarks: z.string().min(10, "Please provide remarks for the applicant."),
-});
-
-
-export function EmrManagementClient({ call, interests, allUsers, currentUser, onActionComplete }: EmrManagementClientProps) {
-    const { toast } = useToast();
-    const userMap = new Map(allUsers.map(u => [u.uid, u]));
-    const [isDeleting, setIsDeleting] = useState(false);
-    const [interestToUpdate, setInterestToUpdate] = useState<EmrInterest | null>(null);
-    const [statusToUpdate, setStatusToUpdate] = useState<EmrInterest['status'] | null>(null);
-    const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
-    const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-
-
-    const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
-        resolver: zodResolver(deleteRegistrationSchema),
-        defaultValues: { remarks: '' },
-    });
-    
-    const remarksForm = useForm<z.infer<typeof adminRemarksSchema>>({
-        resolver: zodResolver(adminRemarksSchema),
-    });
-
-    const handleDeleteInterest = async (values: z.infer<typeof deleteRegistrationSchema>) => {
-        if (!interestToUpdate) return;
-        setIsDeleting(true);
-        try {
-            const result = await deleteEmrInterest(interestToUpdate.id, values.remarks, currentUser.name);
-            if (result.success) {
-                toast({ title: "Registration Deleted", description: "The user has been notified." });
-                setIsDeleteDialogOpen(false);
-                setInterestToUpdate(null);
-                onActionComplete();
-            } else {
-                toast({ variant: 'destructive', title: "Error", description: result.error });
-            }
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    const handleOpenDeleteDialog = (interest: EmrInterest) => {
-        setInterestToUpdate(interest);
-        deleteForm.reset({ remarks: '' });
-        setIsDeleteDialogOpen(true);
-    };
-    
-    const handleStatusUpdate = async (interestId: string, newStatus: EmrInterest['status'], remarks?: string) => {
-        const result = await updateEmrStatus(interestId, newStatus, remarks);
-         if (result.success) {
-            toast({ title: "Status Updated", description: "The applicant has been notified." });
-            onActionComplete();
-        } else {
-            toast({ variant: 'destructive', title: "Error", description: result.error });
-        }
-    };
-
-    const handleRemarksSubmit = (values: z.infer<typeof adminRemarksSchema>) => {
-        if (interestToUpdate && statusToUpdate) {
-            handleStatusUpdate(interestToUpdate.id, statusToUpdate, values.remarks);
-        }
-        setIsRemarksDialogOpen(false);
-    };
-    
-    const handleOpenRemarksDialog = (interest: EmrInterest, status: EmrInterest['status']) => {
-        setInterestToUpdate(interest);
-        setStatusToUpdate(status);
-        remarksForm.reset({ remarks: '' });
-        setIsRemarksDialogOpen(true);
-    };
-
-    const handleExport = () => {
-        const dataToExport = interests.map(interest => {
-            const interestedUser = userMap.get(interest.userId);
-            return {
-                'Interest ID': interest.interestId || 'N/A',
-                'PI Name': interest.userName,
-                'PI Email': interest.userEmail,
-                'PI Department': interestedUser?.department || interest.department,
-                'Co-PIs': interest.coPiNames?.join(', ') || 'None',
-                'Status': interest.status,
-                'Presentation URL': interest.pptUrl || 'Not Submitted'
-            };
-        });
-
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Registrations');
-        XLSX.writeFile(workbook, `registrations_${call.title.replace(/\s+/g, '_')}.xlsx`);
-    };
-    
-    const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot);
-
-    return (
-        <Card>
-            <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <CardTitle>Applicant Registrations ({interests.length})</CardTitle>
-                    <div className="flex items-center gap-2">
-                         {unscheduledApplicantsExist && (
-                            <Button onClick={() => setIsScheduleDialogOpen(true)}>
-                                <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
-                            </Button>
-                         )}
-                        <Button variant="outline" onClick={handleExport} disabled={interests.length === 0}>
-                            <Download className="mr-2 h-4 w-4" /> Export XLSX
-                        </Button>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="overflow-x-auto">
-                 {interests.length > 0 ? (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>PI</TableHead>
-                                <TableHead className="hidden sm:table-cell">Status</TableHead>
-                                <TableHead>Docs</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {interests.map(interest => {
-                                const interestedUser = userMap.get(interest.userId);
-                                const isMeetingScheduled = !!interest.meetingSlot;
-                                const isPostDecision = ['Recommended', 'Not Recommended', 'Revision Needed', 'Endorsement Submitted', 'Endorsement Signed', 'Submitted to Agency'].includes(interest.status);
-                                
-                                return (
-                                    <TableRow key={interest.id}>
-                                        <TableCell className="font-medium whitespace-nowrap">
-                                            {interestedUser?.misId ? (
-                                                <Link href={`/profile/${interestedUser.misId}`} target="_blank" className="text-primary hover:underline">
-                                                    {interest.userName}
-                                                </Link>
-                                            ) : (
-                                                interest.userName
-                                            )}
-                                            <div className="text-xs text-muted-foreground">{interest.interestId}</div>
-                                        </TableCell>
-                                        <TableCell className="hidden sm:table-cell">
-                                            <Badge variant={interest.status === 'Recommended' ? 'default' : 'secondary'}>{interest.status}</Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                {interest.pptUrl && <Button asChild size="icon" variant="ghost"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer" title="View Presentation"><ViewIcon className="h-4 w-4" /></a></Button>}
-                                                {interest.revisedPptUrl && <Button asChild size="icon" variant="ghost"><a href={interest.revisedPptUrl} target="_blank" rel="noopener noreferrer" title="View Revised Presentation"><FileUp className="h-4 w-4" /></a></Button>}
-                                                {interest.endorsementFormUrl && <Button asChild size="icon" variant="ghost"><a href={interest.endorsementFormUrl} target="_blank" rel="noopener noreferrer" title="View Endorsement Form"><FileUp className="h-4 w-4" /></a></Button>}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Actions</span></Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator />
-                                                    {isMeetingScheduled && (
-                                                        <>
-                                                            {interest.status === 'Recommended' && (
-                                                                <DropdownMenuItem disabled>Recommended</DropdownMenuItem> // Now it's the PI's turn
-                                                            )}
-                                                            {interest.status === 'Endorsement Submitted' && (
-                                                                <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Mark as Endorsement Signed</DropdownMenuItem>
-                                                            )}
-                                                            
-                                                            {!isPostDecision && (
-                                                                <>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                            <DropdownMenuSeparator />
-                                                        </>
-                                                    )}
-                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleOpenDeleteDialog(interest)}>
-                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                ) : (
-                    <div className="text-center p-8 text-muted-foreground">
-                        No users have registered for this call yet.
-                    </div>
-                )}
-            </CardContent>
-
-             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Registration for {interestToUpdate?.userName}?</AlertDialogTitle>
-                        <AlertDialogDescription>Please provide a reason for this deletion. The user will be notified.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <Form {...deleteForm}>
-                        <form id="delete-interest-form" onSubmit={deleteForm.handleSubmit(handleDeleteInterest)}>
-                            <FormField
-                                control={deleteForm.control}
-                                name="remarks"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl><Textarea {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </form>
-                    </Form>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction type="submit" form="delete-interest-form" disabled={isDeleting}>
-                            {isDeleting ? "Deleting..." : "Confirm & Delete"}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            <Dialog open={isRemarksDialogOpen} onOpenChange={setIsRemarksDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Provide Remarks for {statusToUpdate}</DialogTitle>
-                        <DialogDescription>These comments will be sent to the applicant.</DialogDescription>
-                    </DialogHeader>
-                     <Form {...remarksForm}>
-                        <form id="remarks-form" onSubmit={remarksForm.handleSubmit(handleRemarksSubmit)} className="py-4">
-                            <FormField
-                                control={remarksForm.control}
-                                name="remarks"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl><Textarea rows={4} {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </form>
-                    </Form>
-                    <DialogFooter>
-                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                        <Button type="submit" form="remarks-form">Submit Remarks</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-            <ScheduleMeetingDialog
-                isOpen={isScheduleDialogOpen}
-                onOpenChange={setIsScheduleDialogOpen}
-                onActionComplete={onActionComplete}
-                call={call}
-                interests={interests}
-                allUsers={allUsers}
-             />
-        </Card>
-    );
 }
