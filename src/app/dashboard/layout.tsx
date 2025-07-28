@@ -287,6 +287,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if(pathname.includes('/dashboard/incentive-claim')) return "Incentive Claims";
       if(pathname.includes('/dashboard/manage-incentive-claims')) return "Manage Incentive Claims";
       if(pathname.includes('/dashboard/emr-management')) return "EMR Management";
+      if(pathname.includes('/dashboard/emr-calendar')) return "EMR Calendar";
       if(pathname.includes('/dashboard/profile-setup')) return "Profile Setup";
 
       if (lastSegment === 'dashboard') return 'Dashboard';
