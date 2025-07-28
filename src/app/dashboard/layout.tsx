@@ -389,16 +389,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </SidebarMenu>
             </SortableContext>
           </DndContext>
-            <SidebarFooter className="hidden md:flex mt-auto group-data-[collapsible=icon]:hidden">
-                <Image
-                    src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/PU-WATERMARK.svg"
-                    alt="Parul University Logo"
-                    width={150}
-                    height={50}
-                    className="mx-auto"
-                />
-            </SidebarFooter>
         </SidebarContent>
+         <SidebarFooter className="hidden md:flex mt-auto group-data-[collapsible=icon]:hidden">
+            <Image
+                src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/PU-WATERMARK.svg"
+                alt="Parul University Logo"
+                width={150}
+                height={50}
+                className="mx-auto"
+            />
+        </SidebarFooter>
         {isRearrangeEnabled && isDirty && (
           <SidebarHeader>
             <Button onClick={handleSaveOrder} disabled={isSaving}>
