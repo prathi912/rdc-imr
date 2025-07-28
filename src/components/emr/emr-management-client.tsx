@@ -1,4 +1,3 @@
-
 // src/components/emr/emr-management-client.tsx
 'use client';
 
@@ -221,9 +220,16 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                     <DropdownMenuSeparator />
                                                     {isMeetingScheduled && (
                                                         <>
+                                                            {interest.status === 'Recommended' && (
+                                                                <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Pending')}>Move to Endorsement Pending</DropdownMenuItem>
+                                                            )}
+                                                            {interest.status === 'Endorsement Submitted' && (
+                                                                <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Mark as Endorsement Signed</DropdownMenuItem>
+                                                            )}
+                                                            
+                                                            <DropdownMenuSeparator />
+                                                            
                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Pending')}>Endorsement Pending</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Endorsement Signed</DropdownMenuItem>
                                                             <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
                                                             <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
                                                             <DropdownMenuSeparator />
