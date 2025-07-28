@@ -184,7 +184,7 @@ function EndorsementUploadDialog({ interest, onUploadSuccess, isOpen, onOpenChan
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Upload Endorsement Form</DialogTitle>
-                    <DialogDescription>Please upload the signed endorsement form in Word format (.doc, .docx).</DialogDescription>
+                    <DialogDescription>Please upload the signed endorsement form in Word format (.doc, .docx). Below 5 MB.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4">
                     <Input type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={(e) => setEndorsementFile(e.target.files?.[0] || null)} />
@@ -337,7 +337,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
     const isSuperAdmin = user.role === 'Super-admin';
     const isInterestDeadlinePast = isAfter(new Date(), parseISO(call.interestDeadline));
     
-    const showEndorsementActions = interestDetails && ['Recommended', 'Endorsement Pending', 'Endorsement Submitted'].includes(interestDetails.status);
+    const showEndorsementActions = interestDetails && ['Recommended', 'Endorsement Submitted'].includes(interestDetails.status);
     const showSubmitToAgencyAction = interestDetails?.status === 'Endorsement Signed';
     
     if (interestDetails) {
@@ -345,7 +345,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
             return (
                 <div className="flex flex-col items-start gap-2">
                     <div className="w-full flex justify-between items-center mb-2">
-                        <Badge variant={interestDetails.status === 'Recommended' || interestDetails.status === 'Endorsement Pending' ? 'default' : 'secondary'}>
+                        <Badge variant={interestDetails.status === 'Recommended' ? 'default' : 'secondary'}>
                             Status: {interestDetails.status}
                         </Badge>
                     </div>
