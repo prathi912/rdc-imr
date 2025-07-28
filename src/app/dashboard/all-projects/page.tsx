@@ -338,7 +338,6 @@ export default function AllProjectsPage() {
                                     defaultMonth={exportDateRange?.from}
                                     selected={exportDateRange}
                                     onSelect={setExportDateRange}
-                                    numberOfMonths={2}
                                 />
                                 </PopoverContent>
                             </Popover>
