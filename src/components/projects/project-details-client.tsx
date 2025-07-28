@@ -248,10 +248,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }, [project, durationForm, evaluatorForm])
 
   const isPI = user?.uid === project.pi_uid || user?.email === project.pi_email
+  const isCoPi = user && project.coPiUids?.includes(user.uid)
   const isAdmin = user && ["Super-admin", "admin", "CRO"].includes(user.role)
   const isSuperAdmin = user?.role === "Super-admin"
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid)
-  const canViewDocuments = isPI || isAdmin || isAssignedEvaluator
+  const canViewDocuments = isPI || isCoPi || isAdmin || isAssignedEvaluator
 
   const isMeetingToday = project.meetingDetails?.date ? isToday(parseISO(project.meetingDetails.date)) : false
   const showEvaluationForm = user && project.status === "Under Review" && isAssignedEvaluator && isMeetingToday
@@ -264,8 +265,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     user &&
     (user.role === "Super-admin" ||
       user.role === "admin" ||
-      user.uid === project.pi_uid ||
-      user.email === project.pi_email)
+      isPI || isCoPi)
 
   const canRequestClosure = useMemo(() => {
     if (!isPI) return false
