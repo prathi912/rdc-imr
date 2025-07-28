@@ -188,6 +188,8 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                             {interests.map(interest => {
                                 const interestedUser = userMap.get(interest.userId);
                                 const isMeetingScheduled = !!interest.meetingSlot;
+                                const isPostDecision = ['Recommended', 'Not Recommended', 'Revision Needed', 'Endorsement Pending', 'Endorsement Submitted', 'Endorsement Signed', 'Submitted to Agency'].includes(interest.status);
+                                
                                 return (
                                     <TableRow key={interest.id}>
                                         <TableCell className="font-medium whitespace-nowrap">
@@ -227,11 +229,14 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                                 <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Mark as Endorsement Signed</DropdownMenuItem>
                                                             )}
                                                             
-                                                            <DropdownMenuSeparator />
-                                                            
-                                                            <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
+                                                            {!isPostDecision && (
+                                                                <>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
+                                                                </>
+                                                            )}
                                                             <DropdownMenuSeparator />
                                                         </>
                                                     )}
