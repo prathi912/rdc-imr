@@ -146,12 +146,7 @@ export default function ProjectDetailsPage() {
     <div className="container mx-auto py-10">
       <PageHeader
         title={project.title}
-        description={
-          <>
-            {project.projectId && <p className="text-sm font-mono text-muted-foreground -mt-2 mb-2">{project.projectId}</p>}
-            View project details and manage its status.
-          </>
-        }
+        description={"View project details and manage its status."}
         backButtonHref={backButtonHref}
         backButtonText="Back to Projects"
       >
