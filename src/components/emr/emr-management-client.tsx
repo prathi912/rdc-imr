@@ -188,7 +188,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                             {interests.map(interest => {
                                 const interestedUser = userMap.get(interest.userId);
                                 const isMeetingScheduled = !!interest.meetingSlot;
-                                const isPostDecision = ['Recommended', 'Not Recommended', 'Revision Needed', 'Endorsement Pending', 'Endorsement Submitted', 'Endorsement Signed', 'Submitted to Agency'].includes(interest.status);
+                                const isPostDecision = ['Recommended', 'Not Recommended', 'Revision Needed', 'Endorsement Submitted', 'Endorsement Signed', 'Submitted to Agency'].includes(interest.status);
                                 
                                 return (
                                     <TableRow key={interest.id}>
@@ -223,7 +223,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                     {isMeetingScheduled && (
                                                         <>
                                                             {interest.status === 'Recommended' && (
-                                                                <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Pending')}>Move to Endorsement Pending</DropdownMenuItem>
+                                                                <DropdownMenuItem disabled>Recommended</DropdownMenuItem> // Now it's the PI's turn
                                                             )}
                                                             {interest.status === 'Endorsement Submitted' && (
                                                                 <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Mark as Endorsement Signed</DropdownMenuItem>

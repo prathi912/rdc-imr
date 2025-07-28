@@ -2,6 +2,7 @@
 
 
 
+
 export type UserBankDetails = {
   bankName: string;
   accountNumber: string;
@@ -324,7 +325,7 @@ export type EmrInterest = {
     pptSubmissionDate?: string; // ISO String
     coPiUids?: string[];
     coPiNames?: string[];
-    status: 'Registered' | 'PPT Submitted' | 'Revision Submitted' | 'Evaluation Pending' | 'Evaluation Done' | 'Recommended' | 'Not Recommended' | 'Revision Needed' | 'Endorsement Pending' | 'Endorsement Submitted' | 'Endorsement Signed' | 'Process Complete' | 'Submitted to Agency';
+    status: 'Registered' | 'PPT Submitted' | 'Revision Submitted' | 'Evaluation Pending' | 'Evaluation Done' | 'Recommended' | 'Not Recommended' | 'Revision Needed' | 'Endorsement Submitted' | 'Endorsement Signed' | 'Process Complete' | 'Submitted to Agency';
     adminRemarks?: string;
     revisedPptUrl?: string;
     meetingSlot?: {
