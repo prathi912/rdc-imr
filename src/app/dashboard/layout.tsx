@@ -387,7 +387,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </SidebarMenu>
             </SortableContext>
           </DndContext>
-            <SidebarFooter className="mt-auto hidden md:flex group-data-[collapsible=icon]:hidden">
+            <SidebarFooter className="hidden md:flex group-data-[collapsible=icon]:hidden">
                 <Image
                     src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/PU-WATERMARK.svg"
                     alt="Parul University Logo"
