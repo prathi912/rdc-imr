@@ -5,7 +5,7 @@ export function Logo() {
     <div className="flex items-center justify-center p-2" style={{ minHeight: 49 }}>
       {/* Expanded Light mode logo */}
       <Image
-        src="https://rdc-full.vercel.app/assets/RDC-PU-LOGO.svg"
+        src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20b.svg"
         alt="Parul Research Portal Logo"
         width={350}
         height={100}
@@ -14,7 +14,7 @@ export function Logo() {
       />
       {/* Expanded Dark mode logo */}
       <Image
-        src="https://rdc-full.vercel.app/assets/RDC-PU-LOGO-WHITE.svg"
+        src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20W.svg"
         alt="Parul Research Portal Logo"
         width={350}
         height={100}
