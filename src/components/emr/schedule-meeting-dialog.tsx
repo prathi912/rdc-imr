@@ -15,9 +15,9 @@ import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from '@/components/ui/checkbox';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfToday, isToday, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Calendar, ChevronDown } from 'lucide-react';
+import { Calendar, ChevronDown, Loader2 } from 'lucide-react';
 import { scheduleEmrMeeting } from '@/app/actions';
 
 interface ScheduleMeetingDialogProps {
@@ -30,11 +30,22 @@ interface ScheduleMeetingDialogProps {
 }
 
 const scheduleSchema = z.object({
-    date: z.date({ required_error: 'A meeting date is required.' }),
+    date: z.date({ required_error: 'A meeting date is required.' }).min(startOfToday(), "Meeting date cannot be in the past."),
     time: z.string().min(1, "Time is required."),
     venue: z.string().min(3, 'Meeting venue is required.'),
     evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
+}).refine(data => {
+    if (isToday(data.date)) {
+        const now = new Date();
+        const meetingTime = parse(data.time, 'HH:mm', data.date);
+        return meetingTime > now;
+    }
+    return true;
+}, {
+    message: "Meeting time must be in the future for today's date.",
+    path: ['time'],
 });
+
 
 const applicantsSchema = z.object({
     applicantUids: z.array(z.string()).min(1, 'Please select at least one applicant.'),
@@ -178,7 +189,7 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                                             </FormControl>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0" align="start">
-                                            <CalendarPicker mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsDatePickerOpen(false); }} initialFocus />
+                                            <CalendarPicker mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); setIsDatePickerOpen(false); }} disabled={(date) => date < startOfToday()} initialFocus />
                                         </PopoverContent>
                                     </Popover>
                                     <FormMessage />
@@ -227,7 +238,7 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                     <Button type="submit" form="schedule-form" disabled={isSubmitting}>
-                      {isSubmitting ? 'Scheduling...' : 'Confirm & Schedule'}
+                      {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Scheduling...</> : 'Confirm & Schedule'}
                     </Button>
                 </DialogFooter>
             </DialogContent>
