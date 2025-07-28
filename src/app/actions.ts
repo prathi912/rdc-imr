@@ -218,7 +218,7 @@ export async function addResearchPaper(
     // 3. Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
-    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorMisId = mainAuthorDoc.data()?.misId : null;
+    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
     const notificationBatch = adminDb.batch();
     authors.forEach((author) => {
@@ -283,7 +283,7 @@ export async function updateResearchPaper(
     // Notify newly added co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
-    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorMisId = mainAuthorDoc.data()?.misId : null;
+    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
     const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
 
     const notificationBatch = adminDb.batch();
@@ -2692,163 +2692,23 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
   }
 }
 
-export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, targetUserUid: string): Promise<{ success: boolean; projects?: (Project | FundingCall)[]; error?: string }> {
-  try {
-    const today = format(new Date(), 'yyyy-MM-dd');
+export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid: string): Promise<{ success: boolean; projects?: Project[]; error?: string }> {
+    try {
+        const projectsRef = adminDb.collection('projects');
+        const q = query(
+            projectsRef,
+            where('pi_uid', '==', piUid),
+            where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid)
+        );
 
-    // IMR Projects
-    const imrProjectsRef = adminCollection(adminDb, 'projects');
-    const imrPiQuery = adminQuery(imrProjectsRef, adminWhere('pi_uid', '==', targetUserUid), adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), adminWhere('meetingDetails.date', '==', today));
-    const imrCoPiQuery = adminQuery(imrProjectsRef, adminWhere('coPiUids', 'array-contains', targetUserUid), adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), adminWhere('meetingDetails.date', '==', today));
-
-    // EMR Projects
-    const fundingCallsRef = adminCollection(adminDb, 'fundingCalls');
-    const emrCallsQuery = adminQuery(fundingCallsRef, adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid), adminWhere('meetingDetails.date', '==', today));
-
-    const [imrPiSnapshot, imrCoPiSnapshot, emrCallsSnapshot] = await Promise.all([
-      imrPiQuery.get(),
-      imrCoPiQuery.get(),
-      emrCallsQuery.get(),
-    ]);
-
-    const imrProjects = new Map<string, Project>();
-    imrPiSnapshot.forEach(doc => imrProjects.set(doc.id, { id: doc.id, ...doc.data() } as Project));
-    imrCoPiSnapshot.forEach(doc => imrProjects.set(doc.id, { id: doc.id, ...doc.data() } as Project));
-
-    const emrCalls = emrCallsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-
-    // For EMR, we need to check if the target user is actually an applicant for these calls
-    let relevantEmrCalls: FundingCall[] = [];
-    if (emrCalls.length > 0) {
-        const callIds = emrCalls.map(c => c.id);
-        const interestsRef = adminCollection(adminDb, 'emrInterests');
-        const interestsQuery = adminQuery(interestsRef, adminWhere('callId', 'in', callIds), adminWhere('userId', '==', targetUserUid));
-        const interestsSnapshot = await adminGetDocs(interestsQuery);
-        const relevantCallIds = new Set(interestsSnapshot.docs.map(d => d.data().callId));
-        relevantEmrCalls = emrCalls.filter(c => relevantCallIds.has(c.id));
-    }
-    
-    return { success: true, projects: [...imrProjects.values(), ...relevantEmrCalls] };
-
-  } catch (error: any) {
-    console.error("Error fetching projects for evaluator:", error);
-    await logActivity('ERROR', 'Failed to fetch evaluator projects for user', { evaluatorUid, targetUserUid, error: error.message, stack: error.stack });
-    return { success: false, error: "Failed to fetch project data for permission check." };
-  }
-}
-
-type PaperUploadData = {
-  paper_title: string;
-  author_email: string;
-  author_type: 'First Author' | 'Corresponding Author' | 'Co-Author';
-  url: string;
-};
-    
-export async function bulkUploadPapers(
-  papersData: PaperUploadData[],
-): Promise<{ 
-    success: boolean; 
-    data: {
-        successfulPapers: { title: string; authors: string[] }[];
-        failedAuthorLinks: { title: string; email: string; reason: string }[];
-    };
-    error?: string 
-}> {
-  const successfulPapers: { title: string; authors: string[] }[] = [];
-  const failedAuthorLinks: { title: string; email: string; reason: string }[] = [];
-
-  try {
-    const papersMap = new Map<string, { url: string, authors: { email: string, type: string }[] }>();
-    for (const row of papersData) {
-        if (!papersMap.has(row.paper_title)) {
-            papersMap.set(row.paper_title, { url: row.url, authors: [] });
-        }
-        papersMap.get(row.paper_title)!.authors.push({ email: row.author_email, type: row.author_type });
-    }
-    
-    const usersRef = adminDb.collection('users');
-    const batch = adminDb.batch();
-
-    for (const [title, data] of papersMap.entries()) {
-        const authors: Author[] = [];
-        const authorUids: string[] = [];
-        const authorEmails: string[] = [];
-        let mainAuthorUid: string | undefined;
-        let firstAuthorFound: Author | undefined;
-
-        for (const author of data.authors) {
-            const userQuery = await usersRef.where('email', '==', author.email).limit(1).get();
-            const authorData: Author = {
-                email: author.email,
-                name: author.email.split('@')[0],
-                role: author.type as Author['role'],
-                isExternal: false,
-            };
-
-            if (userQuery.empty) {
-                // This is expected for unregistered users, so we don't add it to failedAuthorLinks.
-                // It will be linked upon their registration.
-            } else {
-                const userDoc = userQuery.docs[0];
-                const userData = userDoc.data() as User;
-                authorData.uid = userDoc.id;
-                authorData.name = userData.name;
-                authorUids.push(userDoc.id);
-            }
-            
-            authors.push(authorData);
-            authorEmails.push(author.email.toLowerCase());
-
-            if (author.type === 'First Author') {
-                firstAuthorFound = authorData;
-                if (authorData.uid) {
-                    mainAuthorUid = authorData.uid;
-                }
-            }
-        }
+        const snapshot = await getDocs(q);
+        const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         
-        if (authors.length > 0) {
-             if (!mainAuthorUid) {
-                if (firstAuthorFound?.uid) {
-                    mainAuthorUid = firstAuthorFound.uid;
-                } else if (authorUids.length > 0) {
-                    mainAuthorUid = authorUids[0]; // Fallback to first registered author
-                }
-            }
-            
-            const paperRef = adminDb.collection('papers').doc();
-            const now = new Date().toISOString();
-            
-            const paperData: Omit<ResearchPaper, 'id'> = {
-                title,
-                url: data.url,
-                mainAuthorUid: mainAuthorUid,
-                authors,
-                authorUids,
-                authorEmails,
-                createdAt: now,
-                updatedAt: now,
-            };
-            
-            batch.set(paperRef, paperData);
-            successfulPapers.push({ title, authors: authors.map(a => a.name) });
-        }
+        const projectsForToday = projects.filter(p => p.meetingDetails?.date && isToday(parseISO(p.meetingDetails.date)));
+
+        return { success: true, projects: projectsForToday };
+    } catch (error: any) {
+        console.error("Error fetching projects for evaluator/pi combo:", error);
+        return { success: false, error: error.message || "Failed to fetch projects." };
     }
-
-    await batch.commit();
-    await logActivity('INFO', 'Bulk paper upload completed', { successfulCount: successfulPapers.length, failedCount: failedAuthorLinks.length });
-
-    return { 
-        success: true, 
-        data: { successfulPapers, failedAuthorLinks }
-    };
-  } catch (error: any) {
-    console.error("Error during bulk paper upload:", error);
-    await logActivity('ERROR', 'Failed during bulk paper upload', { error: error.message, stack: error.stack });
-    return { 
-        success: false, 
-        error: error.message || "Failed to upload papers.",
-        data: { successfulPapers, failedAuthorLinks }
-    };
-  }
 }
