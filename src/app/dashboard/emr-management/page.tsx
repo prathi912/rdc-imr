@@ -229,7 +229,6 @@ export default function EmrManagementOverviewPage() {
                                             <TableHeader><TableRow>
                                                 <TableHead>Call Title</TableHead>
                                                 <TableHead>Agency</TableHead>
-                                                <TableHead>Interest Deadline</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead className="text-right">Actions</TableHead>
                                             </TableRow></TableHeader>
@@ -237,7 +236,6 @@ export default function EmrManagementOverviewPage() {
                                                 <TableRow key={call.id}>
                                                     <TableCell className="font-medium whitespace-nowrap">{call.title}</TableCell>
                                                     <TableCell className="whitespace-nowrap">{call.agency}</TableCell>
-                                                    <TableCell className="whitespace-nowrap">{format(parseISO(call.interestDeadline), 'PPp')}</TableCell>
                                                     <TableCell>{getStatusBadge(call)}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button asChild variant="outline" size="sm">

@@ -26,10 +26,10 @@ export const ALL_MODULES = [
 
 const coreModules = ['dashboard', 'notifications', 'settings', 'emr-calendar'];
 const facultyCoreModules = ['new-submission', 'my-projects'];
-const hierarchyCoreModules = ['analytics', 'ai-chat'];
+const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
-const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects', 'ai-chat'];
+const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects'];
 const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'bulk-upload', 'emr-management'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'bulk-upload-papers'];
 
