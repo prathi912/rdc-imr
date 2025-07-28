@@ -62,6 +62,56 @@ export async function sendEmail(options: { to: string; subject: string; html: st
     return await sendEmailUtility(options);
 }
 
+export async function saveProjectSubmission(
+  projectData: Omit<Project, 'id' | 'projectId'>,
+  existingProjectId?: string
+): Promise<{ success: boolean; projectId?: string; error?: string }> {
+  try {
+    let projectId = existingProjectId;
+    const projectToSave = { ...projectData };
+
+    if (!projectId) {
+      // New submission: Generate a sequential ID in a transaction
+      const newProjectRef = await adminDb.runTransaction(async (transaction) => {
+        const counterRef = adminDb.collection('counters').doc('imrProjects');
+        const counterDoc = await transaction.get(counterRef);
+        
+        let newCount = 1;
+        if (counterDoc.exists) {
+          newCount = counterDoc.data()!.current + 1;
+        }
+        transaction.set(counterRef, { current: newCount }, { merge: true });
+
+        const newProjectId = `RDC/IMR/APPL/${String(newCount).padStart(5, '0')}`;
+        const newDocRef = adminDb.collection('projects').doc(newProjectId);
+        
+        // Add the projectId field to the data being saved
+        (projectToSave as Project).projectId = newProjectId;
+        transaction.set(newDocRef, projectToSave);
+        return newDocRef;
+      });
+      projectId = newProjectRef.id;
+    } else {
+      // Existing submission: Just update the document
+      const projectRef = adminDb.collection('projects').doc(projectId);
+      await projectRef.set(projectToSave, { merge: true });
+    }
+
+    // Notify admins only on final submission, not on saving drafts
+    if (projectToSave.status === 'Submitted') {
+      await notifyAdminsOnProjectSubmission(projectId, projectToSave.title, projectToSave.pi);
+    }
+    
+    await logActivity('INFO', `Project ${projectToSave.status}`, { projectId, title: projectToSave.title });
+    return { success: true, projectId };
+
+  } catch (error: any) {
+    console.error("Error saving project submission:", error);
+    await logActivity('ERROR', 'Failed to save project submission', { title: projectData.title, error: error.message, stack: error.stack });
+    return { success: false, error: error.message || 'Failed to save project.' };
+  }
+}
+
 export async function runChatAgent(input: ChatInput): Promise<{ success: boolean, response?: string, error?: string }> {
     try {
         const result = await chatAgent(input);
@@ -1099,18 +1149,15 @@ export async function bulkUploadProjects(
   const usersRef = adminDb.collection("users");
   let successfulCount = 0;
   const failures: { projectTitle: string; piName: string; error: string }[] = [];
+  const batch = adminDb.batch();
 
   for (const project of projectsData) {
       try {
           const projectTitle = project.project_title || 'Untitled';
           const piName = project.Name_of_staff || 'Unknown PI';
 
-          // Basic validation
-          if (
-              !project.pi_email || !project.project_title || !project.status || !project.sanction_number ||
-              !project.Name_of_staff || !project.Faculty || !project.Institute
-          ) {
-              failures.push({ projectTitle, piName, error: 'Missing required columns in the Excel file.' });
+          if (!project.projectId || !project.pi_email || !project.project_title || !project.status) {
+              failures.push({ projectTitle, piName, error: 'Missing required columns (projectId, pi_email, project_title, status).' });
               continue;
           }
 
@@ -1145,8 +1192,8 @@ export async function bulkUploadProjects(
             submissionDate = new Date().toISOString();
           }
 
-          const newProjectData: Partial<Project> = {
-              title: project.project_title, pi_email: project.pi_email, status: project.status,
+          const newProjectData: Omit<Project, 'id'> = {
+              projectId: project.projectId, title: project.project_title, pi_email: project.pi_email, status: project.status,
               pi_uid: pi_uid, pi: piName, abstract: "Historical data migrated from bulk upload.",
               type: "Research", faculty: faculty, institute: institute, departmentName: departmentName,
               teamInfo: "Historical data, team info not available.",
@@ -1164,8 +1211,9 @@ export async function bulkUploadProjects(
                   sanctionNumber: project.sanction_number || "", phases: [firstPhase],
               };
           }
-
-          await adminDb.collection("projects").add(newProjectData as Project);
+          
+          const projectRef = adminDb.collection('projects').doc(project.projectId);
+          batch.set(projectRef, newProjectData);
           successfulCount++;
 
       } catch (error: any) {
@@ -1178,6 +1226,7 @@ export async function bulkUploadProjects(
       }
   }
   
+  await batch.commit();
   await logActivity('INFO', 'Bulk project upload completed', { successfulCount, failureCount: failures.length });
   if (failures.length > 0) {
       await logActivity('WARNING', 'Some projects failed during bulk upload', { failures });
@@ -2809,6 +2858,7 @@ export async function bulkUploadPapers(
 
 
     
+
 
 
 

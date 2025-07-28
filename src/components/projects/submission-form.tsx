@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -19,7 +20,7 @@ import type { User, Project } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
-import { uploadFileToServer, notifyAdminsOnProjectSubmission, findUserByMisId } from '@/app/actions';
+import { uploadFileToServer, findUserByMisId, saveProjectSubmission } from '@/app/actions';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
 import {
@@ -250,73 +251,75 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     const data = form.getValues();
 
     try {
-      const projectId = project?.id || doc(collection(db, 'projects')).id;
-
-      const uploadFile = async (file: File, folder: string): Promise<string> => {
+      const uploadFile = async (file: File, folder: string, projectId: string): Promise<string> => {
         const dataUrl = await fileToDataUrl(file);
         const path = `projects/${projectId}/${folder}/${file.name}`;
         const result = await uploadFileToServer(dataUrl, path);
-        console.log('Upload result for', file.name, ':', result);
         if (result.success && result.url) return result.url;
         throw new Error(result.error || `Failed to upload ${file.name}`);
       };
-
-      let cvUrl = project?.cvUrl;
-      if (data.cvUpload && data.cvUpload.length > 0) {
-        cvUrl = await uploadFile(data.cvUpload[0], 'cv');
-        setProgress(30);
-      }
-
-      let proposalUrl = project?.proposalUrl;
-      if (data.proposalUpload && data.proposalUpload.length > 0) {
-        proposalUrl = await uploadFile(data.proposalUpload[0], 'proposal');
-        setProgress(60);
-      }
-
-      let ethicsUrl = project?.ethicsUrl;
-      if (data.ethicsUpload && data.ethicsUpload.length > 0) {
-        ethicsUrl = await uploadFile(data.ethicsUpload[0], 'ethics');
-        setProgress(90);
-      }
       
       const teamInfoParts = [];
       if (data.studentInfo && data.studentInfo.trim() !== '') teamInfoParts.push(`Students: ${data.studentInfo}`);
       const teamInfo = teamInfoParts.join('; ');
-      
       const coPiUids = coPiList.map(coPi => coPi.uid);
 
-      const projectData: Omit<Project, 'id'> = {
-        title: data.title,
-        abstract: data.abstract,
-        type: data.projectType,
-        faculty: user.faculty,
-        institute: user.institute,
-        departmentName: user.department,
-        pi: user.name,
-        pi_uid: user.uid,
-        pi_email: user.email,
-        pi_phoneNumber: user.phoneNumber,
-        coPiUids: coPiUids,
-        teamInfo,
-        timelineAndOutcomes: data.expectedOutcomes,
-        status: status,
-        submissionDate: project?.submissionDate || new Date().toISOString(),
-        sdgGoals: data.sdgGoals,
+      const projectData: Omit<Project, 'id' | 'projectId'> = {
+        title: data.title, abstract: data.abstract, type: data.projectType,
+        faculty: user.faculty, institute: user.institute, departmentName: user.department,
+        pi: user.name, pi_uid: user.uid, pi_email: user.email, pi_phoneNumber: user.phoneNumber,
+        coPiUids: coPiUids, teamInfo, timelineAndOutcomes: data.expectedOutcomes, status: status,
+        submissionDate: project?.submissionDate || new Date().toISOString(), sdgGoals: data.sdgGoals,
       };
 
-      // Conditionally add URLs to avoid 'undefined' values
-      if (proposalUrl) projectData.proposalUrl = proposalUrl;
-      if (cvUrl) projectData.cvUrl = cvUrl;
-      if (ethicsUrl) projectData.ethicsUrl = ethicsUrl;
+      // Files need to be handled after we get an ID, so we move this logic into the server action
+      // For now, prepare the file data to send
+      let cvFile = data.cvUpload?.[0];
+      let proposalFile = data.proposalUpload?.[0];
+      let ethicsFile = data.ethicsUpload?.[0];
+      
+      const result = await saveProjectSubmission(projectData, project?.id);
 
-      await setDoc(doc(db, 'projects', projectId), projectData, { merge: true });
+      if (!result.success || !result.projectId) {
+        throw new Error(result.error || 'Failed to save project and get an ID.');
+      }
+
+      const projectId = result.projectId;
+
+      // Now upload files with the confirmed project ID
+      let cvUrl = project?.cvUrl;
+      if (cvFile) {
+        cvUrl = await uploadFile(cvFile, 'cv', projectId);
+        setProgress(30);
+      }
+
+      let proposalUrl = project?.proposalUrl;
+      if (proposalFile) {
+        proposalUrl = await uploadFile(proposalFile, 'proposal', projectId);
+        setProgress(60);
+      }
+
+      let ethicsUrl = project?.ethicsUrl;
+      if (ethicsFile) {
+        ethicsUrl = await uploadFile(ethicsFile, 'ethics', projectId);
+        setProgress(90);
+      }
+      
+      // If any files were uploaded, we need to update the doc with their URLs
+      if (cvUrl !== project?.cvUrl || proposalUrl !== project?.proposalUrl || ethicsUrl !== project?.ethicsUrl) {
+          const urlsToUpdate: Partial<Pick<Project, 'proposalUrl' | 'cvUrl' | 'ethicsUrl'>> = {};
+          if (proposalUrl) urlsToUpdate.proposalUrl = proposalUrl;
+          if (cvUrl) urlsToUpdate.cvUrl = cvUrl;
+          if (ethicsUrl) urlsToUpdate.ethicsUrl = ethicsUrl;
+          await setDoc(doc(db, 'projects', projectId), urlsToUpdate, { merge: true });
+      }
+
       setProgress(100);
       
       if (status === 'Draft') {
         toast({ title: 'Draft Saved!', description: "You can continue editing from 'My Projects'." });
         if (!project?.id) router.push(`/dashboard/edit-submission/${projectId}`);
       } else {
-        await notifyAdminsOnProjectSubmission(projectId, data.title, user.name);
         toast({ title: 'Project Submitted!', description: 'Your project is now under review.' });
         router.push('/dashboard/my-projects');
       }
