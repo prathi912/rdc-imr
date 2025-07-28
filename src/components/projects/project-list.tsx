@@ -91,84 +91,100 @@ export function ProjectList({ projects, userRole, allUsers = [] }: ProjectListPr
   return (
     <Card>
       <CardContent className="pt-6 overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <Button variant="ghost" onClick={() => requestSort('title')}>
-                    Title <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead className="hidden sm:table-cell">
-                <Button variant="ghost" onClick={() => requestSort('pi')}>
-                    PI <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead className="hidden sm:table-cell">
-                <Button variant="ghost" onClick={() => requestSort('submissionDate')}>
-                    Date <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead className="hidden md:table-cell">
-                <Button variant="ghost" onClick={() => requestSort('status')}>
-                    Status <ArrowUpDown className="ml-2 h-4 w-4" />
-                </Button>
-              </TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedProjects.map((project) => {
-              const displayDate = project.submissionDate;
-              const piUser = usersMap.get(project.pi_uid);
-             
-              let actionButton;
-              if (project.status === 'Draft') {
-                actionButton = (
-                  <Link href={`/dashboard/edit-submission/${project.id}`}>
-                    <Button variant="outline" size="sm">
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit Draft
-                    </Button>
-                  </Link>
-                );
-              } else {
-                actionButton = (
-                   <Link href={`/dashboard/project/${project.id}`}>
-                    <Button variant="outline" size="icon" aria-label="View Project Details">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </Link>
-                )
-              }
-
-              return (
-                <TableRow key={project.id}>
-                  <TableCell className="font-medium whitespace-nowrap">{project.title}</TableCell>
-                  <TableCell className="hidden sm:table-cell whitespace-nowrap">
-                    {piUser?.misId ? (
-                        <Link href={`/profile/${piUser.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
-                            {project.pi}
+        <TooltipProvider>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <Button variant="ghost" onClick={() => requestSort('title')}>
+                      Title <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  <Button variant="ghost" onClick={() => requestSort('pi')}>
+                      PI <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="hidden sm:table-cell">
+                  <Button variant="ghost" onClick={() => requestSort('submissionDate')}>
+                      Date <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="hidden md:table-cell">
+                  <Button variant="ghost" onClick={() => requestSort('status')}>
+                      Status <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedProjects.map((project) => {
+                const displayDate = project.submissionDate;
+                const piUser = usersMap.get(project.pi_uid);
+               
+                let actionButton;
+                if (project.status === 'Draft') {
+                  actionButton = (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Link href={`/dashboard/edit-submission/${project.id}`}>
+                          <Button variant="outline" size="sm">
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Draft
+                          </Button>
                         </Link>
-                    ) : (
-                        project.pi
-                    )}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell whitespace-nowrap">{new Date(displayDate).toLocaleDateString()}</TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      {actionButton}
-                      {isAdmin && project.status !== 'Draft' && <ProjectSummary project={project} />}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Continue editing your draft</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                } else {
+                  actionButton = (
+                     <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Link href={`/dashboard/project/${project.id}`}>
+                            <Button variant="outline" size="icon" aria-label="View Project Details">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>View Project Details</p>
+                        </TooltipContent>
+                     </Tooltip>
+                  )
+                }
+
+                return (
+                  <TableRow key={project.id}>
+                    <TableCell className="font-medium whitespace-nowrap">{project.title}</TableCell>
+                    <TableCell className="hidden sm:table-cell whitespace-nowrap">
+                      {piUser?.misId ? (
+                          <Link href={`/profile/${piUser.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
+                              {project.pi}
+                          </Link>
+                      ) : (
+                          project.pi
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell whitespace-nowrap">{new Date(displayDate).toLocaleDateString()}</TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {actionButton}
+                        {isAdmin && project.status !== 'Draft' && <ProjectSummary project={project} />}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TooltipProvider>
       </CardContent>
     </Card>
   );

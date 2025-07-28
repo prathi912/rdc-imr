@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
@@ -472,10 +473,22 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                                                 {myRole && <Badge variant="secondary" className="ml-2">{myRole}</Badge>}
                                             </div>
                                             {isOwner && paper.mainAuthorUid === user.uid && (
+                                                <TooltipProvider>
                                                 <div className="flex gap-2">
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setPaperToEdit(paper); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPaperToDelete(paper)}><Trash2 className="h-4 w-4"/></Button>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setPaperToEdit(paper); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent><p>Edit Paper</p></TooltipContent>
+                                                    </Tooltip>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPaperToDelete(paper)}><Trash2 className="h-4 w-4"/></Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent><p>Delete Paper</p></TooltipContent>
+                                                    </Tooltip>
                                                 </div>
+                                                </TooltipProvider>
                                             )}
                                         </div>
                                         <div className="flex flex-wrap gap-2 items-center">

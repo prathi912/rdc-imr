@@ -25,6 +25,7 @@ import { useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from './button';
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
 
 const Toolbar = ({ editor }: { editor: Editor | null }) => {
   if (!editor) {
@@ -55,59 +56,51 @@ const Toolbar = ({ editor }: { editor: Editor | null }) => {
     '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39',
     '#ffeb3b', '#ffc107', '#ff9800', '#ff5722', '#795548', '#607d8b',
   ];
+  
+  const TooltipButton = ({ tooltip, onClick, isActive, children, disabled }: { tooltip: string, onClick: () => void, isActive?: boolean, children: React.ReactNode, disabled?: boolean }) => (
+    <Tooltip>
+        <TooltipTrigger asChild>
+            <Button type="button" onClick={onClick} variant={isActive ? 'secondary' : 'ghost'} size="sm" disabled={disabled}>{children}</Button>
+        </TooltipTrigger>
+        <TooltipContent>
+            <p>{tooltip}</p>
+        </TooltipContent>
+    </Tooltip>
+  );
 
   return (
     <div className="flex flex-wrap items-center gap-1 rounded-t-md border border-input bg-transparent p-1">
-      <Button type="button" onClick={() => editor.chain().focus().toggleBold().run()} variant={editor.isActive('bold') ? 'secondary' : 'ghost'} size="sm"><Bold /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} variant={editor.isActive('italic') ? 'secondary' : 'ghost'} size="sm"><Italic /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().toggleUnderline().run()} variant={editor.isActive('underline') ? 'secondary' : 'ghost'} size="sm"><UnderlineIcon /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().toggleStrike().run()} variant={editor.isActive('strike') ? 'secondary' : 'ghost'} size="sm"><Strikethrough /></Button>
-      
-      <Separator />
-
-      <Button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} variant={editor.isActive('heading', { level: 1 }) ? 'secondary' : 'ghost'} size="sm"><Heading1 /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} variant={editor.isActive('heading', { level: 2 }) ? 'secondary' : 'ghost'} size="sm"><Heading2 /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} variant={editor.isActive('heading', { level: 3 }) ? 'secondary' : 'ghost'} size="sm"><Heading3 /></Button>
-      
-      <Separator />
-      
-      <Button type="button" onClick={() => editor.chain().focus().toggleBulletList().run()} variant={editor.isActive('bulletList') ? 'secondary' : 'ghost'} size="sm"><List /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().toggleOrderedList().run()} variant={editor.isActive('orderedList') ? 'secondary' : 'ghost'} size="sm"><ListOrdered /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().toggleBlockquote().run()} variant={editor.isActive('blockquote') ? 'secondary' : 'ghost'} size="sm"><Quote /></Button>
-      
-      <Separator />
-      
-      <Button type="button" onClick={() => editor.chain().focus().setTextAlign('left').run()} variant={editor.isActive({ textAlign: 'left' }) ? 'secondary' : 'ghost'} size="sm"><AlignLeft /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().setTextAlign('center').run()} variant={editor.isActive({ textAlign: 'center' }) ? 'secondary' : 'ghost'} size="sm"><AlignCenter /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().setTextAlign('right').run()} variant={editor.isActive({ textAlign: 'right' }) ? 'secondary' : 'ghost'} size="sm"><AlignRight /></Button>
-      
-      <Separator />
-
-      <Popover>
-        <PopoverTrigger asChild><Button type="button" variant="ghost" size="sm"><Palette /></Button></PopoverTrigger>
-        <PopoverContent className="w-auto p-2">
-          <div className="grid grid-cols-6 gap-1">
-            {FONT_COLORS.map(color => (
-              <Button key={color} type="button" onClick={() => editor.chain().focus().setColor(color).run()} variant={editor.isActive('textStyle', { color }) ? 'secondary' : 'ghost'} size="icon" className="h-6 w-6 rounded-sm">
-                <div className="h-4 w-4 rounded-sm border" style={{ backgroundColor: color }} />
-              </Button>
-            ))}
-          </div>
-        </PopoverContent>
-      </Popover>
-
-      <Button type="button" onClick={setLink} variant={editor.isActive('link') ? 'secondary' : 'ghost'} size="sm"><LinkIcon /></Button>
-      <Button type="button" onClick={addImage} variant="ghost" size="sm"><ImageIcon /></Button>
-      
-      <Separator />
-      
-      <Button type="button" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} variant="ghost" size="sm"><TableIcon /></Button>
-      
-      <Separator />
-      
-      <Button type="button" onClick={() => editor.chain().focus().undo().run()} variant="ghost" size="sm" disabled={!editor.can().undo()}><Undo /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().redo().run()} variant="ghost" size="sm" disabled={!editor.can().redo()}><Redo /></Button>
-      <Button type="button" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} variant="ghost" size="sm"><Trash2 /></Button>
+        <TooltipProvider>
+            <TooltipButton tooltip="Bold" onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')}><Bold /></TooltipButton>
+            <TooltipButton tooltip="Italic" onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')}><Italic /></TooltipButton>
+            <TooltipButton tooltip="Underline" onClick={() => editor.chain().focus().toggleUnderline().run()} isActive={editor.isActive('underline')}><UnderlineIcon /></TooltipButton>
+            <TooltipButton tooltip="Strikethrough" onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')}><Strikethrough /></TooltipButton>
+            <Separator />
+            <TooltipButton tooltip="Heading 1" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} isActive={editor.isActive('heading', { level: 1 })}><Heading1 /></TooltipButton>
+            <TooltipButton tooltip="Heading 2" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} isActive={editor.isActive('heading', { level: 2 })}><Heading2 /></TooltipButton>
+            <TooltipButton tooltip="Heading 3" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} isActive={editor.isActive('heading', { level: 3 })}><Heading3 /></TooltipButton>
+            <Separator />
+            <TooltipButton tooltip="Bullet List" onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')}><List /></TooltipButton>
+            <TooltipButton tooltip="Ordered List" onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive('orderedList')}><ListOrdered /></TooltipButton>
+            <TooltipButton tooltip="Blockquote" onClick={() => editor.chain().focus().toggleBlockquote().run()} isActive={editor.isActive('blockquote')}><Quote /></TooltipButton>
+            <Separator />
+            <TooltipButton tooltip="Align Left" onClick={() => editor.chain().focus().setTextAlign('left').run()} isActive={editor.isActive({ textAlign: 'left' })}><AlignLeft /></TooltipButton>
+            <TooltipButton tooltip="Align Center" onClick={() => editor.chain().focus().setTextAlign('center').run()} isActive={editor.isActive({ textAlign: 'center' })}><AlignCenter /></TooltipButton>
+            <TooltipButton tooltip="Align Right" onClick={() => editor.chain().focus().setTextAlign('right').run()} isActive={editor.isActive({ textAlign: 'right' })}><AlignRight /></TooltipButton>
+            <Separator />
+            <Popover>
+                <PopoverTrigger asChild><Tooltip><TooltipTrigger asChild><Button type="button" variant="ghost" size="sm"><Palette /></Button></TooltipTrigger><TooltipContent><p>Text Color</p></TooltipContent></Tooltip></PopoverTrigger>
+                <PopoverContent className="w-auto p-2"><div className="grid grid-cols-6 gap-1">{FONT_COLORS.map(color => (<Button key={color} type="button" onClick={() => editor.chain().focus().setColor(color).run()} variant={editor.isActive('textStyle', { color }) ? 'secondary' : 'ghost'} size="icon" className="h-6 w-6 rounded-sm"><div className="h-4 w-4 rounded-sm border" style={{ backgroundColor: color }} /></Button>))}</div></PopoverContent>
+            </Popover>
+            <TooltipButton tooltip="Set Link" onClick={setLink} isActive={editor.isActive('link')}><LinkIcon /></TooltipButton>
+            <TooltipButton tooltip="Add Image" onClick={addImage}><ImageIcon /></TooltipButton>
+            <Separator />
+            <TooltipButton tooltip="Insert Table" onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}><TableIcon /></TooltipButton>
+            <Separator />
+            <TooltipButton tooltip="Undo" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()}><Undo /></TooltipButton>
+            <TooltipButton tooltip="Redo" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()}><Redo /></TooltipButton>
+            <TooltipButton tooltip="Clear Formatting" onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}><Trash2 /></TooltipButton>
+        </TooltipProvider>
     </div>
   );
 };
