@@ -19,7 +19,7 @@ import {
   verticalListSortingStrategy,
   useSortable,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { CSS } from '@d-kit/utilities';
 
 import {
   Award,
@@ -361,12 +361,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-          <Logo />
+          <Logo variant="dashboard" />
         </SidebarHeader>
         <SidebarContent>
            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={menuItems.map(item => item.id)} strategy={verticalListSortingStrategy}>
-              <SidebarMenu>
+              <SidebarMenu className="flex-1">
                 {menuItems.map((item) => (
                   isRearrangeEnabled ? (
                     <SortableSidebarMenuItem key={item.id} item={item} />
