@@ -1,5 +1,4 @@
 
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -1373,14 +1372,14 @@ export async function linkHistoricalData(
     }
 
     const batch = adminDb.batch()
-    projectsSnapshot.forEach((projectDoc) {
+    projectsSnapshot.forEach((projectDoc) => {
       const updateData: { [key: string]: any } = { pi_uid: uid }
       if (institute) updateData.institute = institute
       if (department) updateData.departmentName = department
       if (phoneNumber) updateData.pi_phoneNumber = phoneNumber
 
       batch.update(projectDoc.ref, updateData)
-    })
+    });
 
     await batch.commit()
 
@@ -2705,7 +2704,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, target
     const [imrPiSnapshot, imrCoPiSnapshot, emrCallsSnapshot] = await Promise.all([
       imrPiQuery.get(),
       imrCoPiQuery.get(),
-      emrCallsQuery.get(),
+      emrCallsSnapshot.get(),
     ]);
 
     const imrProjects = new Map<string, Project>();
@@ -2869,5 +2868,7 @@ export async function bulkUploadPapers(
 
 
     
+
+
 
 

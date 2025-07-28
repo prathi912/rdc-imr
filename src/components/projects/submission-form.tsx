@@ -467,6 +467,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                       <FormControl>
                         <Input {...fieldProps} type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} />
                       </FormControl>
+                       <FormDescription>Below 5 MB</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -481,6 +482,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                       <FormControl>
                         <Input {...fieldProps} type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} />
                       </FormControl>
+                      <FormDescription>Below 5 MB</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
