@@ -1373,7 +1373,7 @@ export async function linkHistoricalData(
     }
 
     const batch = adminDb.batch()
-    projectsSnapshot.forEach((projectDoc) => {
+    projectsSnapshot.forEach((projectDoc) {
       const updateData: { [key: string]: any } = { pi_uid: uid }
       if (institute) updateData.institute = institute
       if (department) updateData.departmentName = department
@@ -1824,13 +1824,17 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
       return { success: false, error: "User profile is incomplete. Please update your faculty and department in Settings." };
     }
     
-    // Check if interest already registered
     const interestsRef = adminDb.collection('emrInterests');
     const q = interestsRef.where('callId', '==', callId).where('userId', '==', user.uid);
     const docSnap = await q.get();
     if (!docSnap.empty) {
         return { success: false, error: "You have already registered your interest for this call." };
     }
+    
+    // Check if this is the first registration for this call
+    const allInterestsForCallQuery = interestsRef.where('callId', '==', callId);
+    const allInterestsSnapshot = await allInterestsForCallQuery.get();
+    const isFirstInterest = allInterestsSnapshot.empty;
 
     // Use a transaction to get the next sequential ID
     const newInterest = await adminDb.runTransaction(async (transaction) => {
@@ -1866,12 +1870,36 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
       transaction.set(interestRef, newInterestDoc);
       return { id: interestRef.id, ...newInterestDoc };
     });
+    
+    const callSnap = await adminDb.collection('fundingCalls').doc(callId).get();
+    const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call";
+
+    // If it's the first interest, notify admins
+    if (isFirstInterest) {
+        const adminRoles = ["admin", "Super-admin"];
+        const usersRef = adminDb.collection("users");
+        const adminQuery = usersRef.where("role", "in", adminRoles);
+        const adminUsersSnapshot = await adminQuery.get();
+        
+        if (!adminUsersSnapshot.empty) {
+            const batch = adminDb.batch();
+            const notificationTitle = `First registration for "${callTitle}". Time to schedule a meeting.`;
+            adminUsersSnapshot.forEach((userDoc) => {
+                const notificationRef = adminDb.collection("notifications").doc();
+                batch.set(notificationRef, {
+                    uid: userDoc.id,
+                    title: notificationTitle,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
+                });
+            });
+            await batch.commit();
+        }
+    }
+
 
      // Notify Co-PIs
     if (coPis && coPis.length > 0) {
-        const callSnap = await adminDb.collection('fundingCalls').doc(callId).get();
-        const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call";
-
         const usersRef = adminDb.collection("users");
         const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", coPis.map(p => p.uid));
         const coPiDocs = await usersQuery.get();
@@ -2841,3 +2869,5 @@ export async function bulkUploadPapers(
 
 
     
+
+
