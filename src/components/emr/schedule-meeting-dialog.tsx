@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,9 @@ const scheduleSchema = z.object({
     time: z.string().min(1, "Time is required."),
     venue: z.string().min(3, 'Meeting venue is required.'),
     evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
+});
+
+const applicantsSchema = z.object({
     applicantUids: z.array(z.string()).min(1, 'Please select at least one applicant.'),
 });
 
@@ -42,37 +45,53 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
 
-    const form = useForm<z.infer<typeof scheduleSchema>>({
+    const scheduleForm = useForm<z.infer<typeof scheduleSchema>>({
         resolver: zodResolver(scheduleSchema),
         defaultValues: {
             venue: 'RDC Committee Room, PIMSR',
             evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
-            applicantUids: [],
             date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
             time: call.meetingDetails?.time || '',
         },
     });
 
-    useEffect(() => {
-        form.reset({
-            venue: 'RDC Committee Room, PIMSR',
-            evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
+    const applicantsForm = useForm<z.infer<typeof applicantsSchema>>({
+        resolver: zodResolver(applicantsSchema),
+        defaultValues: {
             applicantUids: [],
-            date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
-            time: call.meetingDetails?.time || '',
-        });
-    }, [call, form]);
+        }
+    });
 
-    const handleBatchSchedule = async (values: z.infer<typeof scheduleSchema>) => {
+    useEffect(() => {
+        if (isOpen) {
+            scheduleForm.reset({
+                venue: 'RDC Committee Room, PIMSR',
+                evaluatorUids: call.meetingDetails?.assignedEvaluators || [],
+                date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
+                time: call.meetingDetails?.time || '',
+            });
+            applicantsForm.reset({
+                applicantUids: [],
+            });
+        }
+    }, [call, isOpen, scheduleForm, applicantsForm]);
+
+    const handleScheduleSubmit = async (scheduleValues: z.infer<typeof scheduleSchema>) => {
+        const applicantUids = applicantsForm.getValues('applicantUids');
+        if (applicantUids.length === 0) {
+            applicantsForm.setError('applicantUids', { type: 'manual', message: 'Please select at least one applicant.' });
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             const meetingDetails = {
-                date: format(values.date, 'yyyy-MM-dd'),
-                time: values.time,
-                venue: values.venue,
-                evaluatorUids: values.evaluatorUids,
+                date: format(scheduleValues.date, 'yyyy-MM-dd'),
+                time: scheduleValues.time,
+                venue: scheduleValues.venue,
+                evaluatorUids: scheduleValues.evaluatorUids,
             };
-            const result = await scheduleEmrMeeting(call.id, meetingDetails, values.applicantUids);
+            const result = await scheduleEmrMeeting(call.id, meetingDetails, applicantUids);
 
             if (result.success) {
                 toast({ title: 'Success', description: 'Meeting slots scheduled and participants notified.' });
@@ -82,7 +101,7 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                 toast({ variant: 'destructive', title: 'Error', description: result.error });
             }
         } catch (error) {
-            console.error('Error scheduling batch meeting:', error);
+            console.error('Error scheduling meeting:', error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not schedule meeting.' });
         } finally {
             setIsSubmitting(false);
@@ -99,26 +118,27 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                     <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
                     <DialogDescription>Select applicants and set the details for the evaluation meeting.</DialogDescription>
                 </DialogHeader>
-                <Form {...form}>
-                    <form id="schedule-form" onSubmit={form.handleSubmit(handleBatchSchedule)} className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
-                        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
+                    <Form {...applicantsForm}>
+                        <form id="applicants-form" className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                             <h4 className="font-semibold">Select Applicants</h4>
                             <FormField
-                                control={form.control}
+                                control={applicantsForm.control}
                                 name="applicantUids"
-                                render={({ field }) => (
+                                render={() => (
                                     <FormItem>
                                         <div className="flex items-center space-x-2 p-2 border-b">
                                             <Checkbox
-                                                checked={field.value?.length === usersWithInterest.length && usersWithInterest.length > 0}
-                                                onCheckedChange={(checked) => field.onChange(checked ? usersWithInterest.map(i => i.userId) : [])}
+                                                id="select-all-applicants"
+                                                checked={applicantsForm.watch('applicantUids')?.length === usersWithInterest.length && usersWithInterest.length > 0}
+                                                onCheckedChange={(checked) => applicantsForm.setValue('applicantUids', checked ? usersWithInterest.map(i => i.userId) : [])}
                                             />
-                                            <FormLabel className="font-medium">Select All</FormLabel>
+                                            <FormLabel htmlFor="select-all-applicants" className="font-medium">Select All</FormLabel>
                                         </div>
                                         {usersWithInterest.map(interest => (
                                             <FormField
                                                 key={interest.id}
-                                                control={form.control}
+                                                control={applicantsForm.control}
                                                 name="applicantUids"
                                                 render={({ field }) => (
                                                     <FormItem className="flex items-center space-x-2 p-2 border-b">
@@ -141,20 +161,20 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                                     </FormItem>
                                 )}
                             />
-                        </div>
-                        <div className="space-y-4">
-                             <FormField name="date" control={form.control} render={({ field }) => ( 
+                        </form>
+                    </Form>
+                    <Form {...scheduleForm}>
+                        <form id="schedule-form" onSubmit={scheduleForm.handleSubmit(handleScheduleSubmit)} className="space-y-4">
+                             <FormField name="date" control={scheduleForm.control} render={({ field }) => ( 
                                 <FormItem className="flex flex-col">
                                     <FormLabel>Meeting Date</FormLabel>
                                     <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                                         <PopoverTrigger asChild>
                                             <FormControl>
-                                                <div>
-                                                    <Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>
-                                                        {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
-                                                        <Calendar className="ml-auto h-4 w-4 opacity-50" />
-                                                    </Button>
-                                                </div>
+                                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>
+                                                    {field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}
+                                                    <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                                                </Button>
                                             </FormControl>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0" align="start">
@@ -164,10 +184,10 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                                     <FormMessage />
                                 </FormItem> 
                             )} />
-                             <FormField name="time" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                             <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                             <FormField name="time" control={scheduleForm.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                             <FormField name="venue" control={scheduleForm.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                              <FormField
-                                control={form.control}
+                                control={scheduleForm.control}
                                 name="evaluatorUids"
                                 render={({ field }) => (
                                     <FormItem className="flex flex-col">
@@ -201,9 +221,9 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                                     </FormItem>
                                 )}
                              />
-                        </div>
-                    </form>
-                </Form>
+                        </form>
+                    </Form>
+                </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                     <Button type="submit" form="schedule-form" disabled={isSubmitting}>
