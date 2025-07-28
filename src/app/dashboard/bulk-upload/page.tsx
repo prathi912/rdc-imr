@@ -29,7 +29,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 
 type ProjectData = {
-  projectId: string;
   pi_email: string;
   project_title: string;
   status: string;
@@ -93,7 +92,7 @@ export default function BulkUploadPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['projectId', 'pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty', 'Institute', 'sanction_number'];
+        const requiredColumns = ['pi_email', 'project_title', 'status', 'grant_amount', 'sanction_date', 'Name_of_staff', 'Faculty', 'Institute', 'sanction_number'];
         
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
@@ -109,7 +108,6 @@ export default function BulkUploadPage() {
         }
 
         const formattedData = jsonData.map(row => ({
-          projectId: String(row.projectId || ''),
           pi_email: String(row.pi_email || ''),
           project_title: String(row.project_title || ''),
           status: String(row.status || ''),
@@ -184,7 +182,7 @@ export default function BulkUploadPage() {
       return;
     }
     const dataToExport = history.map(p => ({
-        'Project ID': p.projectId || p.id,
+        'Project ID': p.id,
         'Project Title': p.title,
         'PI Name': p.pi,
         'PI Email': p.pi_email,
@@ -219,7 +217,6 @@ export default function BulkUploadPage() {
               <AlertTitle>Important: File Format</AlertTitle>
               <AlertDescription>
                 Your Excel file must contain these columns: 
-                <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">projectId</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">pi_email</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">project_title</code>, 
                 <code className="font-mono text-sm bg-muted p-1 rounded-sm mx-1">status</code>, 
@@ -286,7 +283,6 @@ export default function BulkUploadPage() {
                     <Table>
                         <TableHeader>
                         <TableRow>
-                            <TableHead>Project ID</TableHead>
                             <TableHead>PI Name</TableHead>
                             <TableHead>Project Title</TableHead>
                             <TableHead>Institute</TableHead>
@@ -297,7 +293,6 @@ export default function BulkUploadPage() {
                         <TableBody>
                         {data.map((row, index) => (
                             <TableRow key={index}>
-                            <TableCell>{row.projectId}</TableCell>
                             <TableCell>{row.Name_of_staff}</TableCell>
                             <TableCell className="font-medium">{row.project_title}</TableCell>
                             <TableCell>{row.Institute}</TableCell>
@@ -341,7 +336,6 @@ export default function BulkUploadPage() {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Project ID</TableHead>
                             <TableHead>Project Title</TableHead>
                             <TableHead>PI Email</TableHead>
                             <TableHead>Sanction Date</TableHead>
@@ -351,7 +345,6 @@ export default function BulkUploadPage() {
                     <TableBody>
                         {history.map((project) => (
                             <TableRow key={project.id}>
-                                <TableCell className="font-medium">{project.projectId || project.id}</TableCell>
                                 <TableCell className="font-medium">{project.title}</TableCell>
                                 <TableCell>{project.pi_email}</TableCell>
                                 <TableCell>{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
