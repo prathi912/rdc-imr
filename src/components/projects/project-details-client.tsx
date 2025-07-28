@@ -1022,7 +1022,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     )}
                 </dd>
                 <dt className="font-medium text-muted-foreground">Email</dt>
-                <dd>{project.pi_email || "N/A"}</dd>
+                <dd className="break-all">{project.pi_email || "N/A"}</dd>
                 <dt className="font-medium text-muted-foreground">Phone</dt>
                 <dd>{project.pi_phoneNumber || "N/A"}</dd>
                 <dt className="font-medium text-muted-foreground">Faculty</dt>
