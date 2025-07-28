@@ -380,12 +380,12 @@ export default function AllProjectsPage() {
         )}
       </PageHeader>
       
-      <div className="flex flex-col sm:flex-row items-center py-4 gap-2 sm:gap-4">
+      <div className="flex flex-col sm:flex-row flex-wrap items-center py-4 gap-2 sm:gap-4">
         <Input
             placeholder="Filter by title or PI..."
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            className="w-full sm:max-w-xs"
+            className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-xs"
         />
         <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
