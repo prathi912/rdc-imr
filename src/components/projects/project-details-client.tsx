@@ -676,8 +676,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle className="text-2xl">{project.title}</CardTitle>
-              <CardDescription>Submitted on {formatDate(project.submissionDate)}</CardDescription>
+              <p className="text-sm text-muted-foreground">Submitted on {formatDate(project.submissionDate)}</p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
               <Badge variant={statusVariant[project.status] || "secondary"} className="text-sm px-3 py-1">
