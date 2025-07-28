@@ -283,7 +283,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const segments = pathname.split('/');
       const lastSegment = segments.pop() || 'dashboard';
 
-      if(lastSegment === 'project' && segments.includes('dashboard')) return "Project Details";
+      if(pathname.includes('/dashboard/project/')) return "Project Details";
       if(pathname.includes('/dashboard/incentive-claim')) return "Incentive Claims";
       if(pathname.includes('/dashboard/manage-incentive-claims')) return "Manage Incentive Claims";
       if(pathname.includes('/dashboard/emr-management')) return "EMR Management";
