@@ -429,7 +429,7 @@ export default function ProfileSetupPage() {
                       </FormItem>
                     );
                   }} />
-                  <FormField name="institute" control={form.control} render={({ field }) => {
+ <FormField name="institute" control={form.control} render={({ field }) => {
                     const instituteOptions = form.getValues("campus") === "Goa" ? goaInstitutes : institutes;
                     return (
                       <FormItem>
@@ -450,25 +450,8 @@ export default function ProfileSetupPage() {
                       </FormItem>
                     );
                   }} />
-
                   <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
                    {/* Removed duplicate faculty field here since it's rendered conditionally above */}
-                  <FormField name="institute" control={form.control} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Institute</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                     <SelectValue placeholder="Select your institute" />
-                       </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {institutes.map(i => 
-                          <SelectItem key={i} value={i}>{i}</SelectItem>)}
-                          </SelectContent></Select><FormMessage />
-                          </FormItem>
-                  )} />
-                 {/* Removed duplicate institute field here since it's rendered conditionally above */}
                   {userType !== 'Institutional' && (
                      <FormField
                       control={form.control}

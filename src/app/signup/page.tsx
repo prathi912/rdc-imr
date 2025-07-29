@@ -45,7 +45,7 @@ const signupSchema = z.object({
     )
     .refine(
       (email) => {
-        if (email === 'rathipranav07@gmail.com') return true;
+        if (email === 'rathipranav07@gmail.com' || email === 'vicepresident_86@paruluniversity.ac.in') return true;
         return !/^\d+$/.test(email.split('@')[0]);
       }, 'Access is for faculty members only. Student accounts are not permitted.'
     ),
@@ -99,7 +99,12 @@ export default function SignupPage() {
     let profileComplete = false;
     let notifyRole: string | null = null;
 
-    if (staffResult.success) {
+    if (firebaseUser.email === 'vicepresident_86@paruluniversity.ac.in') {
+        role = 'Super-admin';
+        designation = 'Super-admin';
+        profileComplete = true;
+        notifyRole = 'Super-admin';
+    } else if (staffResult.success) {
         userDataFromExcel = staffResult.data;
         const userType = staffResult.data.type;
         
@@ -211,7 +216,7 @@ export default function SignupPage() {
 
       const isAllowedDomain = email && (email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com');
       
-      if (email && /^\d+$/.test(email.split('@')[0]) && email !== 'rathipranav07@gmail.com') {
+      if (email && /^\d+$/.test(email.split('@')[0]) && email !== 'rathipranav07@gmail.com' && email !== 'vicepresident_86@paruluniversity.ac.in') {
         await signOut(auth);
         toast({ variant: 'destructive', title: 'Access Denied', description: 'Access is for faculty members only. Student accounts are not permitted.' });
         setIsSubmitting(false);
