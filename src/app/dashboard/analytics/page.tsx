@@ -262,6 +262,8 @@ export default function AnalyticsPage() {
     let projectsToProcess = projectsWithGrants;
     if ((user?.role === 'Super-admin' || user?.role === 'admin') && grantFacultyFilter !== 'all') {
         projectsToProcess = projectsWithGrants.filter(p => p.faculty === grantFacultyFilter);
+    } else if (user?.role === 'CRO' && facultyFilter !== 'all') {
+        projectsToProcess = projectsWithGrants.filter(p => p.faculty === facultyFilter);
     }
     
     const yearlyData = projectsToProcess.reduce((acc, project) => {
@@ -275,7 +277,7 @@ export default function AnalyticsPage() {
     }, {} as Record<string, any>);
 
     return Object.values(yearlyData).sort((a, b) => parseInt(a.year) - parseInt(b.year));
-  }, [projects, user, grantFacultyFilter, aggregationKey]);
+  }, [projects, user, grantFacultyFilter, facultyFilter, aggregationKey]);
 
   const grantAmountConfig = useMemo(() => {
     const keys = new Set<string>();
