@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell } from 'recharts';
@@ -11,9 +11,11 @@ import { db } from '@/lib/config';
 import { collection, query, where, getDocs, onSnapshot, or } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, getYear } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, Download } from 'lucide-react';
 import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { toPng } from 'html-to-image';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB"];
@@ -26,7 +28,25 @@ export default function AnalyticsPage() {
   const [facultyFilter, setFacultyFilter] = useState('all');
   const [timeRange, setTimeRange] = useState<string>('last6months');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
+  
+  const statusChartRef = useRef<HTMLDivElement>(null);
+  const submissionsTimeChartRef = useRef<HTMLDivElement>(null);
+  const submissionsYearChartRef = useRef<HTMLDivElement>(null);
+  const projectsByGroupChartRef = useRef<HTMLDivElement>(null);
 
+  const handleExport = useCallback((ref: React.RefObject<HTMLDivElement>, fileName: string) => {
+    if (!ref.current) return;
+    toPng(ref.current, { cacheBust: true, backgroundColor: 'hsl(var(--card))' })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = `${fileName}.png`;
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((err) => {
+        console.error('oops, something went wrong!', err);
+      });
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -292,11 +312,16 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
         <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Project Status Distribution</CardTitle>
-            <CardDescription>A summary of all projects by their current status.</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Project Status Distribution</CardTitle>
+              <CardDescription>A summary of all projects by their current status.</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => handleExport(statusChartRef, 'project_status_distribution')}>
+              <Download className="mr-2 h-4 w-4" /> Export PNG
+            </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent ref={statusChartRef} className="bg-card">
             <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -324,20 +349,23 @@ export default function AnalyticsPage() {
                     : `Monthly project submissions for ${timeRange}.`}
                 </CardDescription>
               </div>
-              <Select value={timeRange} onValueChange={setTimeRange}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Select time range" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="last6months">Last 6 Months</SelectItem>
-                  {availableYears.map(year => (
-                    <SelectItem key={year} value={year}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select value={timeRange} onValueChange={setTimeRange}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Select time range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="last6months">Last 6 Months</SelectItem>
+                    {availableYears.map(year => (
+                      <SelectItem key={year} value={year}>{year}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                 <Button variant="outline" size="icon" onClick={() => handleExport(submissionsTimeChartRef, 'submissions_over_time')}><Download className="h-4 w-4" /></Button>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent ref={submissionsTimeChartRef} className="bg-card pt-4">
             <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
               <LineChart accessibilityLayer data={submissionsData} margin={{ left: 12, right: 12 }}>
                 <CartesianGrid vertical={false} />
@@ -350,11 +378,14 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
         <Card>
-          <CardHeader>
-            <CardTitle>Submissions by Year</CardTitle>
-            <CardDescription>Total projects submitted each year.</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Submissions by Year</CardTitle>
+              <CardDescription>Total projects submitted each year.</CardDescription>
+            </div>
+             <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'submissions_by_year')}><Download className="h-4 w-4" /></Button>
           </CardHeader>
-          <CardContent>
+          <CardContent ref={submissionsYearChartRef} className="bg-card pt-4">
              <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
               <BarChart accessibilityLayer data={submissionsByYearData}>
                 <CartesianGrid vertical={false} />
@@ -369,11 +400,14 @@ export default function AnalyticsPage() {
       </div>
       <div className="mt-8 grid gap-6 md:grid-cols-1">
         <Card>
-          <CardHeader>
-            <CardTitle>Projects by {aggregationLabel}</CardTitle>
-            <CardDescription>Total projects submitted by each {aggregationLabel.toLowerCase()}.</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Projects by {aggregationLabel}</CardTitle>
+              <CardDescription>Total projects submitted by each {aggregationLabel.toLowerCase()}.</CardDescription>
+            </div>
+            <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group')}><Download className="h-4 w-4" /></Button>
           </CardHeader>
-          <CardContent>
+          <CardContent ref={projectsByGroupChartRef} className="bg-card pt-4">
              <ChartContainer config={projectsByGroupConfig} className="h-[300px] w-full">
               <BarChart accessibilityLayer data={projectsByGroupData} layout="vertical" margin={{left: 30}}>
                 <CartesianGrid horizontal={false} />
