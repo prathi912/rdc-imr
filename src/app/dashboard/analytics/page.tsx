@@ -25,7 +25,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
-  const [grantGroupFilter, setGrantGroupFilter] = useState<string>('all');
+  const [grantGroupFilter, setGrantGroupFilter] = useState<string>('');
   const [timeRange, setTimeRange] = useState<string>('last6months');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   
@@ -96,8 +96,6 @@ export default function AnalyticsPage() {
     const unsubscribe = onSnapshot(projectsQuery, (snapshot) => {
         let projectList: Project[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         
-        // This is a special fallback for principals if their direct institute match returns no results.
-        // It's less efficient but handles potential mismatches in institute names.
         if (isPrincipal && user.institute && snapshot.empty) {
             const allProjectsQuery = query(collection(db, 'projects'));
             onSnapshot(allProjectsQuery, (allSnapshot) => {
@@ -158,7 +156,6 @@ export default function AnalyticsPage() {
         });
     }
 
-    // Handle year selection
     const year = parseInt(timeRange, 10);
     const months = Array.from({ length: 12 }, (_, i) => format(new Date(year, i, 1), 'MMM'));
     return months.map((monthName, monthIndex) => {
@@ -260,11 +257,17 @@ export default function AnalyticsPage() {
     return { grantAggregationKey: key, grantAggregationLabel: label, grantFilterOptions: options };
   }, [user, filteredProjects, projects]);
   
+  useEffect(() => {
+    if (!grantGroupFilter && grantFilterOptions.length > 0) {
+      setGrantGroupFilter(grantFilterOptions[0]);
+    }
+  }, [grantFilterOptions, grantGroupFilter]);
+
   const grantAmountData = useMemo(() => {
     const projectsWithGrants = projects.filter(p => p.grant?.totalAmount);
     
     let projectsToProcess = projectsWithGrants;
-    if (grantGroupFilter !== 'all') {
+    if (grantGroupFilter) {
       projectsToProcess = projectsWithGrants.filter(p => p[grantAggregationKey] === grantGroupFilter);
     } else if (user?.role === 'CRO') {
       projectsToProcess = projectsWithGrants.filter(p => p.faculty === facultyFilter);
@@ -283,7 +286,7 @@ export default function AnalyticsPage() {
   }, [projects, grantGroupFilter, facultyFilter, grantAggregationKey, user?.role]);
 
   const grantAmountConfig = {
-    amount: { label: grantGroupFilter === 'all' ? `All ${grantAggregationLabel}s` : grantGroupFilter, color: 'hsl(var(--primary))' },
+    amount: { label: grantGroupFilter, color: 'hsl(var(--primary))' },
   } satisfies ChartConfig;
 
 
@@ -332,7 +335,7 @@ export default function AnalyticsPage() {
     <div className="container mx-auto py-10">
       <PageHeader title={getPageTitle()} description={getPageDescription()}>
           {isCro && user.faculties && user.faculties.length > 1 && (
-            <Select value={facultyFilter} onValueChange={(value) => { setFacultyFilter(value); setGrantGroupFilter('all'); }}>
+            <Select value={facultyFilter} onValueChange={(value) => { setFacultyFilter(value); setGrantGroupFilter(''); }}>
                 <SelectTrigger className="w-full sm:w-[280px]">
                     <SelectValue placeholder="Filter by faculty" />
                 </SelectTrigger>
@@ -461,7 +464,6 @@ export default function AnalyticsPage() {
                     <SelectValue placeholder={`Filter by ${grantAggregationLabel.toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All {grantAggregationLabel}s</SelectItem>
                     {grantFilterOptions.map(option => (
                       <SelectItem key={option} value={option}>{option}</SelectItem>
                     ))}
