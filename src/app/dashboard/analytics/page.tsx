@@ -20,29 +20,12 @@ import { toPng } from 'html-to-image';
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
 
-const ALL_FACULTIES = [
-    "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
-    "Faculty of IT & Computer Science", "Faculty of Agriculture", "Faculty of Architecture & Planning",
-    "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
-    "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
-    "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
-    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
-    "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal",
-    "Faculty of Engineering, IT & CS", // Goa
-    "Faculty of Management Studies", // Goa
-    "Faculty of Pharmacy", // Goa
-    "Faculty of Applied and Health Sciences", // Goa
-    "Faculty of Nursing", // Goa
-    "Faculty of Physiotherapy" // Goa
-];
-
-
 export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
-  const [grantFacultyFilter, setGrantFacultyFilter] = useState<string>('all');
+  const [grantGroupFilter, setGrantGroupFilter] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<string>('last6months');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   
@@ -256,46 +239,53 @@ export default function AnalyticsPage() {
     return config;
   }, [statusDistributionData]);
 
+  // --- Grant Chart Data & Config ---
+  const { grantAggregationKey, grantAggregationLabel, grantFilterOptions } = useMemo(() => {
+    let key: keyof Project = 'faculty';
+    let label = 'Faculty';
+    let options: string[] = [];
+  
+    if (user?.role === 'CRO') {
+      key = 'institute';
+      label = 'Institute';
+      options = [...new Set(filteredProjects.map(p => p.institute).filter(Boolean) as string[])].sort();
+    } else if (user?.designation === 'Principal' || user?.designation === 'HOD') {
+      key = 'departmentName';
+      label = 'Department';
+      options = [...new Set(filteredProjects.map(p => p.departmentName).filter(Boolean) as string[])].sort();
+    } else { // Admin/Super-admin
+      options = [...new Set(projects.map(p => p.faculty).filter(Boolean) as string[])].sort();
+    }
+  
+    return { grantAggregationKey: key, grantAggregationLabel: label, grantFilterOptions: options };
+  }, [user, filteredProjects, projects]);
+  
   const grantAmountData = useMemo(() => {
     const projectsWithGrants = projects.filter(p => p.grant?.totalAmount);
-
+    
     let projectsToProcess = projectsWithGrants;
-    if ((user?.role === 'Super-admin' || user?.role === 'admin') && grantFacultyFilter !== 'all') {
-        projectsToProcess = projectsWithGrants.filter(p => p.faculty === grantFacultyFilter);
-    } else if (user?.role === 'CRO' && facultyFilter !== 'all') {
-        projectsToProcess = projectsWithGrants.filter(p => p.faculty === facultyFilter);
+    if (grantGroupFilter !== 'all') {
+      projectsToProcess = projectsWithGrants.filter(p => p[grantAggregationKey] === grantGroupFilter);
+    } else if (user?.role === 'CRO') {
+      projectsToProcess = projectsWithGrants.filter(p => p.faculty === facultyFilter);
     }
-    
+  
     const yearlyData = projectsToProcess.reduce((acc, project) => {
-        const year = getYear(parseISO(project.submissionDate));
-        const group = project[aggregationKey as keyof Project] as string || 'Unknown';
-        if (!acc[year]) {
-            acc[year] = { year: String(year) };
-        }
-        acc[year][group] = (acc[year][group] || 0) + project.grant!.totalAmount;
-        return acc;
-    }, {} as Record<string, any>);
-
+      const year = getYear(parseISO(project.submissionDate));
+      if (!acc[year]) {
+        acc[year] = { year: String(year), amount: 0 };
+      }
+      acc[year].amount += project.grant!.totalAmount;
+      return acc;
+    }, {} as Record<string, { year: string; amount: number }>);
+  
     return Object.values(yearlyData).sort((a, b) => parseInt(a.year) - parseInt(b.year));
-  }, [projects, user, grantFacultyFilter, facultyFilter, aggregationKey]);
+  }, [projects, grantGroupFilter, facultyFilter, grantAggregationKey, user?.role]);
 
-  const grantAmountConfig = useMemo(() => {
-    const keys = new Set<string>();
-    grantAmountData.forEach(yearData => {
-        Object.keys(yearData).forEach(key => {
-            if (key !== 'year') keys.add(key);
-        });
-    });
-    
-    const config: ChartConfig = {};
-    Array.from(keys).forEach((key, index) => {
-        config[key] = {
-            label: key,
-            color: COLORS[index % COLORS.length],
-        };
-    });
-    return config;
-  }, [grantAmountData]);
+  const grantAmountConfig = {
+    amount: { label: grantGroupFilter === 'all' ? `All ${grantAggregationLabel}s` : grantGroupFilter, color: 'hsl(var(--primary))' },
+  } satisfies ChartConfig;
+
 
   const totalGrantAmount = useMemo(() => {
     return filteredProjects.reduce((acc, project) => {
@@ -304,7 +294,6 @@ export default function AnalyticsPage() {
   }, [filteredProjects]);
 
   const isCro = user?.role === 'CRO';
-  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
 
   const getPageTitle = () => {
       if (isCro) {
@@ -343,7 +332,7 @@ export default function AnalyticsPage() {
     <div className="container mx-auto py-10">
       <PageHeader title={getPageTitle()} description={getPageDescription()}>
           {isCro && user.faculties && user.faculties.length > 1 && (
-            <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+            <Select value={facultyFilter} onValueChange={(value) => { setFacultyFilter(value); setGrantGroupFilter('all'); }}>
                 <SelectTrigger className="w-full sm:w-[280px]">
                     <SelectValue placeholder="Filter by faculty" />
                 </SelectTrigger>
@@ -463,18 +452,18 @@ export default function AnalyticsPage() {
           <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-2">
             <div>
               <CardTitle>Grant Amount Awarded Over Years</CardTitle>
-              <CardDescription>Total grant amount disbursed each year, broken down by {aggregationLabel.toLowerCase()}.</CardDescription>
+              <CardDescription>Total grant amount disbursed each year for the selected {grantAggregationLabel.toLowerCase()}.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              {isAdminOrSuperAdmin && (
-                <Select value={grantFacultyFilter} onValueChange={setGrantFacultyFilter}>
+              {grantFilterOptions.length > 0 && (
+                <Select value={grantGroupFilter} onValueChange={setGrantGroupFilter}>
                   <SelectTrigger className="w-full sm:w-[280px]">
-                    <SelectValue placeholder="Filter by faculty" />
+                    <SelectValue placeholder={`Filter by ${grantAggregationLabel.toLowerCase()}`} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Faculties</SelectItem>
-                    {[...new Set(ALL_FACULTIES)].sort().map(faculty => (
-                      <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                    <SelectItem value="all">All {grantAggregationLabel}s</SelectItem>
+                    {grantFilterOptions.map(option => (
+                      <SelectItem key={option} value={option}>{option}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -489,10 +478,7 @@ export default function AnalyticsPage() {
                     <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
                     <YAxis tickFormatter={(value) => `₹${Number(value) / 100000}L`} />
                     <Tooltip content={<ChartTooltipContent formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} />} />
-                    <Legend />
-                    {Object.keys(grantAmountConfig).map(key => (
-                       <Bar key={key} dataKey={key} stackId="a" fill={`var(--color-${key})`} radius={4} />
-                    ))}
+                    <Bar dataKey="amount" fill="var(--color-amount)" radius={4} />
                 </BarChart>
             </ChartContainer>
           </CardContent>

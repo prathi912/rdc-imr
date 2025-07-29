@@ -541,7 +541,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
                 <p style="color:#e0e0e0;">
                   You can view your claims on the 
                   <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim" style="color:#64b5f6; text-decoration:underline;">
-                    
+                 PU Research Projects Portal             
                   </a>.
                 </p>
                 ${EMAIL_STYLES.footer}
@@ -662,7 +662,7 @@ export async function scheduleMeeting(
                     <p style="color: #cccccc;">
                         You can access your evaluation queue on the
                         <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="color: #64b5f6; text-decoration: underline;">
-                        PU Research Portal
+                       
                         </a>.
                     </p>
                     ${EMAIL_STYLES.footer}
