@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
@@ -18,7 +18,23 @@ import { Button } from '@/components/ui/button';
 import { toPng } from 'html-to-image';
 
 
-const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB"];
+const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
+
+const ALL_FACULTIES = [
+    "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
+    "Faculty of IT & Computer Science", "Faculty of Agriculture", "Faculty of Architecture & Planning",
+    "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
+    "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
+    "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
+    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
+    "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal",
+    "Faculty of Engineering, IT & CS", // Goa
+    "Faculty of Management Studies", // Goa
+    "Faculty of Pharmacy", // Goa
+    "Faculty of Applied and Health Sciences", // Goa
+    "Faculty of Nursing", // Goa
+    "Faculty of Physiotherapy" // Goa
+];
 
 
 export default function AnalyticsPage() {
@@ -26,6 +42,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
+  const [grantFacultyFilter, setGrantFacultyFilter] = useState<string>('all');
   const [timeRange, setTimeRange] = useState<string>('last6months');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   
@@ -33,6 +50,7 @@ export default function AnalyticsPage() {
   const submissionsTimeChartRef = useRef<HTMLDivElement>(null);
   const submissionsYearChartRef = useRef<HTMLDivElement>(null);
   const projectsByGroupChartRef = useRef<HTMLDivElement>(null);
+  const grantAmountChartRef = useRef<HTMLDivElement>(null);
 
   const handleExport = useCallback((ref: React.RefObject<HTMLDivElement>, fileName: string) => {
     if (!ref.current) return;
@@ -238,6 +256,45 @@ export default function AnalyticsPage() {
     return config;
   }, [statusDistributionData]);
 
+  const grantAmountData = useMemo(() => {
+    const projectsWithGrants = projects.filter(p => p.grant?.totalAmount);
+
+    let projectsToProcess = projectsWithGrants;
+    if ((user?.role === 'Super-admin' || user?.role === 'admin') && grantFacultyFilter !== 'all') {
+        projectsToProcess = projectsWithGrants.filter(p => p.faculty === grantFacultyFilter);
+    }
+    
+    const yearlyData = projectsToProcess.reduce((acc, project) => {
+        const year = getYear(parseISO(project.submissionDate));
+        const group = project[aggregationKey as keyof Project] as string || 'Unknown';
+        if (!acc[year]) {
+            acc[year] = { year: String(year) };
+        }
+        acc[year][group] = (acc[year][group] || 0) + project.grant!.totalAmount;
+        return acc;
+    }, {} as Record<string, any>);
+
+    return Object.values(yearlyData).sort((a, b) => parseInt(a.year) - parseInt(b.year));
+  }, [projects, user, grantFacultyFilter, aggregationKey]);
+
+  const grantAmountConfig = useMemo(() => {
+    const keys = new Set<string>();
+    grantAmountData.forEach(yearData => {
+        Object.keys(yearData).forEach(key => {
+            if (key !== 'year') keys.add(key);
+        });
+    });
+    
+    const config: ChartConfig = {};
+    Array.from(keys).forEach((key, index) => {
+        config[key] = {
+            label: key,
+            color: COLORS[index % COLORS.length],
+        };
+    });
+    return config;
+  }, [grantAmountData]);
+
   const totalGrantAmount = useMemo(() => {
     return filteredProjects.reduce((acc, project) => {
         return acc + (project.grant?.totalAmount || 0);
@@ -245,6 +302,7 @@ export default function AnalyticsPage() {
   }, [filteredProjects]);
 
   const isCro = user?.role === 'CRO';
+  const isAdminOrSuperAdmin = user?.role === 'admin' || user?.role === 'Super-admin';
 
   const getPageTitle = () => {
       if (isCro) {
@@ -394,6 +452,46 @@ export default function AnalyticsPage() {
                 <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
                 <Bar dataKey="submissions" fill="var(--color-submissions)" radius={4} />
               </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+       <div className="mt-8 grid gap-6 md:grid-cols-1">
+        <Card>
+          <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-2">
+            <div>
+              <CardTitle>Grant Amount Awarded Over Years</CardTitle>
+              <CardDescription>Total grant amount disbursed each year, broken down by {aggregationLabel.toLowerCase()}.</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              {isAdminOrSuperAdmin && (
+                <Select value={grantFacultyFilter} onValueChange={setGrantFacultyFilter}>
+                  <SelectTrigger className="w-full sm:w-[280px]">
+                    <SelectValue placeholder="Filter by faculty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Faculties</SelectItem>
+                    {[...new Set(ALL_FACULTIES)].sort().map(faculty => (
+                      <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year')}><Download className="h-4 w-4" /></Button>
+            </div>
+          </CardHeader>
+          <CardContent ref={grantAmountChartRef} className="bg-card pt-4">
+             <ChartContainer config={grantAmountConfig} className="h-[400px] w-full">
+                <BarChart data={grantAmountData}>
+                    <CartesianGrid vertical={false} />
+                    <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+                    <YAxis tickFormatter={(value) => `₹${Number(value) / 100000}L`} />
+                    <Tooltip content={<ChartTooltipContent formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} />} />
+                    <Legend />
+                    {Object.keys(grantAmountConfig).map(key => (
+                       <Bar key={key} dataKey={key} stackId="a" fill={`var(--color-${key})`} radius={4} />
+                    ))}
+                </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
