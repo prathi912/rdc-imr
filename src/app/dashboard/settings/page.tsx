@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -591,7 +591,8 @@ export default function SettingsPage() {
                 <FormField control={profileForm.control} name="designation" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Designation</FormLabel>
-                    <FormControl><Input placeholder="e.g., Professor" {...field} /></FormControl>
+                    <FormControl><Input placeholder="e.g., Professor" {...field} disabled={isPrincipal} /></FormControl>
+                    {isPrincipal && <FormDescription>The 'Principal' designation cannot be changed.</FormDescription>}
                     <FormMessage />
                   </FormItem>
                 )} />
