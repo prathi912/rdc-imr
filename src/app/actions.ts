@@ -2723,6 +2723,8 @@ export async function generateChartImage(html: string): Promise<{ success: boole
     return { success: true, dataUrl };
   } catch (error: any) {
     console.error("Server-side image generation failed:", error);
-    return { success: false, error: error.message || "Failed to generate chart image on the server." };
+    // Use a simpler string conversion to avoid circular reference issues with complex errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return { success: false, error: `Failed to generate chart image on the server: ${errorMessage}` };
   }
 }
