@@ -19,6 +19,14 @@ import { toPng } from 'html-to-image';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
+const GOA_FACULTIES = [
+    "Faculty of Engineering, IT & CS",
+    "Faculty of Management Studies",
+    "Faculty of Pharmacy",
+    "Faculty of Applied and Health Sciences",
+    "Faculty of Nursing",
+    "Faculty of Physiotherapy"
+];
 
 export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -35,9 +43,34 @@ export default function AnalyticsPage() {
   const projectsByGroupChartRef = useRef<HTMLDivElement>(null);
   const grantAmountChartRef = useRef<HTMLDivElement>(null);
 
-  const handleExport = useCallback((ref: React.RefObject<HTMLDivElement>, fileName: string) => {
+  const handleExport = useCallback((ref: React.RefObject<HTMLDivElement>, fileName: string, captionText: string) => {
     if (!ref.current) return;
-    toPng(ref.current, { cacheBust: true, backgroundColor: 'hsl(var(--card))' })
+
+    const container = document.createElement('div');
+    container.style.padding = '20px';
+    container.style.backgroundColor = 'hsl(var(--card))';
+    container.style.color = 'hsl(var(--card-foreground))';
+    container.style.display = 'inline-block';
+
+    const chartNode = ref.current.cloneNode(true) as HTMLElement;
+    container.appendChild(chartNode);
+
+    const caption = document.createElement('div');
+    caption.textContent = captionText;
+    caption.style.marginTop = '15px';
+    caption.style.fontSize = '12px';
+    caption.style.fontStyle = 'italic';
+    caption.style.color = 'hsl(var(--muted-foreground))';
+    caption.style.textAlign = 'center';
+    caption.style.maxWidth = '100%';
+    container.appendChild(caption);
+
+    // Append to body to render, but keep it off-screen
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    document.body.appendChild(container);
+
+    toPng(container, { cacheBust: true, pixelRatio: 2 })
       .then((dataUrl) => {
         const link = document.createElement('a');
         link.download = `${fileName}.png`;
@@ -46,6 +79,9 @@ export default function AnalyticsPage() {
       })
       .catch((err) => {
         console.error('oops, something went wrong!', err);
+      })
+      .finally(() => {
+        document.body.removeChild(container);
       });
   }, []);
 
@@ -251,7 +287,13 @@ export default function AnalyticsPage() {
       label = 'Department';
       options = [...new Set(filteredProjects.map(p => p.departmentName).filter(Boolean) as string[])].sort();
     } else { // Admin/Super-admin
-      options = [...new Set(projects.map(p => p.faculty).filter(Boolean) as string[])].sort();
+      options = [...new Set(projects.map(p => {
+          const faculty = p.faculty || '';
+          if (GOA_FACULTIES.includes(faculty)) {
+              return `${faculty} (Goa)`;
+          }
+          return faculty;
+      }).filter(Boolean))].sort();
     }
   
     return { grantAggregationKey: key, grantAggregationLabel: label, grantFilterOptions: options };
@@ -267,9 +309,11 @@ export default function AnalyticsPage() {
     const projectsWithGrants = projects.filter(p => p.grant?.totalAmount);
     
     let projectsToProcess = projectsWithGrants;
+
     if (grantGroupFilter) {
-      projectsToProcess = projectsWithGrants.filter(p => p[grantAggregationKey] === grantGroupFilter);
-    } else if (user?.role === 'CRO') {
+      const filterValue = grantGroupFilter.replace(' (Goa)', '');
+      projectsToProcess = projectsWithGrants.filter(p => p[grantAggregationKey] === filterValue);
+    } else if (user?.role === 'CRO' && facultyFilter !== 'all') {
       projectsToProcess = projectsWithGrants.filter(p => p.faculty === facultyFilter);
     }
   
@@ -369,7 +413,7 @@ export default function AnalyticsPage() {
               <CardTitle>Project Status Distribution</CardTitle>
               <CardDescription>A summary of all projects by their current status.</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => handleExport(statusChartRef, 'project_status_distribution')}>
+            <Button variant="outline" size="sm" onClick={() => handleExport(statusChartRef, 'project_status_distribution', 'This chart shows the distribution of all projects based on their current status.')}>
               <Download className="mr-2 h-4 w-4" /> Export PNG
             </Button>
           </CardHeader>
@@ -413,7 +457,7 @@ export default function AnalyticsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                 <Button variant="outline" size="icon" onClick={() => handleExport(submissionsTimeChartRef, 'submissions_over_time')}><Download className="h-4 w-4" /></Button>
+                 <Button variant="outline" size="icon" onClick={() => handleExport(submissionsTimeChartRef, 'submissions_over_time', `This chart shows the trend of monthly project submissions for ${timeRange === 'last6months' ? 'the last 6 months' : `the year ${timeRange}`}.`)}><Download className="h-4 w-4" /></Button>
               </div>
             </div>
           </CardHeader>
@@ -435,7 +479,7 @@ export default function AnalyticsPage() {
               <CardTitle>Submissions by Year</CardTitle>
               <CardDescription>Total projects submitted each year.</CardDescription>
             </div>
-             <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'submissions_by_year')}><Download className="h-4 w-4" /></Button>
+             <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'submissions_by_year', 'This chart displays the total number of projects submitted annually.')}><Download className="h-4 w-4" /></Button>
           </CardHeader>
           <CardContent ref={submissionsYearChartRef} className="bg-card pt-4">
              <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
@@ -470,7 +514,7 @@ export default function AnalyticsPage() {
                   </SelectContent>
                 </Select>
               )}
-              <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year')}><Download className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year', `This chart illustrates the total grant amount awarded each year for the ${grantAggregationLabel.toLowerCase()}: ${grantGroupFilter}.`)}><Download className="h-4 w-4" /></Button>
             </div>
           </CardHeader>
           <CardContent ref={grantAmountChartRef} className="bg-card pt-4">
@@ -493,7 +537,7 @@ export default function AnalyticsPage() {
               <CardTitle>Projects by {aggregationLabel}</CardTitle>
               <CardDescription>Total projects submitted by each {aggregationLabel.toLowerCase()}.</CardDescription>
             </div>
-            <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group')}><Download className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group', `This chart shows the breakdown of project submissions by ${aggregationLabel.toLowerCase()}.`)}><Download className="h-4 w-4" /></Button>
           </CardHeader>
           <CardContent ref={projectsByGroupChartRef} className="bg-card pt-4">
              <ChartContainer config={projectsByGroupConfig} className="h-[300px] w-full">
