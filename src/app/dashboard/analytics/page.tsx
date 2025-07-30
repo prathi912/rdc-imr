@@ -49,31 +49,29 @@ export default function AnalyticsPage() {
 
     const exportNode = ref.current;
     
-    // Temporarily add a caption inside the node to be exported
+    // Create a container for the export content
+    const container = document.createElement('div');
+    container.style.padding = '1rem';
+    container.style.width = `${exportNode.offsetWidth}px`;
+
+    // Clone the chart node to avoid manipulating the live DOM
+    container.appendChild(exportNode.cloneNode(true));
+    
+    // Add the caption
     const caption = document.createElement('div');
     caption.textContent = captionText;
     caption.style.marginTop = '15px';
     caption.style.fontSize = '12px';
     caption.style.fontStyle = 'italic';
-    caption.style.color = 'hsl(var(--muted-foreground))';
     caption.style.textAlign = 'center';
     caption.style.width = '100%';
-    
-    // The container that wraps the chart for consistent background color
-    const container = document.createElement('div');
-    container.style.padding = '1rem';
-    container.style.backgroundColor = document.body.classList.contains('dark') ? 'hsl(224 71% 4%)' : 'hsl(0 0% 100%)';
-    container.appendChild(exportNode.cloneNode(true)); // Clone the node to avoid moving the live chart
+    caption.style.color = document.body.classList.contains('dark') ? 'hsl(var(--muted-foreground))' : 'hsl(var(--muted-foreground))';
     container.appendChild(caption);
-
-    // We append the new container to the body to ensure it's in the DOM for rendering, but make it invisible.
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    document.body.appendChild(container);
 
     toPng(container, { 
         cacheBust: true, 
         pixelRatio: 2,
+        backgroundColor: document.body.classList.contains('dark') ? 'hsl(224 71% 4%)' : 'hsl(0 0% 100%)',
     })
       .then((dataUrl) => {
         const link = document.createElement('a');
@@ -83,10 +81,6 @@ export default function AnalyticsPage() {
       })
       .catch((err) => {
         console.error('Chart export failed:', err);
-      })
-      .finally(() => {
-        // Clean up the temporary container from the body
-        document.body.removeChild(container);
       });
   }, []);
 
@@ -221,7 +215,7 @@ export default function AnalyticsPage() {
     if (filteredProjects.length === 0) return [];
     
     const projectsToCount = submissionsByYearType === 'sanctions'
-        ? filteredProjects.filter(p => (p.status === 'Recommended' || p.status === 'Sanctioned' || p.status === 'In Progress' || p.status === 'Completed') && p.grant)
+        ? filteredProjects.filter(p => ['Recommended', 'In Progress', 'Completed'].includes(p.status) && p.grant)
         : filteredProjects;
 
     const yearCounts = projectsToCount.reduce((acc, project) => {
@@ -430,7 +424,7 @@ export default function AnalyticsPage() {
               <Download className="mr-2 h-4 w-4" /> Export PNG
             </Button>
           </CardHeader>
-          <CardContent ref={statusChartRef} className="bg-card p-4">
+          <CardContent className="bg-card p-4" ref={statusChartRef}>
             <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -474,7 +468,7 @@ export default function AnalyticsPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent ref={submissionsTimeChartRef} className="bg-card pt-4 p-4">
+          <CardContent className="bg-card pt-4 p-4" ref={submissionsTimeChartRef}>
             <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
               <LineChart accessibilityLayer data={submissionsData} margin={{ left: 12, right: 12 }} isAnimationActive={false}>
                 <CartesianGrid vertical={false} />
@@ -503,7 +497,7 @@ export default function AnalyticsPage() {
                 <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'projects_by_year', `This chart displays the total number of projects ${submissionsByYearType} annually.`)}><Download className="h-4 w-4" /></Button>
              </div>
           </CardHeader>
-          <CardContent ref={submissionsYearChartRef} className="bg-card pt-4 p-4">
+          <CardContent className="bg-card pt-4 p-4" ref={submissionsYearChartRef}>
              <ChartContainer config={submissionsByYearType === 'submissions' ? submissionsConfig : sanctionsConfig} className="h-[300px] w-full">
               <BarChart accessibilityLayer data={submissionsByYearData} isAnimationActive={false}>
                 <CartesianGrid vertical={false} />
@@ -539,7 +533,7 @@ export default function AnalyticsPage() {
               <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year', `This chart illustrates the total grant amount awarded each year for the ${grantAggregationLabel.toLowerCase()}: ${grantGroupFilter}.`)}><Download className="h-4 w-4" /></Button>
             </div>
           </CardHeader>
-          <CardContent ref={grantAmountChartRef} className="bg-card pt-4 p-4">
+          <CardContent className="bg-card pt-4 p-4" ref={grantAmountChartRef}>
              <ChartContainer config={grantAmountConfig} className="h-[400px] w-full">
                 <BarChart data={grantAmountData} isAnimationActive={false}>
                     <CartesianGrid vertical={false} />
@@ -561,7 +555,7 @@ export default function AnalyticsPage() {
             </div>
             <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group', `This chart shows the breakdown of project submissions by ${aggregationLabel.toLowerCase()}.`)}><Download className="h-4 w-4" /></Button>
           </CardHeader>
-          <CardContent ref={projectsByGroupChartRef} className="bg-card pt-4 p-4">
+          <CardContent className="bg-card pt-4 p-4" ref={projectsByGroupChartRef}>
              <ChartContainer config={projectsByGroupConfig} className="h-[400px] w-full">
               <BarChart accessibilityLayer data={projectsByGroupData} layout="vertical" margin={{left: 30}} isAnimationActive={false}>
                 <CartesianGrid horizontal={false} />
