@@ -47,17 +47,24 @@ export default function AnalyticsPage() {
   const handleExport = useCallback((ref: React.RefObject<HTMLDivElement>, fileName: string, captionText: string) => {
     if (!ref.current) return;
 
-    // Create a temporary container with a solid background
-    const container = document.createElement('div');
-    container.style.padding = '20px';
-    // Use a specific color for background to ensure consistency, as hsl() might not be parsed correctly by all browsers for this library
-    container.style.backgroundColor = document.body.classList.contains('dark') ? '#0c1322' : '#f5f7fa';
-    container.style.color = 'hsl(var(--card-foreground))';
-    container.style.display = 'inline-block';
+    const originalNode = ref.current;
+    
+    // Create a wrapper that will contain the chart and the caption
+    const exportContainer = document.createElement('div');
+    exportContainer.style.padding = '20px';
+    exportContainer.style.backgroundColor = document.body.classList.contains('dark') ? '#0c1322' : '#ffffff';
+    exportContainer.style.color = document.body.classList.contains('dark') ? 'hsl(var(--card-foreground))' : 'hsl(var(--card-foreground))';
+    exportContainer.style.display = 'inline-block'; // Important for html-to-image to get correct dimensions
 
-    const chartNode = ref.current.cloneNode(true) as HTMLElement;
-    container.appendChild(chartNode);
+    // The parent of the original node will be used to append our export container temporarily
+    const parent = originalNode.parentNode;
+    if (!parent) return;
 
+    // Move the original node into our new container
+    parent.replaceChild(exportContainer, originalNode);
+    exportContainer.appendChild(originalNode);
+    
+    // Create and add the caption to the container
     const caption = document.createElement('div');
     caption.textContent = captionText;
     caption.style.marginTop = '15px';
@@ -65,15 +72,10 @@ export default function AnalyticsPage() {
     caption.style.fontStyle = 'italic';
     caption.style.color = 'hsl(var(--muted-foreground))';
     caption.style.textAlign = 'center';
-    caption.style.maxWidth = '100%';
-    container.appendChild(caption);
+    caption.style.width = '100%';
+    exportContainer.appendChild(caption);
 
-    // Append to body to render, but keep it off-screen
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    document.body.appendChild(container);
-
-    toPng(container, { cacheBust: true, pixelRatio: 2, backgroundColor: container.style.backgroundColor })
+    toPng(exportContainer, { cacheBust: true, pixelRatio: 2, backgroundColor: exportContainer.style.backgroundColor })
       .then((dataUrl) => {
         const link = document.createElement('a');
         link.download = `${fileName}.png`;
@@ -84,7 +86,8 @@ export default function AnalyticsPage() {
         console.error('Chart export failed:', err);
       })
       .finally(() => {
-        document.body.removeChild(container);
+        // IMPORTANT: Put the original node back where it was
+        parent.replaceChild(originalNode, exportContainer);
       });
   }, []);
 
