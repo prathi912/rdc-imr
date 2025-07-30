@@ -19,7 +19,6 @@ import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getDoc, getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
-import * as htmlToImage from 'html-to-image';
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -2716,15 +2715,24 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid:
 
 export async function generateChartImage(html: string): Promise<{ success: boolean; dataUrl?: string; error?: string }> {
   try {
-    const dataUrl = await htmlToImage.toPng(Buffer.from(html), {
-      quality: 0.95,
-      pixelRatio: 2,
+    // This server action is now a pass-through. The logic is in the API route.
+    // This is to maintain the existing client-side structure.
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/export-chart`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html }),
     });
-    return { success: true, dataUrl };
+
+    if (!response.ok) {
+        const errorResult = await response.json();
+        throw new Error(errorResult.error || `Server responded with ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result;
   } catch (error: any) {
-    console.error("Server-side image generation failed:", error);
-    // Use a simpler string conversion to avoid circular reference issues with complex errors
+    console.error("Server-side image generation failed in action:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return { success: false, error: `Failed to generate chart image on the server: ${errorMessage}` };
+    return { success: false, error: `Failed to generate chart image via action: ${errorMessage}` };
   }
 }

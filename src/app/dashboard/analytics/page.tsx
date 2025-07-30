@@ -62,9 +62,9 @@ export default function AnalyticsPage() {
     container.style.backgroundColor = bgColor;
     container.style.border = '1px solid #334155';
     container.style.borderRadius = '0.5rem';
-
-    // Use the chart's outerHTML directly instead of cloning the node
-    container.innerHTML = ref.current.outerHTML;
+    
+    const chartClone = ref.current.cloneNode(true) as HTMLElement;
+    container.appendChild(chartClone);
 
     // Add the caption
     const caption = document.createElement('div');
@@ -440,21 +440,19 @@ export default function AnalyticsPage() {
               <Download className="mr-2 h-4 w-4" /> Export PNG
             </Button>
           </CardHeader>
-          <CardContent className="p-4">
-            <div ref={statusChartRef}>
-                <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
-                            <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} isAnimationActive={false}>
-                                {statusDistributionData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={statusDistributionConfig[entry.name]?.color || '#8884d8'} />
-                                ))}
-                            </Pie>
-                        </PieChart>
-                    </ResponsiveContainer>
-                </ChartContainer>
-            </div>
+          <CardContent className="p-4" ref={statusChartRef}>
+            <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
+                        <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} isAnimationActive={false}>
+                            {statusDistributionData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={statusDistributionConfig[entry.name]?.color || '#8884d8'} />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
+            </ChartContainer>
           </CardContent>
         </Card>
       </div>
@@ -486,18 +484,16 @@ export default function AnalyticsPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-4 p-4">
-             <div ref={submissionsTimeChartRef}>
-                <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
-                  <LineChart accessibilityLayer data={submissionsData} isAnimationActive={false}>
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                    <Line dataKey="submissions" type="monotone" stroke="var(--color-submissions)" strokeWidth={2} dot={true} />
-                  </LineChart>
-                </ChartContainer>
-             </div>
+          <CardContent className="pt-4 p-4" ref={submissionsTimeChartRef}>
+             <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
+              <LineChart accessibilityLayer data={submissionsData} isAnimationActive={false}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
+                <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                <Line dataKey="submissions" type="monotone" stroke="var(--color-submissions)" strokeWidth={2} dot={true} />
+              </LineChart>
+            </ChartContainer>
           </CardContent>
         </Card>
         <Card>
@@ -517,18 +513,16 @@ export default function AnalyticsPage() {
                 <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'projects_by_year', `This chart displays the total number of projects ${submissionsByYearType} annually.`)}><Download className="h-4 w-4" /></Button>
              </div>
           </CardHeader>
-          <CardContent className="pt-4 p-4">
-            <div ref={submissionsYearChartRef}>
-               <ChartContainer config={submissionsByYearType === 'submissions' ? submissionsConfig : sanctionsConfig} className="h-[300px] w-full">
-                <BarChart accessibilityLayer data={submissionsByYearData} isAnimationActive={false}>
-                  <CartesianGrid vertical={false} />
-                  <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
-                  <YAxis allowDecimals={false}/>
-                  <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                  <Bar dataKey="count" fill="var(--color-submissions)" radius={4} />
-                </BarChart>
-              </ChartContainer>
-            </div>
+          <CardContent className="pt-4 p-4" ref={submissionsYearChartRef}>
+            <ChartContainer config={submissionsByYearType === 'submissions' ? submissionsConfig : sanctionsConfig} className="h-[300px] w-full">
+            <BarChart accessibilityLayer data={submissionsByYearData} isAnimationActive={false}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+              <YAxis allowDecimals={false}/>
+              <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+              <Bar dataKey="count" fill="var(--color-submissions)" radius={4} />
+            </BarChart>
+          </ChartContainer>
           </CardContent>
         </Card>
       </div>
@@ -555,18 +549,16 @@ export default function AnalyticsPage() {
               <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year', `This chart illustrates the total grant amount awarded each year for the ${grantAggregationLabel.toLowerCase()}: ${grantGroupFilter}.`)}><Download className="h-4 w-4" /></Button>
             </div>
           </CardHeader>
-          <CardContent className="pt-4 p-4">
-            <div ref={grantAmountChartRef}>
-               <ChartContainer config={grantAmountConfig} className="h-[400px] w-full">
-                  <BarChart data={grantAmountData} isAnimationActive={false}>
-                      <CartesianGrid vertical={false} />
-                      <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
-                      <YAxis tickFormatter={(value) => `₹${Number(value) / 100000}L`} />
-                      <Tooltip content={<ChartTooltipContent formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} />} />
-                      <Bar dataKey="amount" fill="var(--color-amount)" radius={4} />
-                  </BarChart>
-              </ChartContainer>
-            </div>
+          <CardContent className="pt-4 p-4" ref={grantAmountChartRef}>
+            <ChartContainer config={grantAmountConfig} className="h-[400px] w-full">
+              <BarChart data={grantAmountData} isAnimationActive={false}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis tickFormatter={(value) => `₹${Number(value) / 100000}L`} />
+                  <Tooltip content={<ChartTooltipContent formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} />} />
+                  <Bar dataKey="amount" fill="var(--color-amount)" radius={4} />
+              </BarChart>
+            </ChartContainer>
           </CardContent>
         </Card>
       </div>
@@ -579,29 +571,27 @@ export default function AnalyticsPage() {
             </div>
             <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group', `This chart shows the breakdown of project submissions by ${aggregationLabel.toLowerCase()}.`)}><Download className="h-4 w-4" /></Button>
           </CardHeader>
-          <CardContent className="pt-4 p-4">
-            <div ref={projectsByGroupChartRef}>
-               <ChartContainer config={projectsByGroupConfig} className="h-[400px] w-full">
-                <BarChart accessibilityLayer data={projectsByGroupData} layout="vertical" margin={{left: 30}} isAnimationActive={false}>
-                  <CartesianGrid horizontal={false} />
-                  <YAxis
-                    dataKey="group"
-                    type="category"
-                    tickLine={false}
-                    tickMargin={10}
-                    axisLine={false}
-                    width={250}
-                    tick={{ fontSize: 12, width: 240, whiteSpace: 'normal', textAnchor: 'end' }}
-                    interval={0}
-                  />
-                   <XAxis dataKey="projects" type="number" hide allowDecimals={false} />
-                   <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
-                  <Bar dataKey="projects" layout="vertical" fill="var(--color-projects)" radius={4}>
-                     <LabelList dataKey="projects" position="right" offset={8} className="fill-foreground" fontSize={12} />
-                  </Bar>
-                </BarChart>
-              </ChartContainer>
-            </div>
+          <CardContent className="pt-4 p-4" ref={projectsByGroupChartRef}>
+            <ChartContainer config={projectsByGroupConfig} className="h-[400px] w-full">
+            <BarChart accessibilityLayer data={projectsByGroupData} layout="vertical" margin={{left: 30}} isAnimationActive={false}>
+              <CartesianGrid horizontal={false} />
+              <YAxis
+                dataKey="group"
+                type="category"
+                tickLine={false}
+                tickMargin={10}
+                axisLine={false}
+                width={250}
+                tick={{ fontSize: 12, width: 240, whiteSpace: 'normal', textAnchor: 'end' }}
+                interval={0}
+              />
+               <XAxis dataKey="projects" type="number" hide allowDecimals={false} />
+               <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
+              <Bar dataKey="projects" layout="vertical" fill="var(--color-projects)" radius={4}>
+                 <LabelList dataKey="projects" position="right" offset={8} className="fill-foreground" fontSize={12} />
+              </Bar>
+            </BarChart>
+          </ChartContainer>
           </CardContent>
         </Card>
       </div>
