@@ -36,6 +36,7 @@ export default function AnalyticsPage() {
   const [grantGroupFilter, setGrantGroupFilter] = useState<string>('');
   const [timeRange, setTimeRange] = useState<string>('last6months');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
+  const [submissionsByYearType, setSubmissionsByYearType] = useState<'submissions' | 'sanctions'>('submissions');
   
   const statusChartRef = useRef<HTMLDivElement>(null);
   const submissionsTimeChartRef = useRef<HTMLDivElement>(null);
@@ -46,9 +47,11 @@ export default function AnalyticsPage() {
   const handleExport = useCallback((ref: React.RefObject<HTMLDivElement>, fileName: string, captionText: string) => {
     if (!ref.current) return;
 
+    // Create a temporary container with a solid background
     const container = document.createElement('div');
     container.style.padding = '20px';
-    container.style.backgroundColor = 'hsl(var(--card))';
+    // Use a specific color for background to ensure consistency, as hsl() might not be parsed correctly by all browsers for this library
+    container.style.backgroundColor = document.body.classList.contains('dark') ? '#0c1322' : '#f5f7fa';
     container.style.color = 'hsl(var(--card-foreground))';
     container.style.display = 'inline-block';
 
@@ -70,7 +73,7 @@ export default function AnalyticsPage() {
     container.style.left = '-9999px';
     document.body.appendChild(container);
 
-    toPng(container, { cacheBust: true, pixelRatio: 2 })
+    toPng(container, { cacheBust: true, pixelRatio: 2, backgroundColor: container.style.backgroundColor })
       .then((dataUrl) => {
         const link = document.createElement('a');
         link.download = `${fileName}.png`;
@@ -78,7 +81,7 @@ export default function AnalyticsPage() {
         link.click();
       })
       .catch((err) => {
-        console.error('oops, something went wrong!', err);
+        console.error('Chart export failed:', err);
       })
       .finally(() => {
         document.body.removeChild(container);
@@ -208,19 +211,27 @@ export default function AnalyticsPage() {
     submissions: { label: 'Submissions', color: 'hsl(var(--primary))' },
   } satisfies ChartConfig;
 
+  const sanctionsConfig = {
+    sanctions: { label: 'Sanctions', color: 'hsl(var(--primary))' },
+  } satisfies ChartConfig;
+
   const submissionsByYearData = useMemo(() => {
     if (filteredProjects.length === 0) return [];
     
-    const yearCounts = filteredProjects.reduce((acc, project) => {
+    const projectsToCount = submissionsByYearType === 'sanctions'
+        ? filteredProjects.filter(p => (p.status === 'Recommended' || p.status === 'Sanctioned' || p.status === 'In Progress' || p.status === 'Completed') && p.grant)
+        : filteredProjects;
+
+    const yearCounts = projectsToCount.reduce((acc, project) => {
       const year = getYear(parseISO(project.submissionDate));
       acc[year] = (acc[year] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     return Object.entries(yearCounts)
-      .map(([year, count]) => ({ year, submissions: count }))
+      .map(([year, count]) => ({ year, count }))
       .sort((a, b) => parseInt(a.year) - parseInt(b.year));
-  }, [filteredProjects]);
+  }, [filteredProjects, submissionsByYearType]);
 
   const { aggregationKey, aggregationLabel } = useMemo(() => {
     if (user?.role === 'CRO') {
@@ -302,6 +313,8 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (!grantGroupFilter && grantFilterOptions.length > 0) {
       setGrantGroupFilter(grantFilterOptions[0]);
+    } else if (grantFilterOptions.length > 0 && !grantFilterOptions.includes(grantGroupFilter)) {
+      setGrantGroupFilter(grantFilterOptions[0]);
     }
   }, [grantFilterOptions, grantGroupFilter]);
 
@@ -313,8 +326,6 @@ export default function AnalyticsPage() {
     if (grantGroupFilter) {
       const filterValue = grantGroupFilter.replace(' (Goa)', '');
       projectsToProcess = projectsWithGrants.filter(p => p[grantAggregationKey] === filterValue);
-    } else if (user?.role === 'CRO' && facultyFilter !== 'all') {
-      projectsToProcess = projectsWithGrants.filter(p => p.faculty === facultyFilter);
     }
   
     const yearlyData = projectsToProcess.reduce((acc, project) => {
@@ -327,10 +338,10 @@ export default function AnalyticsPage() {
     }, {} as Record<string, { year: string; amount: number }>);
   
     return Object.values(yearlyData).sort((a, b) => parseInt(a.year) - parseInt(b.year));
-  }, [projects, grantGroupFilter, facultyFilter, grantAggregationKey, user?.role]);
+  }, [projects, grantGroupFilter, grantAggregationKey]);
 
   const grantAmountConfig = {
-    amount: { label: grantGroupFilter || grantAggregationLabel, color: 'hsl(var(--primary))' },
+    amount: { label: grantGroupFilter, color: 'hsl(var(--primary))' },
   } satisfies ChartConfig;
 
 
@@ -476,19 +487,28 @@ export default function AnalyticsPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Submissions by Year</CardTitle>
-              <CardDescription>Total projects submitted each year.</CardDescription>
+              <CardTitle>Projects by Year</CardTitle>
+              <CardDescription>Total projects submitted or sanctioned each year.</CardDescription>
             </div>
-             <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'submissions_by_year', 'This chart displays the total number of projects submitted annually.')}><Download className="h-4 w-4" /></Button>
+             <div className="flex items-center gap-2">
+                <Select value={submissionsByYearType} onValueChange={(v) => setSubmissionsByYearType(v as 'submissions' | 'sanctions')}>
+                    <SelectTrigger className="w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="submissions">Total Submissions</SelectItem>
+                        <SelectItem value="sanctions">Total Sanctions</SelectItem>
+                    </SelectContent>
+                </Select>
+                <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'projects_by_year', `This chart displays the total number of projects ${submissionsByYearType} annually.`)}><Download className="h-4 w-4" /></Button>
+             </div>
           </CardHeader>
           <CardContent ref={submissionsYearChartRef} className="bg-card pt-4">
-             <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
+             <ChartContainer config={submissionsByYearType === 'submissions' ? submissionsConfig : sanctionsConfig} className="h-[300px] w-full">
               <BarChart accessibilityLayer data={submissionsByYearData} isAnimationActive={false}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
                 <YAxis allowDecimals={false}/>
                 <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                <Bar dataKey="submissions" fill="var(--color-submissions)" radius={4} />
+                <Bar dataKey="count" fill="var(--color-submissions)" radius={4} />
               </BarChart>
             </ChartContainer>
           </CardContent>
@@ -563,3 +583,6 @@ export default function AnalyticsPage() {
     </div>
   );
 }
+
+
+    
