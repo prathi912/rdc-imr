@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell, Legend } from 'recharts';
+import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell, Legend, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
@@ -48,11 +48,9 @@ export default function AnalyticsPage() {
     if (!ref.current) return;
 
     const exportNode = ref.current;
-    const captionId = `caption-${fileName}`;
-
+    
     // Temporarily add a caption inside the node to be exported
     const caption = document.createElement('div');
-    caption.id = captionId;
     caption.textContent = captionText;
     caption.style.marginTop = '15px';
     caption.style.fontSize = '12px';
@@ -60,12 +58,22 @@ export default function AnalyticsPage() {
     caption.style.color = 'hsl(var(--muted-foreground))';
     caption.style.textAlign = 'center';
     caption.style.width = '100%';
-    exportNode.appendChild(caption);
+    
+    // The container that wraps the chart for consistent background color
+    const container = document.createElement('div');
+    container.style.padding = '1rem';
+    container.style.backgroundColor = document.body.classList.contains('dark') ? 'hsl(224 71% 4%)' : 'hsl(0 0% 100%)';
+    container.appendChild(exportNode.cloneNode(true)); // Clone the node to avoid moving the live chart
+    container.appendChild(caption);
 
-    toPng(exportNode, { 
+    // We append the new container to the body to ensure it's in the DOM for rendering, but make it invisible.
+    container.style.position = 'absolute';
+    container.style.left = '-9999px';
+    document.body.appendChild(container);
+
+    toPng(container, { 
         cacheBust: true, 
-        pixelRatio: 2, 
-        backgroundColor: document.body.classList.contains('dark') ? 'hsl(224 71% 4%)' : 'hsl(0 0% 100%)' 
+        pixelRatio: 2,
     })
       .then((dataUrl) => {
         const link = document.createElement('a');
@@ -77,11 +85,8 @@ export default function AnalyticsPage() {
         console.error('Chart export failed:', err);
       })
       .finally(() => {
-        // Clean up the added caption
-        const addedCaption = document.getElementById(captionId);
-        if (addedCaption) {
-          exportNode.removeChild(addedCaption);
-        }
+        // Clean up the temporary container from the body
+        document.body.removeChild(container);
       });
   }, []);
 
@@ -557,7 +562,7 @@ export default function AnalyticsPage() {
             <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group', `This chart shows the breakdown of project submissions by ${aggregationLabel.toLowerCase()}.`)}><Download className="h-4 w-4" /></Button>
           </CardHeader>
           <CardContent ref={projectsByGroupChartRef} className="bg-card pt-4 p-4">
-             <ChartContainer config={projectsByGroupConfig} className="h-[300px] w-full">
+             <ChartContainer config={projectsByGroupConfig} className="h-[400px] w-full">
               <BarChart accessibilityLayer data={projectsByGroupData} layout="vertical" margin={{left: 30}} isAnimationActive={false}>
                 <CartesianGrid horizontal={false} />
                 <YAxis
@@ -567,11 +572,14 @@ export default function AnalyticsPage() {
                   tickMargin={10}
                   axisLine={false}
                   width={250}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: 12, width: 240, whiteSpace: 'normal', textAnchor: 'end' }}
+                  interval={0}
                 />
                  <XAxis dataKey="projects" type="number" hide allowDecimals={false} />
                  <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
-                <Bar dataKey="projects" layout="vertical" fill="var(--color-projects)" radius={4} />
+                <Bar dataKey="projects" layout="vertical" fill="var(--color-projects)" radius={4}>
+                   <LabelList dataKey="projects" position="right" offset={8} className="fill-foreground" fontSize={12} />
+                </Bar>
               </BarChart>
             </ChartContainer>
           </CardContent>
