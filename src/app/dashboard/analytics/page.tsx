@@ -15,7 +15,7 @@ import { DollarSign, Download } from 'lucide-react';
 import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
@@ -51,20 +51,18 @@ export default function AnalyticsPage() {
     }
 
     const exportNode = ref.current;
-    const parentNode = exportNode.parentNode as HTMLElement | null;
-    if (!parentNode) {
-        console.error("Export failed: parent node not found.");
-        return;
-    }
-
+    
     // Create a temporary container for the export content
     const container = document.createElement('div');
     container.style.padding = '1rem';
-    container.style.width = `${exportNode.offsetWidth}px`;
+    container.style.display = 'inline-block';
     const isDarkMode = document.body.classList.contains('dark');
-    container.style.backgroundColor = isDarkMode ? 'hsl(224 71% 4%)' : 'hsl(0 0% 100%)';
-    container.style.position = 'absolute';
-    container.style.left = '-9999px'; // Move it off-screen
+    const bgColor = isDarkMode ? 'hsl(224 71% 4%)' : 'hsl(0 0% 100%)';
+    container.style.backgroundColor = bgColor;
+
+    // Clone the chart and append it to the temporary container
+    const clonedNode = exportNode.cloneNode(true) as HTMLElement;
+    container.appendChild(clonedNode);
 
     // Add the caption
     const caption = document.createElement('div');
@@ -76,17 +74,18 @@ export default function AnalyticsPage() {
     caption.style.width = '100%';
     const captionColor = isDarkMode ? 'hsl(215 20.2% 65.1%)' : 'hsl(215.4 16.3% 46.9%)';
     caption.style.color = captionColor;
-
-    // Temporarily move the original chart node to the container, generate image, then move it back
-    document.body.appendChild(container);
-    container.appendChild(exportNode);
     container.appendChild(caption);
     
+    // Append to body to ensure it's rendered for capturing
+    document.body.appendChild(container);
+    
     try {
-        const dataUrl = await toPng(container, { 
-            cacheBust: true, 
-            pixelRatio: 2,
+        const canvas = await html2canvas(container, {
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: bgColor,
         });
+        const dataUrl = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.download = `${fileName}.png`;
         link.href = dataUrl;
@@ -94,8 +93,7 @@ export default function AnalyticsPage() {
     } catch (err) {
         console.error('Chart export failed:', err);
     } finally {
-        // IMPORTANT: Restore the original element to its place
-        parentNode.appendChild(exportNode);
+        // Cleanup: remove the temporary container
         document.body.removeChild(container);
     }
   }, []);
@@ -231,7 +229,7 @@ export default function AnalyticsPage() {
     if (filteredProjects.length === 0) return [];
     
     const projectsToCount = submissionsByYearType === 'sanctions'
-        ? filteredProjects.filter(p => ['Recommended', 'In Progress', 'Completed'].includes(p.status) && p.grant)
+        ? filteredProjects.filter(p => ['Recommended', 'In Progress', 'Completed', 'Sanctioned'].includes(p.status) && p.grant)
         : filteredProjects;
 
     const yearCounts = projectsToCount.reduce((acc, project) => {
