@@ -286,7 +286,7 @@ export default function AnalyticsPage() {
   }, [projects, grantGroupFilter, facultyFilter, grantAggregationKey, user?.role]);
 
   const grantAmountConfig = {
-    amount: { label: grantGroupFilter, color: 'hsl(var(--primary))' },
+    amount: { label: grantGroupFilter || grantAggregationLabel, color: 'hsl(var(--primary))' },
   } satisfies ChartConfig;
 
 
@@ -378,7 +378,7 @@ export default function AnalyticsPage() {
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
-                        <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
+                        <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} isAnimationActive={false}>
                             {statusDistributionData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={statusDistributionConfig[entry.name]?.color || '#8884d8'} />
                             ))}
@@ -419,7 +419,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent ref={submissionsTimeChartRef} className="bg-card pt-4">
             <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
-              <LineChart accessibilityLayer data={submissionsData} margin={{ left: 12, right: 12 }}>
+              <LineChart accessibilityLayer data={submissionsData} margin={{ left: 12, right: 12 }} isAnimationActive={false}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
                 <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
@@ -439,7 +439,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent ref={submissionsYearChartRef} className="bg-card pt-4">
              <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
-              <BarChart accessibilityLayer data={submissionsByYearData}>
+              <BarChart accessibilityLayer data={submissionsByYearData} isAnimationActive={false}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
                 <YAxis allowDecimals={false}/>
@@ -475,7 +475,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent ref={grantAmountChartRef} className="bg-card pt-4">
              <ChartContainer config={grantAmountConfig} className="h-[400px] w-full">
-                <BarChart data={grantAmountData}>
+                <BarChart data={grantAmountData} isAnimationActive={false}>
                     <CartesianGrid vertical={false} />
                     <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
                     <YAxis tickFormatter={(value) => `₹${Number(value) / 100000}L`} />
@@ -497,7 +497,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <CardContent ref={projectsByGroupChartRef} className="bg-card pt-4">
              <ChartContainer config={projectsByGroupConfig} className="h-[300px] w-full">
-              <BarChart accessibilityLayer data={projectsByGroupData} layout="vertical" margin={{left: 30}}>
+              <BarChart accessibilityLayer data={projectsByGroupData} layout="vertical" margin={{left: 30}} isAnimationActive={false}>
                 <CartesianGrid horizontal={false} />
                 <YAxis
                   dataKey="group"
