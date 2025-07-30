@@ -2713,14 +2713,12 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid:
     }
 }
 
-export async function generateChartImage(html: string): Promise<{ success: boolean; dataUrl?: string; error?: string }> {
+export async function generateChartImage(html: string, isDarkMode: boolean): Promise<{ success: boolean; dataUrl?: string; error?: string }> {
   try {
-    // This server action is now a pass-through. The logic is in the API route.
-    // This is to maintain the existing client-side structure.
     const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/export-chart`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html }),
+      body: JSON.stringify({ html, isDarkMode }),
     });
 
     if (!response.ok) {
@@ -2733,6 +2731,6 @@ export async function generateChartImage(html: string): Promise<{ success: boole
   } catch (error: any) {
     console.error("Server-side image generation failed in action:", error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return { success: false, error: `Failed to generate chart image via action: ${errorMessage}` };
+    return { success: false, error: `Failed to generate chart image: ${errorMessage}` };
   }
 }
