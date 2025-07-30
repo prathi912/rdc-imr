@@ -19,6 +19,7 @@ import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getDoc, getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
+import * as htmlToImage from 'html-to-image';
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -2711,4 +2712,17 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid:
         console.error("Error fetching projects for evaluator/pi combo:", error);
         return { success: false, error: error.message || "Failed to fetch projects." };
     }
+}
+
+export async function generateChartImage(html: string): Promise<{ success: boolean; dataUrl?: string; error?: string }> {
+  try {
+    const dataUrl = await htmlToImage.toPng(Buffer.from(html), {
+      quality: 0.95,
+      pixelRatio: 2,
+    });
+    return { success: true, dataUrl };
+  } catch (error: any) {
+    console.error("Server-side image generation failed:", error);
+    return { success: false, error: error.message || "Failed to generate chart image on the server." };
+  }
 }
