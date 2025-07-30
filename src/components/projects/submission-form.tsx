@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -16,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { User, Project } from '@/types';
+import type { User, Project, CoPiDetails } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
@@ -83,8 +82,8 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-  const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null);
-  const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([]);
+  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
+  const [coPiList, setCoPiList] = useState<CoPiDetails[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
   const formSchema = useMemo(() => z.object({
@@ -152,22 +151,9 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
             sdgGoals: project.sdgGoals || [],
         });
         
-        const fetchCoPiUsers = async () => {
-            if (project.coPiUids && project.coPiUids.length > 0) {
-                try {
-                    const usersRef = collection(db, 'users');
-                    const q = query(usersRef, where('__name__', 'in', project.coPiUids));
-                    const querySnapshot = await getDocs(q);
-                    const fetchedUsers = querySnapshot.docs.map(d => ({ uid: d.id, name: d.data().name as string }));
-                    setCoPiList(fetchedUsers);
-                } catch (error) {
-                    console.error("Error fetching Co-PIs:", error);
-                    toast({ variant: 'destructive', title: 'Error', description: "Could not load existing Co-PIs." });
-                }
-            }
-        };
-
-        fetchCoPiUsers();
+        if (project.coPiDetails) {
+            setCoPiList(project.coPiDetails);
+        }
     }
   }, [project, form, toast]);
 
@@ -189,7 +175,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
 
   const handlePrevious = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+      setCurrentStep(currentStep + 1);
     }
   };
   
@@ -199,8 +185,12 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     setFoundCoPi(null);
     try {
         const result = await findUserByMisId(coPiSearchTerm);
-        if (result.success && result.user) {
-            setFoundCoPi(result.user);
+        if (result.success) {
+            if (result.user) {
+                setFoundCoPi({ ...result.user });
+            } else if (result.staff) {
+                setFoundCoPi({ ...result.staff });
+            }
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
         }
@@ -212,8 +202,8 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   };
 
   const handleAddCoPi = () => {
-    if (foundCoPi && !coPiList.some(coPi => coPi.uid === foundCoPi.uid)) {
-        if (user && foundCoPi.uid === user.uid) {
+    if (foundCoPi && !coPiList.some(coPi => coPi.email === foundCoPi.email)) {
+        if (user && foundCoPi.email === user.email) {
             toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
             return;
         }
@@ -223,8 +213,8 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     setCoPiSearchTerm('');
   };
 
-  const handleRemoveCoPi = (uidToRemove: string) => {
-    setCoPiList(coPiList.filter(coPi => coPi.uid !== uidToRemove));
+  const handleRemoveCoPi = (emailToRemove: string) => {
+    setCoPiList(coPiList.filter(coPi => coPi.email !== emailToRemove));
   };
 
 
@@ -282,13 +272,16 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       const teamInfoParts = [];
       if (data.studentInfo && data.studentInfo.trim() !== '') teamInfoParts.push(`Students: ${data.studentInfo}`);
       const teamInfo = teamInfoParts.join('; ');
-      const coPiUids = coPiList.map(coPi => coPi.uid);
+      
+      const coPiUids = coPiList.filter(coPi => coPi.uid).map(coPi => coPi.uid!);
 
       const projectData: Omit<Project, 'id'> = {
         title: data.title, abstract: data.abstract, type: data.projectType,
         faculty: user.faculty, institute: user.institute, departmentName: user.department,
         pi: user.name, pi_uid: user.uid, pi_email: user.email, pi_phoneNumber: user.phoneNumber,
-        coPiUids: coPiUids, teamInfo, timelineAndOutcomes: data.expectedOutcomes, status: status,
+        coPiDetails: coPiList, // Store details for all
+        coPiUids: coPiUids, // Store UIDs for registered users
+        teamInfo, timelineAndOutcomes: data.expectedOutcomes, status: status,
         submissionDate: project?.submissionDate || new Date().toISOString(), proposalUrl, cvUrl, ethicsUrl,
         sdgGoals: data.sdgGoals,
       };
@@ -428,9 +421,9 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                     )}
                     <div className="space-y-2 pt-2">
                       {coPiList.map(coPi => (
-                        <div key={coPi.uid} className="flex items-center justify-between p-2 bg-secondary rounded-md">
-                           <p className="text-sm font-medium">{coPi.name}</p>
-                           <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>Remove</Button>
+                        <div key={coPi.email} className="flex items-center justify-between p-2 bg-secondary rounded-md">
+                           <p className="text-sm font-medium">{coPi.name} {!coPi.uid && <span className="text-xs text-muted-foreground">(Not Registered)</span>}</p>
+                           <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.email)}>Remove</Button>
                         </div>
                       ))}
                     </div>

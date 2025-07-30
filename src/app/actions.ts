@@ -44,28 +44,28 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
 }
 
 export async function generateChartImage(html: string, isDarkMode: boolean): Promise<{ success: boolean; dataUrl?: string; error?: string }> {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/export-chart`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html, isDarkMode }),
-    });
+    try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/export-chart`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ html, isDarkMode }),
+        });
 
-    if (!response.ok) {
-        const errorResult = await response.json();
-        throw new Error(errorResult.error || 'Server responded with an error.');
-    }
+        if (!response.ok) {
+            const errorResult = await response.json();
+            throw new Error(errorResult.error || 'Server responded with an error.');
+        }
 
-    const result = await response.json();
-    if (!result.success) {
-        throw new Error(result.error || 'Failed to generate chart image on the server.');
+        const result = await response.json();
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to generate chart image on the server.');
+        }
+        
+        return { success: true, dataUrl: result.dataUrl };
+    } catch (error: any) {
+        console.error('Error in generateChartImage action:', error);
+        return { success: false, error: error.message };
     }
-    
-    return { success: true, dataUrl: result.dataUrl };
-  } catch (error: any) {
-    console.error('Error in generateChartImage action:', error);
-    return { success: false, error: error.message };
-  }
 }
 
 
@@ -1561,6 +1561,7 @@ export async function findUserByMisId(
     return { success: false, error: error.message || "Failed to search for user." };
   }
 }
+
 
 // New server actions for grant management
 export async function addGrantPhase(

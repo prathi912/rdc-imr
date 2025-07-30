@@ -1,6 +1,10 @@
 
 
-
+export type CoPiDetails = {
+    uid?: string; // Will exist for registered users
+    name: string;
+    email: string;
+};
 
 
 export type UserBankDetails = {
@@ -119,6 +123,7 @@ export type Project = {
   pi_uid: string;
   pi_email?: string;
   pi_phoneNumber?: string;
+  coPiDetails?: CoPiDetails[];
   coPiUids?: string[];
   status: 'Draft' | 'Submitted' | 'Under Review' | 'Revision Needed' | 'Recommended' | 'Not Recommended' | 'In Progress' | 'Completed' | 'Pending Completion Approval' | 'Sanctioned';
   teamInfo: string;
