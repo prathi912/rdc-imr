@@ -63,9 +63,8 @@ export default function AnalyticsPage() {
     container.style.border = '1px solid #334155';
     container.style.borderRadius = '0.5rem';
 
-    // Clone the chart and append it to the temporary container
-    const clonedNode = ref.current.cloneNode(true) as HTMLElement;
-    container.appendChild(clonedNode);
+    // Use the chart's outerHTML directly instead of cloning the node
+    container.innerHTML = ref.current.outerHTML;
 
     // Add the caption
     const caption = document.createElement('div');
