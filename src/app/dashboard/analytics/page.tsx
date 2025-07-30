@@ -16,7 +16,7 @@ import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { generateChartImage } from '@/app/actions';
+import { toPng } from 'html-to-image';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
@@ -56,35 +56,45 @@ export default function AnalyticsPage() {
     const bgColor = isDarkMode ? '#0f172a' : '#ffffff';
     const textColor = isDarkMode ? '#e2e8f0' : '#334155';
     
-    const container = document.createElement('div');
-    container.style.padding = '1.5rem';
-    container.style.display = 'inline-block';
-    container.style.backgroundColor = bgColor;
-
-    const chartClone = ref.current.cloneNode(true) as HTMLElement;
-    container.appendChild(chartClone);
-
-    const caption = document.createElement('div');
-    caption.textContent = captionText;
-    caption.style.marginTop = '15px';
-    caption.style.fontSize = '12px';
-    caption.style.fontStyle = 'italic';
-    caption.style.textAlign = 'center';
-    caption.style.width = '100%';
-    caption.style.color = textColor;
-    container.appendChild(caption);
-
     try {
-        const result = await generateChartImage(container.outerHTML, isDarkMode);
+        const dataUrl = await toPng(ref.current, { 
+            backgroundColor: bgColor,
+            pixelRatio: 2 
+        });
 
-        if (result.success && result.dataUrl) {
-            const link = document.createElement('a');
-            link.download = `${fileName}.png`;
-            link.href = result.dataUrl;
-            link.click();
-        } else {
-            throw new Error(result.error || 'Failed to generate image on the server.');
-        }
+        // Create a temporary canvas to add the caption
+        const img = new Image();
+        img.src = dataUrl;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const padding = 20;
+            const captionHeight = 40;
+            canvas.width = img.width;
+            canvas.height = img.height + captionHeight + padding;
+            const ctx = canvas.getContext('2d');
+
+            if (ctx) {
+                // Fill background
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw the chart image
+                ctx.drawImage(img, 0, 0);
+
+                // Add the caption
+                ctx.fillStyle = textColor;
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(captionText, canvas.width / 2, img.height + padding + 16);
+
+                // Trigger download
+                const finalUrl = canvas.toDataURL('image/png');
+                const link = document.createElement('a');
+                link.download = `${fileName}.png`;
+                link.href = finalUrl;
+                link.click();
+            }
+        };
     } catch (err: any) {
         console.error('Chart export failed:', err);
         toast({ variant: 'destructive', title: 'Export Failed', description: err.message });

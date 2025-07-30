@@ -2712,25 +2712,3 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid:
         return { success: false, error: error.message || "Failed to fetch projects." };
     }
 }
-
-export async function generateChartImage(html: string, isDarkMode: boolean): Promise<{ success: boolean; dataUrl?: string; error?: string }> {
-  try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/export-chart`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ html, isDarkMode }),
-    });
-
-    if (!response.ok) {
-        const errorResult = await response.json();
-        throw new Error(errorResult.error || `Server responded with ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result;
-  } catch (error: any) {
-    console.error("Server-side image generation failed in action:", error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return { success: false, error: `Failed to generate chart image: ${errorMessage}` };
-  }
-}
