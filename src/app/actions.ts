@@ -51,9 +51,14 @@ export async function generateChartImage(html: string, isDarkMode: boolean): Pro
         body: JSON.stringify({ html, isDarkMode }),
     });
 
+    if (!response.ok) {
+        const errorResult = await response.json();
+        throw new Error(errorResult.error || 'Server responded with an error.');
+    }
+
     const result = await response.json();
-    if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Failed to generate chart image.');
+    if (!result.success) {
+        throw new Error(result.error || 'Failed to generate chart image on the server.');
     }
     
     return { success: true, dataUrl: result.dataUrl };
@@ -1536,9 +1541,6 @@ export async function findUserByMisId(
     if (!querySnapshot.empty) {
       const userDoc = querySnapshot.docs[0];
       const userData = userDoc.data() as User;
-      if (userData.role === "admin" || userData.role === "Super-admin") {
-        return { success: false, error: "Administrative users cannot be added as Co-PIs." };
-      }
       return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email } };
     }
 
@@ -2731,4 +2733,96 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid:
         console.error("Error fetching projects for evaluator/pi combo:", error);
         return { success: false, error: error.message || "Failed to fetch projects." };
     }
+}
+
+
+type PaperUploadData = {
+  paper_title: string;
+  author_email: string;
+  author_type: 'First Author' | 'Corresponding Author' | 'Co-Author';
+  url: string;
+};
+
+export async function bulkUploadPapers(
+  papersData: PaperUploadData[]
+): Promise<{ 
+    success: boolean; 
+    data: {
+        successfulPapers: { title: string; authors: string[] }[];
+        failedAuthorLinks: { title: string; email: string; reason: string }[];
+    };
+    error?: string 
+}> {
+  // Group rows by paper title
+  const papersMap = new Map<string, { url: string; authors: { email: string; type: string }[] }>();
+  for (const row of papersData) {
+    const title = row.paper_title.trim();
+    if (!papersMap.has(title)) {
+      papersMap.set(title, { url: row.url, authors: [] });
+    }
+    papersMap.get(title)!.authors.push({ email: row.author_email, type: row.author_type });
+  }
+
+  const successfulPapers: { title: string; authors: string[] }[] = [];
+  const failedAuthorLinks: { title: string; email: string; reason: string }[] = [];
+
+  const allAuthorEmails = [...new Set(papersData.map(p => p.author_email.toLowerCase()))];
+  const usersRef = adminDb.collection('users');
+  const userChunks: string[][] = [];
+  for (let i = 0; i < allAuthorEmails.length; i += 30) {
+      userChunks.push(allAuthorEmails.slice(i, i + 30));
+  }
+  
+  const usersMap = new Map<string, { uid: string, name: string }>();
+  for (const chunk of userChunks) {
+      const userQuery = await usersRef.where('email', 'in', chunk).get();
+      userQuery.forEach(doc => {
+          usersMap.set(doc.data().email.toLowerCase(), { uid: doc.id, name: doc.data().name });
+      });
+  }
+
+  for (const [title, paperInfo] of papersMap.entries()) {
+    try {
+      // Determine the main author (First Author > Corresponding Author > first in list)
+      let mainAuthorInfo = 
+        paperInfo.authors.find(a => a.type === 'First Author') || 
+        paperInfo.authors.find(a => a.type === 'Corresponding Author') || 
+        paperInfo.authors[0];
+
+      if (!mainAuthorInfo) continue;
+
+      let mainAuthorUid = usersMap.get(mainAuthorInfo.email.toLowerCase())?.uid;
+      
+      if (!mainAuthorUid) {
+        failedAuthorLinks.push({ title, email: mainAuthorInfo.email, reason: 'Main author is not a registered user.' });
+        continue;
+      }
+      
+      const authors: Author[] = paperInfo.authors.map(author => {
+        const userInfo = usersMap.get(author.email.toLowerCase());
+        if (!userInfo) {
+          failedAuthorLinks.push({ title, email: author.email, reason: 'Author not found in staff data.' });
+        }
+        return {
+          uid: userInfo?.uid,
+          email: author.email,
+          name: userInfo?.name || author.email.split('@')[0],
+          role: author.type as Author['role'],
+          isExternal: !userInfo,
+        };
+      });
+
+      const result = await addResearchPaper(title, paperInfo.url, mainAuthorUid, authors);
+      if (result.success) {
+        successfulPapers.push({ title, authors: authors.map(a => a.name) });
+      } else {
+        // This case is less likely unless there's a server-side validation error
+        console.error(`Failed to add paper "${title}": ${result.error}`);
+      }
+    } catch (error: any) {
+      console.error(`Error processing paper "${title}" during bulk upload:`, error);
+    }
+  }
+
+  return { success: true, data: { successfulPapers, failedAuthorLinks } };
 }
