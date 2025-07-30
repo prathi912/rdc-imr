@@ -56,48 +56,43 @@ export default function AnalyticsPage() {
     const bgColor = isDarkMode ? '#0f172a' : '#ffffff';
     const textColor = isDarkMode ? '#e2e8f0' : '#334155';
     
+    // Temporarily append a styled container to the body
+    const exportContainer = document.createElement('div');
+    exportContainer.style.position = 'absolute';
+    exportContainer.style.left = '-9999px'; // Move it off-screen
+    exportContainer.style.padding = '20px';
+    exportContainer.style.backgroundColor = bgColor;
+
+    const contentToExport = ref.current.cloneNode(true) as HTMLElement;
+    
+    // Add caption
+    const caption = document.createElement('div');
+    caption.innerText = captionText;
+    caption.style.textAlign = 'center';
+    caption.style.marginTop = '10px';
+    caption.style.fontSize = '12px';
+    caption.style.color = textColor;
+    
+    exportContainer.appendChild(contentToExport);
+    exportContainer.appendChild(caption);
+    document.body.appendChild(exportContainer);
+
     try {
-        const dataUrl = await toPng(ref.current, { 
+        const dataUrl = await toPng(exportContainer, { 
+            pixelRatio: 2,
             backgroundColor: bgColor,
-            pixelRatio: 2 
         });
 
-        // Create a temporary canvas to add the caption
-        const img = new Image();
-        img.src = dataUrl;
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const padding = 20;
-            const captionHeight = 40;
-            canvas.width = img.width;
-            canvas.height = img.height + captionHeight + padding;
-            const ctx = canvas.getContext('2d');
-
-            if (ctx) {
-                // Fill background
-                ctx.fillStyle = bgColor;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-                // Draw the chart image
-                ctx.drawImage(img, 0, 0);
-
-                // Add the caption
-                ctx.fillStyle = textColor;
-                ctx.font = '16px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(captionText, canvas.width / 2, img.height + padding + 16);
-
-                // Trigger download
-                const finalUrl = canvas.toDataURL('image/png');
-                const link = document.createElement('a');
-                link.download = `${fileName}.png`;
-                link.href = finalUrl;
-                link.click();
-            }
-        };
+        const link = document.createElement('a');
+        link.download = `${fileName}.png`;
+        link.href = dataUrl;
+        link.click();
     } catch (err: any) {
         console.error('Chart export failed:', err);
         toast({ variant: 'destructive', title: 'Export Failed', description: err.message });
+    } finally {
+        // Clean up the temporary container from the body
+        document.body.removeChild(exportContainer);
     }
   }, [toast]);
 
@@ -490,12 +485,12 @@ export default function AnalyticsPage() {
           <CardContent>
             <div ref={submissionsTimeChartRef} className="p-4 bg-card">
               <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
-                <LineChart accessibilityLayer data={submissionsData} isAnimationActive={false}>
+                <LineChart accessibilityLayer data={submissionsData}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
                   <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
                   <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                  <Line dataKey="submissions" type="monotone" stroke="var(--color-submissions)" strokeWidth={2} dot={true} />
+                  <Line dataKey="submissions" type="monotone" stroke="var(--color-submissions)" strokeWidth={2} dot={true} isAnimationActive={false} />
                 </LineChart>
               </ChartContainer>
             </div>
