@@ -47,25 +47,12 @@ export default function AnalyticsPage() {
   const handleExport = useCallback((ref: React.RefObject<HTMLDivElement>, fileName: string, captionText: string) => {
     if (!ref.current) return;
 
-    const originalNode = ref.current;
-    
-    // Create a wrapper that will contain the chart and the caption
-    const exportContainer = document.createElement('div');
-    exportContainer.style.padding = '20px';
-    exportContainer.style.backgroundColor = document.body.classList.contains('dark') ? '#0c1322' : '#ffffff';
-    exportContainer.style.color = document.body.classList.contains('dark') ? 'hsl(var(--card-foreground))' : 'hsl(var(--card-foreground))';
-    exportContainer.style.display = 'inline-block'; // Important for html-to-image to get correct dimensions
+    const exportNode = ref.current;
+    const captionId = `caption-${fileName}`;
 
-    // The parent of the original node will be used to append our export container temporarily
-    const parent = originalNode.parentNode;
-    if (!parent) return;
-
-    // Move the original node into our new container
-    parent.replaceChild(exportContainer, originalNode);
-    exportContainer.appendChild(originalNode);
-    
-    // Create and add the caption to the container
+    // Temporarily add a caption inside the node to be exported
     const caption = document.createElement('div');
+    caption.id = captionId;
     caption.textContent = captionText;
     caption.style.marginTop = '15px';
     caption.style.fontSize = '12px';
@@ -73,9 +60,9 @@ export default function AnalyticsPage() {
     caption.style.color = 'hsl(var(--muted-foreground))';
     caption.style.textAlign = 'center';
     caption.style.width = '100%';
-    exportContainer.appendChild(caption);
+    exportNode.appendChild(caption);
 
-    toPng(exportContainer, { cacheBust: true, pixelRatio: 2, backgroundColor: exportContainer.style.backgroundColor })
+    toPng(exportNode, { cacheBust: true, pixelRatio: 2, backgroundColor: exportNode.style.backgroundColor || (document.body.classList.contains('dark') ? '#0c1322' : '#ffffff') })
       .then((dataUrl) => {
         const link = document.createElement('a');
         link.download = `${fileName}.png`;
@@ -86,8 +73,11 @@ export default function AnalyticsPage() {
         console.error('Chart export failed:', err);
       })
       .finally(() => {
-        // IMPORTANT: Put the original node back where it was
-        parent.replaceChild(originalNode, exportContainer);
+        // Clean up the added caption
+        const addedCaption = document.getElementById(captionId);
+        if (addedCaption) {
+          exportNode.removeChild(addedCaption);
+        }
       });
   }, []);
 
@@ -431,7 +421,8 @@ export default function AnalyticsPage() {
               <Download className="mr-2 h-4 w-4" /> Export PNG
             </Button>
           </CardHeader>
-          <CardContent ref={statusChartRef} className="bg-card">
+          <CardContent ref={statusChartRef} className="bg-card p-4 relative">
+            <div className="absolute inset-0 bg-card -z-10"></div>
             <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -475,7 +466,8 @@ export default function AnalyticsPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent ref={submissionsTimeChartRef} className="bg-card pt-4">
+          <CardContent ref={submissionsTimeChartRef} className="bg-card pt-4 p-4 relative">
+            <div className="absolute inset-0 bg-card -z-10"></div>
             <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
               <LineChart accessibilityLayer data={submissionsData} margin={{ left: 12, right: 12 }} isAnimationActive={false}>
                 <CartesianGrid vertical={false} />
@@ -504,7 +496,8 @@ export default function AnalyticsPage() {
                 <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'projects_by_year', `This chart displays the total number of projects ${submissionsByYearType} annually.`)}><Download className="h-4 w-4" /></Button>
              </div>
           </CardHeader>
-          <CardContent ref={submissionsYearChartRef} className="bg-card pt-4">
+          <CardContent ref={submissionsYearChartRef} className="bg-card pt-4 p-4 relative">
+             <div className="absolute inset-0 bg-card -z-10"></div>
              <ChartContainer config={submissionsByYearType === 'submissions' ? submissionsConfig : sanctionsConfig} className="h-[300px] w-full">
               <BarChart accessibilityLayer data={submissionsByYearData} isAnimationActive={false}>
                 <CartesianGrid vertical={false} />
@@ -540,7 +533,8 @@ export default function AnalyticsPage() {
               <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year', `This chart illustrates the total grant amount awarded each year for the ${grantAggregationLabel.toLowerCase()}: ${grantGroupFilter}.`)}><Download className="h-4 w-4" /></Button>
             </div>
           </CardHeader>
-          <CardContent ref={grantAmountChartRef} className="bg-card pt-4">
+          <CardContent ref={grantAmountChartRef} className="bg-card pt-4 p-4 relative">
+             <div className="absolute inset-0 bg-card -z-10"></div>
              <ChartContainer config={grantAmountConfig} className="h-[400px] w-full">
                 <BarChart data={grantAmountData} isAnimationActive={false}>
                     <CartesianGrid vertical={false} />
@@ -562,7 +556,8 @@ export default function AnalyticsPage() {
             </div>
             <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group', `This chart shows the breakdown of project submissions by ${aggregationLabel.toLowerCase()}.`)}><Download className="h-4 w-4" /></Button>
           </CardHeader>
-          <CardContent ref={projectsByGroupChartRef} className="bg-card pt-4">
+          <CardContent ref={projectsByGroupChartRef} className="bg-card pt-4 p-4 relative">
+             <div className="absolute inset-0 bg-card -z-10"></div>
              <ChartContainer config={projectsByGroupConfig} className="h-[300px] w-full">
               <BarChart accessibilityLayer data={projectsByGroupData} layout="vertical" margin={{left: 30}} isAnimationActive={false}>
                 <CartesianGrid horizontal={false} />
@@ -586,6 +581,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-
-
-    
