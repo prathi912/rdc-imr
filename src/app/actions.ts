@@ -43,6 +43,26 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
   }
 }
 
+export async function generateChartImage(html: string, isDarkMode: boolean): Promise<{ success: boolean; dataUrl?: string; error?: string }> {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/export-chart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html, isDarkMode }),
+    });
+
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to generate chart image.');
+    }
+    
+    return { success: true, dataUrl: result.dataUrl };
+  } catch (error: any) {
+    console.error('Error in generateChartImage action:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 
 const EMAIL_STYLES = {
   background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',

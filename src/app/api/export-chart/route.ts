@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     const bgColor = isDarkMode ? '#0f172a' : '#ffffff';
     
     const image = await nodeHtmlToImage({
-      html: html,
+      html: `<html><head><style>body { background-color: ${bgColor}; padding: 20px; }</style></head><body>${html}</body></html>`,
       quality: 100,
       type: 'png',
       puppeteerArgs: {
@@ -20,15 +20,6 @@ export async function POST(request: NextRequest) {
       },
       encoding: 'base64',
       transparent: false,
-      selector: 'body > div', 
-      beforeScreenshot: async (page) => {
-        await page.evaluate((bgColor) => {
-            const body = document.querySelector('body');
-            if(body) {
-                body.style.backgroundColor = bgColor;
-            }
-        }, bgColor);
-      }
     });
 
     const dataUrl = `data:image/png;base64,${image}`;

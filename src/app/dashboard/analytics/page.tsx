@@ -16,7 +16,7 @@ import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { toPng } from 'html-to-image';
+import { generateChartImage } from '@/app/actions';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
@@ -46,53 +46,41 @@ export default function AnalyticsPage() {
   const projectsByGroupChartRef = useRef<HTMLDivElement>(null);
   const grantAmountChartRef = useRef<HTMLDivElement>(null);
 
-  const handleExport = useCallback(async (ref: React.RefObject<HTMLDivElement>, fileName: string, captionText: string) => {
+  const handleExport = useCallback(async (ref: React.RefObject<HTMLDivElement>, fileName: string) => {
     if (!ref.current) {
         toast({ variant: 'destructive', title: "Export Error", description: "Chart element not found." });
         return;
     }
-
+    
     const isDarkMode = document.documentElement.classList.contains('dark');
-    const bgColor = isDarkMode ? '#0f172a' : '#ffffff';
-    const textColor = isDarkMode ? '#e2e8f0' : '#334155';
     
-    // Temporarily append a styled container to the body
-    const exportContainer = document.createElement('div');
-    exportContainer.style.position = 'absolute';
-    exportContainer.style.left = '-9999px'; // Move it off-screen
-    exportContainer.style.padding = '20px';
-    exportContainer.style.backgroundColor = bgColor;
-
-    const contentToExport = ref.current.cloneNode(true) as HTMLElement;
-    
-    // Add caption
+    // Temporarily add a caption for the export
     const caption = document.createElement('div');
-    caption.innerText = captionText;
+    caption.innerText = `Chart showing ${fileName.replace(/_/g, ' ')}`;
     caption.style.textAlign = 'center';
     caption.style.marginTop = '10px';
     caption.style.fontSize = '12px';
-    caption.style.color = textColor;
-    
-    exportContainer.appendChild(contentToExport);
-    exportContainer.appendChild(caption);
-    document.body.appendChild(exportContainer);
+    caption.style.color = isDarkMode ? '#e2e8f0' : '#334155';
+    ref.current.appendChild(caption);
 
     try {
-        const dataUrl = await toPng(exportContainer, { 
-            pixelRatio: 2,
-            backgroundColor: bgColor,
-        });
+        const htmlContent = ref.current.outerHTML;
+        const result = await generateChartImage(htmlContent, isDarkMode);
 
-        const link = document.createElement('a');
-        link.download = `${fileName}.png`;
-        link.href = dataUrl;
-        link.click();
+        if (result.success && result.dataUrl) {
+            const link = document.createElement('a');
+            link.download = `${fileName}.png`;
+            link.href = result.dataUrl;
+            link.click();
+        } else {
+            throw new Error(result.error || 'Failed to generate image on the server.');
+        }
     } catch (err: any) {
         console.error('Chart export failed:', err);
         toast({ variant: 'destructive', title: 'Export Failed', description: err.message });
     } finally {
-        // Clean up the temporary container from the body
-        document.body.removeChild(exportContainer);
+        // Clean up the added caption
+        ref.current.removeChild(caption);
     }
   }, [toast]);
 
@@ -432,7 +420,7 @@ export default function AnalyticsPage() {
               <CardTitle>Project Status Distribution</CardTitle>
               <CardDescription>A summary of all projects by their current status.</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => handleExport(statusChartRef, 'project_status_distribution', 'This chart shows the distribution of all projects based on their current status.')}>
+            <Button variant="outline" size="sm" onClick={() => handleExport(statusChartRef, 'project_status_distribution')}>
               <Download className="mr-2 h-4 w-4" /> Export PNG
             </Button>
           </CardHeader>
@@ -478,14 +466,14 @@ export default function AnalyticsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                 <Button variant="outline" size="icon" onClick={() => handleExport(submissionsTimeChartRef, 'submissions_over_time', `This chart shows the trend of monthly project submissions for ${timeRange === 'last6months' ? 'the last 6 months' : `the year ${timeRange}`}.`)}><Download className="h-4 w-4" /></Button>
+                 <Button variant="outline" size="icon" onClick={() => handleExport(submissionsTimeChartRef, 'submissions_over_time')}><Download className="h-4 w-4" /></Button>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <div ref={submissionsTimeChartRef} className="p-4 bg-card">
               <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
-                <LineChart accessibilityLayer data={submissionsData}>
+                <LineChart accessibilityLayer data={submissionsData} isAnimationActive={false}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
                   <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
@@ -510,7 +498,7 @@ export default function AnalyticsPage() {
                         <SelectItem value="sanctions">Total Sanctions</SelectItem>
                     </SelectContent>
                 </Select>
-                <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'projects_by_year', `This chart displays the total number of projects ${submissionsByYearType} annually.`)}><Download className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'projects_by_year')}><Download className="h-4 w-4" /></Button>
              </div>
           </CardHeader>
           <CardContent>
@@ -548,7 +536,7 @@ export default function AnalyticsPage() {
                   </SelectContent>
                 </Select>
               )}
-              <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year', `This chart illustrates the total grant amount awarded each year for the ${grantAggregationLabel.toLowerCase()}: ${grantGroupFilter}.`)}><Download className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year')}><Download className="h-4 w-4" /></Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -573,7 +561,7 @@ export default function AnalyticsPage() {
               <CardTitle>Projects by {aggregationLabel}</CardTitle>
               <CardDescription>Total projects submitted by each {aggregationLabel.toLowerCase()}.</CardDescription>
             </div>
-            <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group', `This chart shows the breakdown of project submissions by ${aggregationLabel.toLowerCase()}.`)}><Download className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group')}><Download className="h-4 w-4" /></Button>
           </CardHeader>
           <CardContent>
             <div ref={projectsByGroupChartRef} className="p-4 bg-card">
