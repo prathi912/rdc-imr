@@ -30,7 +30,7 @@ A dedicated module to manage the lifecycle of externally funded research opportu
 -   **Admin Oversight:** Super-admins can manage the entire EMR lifecycle, from adding new funding calls to tracking evaluation outcomes.
 
 ### 4. User Profiles & Publication Tracking
--   **Public Profiles:** Faculty can maintain a public-facing profile showcasing their research contributions, projects, and a comprehensive list of their publications.
+-   **Public Profiles:** Faculty can maintain a public-facing profile showcasing their research contributions, projects, and a comprehensive list of their publications. This profile is viewable by administrators and assigned evaluators.
 -   **Publication Management:** A dedicated system for faculty to add, edit, and delete their research papers. The system intelligently handles co-authors, ensuring a single paper entry appears on the profiles of all its authors to reduce data redundancy.
 -   **Automated Co-Author Linking:** When adding a paper, the system automatically checks for existing users or staff members by their university email, linking profiles and fetching names to streamline the process.
 
@@ -159,3 +159,4 @@ The application should now be running at [http://localhost:9002](http://localhos
 ## ☁️ Deployment
 
 This project is configured for one-click deployment to **Firebase App Hosting**. Simply connect your GitHub repository to your Firebase project, and it will build and deploy automatically. The `apphosting.yaml` file controls the build and runtime settings.
+```

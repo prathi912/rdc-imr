@@ -79,7 +79,7 @@ This is the base role for all teaching and research staff.
     -   Before the deadline, you can view, replace, or remove your uploaded presentation using the "Manage PPT" button on your application card.
 
 ### Public Profile & Publications
--   Any user can view your public profile by accessing `/profile/[your-mis-id]`.
+-   Your public profile page is accessible to administrators and assigned evaluators for review purposes.
 -   This page displays your academic details and a comprehensive list of your research papers.
 -   You are responsible for adding and maintaining your list of publications.
 -   When adding a paper, you can add co-authors by their university email. If they are registered, the system links them automatically. If not, the paper will link to their account when they sign up.

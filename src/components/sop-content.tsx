@@ -115,7 +115,7 @@ const sopContent = `
 </ol>
 <h3>Public Profile & Publications</h3>
 <ul>
-    <li>Any user can view your public profile by accessing <code>/profile/[your-mis-id]</code>.</li>
+    <li>Your public profile page is accessible to administrators and assigned evaluators for review purposes.</li>
     <li>This page displays your academic details and a comprehensive list of your research papers.</li>
     <li>You are responsible for adding and maintaining your list of publications.</li>
     <li>When adding a paper, you can add co-authors by their university email. If they are registered, the system links them automatically. If not, the paper will link to their account when they sign up.</li>
