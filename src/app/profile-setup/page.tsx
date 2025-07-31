@@ -43,7 +43,7 @@ type ProfileSetupFormValues = z.infer<typeof profileSetupSchema>;
 
 
 const faculties = [
-    "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
+    "Faculty of Engineering & Technology", "Faculty of Applied Sciences", "Faculty of Library & Information Science",
     "Faculty of IT & Computer Science", "Faculty of Agriculture", "Faculty of Architecture & Planning",
     "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
     "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
