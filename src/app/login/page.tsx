@@ -32,8 +32,9 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
-import { linkHistoricalData } from '@/app/actions';
+import { linkHistoricalData, getSystemSettings, sendLoginOtp, verifyLoginOtp } from '@/app/actions';
 import { Eye, EyeOff } from 'lucide-react';
+import { OtpDialog } from '@/components/otp-dialog';
 
 const loginSchema = z.object({
   email: z
@@ -53,6 +54,8 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isOtpOpen, setIsOtpOpen] = useState(false);
+  const [otpUser, setOtpUser] = useState<{ email: string; firebaseUser: FirebaseUser } | null>(null);
   
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -69,13 +72,10 @@ export default function LoginPage() {
 
     if (userDocSnap.exists()) {
       user = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
-      // If the existing name is just the email prefix, and a Google display name is available, update it.
       if (user.name === user.email.split('@')[0] && firebaseUser.displayName) {
         user.name = firebaseUser.displayName;
       }
     } else {
-      // User does not exist, need to create them.
-      // We will fetch their details from staffdata.xlsx
       const staffRes = await fetch(`/api/get-staff-data?email=${firebaseUser.email!}`);
       const staffResult = await staffRes.json();
       
@@ -91,11 +91,11 @@ export default function LoginPage() {
           if (userType === 'CRO') {
               role = 'CRO';
               designation = 'CRO';
-              profileComplete = true; // CROs skip profile setup
+              profileComplete = true; 
           } else if (userType === 'Institutional') {
               role = 'faculty';
-              designation = 'Principal'; // Institutional type maps to Principal
-              profileComplete = true; // Principals skip profile setup
+              designation = 'Principal';
+              profileComplete = true; 
           }
       }
 
@@ -115,19 +115,16 @@ export default function LoginPage() {
       };
     }
     
-    // Always update/set the photoURL from provider on sign-in
     if (firebaseUser.photoURL) {
         user.photoURL = firebaseUser.photoURL;
     }
 
-    // Ensure default modules for existing users if they don't have them
     if (!user.allowedModules || user.allowedModules.length === 0) {
       user.allowedModules = getDefaultModulesForRole(user.role, user.designation);
     }
     
     await setDoc(userDocRef, user, { merge: true });
 
-    // Back-fill pi_uid for migrated projects using a server action
     try {
       const result = await linkHistoricalData(user);
       if (result.success && result.count > 0) {
@@ -159,11 +156,30 @@ export default function LoginPage() {
     }
   };
 
+  const handleSuccessfulOtp = async () => {
+      if (!otpUser) return;
+      setIsOtpOpen(false);
+      await processSignIn(otpUser.firebaseUser);
+  };
+
   const onEmailSubmit = async (data: LoginFormValues) => {
     setIsSubmitting(true);
     try {
+      const settings = await getSystemSettings();
+
       const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
-      await processSignIn(userCredential.user);
+      
+      if (settings.is2faEnabled) {
+          const otpResult = await sendLoginOtp(data.email);
+          if (otpResult.success) {
+              setOtpUser({ email: data.email, firebaseUser: userCredential.user });
+              setIsOtpOpen(true);
+          } else {
+              throw new Error(otpResult.error || "Failed to send OTP.");
+          }
+      } else {
+          await processSignIn(userCredential.user);
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       toast({
@@ -221,6 +237,7 @@ export default function LoginPage() {
 
 
   return (
+    <>
     <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
       <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <div className="w-full max-w-md">
@@ -331,5 +348,14 @@ export default function LoginPage() {
         </nav>
       </footer>
     </div>
+    {otpUser && (
+        <OtpDialog 
+            isOpen={isOtpOpen} 
+            onOpenChange={setIsOtpOpen} 
+            email={otpUser.email}
+            onVerify={handleSuccessfulOtp} 
+        />
+    )}
+    </>
   );
 }

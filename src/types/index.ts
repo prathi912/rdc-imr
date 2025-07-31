@@ -352,4 +352,13 @@ export type EmrEvaluation = {
   comments: string;
 };
 
+export type SystemSettings = {
+    is2faEnabled: boolean;
+};
+
+export type LoginOtp = {
+    email: string;
+    otp: string;
+    expiresAt: number; // Store as timestamp
+};
     

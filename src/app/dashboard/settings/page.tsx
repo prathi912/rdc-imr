@@ -16,13 +16,14 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { db, auth } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { uploadFileToServer, fetchOrcidData, checkHODUniqueness } from '@/app/actions';
-import type { User } from '@/types';
+import { uploadFileToServer, fetchOrcidData, checkHODUniqueness, getSystemSettings, updateSystemSettings } from '@/app/actions';
+import type { User, SystemSettings } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Banknote, Bot, Loader2 } from 'lucide-react';
+import { Banknote, Bot, Loader2, ShieldCheck } from 'lucide-react';
 import { Combobox } from '@/components/ui/combobox';
+import { Switch } from '@/components/ui/switch';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
@@ -147,6 +148,9 @@ export default function SettingsPage() {
   const isPrincipal = useMemo(() => user?.designation === 'Principal', [user]);
   const isCro = useMemo(() => user?.role === 'CRO', [user]);
 
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -195,6 +199,11 @@ export default function SettingsPage() {
           const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
+
+          if (appUser.role === 'Super-admin') {
+              const settings = await getSystemSettings();
+              setSystemSettings(settings);
+          }
 
           profileForm.reset({
             name: appUser.name || '',
@@ -392,61 +401,23 @@ export default function SettingsPage() {
     }
   };
 
+  const handle2faToggle = async (enabled: boolean) => {
+    if (!systemSettings) return;
+    setIsSavingSettings(true);
+    const newSettings = { ...systemSettings, is2faEnabled: enabled };
+    setSystemSettings(newSettings); // Optimistic update
+    const result = await updateSystemSettings(newSettings);
+    if (result.success) {
+      toast({ title: 'System settings updated.' });
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
+      // Revert optimistic update
+      setSystemSettings({ ...systemSettings, is2faEnabled: !enabled });
+    }
+    setIsSavingSettings(false);
+  };
+
   const isAcademicInfoLocked = isCro || isPrincipal;
-
-  // Research paper state
-  const [paperTitle, setPaperTitle] = useState('');
-  const [coAuthorEmailInput, setCoAuthorEmailInput] = useState('');
-  const [coAuthorEmails, setCoAuthorEmails] = useState<string[]>([]);
-  const [isSubmittingPaper, setIsSubmittingPaper] = useState(false);
-
-  const addCoAuthorEmail = () => {
-    const email = coAuthorEmailInput.trim().toLowerCase();
-    if (email && !coAuthorEmails.includes(email)) {
-      setCoAuthorEmails([...coAuthorEmails, email]);
-      setCoAuthorEmailInput('');
-    }
-  };
-
-  const removeCoAuthorEmail = (emailToRemove: string) => {
-    setCoAuthorEmails(coAuthorEmails.filter(email => email !== emailToRemove));
-  };
-
-  const handlePaperSubmit = async () => {
-    if (!paperTitle.trim()) {
-      toast({ variant: 'destructive', title: 'Validation Error', description: 'Paper title is required.' });
-      return;
-    }
-    if (!user) {
-      toast({ variant: 'destructive', title: 'User Error', description: 'User not authenticated.' });
-      return;
-    }
-    setIsSubmittingPaper(true);
-    try {
-      const response = await fetch('/api/add-research-paper', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: paperTitle.trim(),
-          authorUid: user.uid,
-          coAuthorEmails,
-        }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        toast({ title: 'Research paper added successfully!' });
-        setPaperTitle('');
-        setCoAuthorEmails([]);
-      } else {
-        toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to add paper.' });
-      }
-    } catch (error) {
-      console.error('Error adding research paper:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to add paper.' });
-    } finally {
-      setIsSubmittingPaper(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -491,6 +462,32 @@ export default function SettingsPage() {
     <div className="container mx-auto py-10">
       <PageHeader title="Settings" description="Manage your account settings and preferences." />
       <div className="mt-8 space-y-8">
+        {user?.role === 'Super-admin' && systemSettings && (
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <ShieldCheck />
+                        <CardTitle>System Settings</CardTitle>
+                    </div>
+                    <CardDescription>Global settings for the application. Changes affect all users.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                            <Label className="text-base">Two-Factor Authentication (2FA)</Label>
+                            <p className="text-sm text-muted-foreground">
+                                {systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require users to verify their identity with an email OTP upon login.
+                            </p>
+                        </div>
+                        <Switch
+                            checked={systemSettings.is2faEnabled}
+                            onCheckedChange={handle2faToggle}
+                            disabled={isSavingSettings}
+                        />
+                    </div>
+                </CardContent>
+            </Card>
+        )}
         <Card>
           <CardHeader>
             <CardTitle>Profile Picture</CardTitle>

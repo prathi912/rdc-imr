@@ -28,7 +28,7 @@ export default function HelpPage() {
                 </CardHeader>
                 <CardContent className="text-center">
                     <p className="text-muted-foreground">
-                        For any queries, technical issues, or assistance with the RDC IMR Portal, please do not hesitate to reach out to our dedicated support team.
+                        For any queries, technical issues, or assistance with the Research Project Portal, please do not hesitate to reach out to our dedicated support team.
                     </p>
                     <a
                         href="mailto:helpdesk.rdc@paruluniversity.ac.in"
