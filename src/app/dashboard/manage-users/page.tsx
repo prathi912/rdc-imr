@@ -378,22 +378,24 @@ export default function ManageUsersPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onSelect={() => setUserToView(user)}>View Details</DropdownMenuItem>
-                            <DropdownMenuSub>
-                                <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
-                                <DropdownMenuPortal>
-                                    <DropdownMenuSubContent>
-                                        {availableRoles.map(role => (
-                                          <DropdownMenuItem 
-                                              key={role} 
-                                              onClick={() => handleRoleChange(user.uid, role)}
-                                              disabled={user.role === role}
-                                          >
-                                             {role.charAt(0).toUpperCase() + role.slice(1)}
-                                          </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuSubContent>
-                                </DropdownMenuPortal>
-                            </DropdownMenuSub>
+                            {isCurrentUserSuperAdmin && (
+                              <DropdownMenuSub>
+                                  <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
+                                  <DropdownMenuPortal>
+                                      <DropdownMenuSubContent>
+                                          {availableRoles.map(role => (
+                                            <DropdownMenuItem 
+                                                key={role} 
+                                                onClick={() => handleRoleChange(user.uid, role)}
+                                                disabled={user.role === role}
+                                            >
+                                               {role.charAt(0).toUpperCase() + role.slice(1)}
+                                            </DropdownMenuItem>
+                                          ))}
+                                      </DropdownMenuSubContent>
+                                  </DropdownMenuPortal>
+                              </DropdownMenuSub>
+                            )}
                             {isCurrentUserSuperAdmin && user.role === 'CRO' && (
                                 <DropdownMenuSub>
                                     <DropdownMenuSubTrigger>Assign Faculties</DropdownMenuSubTrigger>

@@ -30,7 +30,7 @@ const hierarchyCoreModules = ['analytics'];
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules];
 const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects'];
-const adminDefaults = [...croDefaults, 'schedule-meeting', 'pending-reviews', 'completed-reviews', 'analytics', 'manage-users', 'bulk-upload', 'emr-management'];
+const adminDefaults = [...croDefaults, 'schedule-meeting', 'analytics', 'manage-users'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'bulk-upload-papers'];
 
 // Default modules for special designations who are otherwise 'faculty' role
