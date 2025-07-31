@@ -154,7 +154,7 @@ The application should now be running at [http://localhost:9002](http://localhos
 -   `public/`: Static assets like images and logos.
 -   `firestore.rules`: Security rules for the Firestore database.
 -   `apphosting.yaml`: Configuration for deployment to Firebase App Hosting.
--   `format.xlsx`: Template file for Excel exports.
+-   `format.xlsx`: file for Excel exports.
 
 ## ☁️ Deployment
 

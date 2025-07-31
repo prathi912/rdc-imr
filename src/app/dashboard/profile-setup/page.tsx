@@ -55,7 +55,7 @@ const institutes = [
     "Parul Institute of Technology",
     "Parul Institute of Technology-Diploma studies",
     "Ahmedabad Homoeopathic Medical College", "Ahmedabad Physiotherapy College",
-    "College of Agriculture", "Department of Paramedical & Health Sciences", "Faculty of Library & Information Science",
+    "College of Agriculture", "Parul Institute of Allied & Healthcare Sciences", "Faculty of Library & Information Science",
     "Institute of Pharmaceutical Sciences", "Jawaharlal Nehru Homoeopathic Medical College", "Parul College of Pharmacy & Research",
     "Parul Institute of Applied Sciences (Ahmedabad Campus)", "Parul Institute of Applied Sciences (Vadodara Campus)", "Parul Institute of Architecture & Research",
     "Parul Institute of Arts", "Parul Institute of Ayurveda", "Parul Institute of Ayurveda & Research", "Parul Institute of Business Administration",

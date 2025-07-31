@@ -76,7 +76,7 @@ const institutes = [
   "Ahmedabad Homoeopathic Medical College",
   "Ahmedabad Physiotherapy College",
   "College of Agriculture",
-  "Department of Paramedical & Health Sciences",
+  "Parul Institute of Allied & Healthcare Sciences",
   "Faculty of Library & Information Science",
   "Institute of Pharmaceutical Sciences",
   "Jawaharlal Nehru Homoeopathic Medical College",

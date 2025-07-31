@@ -46,7 +46,7 @@ export function FacultyDashboard({ user }: { user: User }) {
       const [projectsSnapshot, interestsSnapshot, callsSnapshot] = await Promise.all([
           getDocs(projectsQuery),
           getDocs(emrQuery),
-          getDocs(callsSnapshot)
+          getDocs(callsQuery)
       ]);
 
       const userProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
