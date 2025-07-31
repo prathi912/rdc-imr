@@ -9,12 +9,12 @@ import { chat as chatAgent, type ChatInput } from "@/ai/flows/chat-agent"
 import { adminDb, adminStorage } from "@/lib/admin"
 import { FieldValue } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
-import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper } from "@/types"
+import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper, SystemSettings, LoginOtp } from "@/types"
 import { sendEmail as sendEmailUtility } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
-import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds, isToday } from "date-fns"
+import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds, isToday, isAfter } from "date-fns"
 import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
@@ -59,6 +59,102 @@ const EMAIL_STYLES = {
 export async function sendEmail(options: { to: string; subject: string; html: string; from: 'default' | 'rdc' }) {
     return await sendEmailUtility(options);
 }
+
+// --- 2FA & System Settings ---
+export async function getSystemSettings(): Promise<SystemSettings> {
+  try {
+    const settingsRef = adminDb.collection('system').doc('settings');
+    const settingsSnap = await settingsRef.get();
+    if (settingsSnap.exists) {
+      return settingsSnap.data() as SystemSettings;
+    }
+    // Default settings if none are found
+    return { is2faEnabled: false };
+  } catch (error) {
+    console.error("Error fetching system settings:", error);
+    // Return default settings on error to ensure app functionality
+    return { is2faEnabled: false };
+  }
+}
+
+export async function updateSystemSettings(settings: SystemSettings): Promise<{ success: boolean; error?: string }> {
+  try {
+    const settingsRef = adminDb.collection('system').doc('settings');
+    await settingsRef.set(settings, { merge: true });
+    await logActivity('INFO', 'System settings updated', { newSettings: settings });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating system settings:", error);
+    await logActivity('ERROR', 'Failed to update system settings', { error: error.message, stack: error.stack });
+    return { success: false, error: error.message || 'Failed to update settings.' };
+  }
+}
+
+export async function sendLoginOtp(email: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes from now
+
+    const otpData: LoginOtp = { email, otp, expiresAt };
+    await adminDb.collection('loginOtps').doc(email).set(otpData);
+
+    const emailHtml = `
+      <div ${EMAIL_STYLES.background}>
+        ${EMAIL_STYLES.logo}
+        <p style="color:#ffffff; text-align:center; font-size:18px;">Your Verification Code</p>
+        <p style="color:#e0e0e0; text-align:center;">Please use the following code to complete your login. This code will expire in 10 minutes.</p>
+        <div style="text-align:center; margin: 20px 0;">
+            <p style="background-color:#2c3e50; color:#ffffff; display:inline-block; padding: 10px 20px; font-size:24px; letter-spacing: 5px; border-radius: 5px;">
+                ${otp}
+            </p>
+        </div>
+        ${EMAIL_STYLES.footer}
+      </div>
+    `;
+
+    await sendEmailUtility({
+      to: email,
+      subject: 'Your Login Verification Code for PU Research Portal',
+      html: emailHtml,
+      from: 'default'
+    });
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error sending OTP:", error);
+    return { success: false, error: 'Failed to send OTP email.' };
+  }
+}
+
+export async function verifyLoginOtp(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const otpRef = adminDb.collection('loginOtps').doc(email);
+    const otpSnap = await otpRef.get();
+
+    if (!otpSnap.exists) {
+      return { success: false, error: 'Invalid or expired OTP. Please try again.' };
+    }
+
+    const otpData = otpSnap.data() as LoginOtp;
+
+    if (otpData.otp !== otp) {
+      return { success: false, error: 'The OTP you entered is incorrect.' };
+    }
+
+    if (Date.now() > otpData.expiresAt) {
+      await otpRef.delete(); // Clean up expired OTP
+      return { success: false, error: 'Your OTP has expired. Please log in again to receive a new one.' };
+    }
+
+    await otpRef.delete(); // OTP is valid and used, so delete it
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error verifying OTP:", error);
+    return { success: false, error: 'An unexpected error occurred during verification.' };
+  }
+}
+
 
 export async function saveProjectSubmission(
   projectId: string,
@@ -1515,6 +1611,9 @@ export async function findUserByMisId(
     if (!querySnapshot.empty) {
       const userDoc = querySnapshot.docs[0];
       const userData = userDoc.data() as User;
+       if (userData.role === 'admin' || userData.role === 'Super-admin') {
+         return { success: false, error: "Administrators cannot be added as Co-PIs." };
+      }
       return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email } };
     }
 
@@ -2692,13 +2791,13 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
 export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid: string): Promise<{ success: boolean; projects?: Project[]; error?: string }> {
     try {
         const projectsRef = adminDb.collection('projects');
-        const q = query(
+        const q = adminQuery(
             projectsRef,
             where('pi_uid', '==', piUid),
             where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid)
         );
 
-        const snapshot = await getDocs(q);
+        const snapshot = await adminGetDocs(q);
         const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         
         const projectsForToday = projects.filter(p => p.meetingDetails?.date && isToday(parseISO(p.meetingDetails.date)));
