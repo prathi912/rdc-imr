@@ -16,7 +16,7 @@ import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { generateChartImage } from '@/app/actions';
+import { toPng } from 'html-to-image';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
@@ -52,35 +52,19 @@ export default function AnalyticsPage() {
         return;
     }
     
-    const isDarkMode = document.documentElement.classList.contains('dark');
-    
-    // Temporarily add a caption for the export
-    const caption = document.createElement('div');
-    caption.innerText = `Chart showing ${fileName.replace(/_/g, ' ')}`;
-    caption.style.textAlign = 'center';
-    caption.style.marginTop = '10px';
-    caption.style.fontSize = '12px';
-    caption.style.color = isDarkMode ? '#e2e8f0' : '#334155';
-    ref.current.appendChild(caption);
-
     try {
-        const htmlContent = ref.current.outerHTML;
-        const result = await generateChartImage(htmlContent, isDarkMode);
-
-        if (result.success && result.dataUrl) {
-            const link = document.createElement('a');
-            link.download = `${fileName}.png`;
-            link.href = result.dataUrl;
-            link.click();
-        } else {
-            throw new Error(result.error || 'Failed to generate image on the server.');
-        }
+        const isDarkMode = document.documentElement.classList.contains('dark');
+        const dataUrl = await toPng(ref.current, { 
+            cacheBust: true, 
+            backgroundColor: isDarkMode ? '#0f172a' : '#ffffff'
+        });
+        const link = document.createElement('a');
+        link.download = `${fileName}.png`;
+        link.href = dataUrl;
+        link.click();
     } catch (err: any) {
         console.error('Chart export failed:', err);
         toast({ variant: 'destructive', title: 'Export Failed', description: err.message });
-    } finally {
-        // Clean up the added caption
-        ref.current.removeChild(caption);
     }
   }, [toast]);
 
@@ -473,7 +457,7 @@ export default function AnalyticsPage() {
           <CardContent>
             <div ref={submissionsTimeChartRef} className="p-4 bg-card">
               <ChartContainer config={submissionsConfig} className="h-[300px] w-full">
-                <LineChart accessibilityLayer data={submissionsData} isAnimationActive={false}>
+                <LineChart accessibilityLayer data={submissionsData}>
                   <CartesianGrid vertical={false} />
                   <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} />
                   <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
