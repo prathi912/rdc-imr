@@ -114,7 +114,7 @@ export async function sendLoginOtp(email: string): Promise<{ success: boolean; e
 
     await sendEmailUtility({
       to: email,
-      subject: 'Your Login Verification Code for PU Research Portal',
+      subject: 'Your Login Verification Code for PU Research Projects Portal',
       html: emailHtml,
       from: 'default'
     });
@@ -704,7 +704,7 @@ export async function scheduleMeeting(
               <p style="color: #cccccc;">
                 Please prepare for your presentation. You can view more details on the 
                 <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectData.id}" style="color: #64b5f6; text-decoration: underline;">
-                  PU Research Portal
+                  PU Research Projects Portal
                 </a>.
               </p>
               ${EMAIL_STYLES.footer}
@@ -1875,7 +1875,7 @@ export async function updateCoInvestigators(
               ${EMAIL_STYLES.logo}
               <p style="color:#ffffff;">Dear ${coPi.name},</p>
               <p style="color:#e0e0e0;">You have been added as a Co-PI to the IMR project titled "<strong style="color:#ffffff;">${project.title}</strong>" by ${project.pi}.</p>
-              <p style="color:#e0e0e0;">You can view the project details on the PU Research Portal.</p>
+              <p style="color:#e0e0e0;">You can view the project details on the PU Research Projects Portal</p>
               ${EMAIL_STYLES.footer}
             </div>`;
           await sendEmailUtility({
@@ -2148,7 +2148,7 @@ export async function scheduleEmrMeeting(
                     <p><strong style="color: #ffffff;">Date:</strong> ${format(parseISO(date), 'MMMM d, yyyy')}</p>
                      <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
                     <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
-                    <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Portal.</p>
+                    <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Projects Portal.</p>
                     ${EMAIL_STYLES.footer}
                 </div>
               `,
@@ -2475,7 +2475,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
       <div ${EMAIL_STYLES.background}>
         ${EMAIL_STYLES.logo}
         <h2 style="color: #ffffff; text-align: center;">New Funding Opportunity: ${call.title}</h2>
-        <p style="color:#e0e0e0;">A new funding call from <strong style="color:#ffffff;">${call.agency}</strong> has been posted on the PU Research Portal.</p>
+        <p style="color:#e0e0e0;">A new funding call from <strong style="color:#ffffff;">${call.agency}</strong> has been posted on the PU Research Projects Portal.</p>
         <div style="padding: 15px; border: 1px solid #4f5b62; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
           <div style="color:#e0e0e0;" class="prose prose-sm">${call.description || 'No description provided.'}</div>
           <p style="color:#e0e0e0;"><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>

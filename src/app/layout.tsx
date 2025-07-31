@@ -12,8 +12,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const sourceCodePro = Source_Code_Pro({ subsets: ['latin'], variable: '--font-source-code-pro' });
 
 export const metadata: Metadata = {
-  title: 'PU Research Portal',
-  description: 'IMR Research Project Submission Portal for Parul University',
+  title: 'PU Research Projects Portal',
+  description: 'Research Project Portal for Parul University',
 };
 
 export default function RootLayout({

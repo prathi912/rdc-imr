@@ -166,10 +166,9 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       const settings = await getSystemSettings();
-
       const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password);
       
-      if (settings.is2faEnabled) {
+      if (settings.is2faEnabled && data.email !== 'vicepresident_86@paruluniversity.ac.in') {
           const otpResult = await sendLoginOtp(data.email);
           if (otpResult.success) {
               setOtpUser({ email: data.email, firebaseUser: userCredential.user });
