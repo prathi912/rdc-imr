@@ -273,9 +273,6 @@ export default function LoginPage() {
                       <FormItem>
                          <div className="flex items-center justify-between">
                           <FormLabel>Password</FormLabel>
-                          <Link href="/forgot-password" passHref>
-                             <Button variant="link" className="p-0 h-auto text-xs">Forgot password?</Button>
-                          </Link>
                         </div>
                         <FormControl>
                           <div className="relative">
@@ -305,6 +302,11 @@ export default function LoginPage() {
                   </Button>
                 </form>
               </Form>
+              <div className="mt-4 text-center">
+                <Link href="/forgot-password" passHref>
+                    <Button variant="link" className="p-0 h-auto text-xs">Forgot password?</Button>
+                </Link>
+              </div>
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
