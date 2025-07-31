@@ -151,6 +151,10 @@ function AddEditPaperDialog({
             toast({ title: "Paper title and URL are required", variant: "destructive" });
             return;
         }
+        if (!url.trim().startsWith('https://')) {
+            toast({ title: "Invalid URL", description: "URL must start with 'https://'", variant: "destructive" });
+            return;
+        }
         setIsSubmitting(true);
         try {
             let result;
