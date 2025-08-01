@@ -564,7 +564,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                            {emrInterests.length > 0 ? emrInterests.map(interest => {
                                 const { amount, duration } = parseAdminRemarks(interest.adminRemarks);
                                 const call = fundingCalls.find(c => c.id === interest.callId);
-                                const projectTitle = interest.callTitle || 'N/A';
+                                const projectTitle = interest.callTitle || call?.title || 'N/A';
                                 const fundingAgency = call?.agency || 'N/A';
 
                                 return (
@@ -572,7 +572,13 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                                     <CardContent className="p-4 space-y-2">
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                                             <div className="flex-1">
-                                                <p className="font-semibold">{projectTitle}</p>
+                                                {interest.proofUrl ? (
+                                                    <a href={interest.proofUrl} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">
+                                                        {projectTitle}
+                                                    </a>
+                                                ) : (
+                                                    <p className="font-semibold">{projectTitle}</p>
+                                                )}
                                                 <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
                                             </div>
                                             {isOwner && interest.isBulkUploaded && <Button variant="outline" size="sm" onClick={() => setInterestToEdit(interest)}><Edit className="mr-2 h-4 w-4"/>Edit</Button>}
@@ -681,4 +687,5 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         </div>
     );
 }
+
 
