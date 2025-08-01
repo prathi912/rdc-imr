@@ -3016,7 +3016,7 @@ export async function bulkUploadEmrProjects(
       
       const interestDoc: Omit<EmrInterest, 'id'> = {
         callId: 'BULK_UPLOADED',
-        callTitle: `${row['Scheme'] || 'General'} - ${row['Funding Agency']}`,
+        callTitle: projectTitle,
         userId: piInfo?.uid || '', // Store UID if found, otherwise empty string
         userName: piInfo?.name || row['PI Name'],
         userEmail: piEmail,
@@ -3095,3 +3095,5 @@ export async function updateEmrInterestDetails(
     return { success: false, error: error.message || "Failed to update details." };
   }
 }
+
+    
