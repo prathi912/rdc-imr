@@ -447,14 +447,12 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     const isOwner = sessionUser?.uid === user.uid;
 
     const parseAdminRemarks = (remarks?: string) => {
-        if (!remarks) return { amount: null, duration: 'N/A', agency: null };
+        if (!remarks) return { amount: null, duration: 'N/A' };
         const amountMatch = remarks.match(/Amount: ([\d,]+)/);
         const durationMatch = remarks.match(/Duration: (.+)/);
-        const agencyMatch = remarks.match(/Agency: (.+?),/); // Assuming agency is before amount
         return {
             amount: amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null,
             duration: durationMatch ? durationMatch[1] : 'N/A',
-            agency: agencyMatch ? agencyMatch[1] : null,
         };
     };
 
@@ -564,10 +562,10 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     <TabsContent value="emr">
                         <div className="space-y-4 mt-4">
                            {emrInterests.length > 0 ? emrInterests.map(interest => {
-                                const { amount, duration, agency } = parseAdminRemarks(interest.adminRemarks);
+                                const { amount, duration } = parseAdminRemarks(interest.adminRemarks);
                                 const call = fundingCalls.find(c => c.id === interest.callId);
-                                const projectTitle = interest.callTitle || call?.title || 'N/A';
-                                const fundingAgency = agency || call?.agency || 'N/A';
+                                const projectTitle = interest.callTitle || 'N/A';
+                                const fundingAgency = call?.agency || 'N/A';
 
                                 return (
                                 <Card key={interest.id}>
@@ -683,3 +681,4 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         </div>
     );
 }
+
