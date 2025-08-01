@@ -447,12 +447,14 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     const isOwner = sessionUser?.uid === user.uid;
 
     const parseAdminRemarks = (remarks?: string) => {
-        if (!remarks) return { amount: null, duration: 'N/A' };
+        if (!remarks) return { amount: null, duration: 'N/A', agency: null };
         const amountMatch = remarks.match(/Amount: ([\d,]+)/);
         const durationMatch = remarks.match(/Duration: (.+)/);
+        const agencyMatch = remarks.match(/Agency: (.+?),/); // Assuming agency is before amount
         return {
             amount: amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null,
             duration: durationMatch ? durationMatch[1] : 'N/A',
+            agency: agencyMatch ? agencyMatch[1] : null,
         };
     };
 
@@ -562,22 +564,23 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     <TabsContent value="emr">
                         <div className="space-y-4 mt-4">
                            {emrInterests.length > 0 ? emrInterests.map(interest => {
-                                const { amount, duration } = parseAdminRemarks(interest.adminRemarks);
-                                const callTitleParts = interest.callTitle?.split(' - ') || [];
-                                const agency = callTitleParts.length > 1 ? callTitleParts[1] : interest.callTitle || 'N/A';
-                                
+                                const { amount, duration, agency } = parseAdminRemarks(interest.adminRemarks);
+                                const call = fundingCalls.find(c => c.id === interest.callId);
+                                const projectTitle = interest.callTitle || call?.title || 'N/A';
+                                const fundingAgency = agency || call?.agency || 'N/A';
+
                                 return (
                                 <Card key={interest.id}>
                                     <CardContent className="p-4 space-y-2">
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                                             <div className="flex-1">
-                                                <p className="font-semibold">{callTitleParts[0]}</p>
+                                                <p className="font-semibold">{projectTitle}</p>
                                                 <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
                                             </div>
                                             {isOwner && interest.isBulkUploaded && <Button variant="outline" size="sm" onClick={() => setInterestToEdit(interest)}><Edit className="mr-2 h-4 w-4"/>Edit</Button>}
                                         </div>
                                         <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
-                                            <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>
+                                            <span><strong className="text-muted-foreground">Agency:</strong> {fundingAgency}</span>
                                             {amount !== null && <span><strong className="text-muted-foreground">Amount:</strong> ₹{amount.toLocaleString('en-IN')}</span>}
                                             <span><strong className="text-muted-foreground">Duration:</strong> {duration}</span>
                                         </div>
