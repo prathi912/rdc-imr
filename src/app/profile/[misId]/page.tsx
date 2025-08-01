@@ -98,45 +98,17 @@ export default function ProfilePage() {
 
         try {
           const projectsRef = collection(db, "projects")
-          const allProjects: Project[] = []
-          const projectIds = new Set<string>()
+          const projectsQuery = query(
+              projectsRef,
+              or(
+                  where("pi_uid", "==", fetchedUser.uid),
+                  where("coPiUids", "array-contains", fetchedUser.uid),
+                  where("pi_email", "==", fetchedUser.email)
+              )
+          );
 
-          const piProjectsQuery = query(projectsRef, where("pi_uid", "==", fetchedUser.uid))
-          const piProjectsSnapshot = await getDocs(piProjectsQuery)
-          piProjectsSnapshot.forEach((doc) => {
-            if (!projectIds.has(doc.id)) {
-              allProjects.push({ id: doc.id, ...doc.data() } as Project)
-              projectIds.add(doc.id)
-            }
-          })
-
-          try {
-            const coPiProjectsQuery = query(projectsRef, where("coPiUids", "array-contains", fetchedUser.uid))
-            const coPiProjectsSnapshot = await getDocs(coPiProjectsQuery)
-            coPiProjectsSnapshot.forEach((doc) => {
-              if (!projectIds.has(doc.id)) {
-                allProjects.push({ id: doc.id, ...doc.data() } as Project)
-                projectIds.add(doc.id)
-              }
-            })
-          } catch (coPiError) {
-            console.warn("Could not fetch Co-PI projects:", coPiError)
-          }
-
-          if (fetchedUser.email) {
-            try {
-              const emailProjectsQuery = query(projectsRef, where("pi_email", "==", fetchedUser.email))
-              const emailProjectsSnapshot = await getDocs(emailProjectsQuery)
-              emailProjectsSnapshot.forEach((doc) => {
-                if (!projectIds.has(doc.id)) {
-                  allProjects.push({ id: doc.id, ...doc.data() } as Project)
-                  projectIds.add(doc.id)
-                }
-              })
-            } catch (emailError) {
-              console.warn("Could not fetch historical projects by email:", emailError)
-            }
-          }
+          const projectsSnapshot = await getDocs(projectsQuery);
+          const allProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
 
           const sortedProjects = allProjects
             .filter((p) => p.status !== "Draft")
