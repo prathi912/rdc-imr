@@ -32,7 +32,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import type { User } from '@/types';
 import { useState } from 'react';
 import { getDefaultModulesForRole } from '@/lib/modules';
-import { linkHistoricalData, notifySuperAdminsOnNewUser, linkPapersToNewUser } from '@/app/actions';
+import { linkHistoricalData, notifySuperAdminsOnNewUser, linkPapersToNewUser, linkEmrInterestsToNewUser } from '@/app/actions';
 import { Eye, EyeOff } from 'lucide-react';
 
 const signupSchema = z.object({
@@ -121,7 +121,7 @@ export default function SignupPage() {
         }
     }
     
-    let user: User = {
+    const user: User = {
       uid: firebaseUser.uid,
       name: userDataFromExcel.name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
@@ -147,22 +147,21 @@ export default function SignupPage() {
       await notifySuperAdminsOnNewUser(user.name, notifyRole);
     }
     
-    // Back-fill pi_uid for migrated projects and link papers using server actions
+    // Back-fill data for migrated projects and link papers using server actions
     try {
       const historicalResult = await linkHistoricalData(user);
       if (historicalResult.success && historicalResult.count > 0) {
-        console.log(`Successfully linked ${historicalResult.count} historical projects for new user ${user.email}.`);
+        console.log(`Successfully linked ${historicalResult.count} historical IMR projects for new user ${user.email}.`);
       }
-      if (!historicalResult.success) {
-          console.error("Failed to link historical projects:", historicalResult.error);
-      }
-      
+
       const paperResult = await linkPapersToNewUser(user.uid, user.email);
       if (paperResult.success && paperResult.count > 0) {
           console.log(`Successfully linked ${paperResult.count} research papers for new user ${user.email}.`);
       }
-      if (!paperResult.success) {
-          console.error("Failed to link research papers:", paperResult.error);
+      
+      const emrResult = await linkEmrInterestsToNewUser(user.uid, user.email);
+      if (emrResult.success && emrResult.count > 0) {
+          console.log(`Successfully linked ${emrResult.count} EMR interests for new user ${user.email}.`);
       }
 
     } catch (e) {
@@ -384,3 +383,4 @@ export default function SignupPage() {
     </div>
   );
 }
+

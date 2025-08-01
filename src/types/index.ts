@@ -323,8 +323,8 @@ export type EmrInterest = {
     userId: string;
     userName: string;
     userEmail: string;
-    faculty: string;
-    department: string;
+    faculty?: string;
+    department?: string;
     registeredAt: string; // ISO String
     pptUrl?: string;
     pptSubmissionDate?: string; // ISO String
@@ -363,3 +363,5 @@ export type LoginOtp = {
     expiresAt: number; // Store as timestamp
 };
     
+
+  
