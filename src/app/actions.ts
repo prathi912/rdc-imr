@@ -1262,7 +1262,7 @@ export async function bulkUploadProjects(
           const newProjectData: Omit<Project, 'id'> = {
               title: project.project_title, pi_email: project.pi_email, status: project.status,
               pi_uid: pi_uid, pi: piName, abstract: "Historical data migrated from bulk upload.",
-              type: "Research", faculty: faculty, institute: institute, departmentName: departmentName,
+              type: "Research", faculty: faculty || 'N/A', institute: institute, departmentName: departmentName || 'N/A',
               teamInfo: "Historical data, team info not available.",
               timelineAndOutcomes: "Historical data, outcomes not available.",
               submissionDate: submissionDate, isBulkUploaded: true,
@@ -2867,7 +2867,7 @@ export async function bulkUploadPapers(
     if (!papersMap.has(title)) {
       papersMap.set(title, { url: row.url, authors: [] });
     }
-    papersMap.get(title)!.authors.push({ email: row.author_email, type: row.author_type });
+    papersMap.get(title)!.authors.push({ email: row.author_email, type: string });
   }
 
   const successfulPapers: { title: string; authors: string[] }[] = [];
@@ -3020,8 +3020,8 @@ export async function bulkUploadEmrProjects(
         userId: piInfo?.uid || '', // Store UID if found, otherwise empty string
         userName: piInfo?.name || row['PI Name'],
         userEmail: piEmail,
-        faculty: piInfo?.faculty,
-        department: piInfo?.department,
+        faculty: piInfo?.faculty || 'N/A',
+        department: piInfo?.department || 'N/A',
         registeredAt: new Date().toISOString(),
         status: 'Sanctioned',
         coPiUids,
