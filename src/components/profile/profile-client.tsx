@@ -447,11 +447,11 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     const isOwner = sessionUser?.uid === user.uid;
 
     const parseAdminRemarks = (remarks?: string) => {
-        if (!remarks) return { amount: 'N/A', duration: 'N/A' };
+        if (!remarks) return { amount: null, duration: 'N/A' };
         const amountMatch = remarks.match(/Amount: ([\d,]+)/);
         const durationMatch = remarks.match(/Duration: (.+)/);
         return {
-            amount: amountMatch ? `₹${amountMatch[1]}` : 'N/A',
+            amount: amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null,
             duration: durationMatch ? durationMatch[1] : 'N/A',
         };
     };
@@ -563,19 +563,22 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                         <div className="space-y-4 mt-4">
                            {emrInterests.length > 0 ? emrInterests.map(interest => {
                                 const { amount, duration } = parseAdminRemarks(interest.adminRemarks);
+                                const callTitleParts = interest.callTitle?.split(' - ') || [];
+                                const agency = callTitleParts.length > 1 ? callTitleParts[1] : interest.callTitle || 'N/A';
+                                
                                 return (
                                 <Card key={interest.id}>
                                     <CardContent className="p-4 space-y-2">
                                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                                             <div className="flex-1">
-                                                <p className="font-semibold">{interest.callTitle}</p>
+                                                <p className="font-semibold">{callTitleParts[0]}</p>
                                                 <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
                                             </div>
                                             {isOwner && interest.isBulkUploaded && <Button variant="outline" size="sm" onClick={() => setInterestToEdit(interest)}><Edit className="mr-2 h-4 w-4"/>Edit</Button>}
                                         </div>
                                         <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
-                                            <span><strong className="text-muted-foreground">Agency:</strong> {interest.callTitle?.split(' - ')[1] || 'N/A'}</span>
-                                            <span><strong className="text-muted-foreground">Amount:</strong> {amount}</span>
+                                            <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>
+                                            {amount !== null && <span><strong className="text-muted-foreground">Amount:</strong> ₹{amount.toLocaleString('en-IN')}</span>}
                                             <span><strong className="text-muted-foreground">Duration:</strong> {duration}</span>
                                         </div>
                                         {!interest.proofUrl && <Badge variant="destructive"><AlertTriangle className="mr-1 h-3 w-3"/> Proof Required</Badge>}
