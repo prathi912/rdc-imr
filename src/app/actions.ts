@@ -2900,3 +2900,120 @@ export async function bulkUploadPapers(
 
   return { success: true, data: { successfulPapers, failedAuthorLinks } };
 }
+
+type EmrUploadData = {
+  'Name of the Project': string;
+  'Scheme'?: string;
+  'Funding Agency': string;
+  'Total Amount': number;
+  'Proof': string; // URL
+  'PI Name': string;
+  'PI Email': string;
+  'Duration of Project': string;
+  [key: string]: any; // For dynamic Co-PI columns
+};
+
+export async function bulkUploadEmrProjects(
+  projectsData: EmrUploadData[]
+): Promise<{
+  success: boolean;
+  data: {
+    successfulCount: number;
+    failures: { projectTitle: string; piName: string; error: string }[];
+  };
+  error?: string;
+}> {
+  let successfulCount = 0;
+  const failures: { projectTitle: string; piName: string; error: string }[] = [];
+
+  const allEmails = new Set<string>();
+  projectsData.forEach(row => {
+    allEmails.add(row['PI Email'].toLowerCase());
+    Object.keys(row).forEach(key => {
+      if (key.toLowerCase().startsWith('co-pi')) {
+        allEmails.add(String(row[key]).toLowerCase());
+      }
+    });
+  });
+  
+  const usersRef = adminDb.collection('users');
+  const userChunks: string[][] = [];
+  const emailsArray = Array.from(allEmails);
+  for (let i = 0; i < emailsArray.length; i += 30) {
+    userChunks.push(emailsArray.slice(i, i + 30));
+  }
+
+  const usersMap = new Map<string, { uid: string; name: string; faculty: string; department: string }>();
+  for (const chunk of userChunks) {
+    if (chunk.length === 0) continue;
+    const userQuery = await usersRef.where('email', 'in', chunk).get();
+    userQuery.forEach(doc => {
+      const userData = doc.data() as User;
+      usersMap.set(userData.email.toLowerCase(), {
+        uid: doc.id,
+        name: userData.name,
+        faculty: userData.faculty || 'N/A',
+        department: userData.department || 'N/A'
+      });
+    });
+  }
+
+  for (const row of projectsData) {
+    const projectTitle = row['Name of the Project'];
+    const piEmail = row['PI Email']?.toLowerCase();
+    
+    try {
+      const piInfo = usersMap.get(piEmail);
+      if (!piInfo) {
+        failures.push({ projectTitle, piName: row['PI Name'], error: `PI with email ${row['PI Email']} is not registered.` });
+        continue;
+      }
+
+      const coPiEmails = Object.keys(row)
+        .filter(key => key.toLowerCase().startsWith('co-pi'))
+        .map(key => String(row[key]).toLowerCase())
+        .filter(email => email);
+
+      const coPiUids: string[] = [];
+      const coPiNames: string[] = [];
+      coPiEmails.forEach(email => {
+        const coPiInfo = usersMap.get(email);
+        if (coPiInfo) {
+          coPiUids.push(coPiInfo.uid);
+          coPiNames.push(coPiInfo.name);
+        }
+      });
+      
+      const interestDoc: Omit<EmrInterest, 'id'> = {
+        callId: 'BULK_UPLOADED',
+        callTitle: `${row['Scheme'] || 'General'} - ${row['Funding Agency']}`,
+        userId: piInfo.uid,
+        userName: piInfo.name,
+        userEmail: piEmail,
+        faculty: piInfo.faculty,
+        department: piInfo.department,
+        registeredAt: new Date().toISOString(),
+        status: 'Sanctioned',
+        coPiUids,
+        coPiNames,
+        agencyReferenceNumber: row['Proof'],
+        // Storing amount and duration in remarks as EmrInterest doesn't have dedicated fields
+        adminRemarks: `Amount: ${row['Total Amount']}, Duration: ${row['Duration of Project']}`,
+        isBulkUploaded: true
+      };
+
+      await adminDb.collection('emrInterests').add(interestDoc);
+      successfulCount++;
+
+    } catch (error: any) {
+      failures.push({ projectTitle, piName: row['PI Name'], error: error.message || 'An unknown error occurred.' });
+    }
+  }
+
+  await logActivity('INFO', 'Bulk EMR upload completed', { successfulCount, failureCount: failures.length });
+  if (failures.length > 0) {
+      await logActivity('WARNING', 'Some EMR projects failed during bulk upload', { failures });
+  }
+
+  return { success: true, data: { successfulCount, failures } };
+}
