@@ -83,7 +83,10 @@ export default function BulkUploadEmrPage() {
     setIsLoading(true);
     setUploadResult(null);
     try {
-        const result = await bulkUploadEmrProjects(data);
+        // Sanitize the data to ensure it's a plain object array before sending to the server action
+        const plainData = JSON.parse(JSON.stringify(data));
+        const result = await bulkUploadEmrProjects(plainData);
+
         if (result.success) {
             setUploadResult(result.data);
             if(result.data.successfulCount > 0) {
