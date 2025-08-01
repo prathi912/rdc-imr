@@ -1,5 +1,6 @@
 
 
+
 export type CoPiDetails = {
     uid?: string; // Will exist for registered users
     name: string;
@@ -328,6 +329,7 @@ export type EmrInterest = {
     registeredAt: string; // ISO String
     pptUrl?: string;
     pptSubmissionDate?: string; // ISO String
+    coPiDetails?: CoPiDetails[];
     coPiUids?: string[];
     coPiNames?: string[];
     status: 'Registered' | 'PPT Submitted' | 'Revision Submitted' | 'Evaluation Pending' | 'Evaluation Done' | 'Recommended' | 'Not Recommended' | 'Revision Needed' | 'Endorsement Submitted' | 'Endorsement Signed' | 'Process Complete' | 'Submitted to Agency' | 'Sanctioned';
@@ -343,6 +345,7 @@ export type EmrInterest = {
     agencyAcknowledgementUrl?: string;
     submittedToAgencyAt?: string;
     isBulkUploaded?: boolean;
+    proofUrl?: string;
 };
 
 export type EmrEvaluation = {
