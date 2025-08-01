@@ -18,7 +18,6 @@ type EmrUploadData = {
   'Scheme'?: string;
   'Funding Agency': string;
   'Total Amount': number;
-  'Proof': string;
   'PI Name': string;
   'PI Email': string;
   'Duration of Project': string;
@@ -52,7 +51,7 @@ export default function BulkUploadEmrPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['Name of the Project', 'Funding Agency', 'Total Amount', 'Proof', 'PI Name', 'PI Email', 'Duration of Project'];
+        const requiredColumns = ['Name of the Project', 'Funding Agency', 'Total Amount', 'PI Name', 'PI Email', 'Duration of Project'];
         
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
@@ -120,7 +119,7 @@ export default function BulkUploadEmrPage() {
               <FileWarning className="h-4 w-4" />
               <AlertTitle>Required File Format</AlertTitle>
               <AlertDescription>
-                Your file must contain: <code className="font-mono text-sm">Name of the Project</code>, <code className="font-mono text-sm">Funding Agency</code>, <code className="font-mono text-sm">Total Amount</code>, <code className="font-mono text-sm">Proof</code>, <code className="font-mono text-sm">PI Name</code>, <code className="font-mono text-sm">PI Email</code>, <code className="font-mono text-sm">Duration of Project</code>. You can add any number of Co-PI columns like <code className="font-mono text-sm">Co-PI 1 email id</code>.
+                Your file must contain: <code className="font-mono text-sm">Name of the Project</code>, <code className="font-mono text-sm">Funding Agency</code>, <code className="font-mono text-sm">Total Amount</code>, <code className="font-mono text-sm">PI Name</code>, <code className="font-mono text-sm">PI Email</code>, <code className="font-mono text-sm">Duration of Project</code>. You can add any number of Co-PI columns like <code className="font-mono text-sm">Co-PI 1 email id</code>.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">

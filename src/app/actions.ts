@@ -2906,7 +2906,6 @@ type EmrUploadData = {
   'Scheme'?: string;
   'Funding Agency': string;
   'Total Amount': number;
-  'Proof': string; // URL
   'PI Name': string;
   'PI Email': string;
   'Duration of Project': string;
@@ -2996,8 +2995,6 @@ export async function bulkUploadEmrProjects(
         status: 'Sanctioned',
         coPiUids,
         coPiNames,
-        agencyReferenceNumber: row['Proof'],
-        // Storing amount and duration in remarks as EmrInterest doesn't have dedicated fields
         adminRemarks: `Amount: ${row['Total Amount']}, Duration: ${row['Duration of Project']}`,
         isBulkUploaded: true
       };
