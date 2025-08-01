@@ -297,7 +297,7 @@ export default function BulkUploadPage() {
                             <TableCell className="font-medium">{row.project_title}</TableCell>
                             <TableCell>{row.Institute}</TableCell>
                             <TableCell>{row.status}</TableCell>
-                            <TableCell className="text-right">{row.grant_amount.toLocaleString()}</TableCell>
+                            <TableCell className="text-right">₹{row.grant_amount.toLocaleString('en-IN')}</TableCell>
                             </TableRow>
                         ))}
                         </TableBody>

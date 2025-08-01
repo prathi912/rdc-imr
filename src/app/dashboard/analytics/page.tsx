@@ -529,7 +529,7 @@ export default function AnalyticsPage() {
                 <BarChart data={grantAmountData} isAnimationActive={false}>
                     <CartesianGrid vertical={false} />
                     <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickFormatter={(value) => `₹${Number(value) / 100000}L`} />
+                    <YAxis tickFormatter={(value) => `₹${Number(value / 100000).toLocaleString('en-IN')}L`} />
                     <Tooltip content={<ChartTooltipContent formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} />} />
                     <Bar dataKey="amount" fill="var(--color-amount)" radius={4} />
                 </BarChart>

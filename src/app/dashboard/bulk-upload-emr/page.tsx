@@ -186,7 +186,7 @@ export default function BulkUploadEmrPage() {
                             <TableCell className="font-medium">{row['Name of the Project']}</TableCell>
                             <TableCell>{row['PI Name']}</TableCell>
                             <TableCell>{row['Funding Agency']}</TableCell>
-                            <TableCell className="text-right">{Number(row['Total Amount']).toLocaleString()}</TableCell>
+                            <TableCell className="text-right">₹{Number(row['Total Amount']).toLocaleString('en-IN')}</TableCell>
                             </TableRow>
                         ))}
                         </TableBody>
