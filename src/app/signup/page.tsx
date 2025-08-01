@@ -121,7 +121,7 @@ export default function SignupPage() {
         }
     }
     
-    const user: User = {
+    let user: User = {
       uid: firebaseUser.uid,
       name: userDataFromExcel.name || firebaseUser.displayName || firebaseUser.email!.split('@')[0],
       email: firebaseUser.email!,
@@ -383,4 +383,3 @@ export default function SignupPage() {
     </div>
   );
 }
-
