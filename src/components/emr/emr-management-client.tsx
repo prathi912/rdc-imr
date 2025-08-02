@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrStatus } from '@/app/actions';
+import { deleteEmrInterest, updateEmrStatus, updateEmrInterestDurationAndStatus } from '@/app/actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +61,11 @@ const deleteRegistrationSchema = z.object({
     remarks: z.string().min(10, "Please provide a reason for deleting the registration."),
 });
 
+const durationStatusSchema = z.object({
+    durationAmount: z.number().min(0, "Duration must be a positive number."),
+    isOpenToPi: z.boolean(),
+});
+
 const adminRemarksSchema = z.object({
     remarks: z.string().min(10, "Please provide remarks for the applicant."),
 });
@@ -76,6 +81,8 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+    const [isDurationDialogOpen, setIsDurationDialogOpen] = useState(false);
+
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
         resolver: zodResolver(deleteRegistrationSchema),
@@ -84,6 +91,11 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     
     const remarksForm = useForm<z.infer<typeof adminRemarksSchema>>({
         resolver: zodResolver(adminRemarksSchema),
+    });
+
+    const durationForm = useForm<z.infer<typeof durationStatusSchema>>({
+        resolver: zodResolver(durationStatusSchema),
+        defaultValues: { durationAmount: 0, isOpenToPi: true },
     });
 
     const handleDeleteInterest = async (values: z.infer<typeof deleteRegistrationSchema>) => {
@@ -109,6 +121,37 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         deleteForm.reset({ remarks: '' });
         setIsDeleteDialogOpen(true);
     };
+
+    const handleOpenDurationDialog = (interest: EmrInterest) => {
+        setInterestToUpdate(interest);
+        durationForm.reset({
+            durationAmount: interest.durationAmount || 0,
+            isOpenToPi: interest.isOpenToPi !== undefined ? interest.isOpenToPi : true,
+        });
+        setIsDurationDialogOpen(true);
+    };
+
+    const handleDurationSubmit = async (values: z.infer<typeof durationStatusSchema>) => {
+        if (!interestToUpdate) return;
+        try {
+            const result = await updateEmrInterestDurationAndStatus(
+                interestToUpdate.id,
+                values.durationAmount,
+                values.isOpenToPi
+            );
+            if (result.success) {
+                toast({ title: "Updated", description: "Duration and open/closed status updated." });
+                setIsDurationDialogOpen(false);
+                setInterestToUpdate(null);
+                onActionComplete();
+            } else {
+                toast({ variant: 'destructive', title: "Error", description: result.error });
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: "Error", description: "Failed to update details." });
+        }
+    };
+    
     
     const handleStatusUpdate = async (interestId: string, newStatus: EmrInterest['status'], remarks?: string) => {
         const result = await updateEmrStatus(interestId, newStatus, remarks);
@@ -143,6 +186,8 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 'PI Email': interest.userEmail,
                 'PI Department': interestedUser?.department || interest.department,
                 'Co-PIs': interest.coPiNames?.join(', ') || 'None',
+                'Duration': interest.durationAmount ?? 'N/A',
+                'Open to PI': interest.isOpenToPi ? 'Yes' : 'No',
                 'Status': interest.status,
                 'Presentation URL': interest.pptUrl || 'Not Submitted'
             };
@@ -153,6 +198,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Registrations');
         XLSX.writeFile(workbook, `registrations_${call.title.replace(/\s+/g, '_')}.xlsx`);
     };
+    
     
     const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot);
 
@@ -178,10 +224,12 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>PI</TableHead>
-                                <TableHead className="hidden sm:table-cell">Status</TableHead>
-                                <TableHead>Docs</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+                        <TableHead>PI</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Open to PI</TableHead>
+                        <TableHead className="hidden sm:table-cell">Status</TableHead>
+                        <TableHead>Docs</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -201,6 +249,12 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                 interest.userName
                                             )}
                                             <div className="text-xs text-muted-foreground">{interest.interestId}</div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {interest.durationAmount ?? 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {interest.isOpenToPi ? 'Yes' : 'No'}
                                         </TableCell>
                                         <TableCell className="hidden sm:table-cell">
                                             <Badge variant={interest.status === 'Recommended' ? 'default' : 'secondary'}>{interest.status}</Badge>
@@ -240,6 +294,10 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                             <DropdownMenuSeparator />
                                                         </>
                                                     )}
+                                                    <DropdownMenuItem onClick={() => handleOpenDurationDialog(interest)}>
+                                                        Edit Duration / Open Status
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
                                                     <DropdownMenuItem className="text-destructive" onClick={() => handleOpenDeleteDialog(interest)}>
                                                         <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
                                                     </DropdownMenuItem>

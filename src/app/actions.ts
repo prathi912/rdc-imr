@@ -44,6 +44,37 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
   }
 }
 
+export async function getEmrInterests(callId: string): Promise<EmrInterest[]> {
+  try {
+    const interestsRef = adminDb.collection('emrInterests');
+    const q = adminQuery(interestsRef, adminWhere('callId', '==', callId));
+    const snapshot = await adminGetDocs(q);
+    const interests: EmrInterest[] = [];
+    snapshot.forEach(doc => {
+      interests.push({ id: doc.id, ...(doc.data() as EmrInterest) });
+    });
+    return interests;
+  } catch (error) {
+    console.error("Error fetching EMR interests:", error);
+    return [];
+  }
+}
+
+export async function getAllUsers(): Promise<User[]> {
+  try {
+    const usersRef = adminDb.collection('users');
+    const snapshot = await usersRef.get();
+    const users: User[] = [];
+    snapshot.forEach(doc => {
+      users.push({ uid: doc.id, ...(doc.data() as User) });
+    });
+    return users;
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    return [];
+  }
+}
+
 const EMAIL_STYLES = {
   background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
   logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
@@ -2952,11 +2983,15 @@ export async function bulkUploadEmrProjects(
   data: {
     successfulCount: number;
     failures: { projectTitle: string; piName: string; error: string }[];
+    linkedUserCount: number;
+    linkedProjects: { projectTitle: string; linkedUserName: string }[];
   };
   error?: string;
 }> {
   let successfulCount = 0;
   const failures: { projectTitle: string; piName: string; error: string }[] = [];
+  const linkedUserIds = new Set<string>();
+  const linkedProjects: { projectTitle: string; linkedUserName: string }[] = [];
 
   const allEmails = new Set<string>();
   projectsData.forEach(row => {
@@ -3014,36 +3049,82 @@ export async function bulkUploadEmrProjects(
         }
       });
       
+      // Parse Duration amount as number if possible
+      let durationAmount: number | null = null;
+      const durationRaw = row['Duration of Project'];
+      if (typeof durationRaw === 'string') {
+        const parsed = parseFloat(durationRaw);
+        if (!isNaN(parsed)) {
+          durationAmount = parsed;
+        }
+      } else if (typeof durationRaw === 'number') {
+        durationAmount = durationRaw;
+      }
+
       const interestDoc: Omit<EmrInterest, 'id'> = {
         callId: 'BULK_UPLOADED',
         callTitle: projectTitle,
         userId: piInfo?.uid || '', // Store UID if found, otherwise empty string
         userName: piInfo?.name || row['PI Name'],
-        userEmail: piEmail,
+        userEmail: piEmail || '', // Ensure no undefined
         faculty: piInfo?.faculty || 'N/A',
         department: piInfo?.department || 'N/A',
         registeredAt: new Date().toISOString(),
         status: 'Sanctioned',
         coPiUids,
         coPiNames,
-        adminRemarks: `Amount: ${row['Total Amount'].toLocaleString('en-IN')}, Duration: ${row['Duration of Project']}`,
+        durationAmount: durationAmount,
+        isOpenToPi: true, // default to open
+        adminRemarks: `Amount: ${row['Total Amount'].toLocaleString('en-IN')}`,
         isBulkUploaded: true
       };
 
-      await adminDb.collection('emrInterests').add(interestDoc);
+      await adminDb.collection('emrInterests').add(interestDoc, { ignoreUndefinedProperties: true });
       successfulCount++;
+      if (piInfo?.uid) {
+        linkedUserIds.add(piInfo.uid);
+        linkedProjects.push({ projectTitle, linkedUserName: piInfo.name || row['PI Name'] });
+      }
 
     } catch (error: any) {
       failures.push({ projectTitle, piName: row['PI Name'], error: error.message || 'An unknown error occurred.' });
     }
   }
 
-  await logActivity('INFO', 'Bulk EMR upload completed', { successfulCount, failureCount: failures.length });
+  await logActivity('INFO', 'Bulk EMR upload completed', { successfulCount, failureCount: failures.length, linkedUserCount: linkedUserIds.size });
   if (failures.length > 0) {
       await logActivity('WARNING', 'Some EMR projects failed during bulk upload', { failures });
   }
 
-  return { success: true, data: { successfulCount, failures } };
+  return { success: true, data: { successfulCount, failures, linkedUserCount: linkedUserIds.size, linkedProjects } };
+}
+
+// New server action to update Duration amount and open/closed status for an EMR interest
+export async function updateEmrInterestDurationAndStatus(
+  interestId: string,
+  durationAmount: number,
+  isOpenToPi: boolean
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId) {
+      return { success: false, error: "Interest ID is required." };
+    }
+    const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    const interestSnap = await interestRef.get();
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." };
+    }
+    await interestRef.update({
+      durationAmount,
+      isOpenToPi
+    });
+    await logActivity('INFO', 'EMR interest duration and open/closed status updated', { interestId, durationAmount, isOpenToPi });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating EMR interest duration and status:", error);
+    await logActivity('ERROR', 'Failed to update EMR interest duration and status', { interestId, error: error.message, stack: error.stack });
+    return { success: false, error: error.message || "Failed to update details." };
+  }
 }
 
 export async function updateEmrInterestDetails(

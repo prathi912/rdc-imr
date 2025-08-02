@@ -1,7 +1,6 @@
-
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { FileWarning, Upload, Loader2, XCircle, CheckCircle } from 'lucide-react';
-import { bulkUploadEmrProjects } from '@/app/actions';
+import { bulkUploadEmrProjects, getEmrInterests, getAllUsers } from '@/app/actions';
+import HistoricalBulkUploads from './historical-bulk-uploads';
+import { EmrInterest, User } from '@/types';
 
 type EmrUploadData = {
   'Name of the Project': string;
@@ -27,6 +28,8 @@ type EmrUploadData = {
 type UploadResult = {
   successfulCount: number;
   failures: { projectTitle: string; piName: string; error: string }[];
+  linkedUserCount: number;
+  linkedProjects: { projectTitle: string; linkedUserName: string }[];
 };
 
 export default function BulkUploadEmrPage() {
@@ -34,7 +37,23 @@ export default function BulkUploadEmrPage() {
   const [fileName, setFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [showHistorical, setShowHistorical] = useState(false);
+  const [historicalInterests, setHistoricalInterests] = useState<EmrInterest[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const { toast } = useToast();
+
+
+  const fetchHistoricalData = useCallback(async () => {
+    try {
+      const interests = await getEmrInterests('BULK_UPLOADED');
+      const users = await getAllUsers();
+      setHistoricalInterests(interests);
+      setAllUsers(users);
+    } catch (error) {
+      console.error('Failed to fetch historical bulk upload data:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to load historical bulk upload data.' });
+    }
+  }, [toast]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -51,7 +70,7 @@ export default function BulkUploadEmrPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['Name of the Project', 'Funding Agency', 'Total Amount', 'PI Name', 'PI Email', 'Duration of Project'];
+        const requiredColumns = ['Name of the Project', 'Funding Agency', 'Total Amount', 'PI Name', 'Duration of Project'];
         
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
@@ -146,6 +165,19 @@ export default function BulkUploadEmrPage() {
                 <div>
                     <h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" /> Successfully Added Projects ({uploadResult.successfulCount})</h3>
                     {uploadResult.successfulCount === 0 && <p className="text-sm text-muted-foreground mt-2">No new projects were added.</p>}
+                    <p className="mt-2 text-sm text-muted-foreground">Projects linked to user profiles: {uploadResult.linkedUserCount}</p>
+                    {uploadResult.linkedProjects && uploadResult.linkedProjects.length > 0 && (
+                      <div className="mt-2 max-h-48 overflow-y-auto border border-gray-300 rounded p-2 bg-gray-50">
+                        <h4 className="font-semibold mb-1">Linked Projects Details:</h4>
+                        <ul className="list-disc list-inside text-sm max-h-40 overflow-y-auto">
+                          {uploadResult.linkedProjects.map((item: { projectTitle: string; linkedUserName: string }, index: number) => (
+                            <li key={index}>
+                              <strong>{item.projectTitle}</strong> linked to <em>{item.linkedUserName}</em>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                 </div>
                  {uploadResult.failures.length > 0 && (
                      <Alert variant="destructive">
@@ -179,7 +211,7 @@ export default function BulkUploadEmrPage() {
                         <TableRow>
                             <TableHead>Project Name</TableHead>
                             <TableHead>PI Name</TableHead>
-                            <TableHead>Agency</TableHead>
+                            <TableHead>Funding Agency</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
                         </TableRow>
                         </TableHeader>
@@ -198,6 +230,20 @@ export default function BulkUploadEmrPage() {
             </CardContent>
           </Card>
         )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Historical Bulk Uploaded EMR Projects</CardTitle>
+            <Button onClick={() => setShowHistorical(!showHistorical)} size="sm" variant="outline">
+              {showHistorical ? 'Hide' : 'Show'} Historical Uploads
+            </Button>
+          </CardHeader>
+          {showHistorical && (
+            <CardContent>
+              <HistoricalBulkUploads interests={historicalInterests} allUsers={allUsers} onUpdate={fetchHistoricalData} />
+            </CardContent>
+          )}
+        </Card>
       </div>
     </div>
   );
