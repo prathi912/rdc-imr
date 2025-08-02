@@ -1290,13 +1290,43 @@ export async function bulkUploadProjects(
             submissionDate = new Date().toISOString();
           }
 
+          const coPiEmails = Object.keys(project)
+              .filter(key => key.toLowerCase().startsWith('co_pi_') && key.toLowerCase().endsWith('_email'))
+              .map(key => project[key])
+              .filter(email => typeof email === 'string' && email.trim() !== '');
+
+          let coPiDetails: CoPiDetails[] = [];
+          let coPiUids: string[] = [];
+
+          if (coPiEmails.length > 0) {
+              const coPiQuery = await usersRef.where('email', 'in', coPiEmails).get();
+              const coPiMap = new Map<string, { uid: string, name: string }>();
+              coPiQuery.forEach(doc => {
+                  const userData = doc.data();
+                  coPiMap.set(userData.email, { uid: doc.id, name: userData.name });
+              });
+
+              coPiDetails = coPiEmails.map(email => {
+                  const coPiUser = coPiMap.get(email);
+                  return {
+                      email: email,
+                      name: coPiUser?.name || 'Unknown User',
+                      uid: coPiUser?.uid,
+                  };
+              });
+
+              coPiUids = coPiDetails.map(d => d.uid).filter((uid): uid is string => !!uid);
+          }
+          
           const newProjectData: Omit<Project, 'id'> = {
               title: project.project_title, pi_email: project.pi_email, status: project.status,
               pi_uid: pi_uid, pi: piName, abstract: "Historical data migrated from bulk upload.",
               type: "Research", faculty: faculty || 'N/A', institute: institute, departmentName: departmentName || 'N/A',
-              teamInfo: "Historical data, team info not available.",
+              teamInfo: "Historical data, team info not available.", // This field is now supplemented by coPiDetails
               timelineAndOutcomes: "Historical data, outcomes not available.",
               submissionDate: submissionDate, isBulkUploaded: true,
+              coPiDetails: coPiDetails,
+              coPiUids: coPiUids,
           };
 
           if (project.grant_amount && project.grant_amount > 0) {
@@ -2898,7 +2928,7 @@ export async function bulkUploadPapers(
     if (!papersMap.has(title)) {
       papersMap.set(title, { url: row.url, authors: [] });
     }
-    papersMap.get(title)!.authors.push({ email: row.author_email, type: string });
+    papersMap.get(title)!.authors.push({ email: row.author_email, type: row.author_type });
   }
 
   const successfulPapers: { title: string; authors: string[] }[] = [];
@@ -3063,7 +3093,7 @@ export async function bulkUploadEmrProjects(
 
       const interestDoc: Omit<EmrInterest, 'id'> = {
         callId: 'BULK_UPLOADED',
-        callTitle: projectTitle,
+        callTitle: projectTitle, // Use project title as callTitle for bulk uploads
         userId: piInfo?.uid || '', // Store UID if found, otherwise empty string
         userName: piInfo?.name || row['PI Name'],
         userEmail: piEmail || '', // Ensure no undefined
@@ -3079,7 +3109,7 @@ export async function bulkUploadEmrProjects(
         isBulkUploaded: true
       };
 
-      await adminDb.collection('emrInterests').add(interestDoc, { ignoreUndefinedProperties: true });
+      await adminDb.collection('emrInterests').add(interestDoc);
       successfulCount++;
       if (piInfo?.uid) {
         linkedUserIds.add(piInfo.uid);
