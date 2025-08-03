@@ -2996,12 +2996,14 @@ export async function bulkUploadPapers(
 }
 
 type EmrUploadData = {
+  'Name of the Project': string;
   'Scheme'?: string;
   'Funding Agency': string;
   'Total Amount': number;
   'PI Name': string;
   'PI Email': string;
-  [key: string]: any; // For dynamic Co-PI columns
+  'Duration of Project': string;
+  [key: string]: any;
 };
 
 export async function bulkUploadEmrProjects(
@@ -3054,7 +3056,7 @@ export async function bulkUploadEmrProjects(
   }
 
   for (const row of projectsData) {
-    const projectTitle = `${row['Scheme'] || 'General'} - ${row['Funding Agency']}`;
+    const projectTitle = row['Name of the Project'] || `${row['Scheme'] || 'General'} - ${row['Funding Agency']}`;
     const piEmail = row['PI Email']?.toLowerCase();
     
     try {
@@ -3066,22 +3068,34 @@ export async function bulkUploadEmrProjects(
         .filter(email => email);
 
       const coPiUids = coPiEmails.map(email => usersMap.get(email)?.uid).filter((uid): uid is string => !!uid);
-      const coPiNames = coPiEmails.map(email => usersMap.get(email)?.name).filter((name): name is string => !!name);
+      const coPiNames = coPiEmails.map(email => usersMap.get(email)?.name || email).filter(Boolean);
+      
+      const coPiDetails: CoPiDetails[] = coPiEmails.map(email => {
+          const user = usersMap.get(email);
+          return {
+              email,
+              name: user?.name || email.split('@')[0],
+              uid: user?.uid
+          };
+      });
 
       const interestDoc: Omit<EmrInterest, 'id'> = {
         callId: 'BULK_UPLOADED',
         callTitle: projectTitle,
-        userId: piInfo?.uid || '', // Store UID if found, otherwise empty string
+        userId: piInfo?.uid || '',
         userName: piInfo?.name || row['PI Name'],
-        userEmail: piEmail || '', // Ensure no undefined
+        userEmail: piEmail || '',
         faculty: piInfo?.faculty || 'N/A',
         department: piInfo?.department || 'N/A',
         registeredAt: new Date().toISOString(),
         status: 'Sanctioned',
+        coPiDetails: coPiDetails,
         coPiUids,
         coPiNames,
-        adminRemarks: `Amount: ${row['Total Amount'].toLocaleString('en-IN')}`,
-        isBulkUploaded: true
+        agency: row['Funding Agency'],
+        durationAmount: `Amount: ${row['Total Amount'].toLocaleString('en-IN')} | Duration: ${row['Duration of Project']}`,
+        isBulkUploaded: true,
+        isOpenToPi: false,
       };
 
       await adminDb.collection('emrInterests').add(interestDoc);
@@ -3101,4 +3115,17 @@ export async function bulkUploadEmrProjects(
   }
 
   return { success: true, data: { successfulCount, failures, linkedUserCount: linkedUserIds.size } };
+}
+
+export async function updateEmrInterestDetails(interestId: string, updates: Partial<EmrInterest>): Promise<{ success: boolean; error?: string }> {
+    try {
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        await interestRef.update(updates);
+        await logActivity('INFO', 'EMR interest details updated', { interestId, updates });
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error updating EMR interest details:", error);
+        await logActivity('ERROR', 'Failed to update EMR interest details', { interestId, error: error.message, stack: error.stack });
+        return { success: false, error: "Failed to update details." };
+    }
 }

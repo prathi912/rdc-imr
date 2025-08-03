@@ -9,14 +9,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon } from 'lucide-react';
+import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '../ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrStatus } from '@/app/actions';
+import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus } from '@/app/actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +48,9 @@ import {
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { ScheduleMeetingDialog } from './schedule-meeting-dialog';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
 
 interface EmrManagementClientProps {
     call: FundingCall;
@@ -65,6 +68,78 @@ const adminRemarksSchema = z.object({
     remarks: z.string().min(10, "Please provide remarks for the applicant."),
 });
 
+const bulkEditSchema = z.object({
+    durationAmount: z.string().optional(),
+    isOpenToPi: z.boolean().default(false),
+});
+
+function BulkEditDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const form = useForm<z.infer<typeof bulkEditSchema>>({
+        resolver: zodResolver(bulkEditSchema),
+        defaultValues: {
+            durationAmount: interest.durationAmount || '',
+            isOpenToPi: interest.isOpenToPi || false,
+        },
+    });
+
+    const handleSubmit = async (values: z.infer<typeof bulkEditSchema>) => {
+        setIsSubmitting(true);
+        try {
+            const result = await updateEmrInterestDetails(interest.id, values);
+            if (result.success) {
+                toast({ title: 'Success', description: 'Project details updated.' });
+                onUpdate();
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Bulk Uploaded Project</DialogTitle>
+                    <DialogDescription>{interest.callTitle}</DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="bulk-edit-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
+                        <FormField control={form.control} name="durationAmount" render={({ field }) => (
+                            <FormItem>
+                                <Label>Duration & Amount</Label>
+                                <Input {...field} placeholder="e.g., Amount: 50,00,000 | Duration: 3 Years" />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="isOpenToPi" render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                                <div className="space-y-0.5">
+                                    <FormLabel>Open for PI to Edit</FormLabel>
+                                    <p className="text-[0.8rem] text-muted-foreground">Allows the PI to edit title, co-pis and upload proof.</p>
+                                </div>
+                                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                            </FormItem>
+                        )} />
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="bulk-edit-form" disabled={isSubmitting}>
+                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Saving...</> : 'Save Changes'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 export function EmrManagementClient({ call, interests, allUsers, currentUser, onActionComplete }: EmrManagementClientProps) {
     const { toast } = useToast();
     const userMap = new Map(allUsers.map(u => [u.uid, u]));
@@ -74,6 +149,8 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
     const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
+
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
         resolver: zodResolver(deleteRegistrationSchema),
@@ -131,6 +208,12 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         remarksForm.reset({ remarks: '' });
         setIsRemarksDialogOpen(true);
     };
+    
+    const handleOpenBulkEditDialog = (interest: EmrInterest) => {
+        setInterestToUpdate(interest);
+        setIsBulkEditDialogOpen(true);
+    };
+
 
     const handleExport = () => {
         const dataToExport = interests.map(interest => {
@@ -178,6 +261,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                         <TableHeader>
                             <TableRow>
                                 <TableHead>PI</TableHead>
+                                <TableHead>Co-PIs</TableHead>
                                 <TableHead className="hidden sm:table-cell">Status</TableHead>
                                 <TableHead>Docs</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
@@ -201,6 +285,9 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                             )}
                                             <div className="text-xs text-muted-foreground">{interest.interestId}</div>
                                         </TableCell>
+                                        <TableCell>
+                                            <span className="text-xs text-muted-foreground">{interest.coPiNames?.join(', ') || 'None'}</span>
+                                        </TableCell>
                                         <TableCell className="hidden sm:table-cell">
                                             <Badge variant={interest.status === 'Recommended' ? 'default' : 'secondary'}>{interest.status}</Badge>
                                         </TableCell>
@@ -219,6 +306,11 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                     <DropdownMenuSeparator />
+                                                    {interest.isBulkUploaded && (
+                                                        <DropdownMenuItem onSelect={() => handleOpenBulkEditDialog(interest)}>
+                                                            <Edit className="mr-2 h-4 w-4" /> Edit Bulk Data
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     {isMeetingScheduled && (
                                                         <>
                                                             {interest.status === 'Recommended' && (
@@ -239,7 +331,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                             <DropdownMenuSeparator />
                                                         </>
                                                     )}
-                                                    <DropdownMenuItem className="text-destructive" onClick={() => handleOpenDeleteDialog(interest)}>
+                                                    <DropdownMenuItem className="text-destructive" onSelect={() => handleOpenDeleteDialog(interest)}>
                                                         <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
@@ -319,6 +411,14 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 interests={interests}
                 allUsers={allUsers}
              />
+             {interestToUpdate && (
+                <BulkEditDialog 
+                    interest={interestToUpdate} 
+                    isOpen={isBulkEditDialogOpen} 
+                    onOpenChange={setIsBulkEditDialogOpen}
+                    onUpdate={onActionComplete}
+                />
+             )}
         </Card>
     );
 }

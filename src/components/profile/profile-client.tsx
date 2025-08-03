@@ -3,13 +3,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author } from '@/types';
-import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId } from '@/app/actions';
+import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails } from '@/types';
+import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId, updateEmrInterestDetails } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -247,13 +247,102 @@ function AddEditPaperDialog({
     )
 }
 
-export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[] }) {
+function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: (updatedInterest: EmrInterest) => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [title, setTitle] = useState(interest.callTitle || '');
+    const [coPis, setCoPis] = useState<CoPiDetails[]>(interest.coPiDetails || []);
+    // Similar co-pi search logic as in AddEditPaperDialog
+    const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+    const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
+    const [isSearching, setIsSearching] = useState(false);
+
+    const handleSearchCoPi = async () => {
+        if (!coPiSearchTerm) return;
+        setIsSearching(true);
+        try {
+            const result = await findUserByMisId(coPiSearchTerm);
+            if (result.success && (result.user || result.staff)) {
+                setFoundCoPi(result.user || { ...result.staff!, uid: undefined });
+            } else {
+                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+            }
+        } finally { setIsSearching(false); }
+    };
+
+    const handleAddCoPi = () => {
+        if (foundCoPi && !coPis.some(c => c.email === foundCoPi.email)) {
+            setCoPis([...coPis, foundCoPi]);
+            setCoPiSearchTerm('');
+            setFoundCoPi(null);
+        }
+    };
+
+    const handleRemoveCoPi = (email: string) => {
+        setCoPis(coPis.filter(c => c.email !== email));
+    };
+
+    const handleSave = async () => {
+        setIsSubmitting(true);
+        try {
+            const updates: Partial<EmrInterest> = {
+                callTitle: title,
+                coPiDetails: coPis,
+                coPiUids: coPis.map(c => c.uid).filter(Boolean) as string[],
+                coPiNames: coPis.map(c => c.name),
+            };
+            const result = await updateEmrInterestDetails(interest.id, updates);
+            if (result.success) {
+                toast({ title: 'Success', description: 'Project details updated.' });
+                onUpdate({ ...interest, ...updates });
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save changes.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader><DialogTitle>Edit EMR Project Details</DialogTitle></DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div><Label>Project Title</Label><Input value={title} onChange={e => setTitle(e.target.value)} /></div>
+                    <div>
+                        <Label>Co-PIs</Label>
+                        <div className="flex gap-2 mt-1">
+                            <Input placeholder="Search Co-PI by MIS ID" value={coPiSearchTerm} onChange={e => setCoPiSearchTerm(e.target.value)} />
+                            <Button onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin"/> : "Search"}</Button>
+                        </div>
+                        {foundCoPi && <div className="flex items-center justify-between p-2 border rounded-md mt-2"><p>{foundCoPi.name}</p><Button size="sm" onClick={handleAddCoPi}>Add</Button></div>}
+                        <div className="space-y-2 mt-2">
+                            {coPis.map(c => <div key={c.email} className="flex justify-between items-center p-2 bg-muted rounded-md text-sm"><span>{c.name}</span><Button variant="ghost" size="sm" onClick={() => handleRemoveCoPi(c.email)}>Remove</Button></div>)}
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSave} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save'}</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
+export function ProfileClient({ user, projects, emrInterests: initialEmrInterests, fundingCalls }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[] }) {
     const [domain, setDomain] = useState<string | null>(user.researchDomain || null);
     const [loadingDomain, setLoadingDomain] = useState(false);
     const [researchPapers, setResearchPapers] = useState<ResearchPaper[]>([]);
+    const [emrInterests, setEmrInterests] = useState(initialEmrInterests);
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
     const [paperToEdit, setPaperToEdit] = useState<ResearchPaper | null>(null);
     const [paperToDelete, setPaperToDelete] = useState<ResearchPaper | null>(null);
+    const [interestToEdit, setInterestToEdit] = useState<EmrInterest | null>(null);
     const { toast } = useToast();
     const [sessionUser, setSessionUser] = useState<User | null>(null);
 
@@ -308,18 +397,6 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     };
     
     const isOwner = sessionUser?.uid === user.uid;
-
-    const parseAdminRemarks = (remarks?: string) => {
-        if (!remarks) return { scheme: 'General', agency: 'N/A', amount: null };
-        const parts = remarks.split(' - ');
-        if (parts.length < 2) return { scheme: 'General', agency: remarks, amount: null };
-        const amountMatch = parts[1].match(/Amount: ([\d,]+)/);
-        return {
-            scheme: parts[0],
-            agency: amountMatch ? parts[1].replace(amountMatch[0], '').trim() : parts[1],
-            amount: amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null
-        };
-    };
 
     const StatItem = ({ value, label }: { value: number | string; label: string }) => (
         <div className="flex flex-col items-center">
@@ -428,18 +505,27 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                         <div className="space-y-4 mt-4">
                            {emrInterests.length > 0 ? emrInterests.map(interest => {
                                 const call = fundingCalls.find(c => c.id === interest.callId);
-                                const { scheme, agency, amount } = parseAdminRemarks(interest.adminRemarks);
-                                const projectTitle = interest.isBulkUploaded ? `${scheme} - ${agency}` : call?.title || 'N/A';
+                                const projectTitle = interest.callTitle || call?.title || 'N/A';
                                 
                                 return (
                                 <Card key={interest.id}>
                                     <CardContent className="p-4 space-y-2">
-                                        <p className="font-semibold">{projectTitle}</p>
-                                        <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
-                                        <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
-                                            <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>
-                                            {amount !== null && <span><strong className="text-muted-foreground">Amount:</strong> ₹{amount.toLocaleString('en-IN')}</span>}
+                                        <div className="flex justify-between items-start">
+                                            <p className="font-semibold flex-1">{projectTitle}</p>
+                                            {isOwner && interest.isBulkUploaded && interest.isOpenToPi && (
+                                                <Button size="sm" variant="outline" onClick={() => setInterestToEdit(interest)}>
+                                                    <Edit className="h-4 w-4 mr-2"/> Edit
+                                                </Button>
+                                            )}
                                         </div>
+                                        <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
+                                         <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
+                                            <span><strong className="text-muted-foreground">Agency:</strong> {interest.agency || call?.agency || 'N/A'}</span>
+                                            {interest.durationAmount && <span><strong className="text-muted-foreground">Details:</strong> {interest.durationAmount}</span>}
+                                        </div>
+                                        {interest.coPiNames && interest.coPiNames.length > 0 && (
+                                            <div className="text-sm pt-2"><strong className="text-muted-foreground">Co-PIs:</strong> {interest.coPiNames.join(', ')}</div>
+                                        )}
                                     </CardContent>
                                 </Card>
                                 )
@@ -511,6 +597,17 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                 />
             )}
             
+            {interestToEdit && (
+                <EditBulkEmrDialog
+                    interest={interestToEdit}
+                    isOpen={!!interestToEdit}
+                    onOpenChange={() => setInterestToEdit(null)}
+                    onUpdate={(updatedInterest) => {
+                        setEmrInterests(prev => prev.map(i => i.id === updatedInterest.id ? updatedInterest : i));
+                    }}
+                />
+            )}
+
             <AlertDialog open={!!paperToDelete} onOpenChange={() => setPaperToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -526,7 +623,3 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         </div>
     );
 }
-
-
-
-

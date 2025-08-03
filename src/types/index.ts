@@ -3,6 +3,7 @@
 
 
 
+
 export type CoPiDetails = {
     uid?: string; // Will exist for registered users
     name: string;
@@ -347,6 +348,10 @@ export type EmrInterest = {
     agencyAcknowledgementUrl?: string;
     submittedToAgencyAt?: string;
     isBulkUploaded?: boolean;
+    agency?: string;
+    durationAmount?: string;
+    isOpenToPi?: boolean;
+    proofUrl?: string;
 };
 
 export type EmrEvaluation = {
@@ -369,5 +374,6 @@ export type LoginOtp = {
     
 
   
+
 
 
