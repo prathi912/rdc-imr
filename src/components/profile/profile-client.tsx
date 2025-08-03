@@ -220,7 +220,7 @@ function AddEditPaperDialog({
                                 <div className="flex items-center justify-between p-2 border rounded-md mt-2">
                                     <div>
                                         <p className="text-sm">{foundCoPi.name}</p>
-                                        {!foundCoPi.isRegistered && <p className="text-xs text-muted-foreground">Not registered, but found in staff data.</p>}
+                                        {!foundCoPi.uid && <p className="text-xs text-muted-foreground">Not registered, but found in staff data.</p>}
                                     </div>
                                     <Button size="sm" onClick={addInternalAuthor}>Add</Button>
                                 </div>
