@@ -3,11 +3,31 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { AdminDashboard } from '@/components/dashboard/admin-dashboard';
-import { FacultyDashboard } from '@/components/dashboard/faculty-dashboard';
+import dynamic from 'next/dynamic';
 import { WelcomeTutorial } from '@/components/dashboard/welcome-tutorial';
 import type { User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
+
+// Dynamically import dashboard components to prevent SSR issues
+const AdminDashboard = dynamic(() => import('@/components/dashboard/admin-dashboard').then(mod => mod.AdminDashboard), {
+    loading: () => <DashboardSkeleton />,
+});
+const FacultyDashboard = dynamic(() => import('@/components/dashboard/faculty-dashboard').then(mod => mod.FacultyDashboard), {
+    loading: () => <DashboardSkeleton />,
+});
+
+const DashboardSkeleton = () => (
+    <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+            <Skeleton className="h-28 w-full" />
+        </div>
+        <Skeleton className="h-96 w-full" />
+    </div>
+);
+
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -31,17 +51,7 @@ export default function DashboardPage() {
   }, [router]);
   
   if (loading || !user || user.role === 'Evaluator') {
-      return (
-          <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Skeleton className="h-28 w-full" />
-                <Skeleton className="h-28 w-full" />
-                <Skeleton className="h-28 w-full" />
-                <Skeleton className="h-28 w-full" />
-              </div>
-              <Skeleton className="h-96 w-full" />
-          </div>
-      )
+      return <DashboardSkeleton />;
   }
 
   const adminRoles: User['role'][] = ['admin', 'Super-admin'];
