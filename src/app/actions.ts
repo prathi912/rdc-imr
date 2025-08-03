@@ -3069,15 +3069,15 @@ export async function bulkUploadEmrProjects(
         .map(key => String(row[key]).toLowerCase())
         .filter(email => email);
 
-      const coPiUids: string[] = [];
-      const coPiNames: string[] = [];
+      const coPiDetails: CoPiDetails[] = [];
       coPiEmails.forEach(email => {
         const coPiInfo = usersMap.get(email);
         if (coPiInfo) {
-          coPiUids.push(coPiInfo.uid);
-          coPiNames.push(coPiInfo.name);
+          coPiDetails.push({ uid: coPiInfo.uid, name: coPiInfo.name, email });
         }
       });
+      const coPiUids = coPiDetails.map(d => d.uid).filter((uid): uid is string => !!uid);
+      const coPiNames = coPiDetails.map(d => d.name);
       
       // Parse Duration amount as number if possible
       let durationAmount: number | null = null;
@@ -3094,6 +3094,7 @@ export async function bulkUploadEmrProjects(
       const interestDoc: Omit<EmrInterest, 'id'> = {
         callId: 'BULK_UPLOADED',
         callTitle: projectTitle, // Use project title as callTitle for bulk uploads
+        agency: row['Funding Agency'] || 'N/A',
         userId: piInfo?.uid || '', // Store UID if found, otherwise empty string
         userName: piInfo?.name || row['PI Name'],
         userEmail: piEmail || '', // Ensure no undefined
@@ -3101,6 +3102,7 @@ export async function bulkUploadEmrProjects(
         department: piInfo?.department || 'N/A',
         registeredAt: new Date().toISOString(),
         status: 'Sanctioned',
+        coPiDetails: coPiDetails,
         coPiUids,
         coPiNames,
         durationAmount: durationAmount,
@@ -3200,10 +3202,6 @@ export async function updateEmrInterestDetails(
     await logActivity('INFO', 'EMR interest details updated by PI', { interestId, userId });
 
     return { success: true };
-  } catch (error: any) {
-    console.error("Error updating EMR interest details:", error);
-    await logActivity('ERROR', 'Failed to update EMR interest details', { interestId, userId, error: error.message, stack: error.stack });
-    return { success: false, error: error.message || "Failed to update details." };
   }
 }
 
