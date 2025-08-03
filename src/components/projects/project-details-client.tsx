@@ -1098,7 +1098,17 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       <div className="space-y-2">
                           <h4 className="font-semibold text-base">Co-Principal Investigators:</h4>
                           <ul className="list-disc list-inside pl-4 text-muted-foreground">
-                              {coPiUsers.map(coPi => <li key={coPi.uid}>{coPi.name}</li>)}
+                              {coPiUsers.map(coPi => (
+                                <li key={coPi.uid}>
+                                  {coPi.misId ? (
+                                    <Link href={`/profile/${coPi.misId}`} className="text-primary hover:underline" target="_blank">
+                                      {coPi.name}
+                                    </Link>
+                                  ) : (
+                                    coPi.name
+                                  )}
+                                </li>
+                              ))}
                           </ul>
                       </div>
                   )}
