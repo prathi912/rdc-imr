@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -1094,7 +1093,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                           </CardContent>
                       </Card>
                   )}
-                  {coPiUsers.length > 0 && (
+                   {coPiUsers.length > 0 && (
                       <div className="space-y-2">
                           <h4 className="font-semibold text-base">Co-Principal Investigators:</h4>
                           <ul className="list-disc list-inside pl-4 text-muted-foreground">
