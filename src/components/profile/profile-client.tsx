@@ -3,13 +3,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails } from '@/types';
-import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId, updateEmrInterestDetails, uploadFileToServer } from '@/app/actions';
+import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author } from '@/types';
+import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, FileUp, AlertTriangle } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -247,142 +247,6 @@ function AddEditPaperDialog({
     )
 }
 
-const fileToDataUrl = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
-};
-
-function EditEmrInterestDialog({
-    isOpen,
-    onOpenChange,
-    onSuccess,
-    user,
-    interest
-}: {
-    isOpen: boolean;
-    onOpenChange: (open: boolean) => void;
-    onSuccess: () => void;
-    user: User;
-    interest: EmrInterest;
-}) {
-    const { toast } = useToast();
-    const [callTitle, setCallTitle] = useState(interest.callTitle || '');
-    const [coPiList, setCoPiList] = useState<CoPiDetails[]>(interest.coPiDetails || []);
-    const [proofFile, setProofFile] = useState<File | null>(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-    const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
-    const [isSearching, setIsSearching] = useState(false);
-
-    const handleSearchCoPi = async () => {
-        if (!coPiSearchTerm) return;
-        setIsSearching(true);
-        setFoundCoPi(null);
-        try {
-            const result = await findUserByMisId(coPiSearchTerm);
-            if (result.success) {
-                if (result.user) setFoundCoPi(result.user);
-                else if (result.staff) setFoundCoPi(result.staff);
-            } else {
-                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
-            }
-        } catch (error) { toast({ variant: 'destructive', title: 'Search Failed' }); } finally { setIsSearching(false); }
-    };
-    
-    const handleAddCoPi = () => {
-        if (foundCoPi && !coPiList.some(coPi => coPi.email === foundCoPi.email)) {
-            if (user && foundCoPi.email === user.email) {
-                toast({ variant: 'destructive', title: 'Cannot Add Self' });
-                return;
-            }
-            setCoPiList([...coPiList, foundCoPi]);
-        }
-        setFoundCoPi(null);
-        setCoPiSearchTerm('');
-    };
-
-    const handleRemoveCoPi = (emailToRemove: string) => {
-        setCoPiList(coPiList.filter(coPi => coPi.email !== emailToRemove));
-    };
-
-    const handleSubmit = async () => {
-        if (!callTitle.trim()) {
-            toast({ title: "Project title is required", variant: "destructive" });
-            return;
-        }
-        setIsSubmitting(true);
-        try {
-            let proofUrl: string | undefined = interest.proofUrl;
-            if (proofFile) {
-                if (proofFile.size > 5 * 1024 * 1024) { // 5MB limit
-                    toast({ title: "File is too large", description: "Proof must be under 5MB.", variant: "destructive" });
-                    setIsSubmitting(false);
-                    return;
-                }
-                const dataUrl = await fileToDataUrl(proofFile);
-                const path = `emr-proofs/${interest.userId}/${interest.id}/${proofFile.name}`;
-                const result = await uploadFileToServer(dataUrl, path);
-                if (result.success && result.url) {
-                    proofUrl = result.url;
-                } else {
-                    throw new Error(result.error || "Proof upload failed.");
-                }
-            }
-
-            const result = await updateEmrInterestDetails(interest.id, user.uid, {
-                callTitle,
-                coPiDetails: coPiList,
-                proofUrl
-            });
-
-            if (result.success) {
-                toast({ title: "EMR Project Updated" });
-                onSuccess();
-                onOpenChange(false);
-            } else {
-                throw new Error(result.error);
-            }
-        } catch (error: any) {
-            toast({ title: "Error updating EMR project", description: error.message, variant: "destructive" });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl">
-                <DialogHeader>
-                    <DialogTitle>Edit EMR Project Details</DialogTitle>
-                    <DialogDescription>Update the details for this sanctioned EMR project.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
-                    <div><Label>Project Title</Label><Input value={callTitle} onChange={(e) => setCallTitle(e.target.value)} /></div>
-                    <div className="space-y-2">
-                        <Label>Co-PIs</Label>
-                        <div className="flex gap-2"><Input value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} placeholder="Search by MIS ID"/><Button onClick={handleSearchCoPi} variant="outline" size="icon" disabled={!coPiSearchTerm.trim() || isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}</Button></div>
-                        {foundCoPi && <div className="flex items-center justify-between p-2 border rounded-md"><p>{foundCoPi.name}</p><Button size="sm" onClick={handleAddCoPi}>Add</Button></div>}
-                        <div className="space-y-2 pt-2">{coPiList.map(coPi => (<div key={coPi.email} className="flex items-center justify-between p-2 bg-secondary rounded-md"><p className="text-sm font-medium">{coPi.name}</p><Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.email)}>Remove</Button></div>))}</div>
-                    </div>
-                     <div>
-                        <Label>Proof Document (PDF, JPG, PNG)</Label>
-                        <Input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setProofFile(e.target.files?.[0] || null)} />
-                        {interest.proofUrl && <a href={interest.proofUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline mt-1 block">View current proof</a>}
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button onClick={() => onOpenChange(false)} variant="outline">Cancel</Button>
-                    <Button onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Save Changes'}</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[] }) {
     const [domain, setDomain] = useState<string | null>(user.researchDomain || null);
     const [loadingDomain, setLoadingDomain] = useState(false);
@@ -390,7 +254,6 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
     const [paperToEdit, setPaperToEdit] = useState<ResearchPaper | null>(null);
     const [paperToDelete, setPaperToDelete] = useState<ResearchPaper | null>(null);
-    const [interestToEdit, setInterestToEdit] = useState<EmrInterest | null>(null);
     const { toast } = useToast();
     const [sessionUser, setSessionUser] = useState<User | null>(null);
 
@@ -447,9 +310,13 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
     const isOwner = sessionUser?.uid === user.uid;
 
     const parseAdminRemarks = (remarks?: string) => {
-        if (!remarks) return { amount: null };
-        const amountMatch = remarks.match(/Amount: ([\d,]+)/);
+        if (!remarks) return { scheme: 'General', agency: 'N/A', amount: null };
+        const parts = remarks.split(' - ');
+        if (parts.length < 2) return { scheme: 'General', agency: remarks, amount: null };
+        const amountMatch = parts[1].match(/Amount: ([\d,]+)/);
         return {
+            scheme: parts[0],
+            agency: amountMatch ? parts[1].replace(amountMatch[0], '').trim() : parts[1],
             amount: amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null
         };
     };
@@ -560,27 +427,19 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     <TabsContent value="emr">
                         <div className="space-y-4 mt-4">
                            {emrInterests.length > 0 ? emrInterests.map(interest => {
-                                const { amount } = parseAdminRemarks(interest.adminRemarks);
-                                const projectTitle = interest.callTitle || 'N/A';
-                                const fundingAgency = interest.agency || 'N/A';
-                                const duration = interest.durationAmount ?? 'N/A';
-
+                                const call = fundingCalls.find(c => c.id === interest.callId);
+                                const { scheme, agency, amount } = parseAdminRemarks(interest.adminRemarks);
+                                const projectTitle = interest.isBulkUploaded ? `${scheme} - ${agency}` : call?.title || 'N/A';
+                                
                                 return (
                                 <Card key={interest.id}>
                                     <CardContent className="p-4 space-y-2">
-                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                                            <div className="flex-1">
-                                                 <p className="font-semibold">{projectTitle}</p>
-                                                <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
-                                            </div>
-                                            {isOwner && interest.isBulkUploaded && interest.isOpenToPi && <Button variant="outline" size="sm" onClick={() => setInterestToEdit(interest)}><Edit className="mr-2 h-4 w-4"/>Edit</Button>}
-                                        </div>
+                                        <p className="font-semibold">{projectTitle}</p>
+                                        <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
                                         <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
-                                            <span><strong className="text-muted-foreground">Agency:</strong> {fundingAgency}</span>
+                                            <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>
                                             {amount !== null && <span><strong className="text-muted-foreground">Amount:</strong> ₹{amount.toLocaleString('en-IN')}</span>}
-                                            <span><strong className="text-muted-foreground">Duration:</strong> {duration} {duration !== 'N/A' ? 'years' : ''}</span>
                                         </div>
-                                        {!interest.proofUrl && <Badge variant="destructive"><AlertTriangle className="mr-1 h-3 w-3"/> Proof Required</Badge>}
                                     </CardContent>
                                 </Card>
                                 )
@@ -651,18 +510,6 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
                     existingPaper={paperToEdit}
                 />
             )}
-             {isOwner && interestToEdit && (
-                <EditEmrInterestDialog
-                    isOpen={!!interestToEdit}
-                    onOpenChange={() => setInterestToEdit(null)}
-                    onSuccess={() => {
-                        // A full reload might be easier than trying to patch state here
-                        window.location.reload();
-                    }}
-                    user={user}
-                    interest={interestToEdit}
-                />
-            )}
             
             <AlertDialog open={!!paperToDelete} onOpenChange={() => setPaperToDelete(null)}>
                 <AlertDialogContent>
@@ -679,6 +526,7 @@ export function ProfileClient({ user, projects, emrInterests, fundingCalls }: { 
         </div>
     );
 }
+
 
 
 

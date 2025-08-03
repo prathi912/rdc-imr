@@ -2996,13 +2996,11 @@ export async function bulkUploadPapers(
 }
 
 type EmrUploadData = {
-  'Name of the Project': string;
   'Scheme'?: string;
   'Funding Agency': string;
   'Total Amount': number;
   'PI Name': string;
   'PI Email': string;
-  'Duration of Project': string;
   [key: string]: any; // For dynamic Co-PI columns
 };
 
@@ -3014,14 +3012,12 @@ export async function bulkUploadEmrProjects(
     successfulCount: number;
     failures: { projectTitle: string; piName: string; error: string }[];
     linkedUserCount: number;
-    linkedProjects: { projectTitle: string; linkedUserName: string }[];
   };
   error?: string;
 }> {
   let successfulCount = 0;
   const failures: { projectTitle: string; piName: string; error: string }[] = [];
   const linkedUserIds = new Set<string>();
-  const linkedProjects: { projectTitle: string; linkedUserName: string }[] = [];
 
   const allEmails = new Set<string>();
   projectsData.forEach(row => {
@@ -3058,7 +3054,7 @@ export async function bulkUploadEmrProjects(
   }
 
   for (const row of projectsData) {
-    const projectTitle = row['Name of the Project'];
+    const projectTitle = `${row['Scheme'] || 'General'} - ${row['Funding Agency']}`;
     const piEmail = row['PI Email']?.toLowerCase();
     
     try {
@@ -3069,32 +3065,12 @@ export async function bulkUploadEmrProjects(
         .map(key => String(row[key]).toLowerCase())
         .filter(email => email);
 
-      const coPiDetails: CoPiDetails[] = [];
-      coPiEmails.forEach(email => {
-        const coPiInfo = usersMap.get(email);
-        if (coPiInfo) {
-          coPiDetails.push({ uid: coPiInfo.uid, name: coPiInfo.name, email });
-        }
-      });
-      const coPiUids = coPiDetails.map(d => d.uid).filter((uid): uid is string => !!uid);
-      const coPiNames = coPiDetails.map(d => d.name);
-      
-      // Parse Duration amount as number if possible
-      let durationAmount: number | null = null;
-      const durationRaw = row['Duration of Project'];
-      if (typeof durationRaw === 'string') {
-        const parsed = parseFloat(durationRaw);
-        if (!isNaN(parsed)) {
-          durationAmount = parsed;
-        }
-      } else if (typeof durationRaw === 'number') {
-        durationAmount = durationRaw;
-      }
+      const coPiUids = coPiEmails.map(email => usersMap.get(email)?.uid).filter((uid): uid is string => !!uid);
+      const coPiNames = coPiEmails.map(email => usersMap.get(email)?.name).filter((name): name is string => !!name);
 
       const interestDoc: Omit<EmrInterest, 'id'> = {
         callId: 'BULK_UPLOADED',
-        callTitle: projectTitle, // Use project title as callTitle for bulk uploads
-        agency: row['Funding Agency'] || 'N/A',
+        callTitle: projectTitle,
         userId: piInfo?.uid || '', // Store UID if found, otherwise empty string
         userName: piInfo?.name || row['PI Name'],
         userEmail: piEmail || '', // Ensure no undefined
@@ -3102,11 +3078,8 @@ export async function bulkUploadEmrProjects(
         department: piInfo?.department || 'N/A',
         registeredAt: new Date().toISOString(),
         status: 'Sanctioned',
-        coPiDetails: coPiDetails,
         coPiUids,
         coPiNames,
-        durationAmount: durationAmount,
-        isOpenToPi: true, // default to open
         adminRemarks: `Amount: ${row['Total Amount'].toLocaleString('en-IN')}`,
         isBulkUploaded: true
       };
@@ -3115,7 +3088,6 @@ export async function bulkUploadEmrProjects(
       successfulCount++;
       if (piInfo?.uid) {
         linkedUserIds.add(piInfo.uid);
-        linkedProjects.push({ projectTitle, linkedUserName: piInfo.name || row['PI Name'] });
       }
 
     } catch (error: any) {
@@ -3128,81 +3100,5 @@ export async function bulkUploadEmrProjects(
       await logActivity('WARNING', 'Some EMR projects failed during bulk upload', { failures });
   }
 
-  return { success: true, data: { successfulCount, failures, linkedUserCount: linkedUserIds.size, linkedProjects } };
+  return { success: true, data: { successfulCount, failures, linkedUserCount: linkedUserIds.size } };
 }
-
-// New server action to update Duration amount and open/closed status for an EMR interest
-export async function updateEmrInterestDurationAndStatus(
-  interestId: string,
-  durationAmount: number,
-  isOpenToPi: boolean
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    if (!interestId) {
-      return { success: false, error: "Interest ID is required." };
-    }
-    const interestRef = adminDb.collection('emrInterests').doc(interestId);
-    const interestSnap = await interestRef.get();
-    if (!interestSnap.exists) {
-      return { success: false, error: "Interest registration not found." };
-    }
-    await interestRef.update({
-      durationAmount,
-      isOpenToPi
-    });
-    await logActivity('INFO', 'EMR interest duration and open/closed status updated', { interestId, durationAmount, isOpenToPi });
-    return { success: true };
-  } catch (error: any) {
-    console.error("Error updating EMR interest duration and status:", error);
-    await logActivity('ERROR', 'Failed to update EMR interest duration and status', { interestId, error: error.message, stack: error.stack });
-    return { success: false, error: error.message || "Failed to update details." };
-  }
-}
-
-export async function updateEmrInterestDetails(
-  interestId: string,
-  userId: string,
-  data: {
-    callTitle: string;
-    coPiDetails: CoPiDetails[];
-    proofUrl?: string;
-  }
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    if (!interestId || !userId) {
-      return { success: false, error: "Interest ID and User ID are required." };
-    }
-    const interestRef = adminDb.collection('emrInterests').doc(interestId);
-    const interestSnap = await interestRef.get();
-
-    if (!interestSnap.exists) {
-      return { success: false, error: "Interest registration not found." };
-    }
-    const interestData = interestSnap.data() as EmrInterest;
-
-    if (interestData.userId !== userId) {
-      return { success: false, error: "You do not have permission to edit this record." };
-    }
-
-    const coPiUids = data.coPiDetails.map(c => c.uid).filter(Boolean) as string[];
-    const coPiNames = data.coPiDetails.map(c => c.name);
-
-    const updateData: Partial<EmrInterest> = {
-      callTitle: data.callTitle,
-      coPiDetails: data.coPiDetails,
-      coPiUids: coPiUids,
-      coPiNames: coPiNames,
-    };
-
-    if (data.proofUrl) {
-      updateData.proofUrl = data.proofUrl;
-    }
-
-    await interestRef.update(updateData);
-    await logActivity('INFO', 'EMR interest details updated by PI', { interestId, userId });
-
-    return { success: true };
-  }
-}
-
-    

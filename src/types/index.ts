@@ -2,6 +2,7 @@
 
 
 
+
 export type CoPiDetails = {
     uid?: string; // Will exist for registered users
     name: string;
@@ -322,7 +323,6 @@ export type EmrInterest = {
     interestId?: string; // Human-readable sequential ID
     callId: string;
     callTitle?: string; // For convenience, especially for bulk uploads
-    agency?: string; // For bulk uploads
     userId: string;
     userName: string;
     userEmail: string;
@@ -347,9 +347,6 @@ export type EmrInterest = {
     agencyAcknowledgementUrl?: string;
     submittedToAgencyAt?: string;
     isBulkUploaded?: boolean;
-    proofUrl?: string;
-    durationAmount?: number | null;
-    isOpenToPi?: boolean;
 };
 
 export type EmrEvaluation = {
@@ -372,4 +369,5 @@ export type LoginOtp = {
     
 
   
+
 
