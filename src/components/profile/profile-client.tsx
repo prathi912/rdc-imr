@@ -506,7 +506,8 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                            {emrInterests.length > 0 ? emrInterests.map(interest => {
                                 const call = fundingCalls.find(c => c.id === interest.callId);
                                 const projectTitle = interest.callTitle || call?.title || 'N/A';
-                                
+                                const agency = interest.agency || call?.agency || 'N/A';
+
                                 return (
                                 <Card key={interest.id}>
                                     <CardContent className="p-4 space-y-2">
@@ -520,7 +521,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                         </div>
                                         <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
                                          <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
-                                            <span><strong className="text-muted-foreground">Agency:</strong> {interest.agency || call?.agency || 'N/A'}</span>
+                                            <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>
                                             {interest.durationAmount && <span><strong className="text-muted-foreground">Details:</strong> {interest.durationAmount}</span>}
                                         </div>
                                         {interest.coPiNames && interest.coPiNames.length > 0 && (
