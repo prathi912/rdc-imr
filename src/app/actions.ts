@@ -3074,7 +3074,7 @@ export async function bulkUploadEmrProjects(
           return {
               email,
               name: user?.name || email.split('@')[0],
-              uid: user?.uid
+              uid: user?.uid || null,
           };
       });
 
@@ -3096,9 +3096,6 @@ export async function bulkUploadEmrProjects(
         isBulkUploaded: true,
         isOpenToPi: false,
       };
-
-      //Fix: Save funding agency
-          interestDoc.agency = row['Funding Agency'] || '';
 
       await adminDb.collection('emrInterests').add(interestDoc);
       successfulCount++;
