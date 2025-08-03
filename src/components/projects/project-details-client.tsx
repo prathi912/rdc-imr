@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import type React from "react"
@@ -1049,65 +1050,59 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           {(project.teamInfo || (coPiUsers && coPiUsers.length > 0) || isPI) && (
             <>
               <div className="space-y-4">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Team Information
-                </h3>
-                {isPI && (
-                  <Card className="bg-muted/50">
-                    <CardHeader>
-                      <CardTitle className="text-base">Manage Co-Investigators</CardTitle>
-                      <CardDescription>Add or remove Co-PIs for this project.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Search & Add Co-PI by MIS ID</Label>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            placeholder="Search by Co-PI's MIS ID"
-                            value={coPiSearchTerm}
-                            onChange={(e) => setCoPiSearchTerm(e.target.value)}
-                          />
-                          <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
-                            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-                          </Button>
-                        </div>
-                        {foundCoPi && (
-                          <div className="flex items-center justify-between p-2 border rounded-md">
-                            <p>{foundCoPi.name}</p>
-                            <Button type="button" size="sm" onClick={handleAddCoPi}>
-                              Add
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Current Co-PI(s)</Label>
-                        {coPiList.length > 0 ? (
-                          coPiList.map((coPi) => (
-                            <div key={coPi.uid} className="flex items-center justify-between p-2 bg-background rounded-md">
-                              <p className="text-sm font-medium">{coPi.name}</p>
-                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>
-                                Remove
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Team Information
+                  </h3>
+                  {isPI && (
+                      <Card className="bg-muted/50">
+                          <CardHeader>
+                              <CardTitle className="text-base">Manage Co-Investigators</CardTitle>
+                              <CardDescription>Add or remove Co-PIs for this project.</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                              <div className="space-y-2">
+                                  <Label>Search & Add Co-PI by MIS ID</Label>
+                                  <div className="flex items-center gap-2">
+                                      <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
+                                      <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}</Button>
+                                  </div>
+                                  {foundCoPi && (
+                                      <div className="flex items-center justify-between p-2 border rounded-md">
+                                          <p>{foundCoPi.name}</p>
+                                          <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
+                                      </div>
+                                  )}
+                              </div>
+                              <div className="space-y-2">
+                                  <Label>Current Co-PI(s)</Label>
+                                  {coPiList.length > 0 ? (
+                                      coPiList.map((coPi) => (
+                                          <div key={coPi.uid} className="flex items-center justify-between p-2 bg-background rounded-md">
+                                              <p className="text-sm font-medium">{coPi.name}</p>
+                                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>Remove</Button>
+                                          </div>
+                                      ))
+                                  ) : (
+                                      <p className="text-sm text-muted-foreground">No Co-PIs added.</p>
+                                  )}
+                              </div>
+                              <Button onClick={handleSaveCoPis} disabled={isSavingCoPis}>
+                                  {isSavingCoPis && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                  Save Co-PI List
                               </Button>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No Co-PIs added.</p>
-                        )}
+                          </CardContent>
+                      </Card>
+                  )}
+                  {coPiUsers.length > 0 && (
+                      <div className="space-y-2">
+                          <h4 className="font-semibold text-base">Co-Principal Investigators:</h4>
+                          <ul className="list-disc list-inside pl-4 text-muted-foreground">
+                              {coPiUsers.map(coPi => <li key={coPi.uid}>{coPi.name}</li>)}
+                          </ul>
                       </div>
-                      <Button onClick={handleSaveCoPis} disabled={isSavingCoPis}>
-                        {isSavingCoPis && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save Co-PI List
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-                {project.teamInfo && (
-                  <p className="text-muted-foreground whitespace-pre-wrap">
-                    {project.teamInfo.split(";").find((part) => part.trim().startsWith("Students:"))}
-                  </p>
-                )}
+                  )}
+                  {project.teamInfo && <p className="text-muted-foreground whitespace-pre-wrap">{project.teamInfo}</p>}
               </div>
               <Separator />
             </>
