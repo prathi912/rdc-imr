@@ -1,5 +1,3 @@
-
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -3093,7 +3091,7 @@ export async function bulkUploadEmrProjects(
         coPiUids,
         coPiNames,
         agency: row['Funding Agency'],
-        durationAmount: `Amount: ${row['Total Amount'].toLocaleString('en-IN')} | Duration: ${row['Duration of Project']}`,
+        durationAmount: `Amount: ${row['Total Amount']?.toLocaleString('en-IN')} | Duration: ${row['Duration of Project']}`,
         isBulkUploaded: true,
         isOpenToPi: false,
       };

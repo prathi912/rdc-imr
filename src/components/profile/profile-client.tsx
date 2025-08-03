@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -519,7 +518,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                             )}
                                         </div>
                                         <p className="text-sm text-muted-foreground">{interest.userId === user.uid ? 'Role: PI' : 'Role: Co-PI'}</p>
-                                         <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
+                                        <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
                                             {agency && <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>}
                                             {interest.durationAmount && <span><strong className="text-muted-foreground">Details:</strong> {interest.durationAmount}</span>}
                                         </div>
