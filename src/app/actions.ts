@@ -1,3 +1,4 @@
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -2926,7 +2927,7 @@ export async function bulkUploadPapers(
     if (!papersMap.has(title)) {
       papersMap.set(title, { url: row.url, authors: [] });
     }
-    papersMap.get(title)!.authors.push({ email: row.author_email, type: row.author_type });
+    papersMap.get(title)!.authors.push({ email: row.author_email, type: string });
   }
 
   const successfulPapers: { title: string; authors: string[] }[] = [];
@@ -3095,6 +3096,9 @@ export async function bulkUploadEmrProjects(
         isBulkUploaded: true,
         isOpenToPi: false,
       };
+
+      //Fix: Save funding agency
+          interestDoc.agency = row['Funding Agency'] || '';
 
       await adminDb.collection('emrInterests').add(interestDoc);
       successfulCount++;
