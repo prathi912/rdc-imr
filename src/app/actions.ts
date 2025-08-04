@@ -2371,7 +2371,6 @@ export async function withdrawEmrInterest(interestId: string): Promise<{ success
         await logActivity('INFO', 'User withdrew EMR interest', { interestId, userId: interest.userId, callId: interest.callId });
         return { success: true };
     } catch (error: any) {
-        console.error("Error withdrawing EMR interest:", error);
         const interestSnap = await adminDb.collection('emrInterests').doc(interestId).get();
         const interest = interestSnap.exists() ? interestSnap.data() as EmrInterest : null;
         await logActivity('ERROR', 'Failed to withdraw EMR interest', { interestId, userId: interest?.userId, callId: interest?.callId, error: error.message, stack: error.stack });
@@ -2825,14 +2824,14 @@ export async function generateOfficeNotingForm(projectId: string): Promise<{ suc
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
     const projectSnap = await projectRef.get();
-    if (!projectSnap.exists()) {
+    if (!projectSnap.exists) {
       return { success: false, error: 'Project not found.' };
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
 
     const piUserRef = adminDb.collection('users').doc(project.pi_uid);
     const piUserSnap = await piUserRef.get();
-    const piUser = piUserSnap.exists() ? piUserSnap.data() as User : null;
+    const piUser = piUserSnap.exists ? piUserSnap.data() as User : null;
 
     const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
     if (!fs.existsSync(templatePath)) {
