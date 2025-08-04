@@ -18,7 +18,7 @@ import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, set
 import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import { getDoc, getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
+import { getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -2824,14 +2824,14 @@ export async function submitToAgency(
 export async function generateOfficeNotingForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
-    const projectSnap = await getDoc(projectRef);
+    const projectSnap = await projectRef.get();
     if (!projectSnap.exists()) {
       return { success: false, error: 'Project not found.' };
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
 
     const piUserRef = adminDb.collection('users').doc(project.pi_uid);
-    const piUserSnap = await getDoc(piUserRef);
+    const piUserSnap = await piUserRef.get();
     const piUser = piUserSnap.exists() ? piUserSnap.data() as User : null;
 
     const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
