@@ -660,7 +660,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     <>
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
-        {isAdmin && (project.status === "Sanctioned") && (
+        {isAdmin && project.status === "Under Review" && allEvaluationsIn && (
           <Button onClick={handlePrint} disabled={isPrinting}>
             {isPrinting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
