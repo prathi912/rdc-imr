@@ -1919,6 +1919,82 @@ export async function updatePhaseStatus(
   }
 }
 
+export async function requestNextPhaseDisbursement(
+    projectId: string,
+    phaseId: string
+): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
+    try {
+        const projectRef = adminDb.collection("projects").doc(projectId);
+        const projectSnap = await projectRef.get();
+
+        if (!projectSnap.exists) {
+            return { success: false, error: "Project not found." };
+        }
+
+        const project = projectSnap.data() as Project;
+        if (!project.grant) {
+            return { success: false, error: "Project does not have grant details." };
+        }
+
+        const phaseIndex = project.grant.phases.findIndex((p) => p.id === phaseId);
+        if (phaseIndex === -1) {
+            return { success: false, error: "Phase not found." };
+        }
+
+        // Server-side validation of 80% utilization
+        const currentPhase = project.grant.phases[phaseIndex];
+        const totalUtilized = currentPhase.transactions?.reduce((acc, t) => acc + t.amount, 0) || 0;
+        const utilizationPercentage = (totalUtilized / currentPhase.amount) * 100;
+
+        if (utilizationPercentage < 80) {
+            return { success: false, error: "Utilization must be at least 80% to request the next phase." };
+        }
+
+        // Update current phase status
+        const updatedPhases = [...project.grant.phases];
+        updatedPhases[phaseIndex] = {
+            ...currentPhase,
+            status: "Utilization Submitted",
+            utilizationSubmissionDate: new Date().toISOString(),
+        };
+
+        const updatedGrant = { ...project.grant, phases: updatedPhases };
+        await projectRef.update({ grant: updatedGrant });
+        await logActivity('INFO', 'Next grant phase disbursement requested', { projectId, phaseId });
+
+        // Notify admins
+        const adminRoles = ["admin", "Super-admin", "CRO"];
+        const usersRef = adminDb.collection("users");
+        const q = usersRef.where("role", "in", adminRoles);
+        const adminUsersSnapshot = await q.get();
+
+        if (!adminUsersSnapshot.empty) {
+            const batch = adminDb.batch();
+            const notificationTitle = `${project.pi} has requested the next grant phase for "${project.title}".`;
+            adminUsersSnapshot.forEach((userDoc) => {
+                const notificationRef = adminDb.collection("notifications").doc();
+                batch.set(notificationRef, {
+                    uid: userDoc.id,
+                    projectId: projectId,
+                    title: notificationTitle,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
+                });
+            });
+            await batch.commit();
+        }
+        
+        const updatedProject = { ...project, grant: updatedGrant };
+        return { success: true, updatedProject };
+        
+    } catch (error: any) {
+        console.error("Error requesting next phase:", error);
+        await logActivity('ERROR', 'Failed to request next phase', { projectId, phaseId, error: error.message, stack: error.stack });
+        return { success: false, error: error.message || "Failed to request the next phase." };
+    }
+}
+
+
 export async function updateCoInvestigators(
   projectId: string,
   coPiUids: string[],
@@ -3196,5 +3272,8 @@ export async function updateEmrInterestDetails(interestId: string, updates: Part
 }
 
     
+
+  
+
 
   
