@@ -6,6 +6,8 @@
 
 
 
+
+
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -155,6 +157,8 @@ export type Project = {
   isBulkUploaded?: boolean;
   projectStartDate?: string;
   projectEndDate?: string;
+  projectDuration?: string;
+  phases?: { name: string, amount: number }[];
   sdgGoals?: string[];
 };
 
@@ -382,3 +386,8 @@ export type LoginOtp = {
 
 
 
+
+
+    
+
+  

@@ -2820,7 +2820,13 @@ export async function submitToAgency(
     }
 }
 
-export async function generateOfficeNotingForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
+export async function generateOfficeNotingForm(
+  projectId: string,
+  formData: {
+    projectDuration: string;
+    phases: { name: string; amount: number }[];
+  }
+): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
     const projectSnap = await projectRef.get();
@@ -2832,6 +2838,13 @@ export async function generateOfficeNotingForm(projectId: string): Promise<{ suc
     const piUserRef = adminDb.collection('users').doc(project.pi_uid);
     const piUserSnap = await piUserRef.get();
     const piUser = piUserSnap.exists ? piUserSnap.data() as User : null;
+    
+    // Save the duration and phases to the project document
+    await projectRef.update({
+        projectDuration: formData.projectDuration,
+        phases: formData.phases,
+    });
+
 
     const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
     if (!fs.existsSync(templatePath)) {
@@ -2856,6 +2869,11 @@ export async function generateOfficeNotingForm(projectId: string): Promise<{ suc
       pi_email: project.pi_email,
       ...coPiData,
       project_title: project.title,
+      project_duration: formData.projectDuration,
+      phases: formData.phases.map(p => ({
+        phase_name: p.name,
+        phase_amount: p.amount.toLocaleString('en-IN')
+      })),
     };
 
     doc.setData(data);
@@ -3141,3 +3159,7 @@ export async function updateEmrInterestDetails(interestId: string, updates: Part
         return { success: false, error: "Failed to update details." };
     }
 }
+
+    
+
+  
