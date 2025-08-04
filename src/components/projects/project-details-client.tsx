@@ -1,12 +1,11 @@
 
-
 "use client"
 
 import type React from "react"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import * as z from "zod"
-import { useForm } from "react-hook-form"
+import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { format, startOfToday, isToday, parseISO } from "date-fns"
 import { useRouter } from "next/navigation"
@@ -82,6 +81,7 @@ import {
   Loader2,
   Printer,
   Download,
+  Plus,
 } from "lucide-react"
 
 import { GrantManagement } from "./grant-management"
@@ -130,6 +130,15 @@ const revisionCommentSchema = z.object({
 })
 type RevisionCommentFormData = z.infer<typeof revisionCommentSchema>
 
+const notingFormSchema = z.object({
+    projectDuration: z.string().min(3, 'Project duration is required.'),
+    phases: z.array(z.object({
+        name: z.string().min(1, 'Phase name is required.'),
+        amount: z.coerce.number().positive('Amount must be a positive number.'),
+    })).min(1, 'At least one funding phase is required.')
+});
+type NotingFormData = z.infer<typeof notingFormSchema>;
+
 const venues = ["RDC Committee Room, PIMSR"]
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -166,6 +175,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isEvaluatorDialogOpen, setIsEvaluatorDialogOpen] = useState(false)
   const [isRevisionCommentDialogOpen, setIsRevisionCommentDialogOpen] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
+  const [isNotingDialogOpen, setIsNotingDialogOpen] = useState(false);
   const isMobile = useIsMobile();
 
   // Co-PI management state
@@ -187,6 +197,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     resolver: zodResolver(revisionCommentSchema),
     defaultValues: { comments: "" },
   })
+
+    const notingForm = useForm<NotingFormData>({
+        resolver: zodResolver(notingFormSchema),
+        defaultValues: {
+            projectDuration: '',
+            phases: [{ name: 'Phase 1', amount: 0 }],
+        }
+    });
 
   const refetchEvaluations = useCallback(async () => {
     try {
@@ -622,10 +640,18 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     handleStatusUpdate("Revision Needed", data.comments)
   }
 
-  const handlePrint = async () => {
+  const handleOpenNotingDialog = () => {
+    notingForm.reset({
+        projectDuration: project.projectDuration || '',
+        phases: project.phases || [{ name: 'Phase 1', amount: 0 }],
+    });
+    setIsNotingDialogOpen(true);
+  };
+
+  const handlePrint = async (data: NotingFormData) => {
     setIsPrinting(true);
     try {
-        const result = await generateOfficeNotingForm(project.id);
+        const result = await generateOfficeNotingForm(project.id, data);
         if (result.success && result.fileData) {
             const byteCharacters = atob(result.fileData);
             const byteNumbers = new Array(byteCharacters.length);
@@ -644,6 +670,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             a.remove();
             window.URL.revokeObjectURL(url);
             toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
+            setIsNotingDialogOpen(false);
         } else {
             throw new Error(result.error || "Failed to generate form.");
         }
@@ -661,13 +688,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
         {isAdmin && project.status === "Under Review" && allEvaluationsIn && (
-          <Button onClick={handlePrint} disabled={isPrinting}>
-            {isPrinting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
+          <Button onClick={handleOpenNotingDialog} disabled={isPrinting}>
               <Download className="mr-2 h-4 w-4" />
-            )}
-            Download Office Notings
+              Download Office Notings
           </Button>
         )}
       </div>
@@ -1334,6 +1357,61 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <OfficeNotingDialog 
+        isOpen={isNotingDialogOpen}
+        onOpenChange={setIsNotingDialogOpen}
+        onSubmit={handlePrint}
+        isPrinting={isPrinting}
+        form={notingForm}
+      />
     </>
   )
+}
+
+
+function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }: { isOpen: boolean, onOpenChange: (open: boolean) => void, onSubmit: (data: NotingFormData) => void, isPrinting: boolean, form: any }) {
+    const { fields, append, remove } = useFieldArray({
+        control: form.control,
+        name: "phases",
+    });
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Generate Office Notings Form</DialogTitle>
+                    <DialogDescription>Please provide the project duration and phase-wise grant amounts before downloading.</DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="noting-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                        <FormField control={form.control} name="projectDuration" render={({ field }) => (
+                            <FormItem><FormLabel>Project Duration</FormLabel><FormControl><Input {...field} placeholder="e.g., 2 Years" /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <div>
+                            <Label>Phase-wise Grant Amount</Label>
+                            <div className="space-y-2 mt-2">
+                                {fields.map((field, index) => (
+                                    <div key={field.id} className="flex items-center gap-2">
+                                        <FormField control={form.control} name={`phases.${index}.name`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input {...field} placeholder={`Phase ${index + 1} Name`} /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input type="number" {...field} placeholder="Amount" /></FormControl><FormMessage /></FormItem> )} />
+                                        <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}><X className="h-4 w-4" /></Button>
+                                    </div>
+                                ))}
+                            </div>
+                            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => append({ name: `Phase ${fields.length + 1}`, amount: 0 })}>
+                                <Plus className="mr-2 h-4 w-4" /> Add Phase
+                            </Button>
+                        </div>
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button type="submit" form="noting-form" disabled={isPrinting}>
+                        {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Save & Download
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }
