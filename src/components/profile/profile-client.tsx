@@ -12,7 +12,7 @@ import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPl
 import { format, parseISO } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '../ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -239,7 +239,7 @@ function AddEditPaperDialog({
                     </div>
                 </div>
                 <DialogFooter>
-                    <Button onClick={() => onOpenChange(false)} variant="outline">Cancel</Button>
+                    <DialogClose asChild><Button onClick={() => onOpenChange(false)} variant="outline">Cancel</Button></DialogClose>
                     <Button onClick={handleSubmit} disabled={isSubmitting}>
                         {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (existingPaper ? 'Save Changes' : 'Add Paper')}
                     </Button>
@@ -535,6 +535,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                 const projectTitle = interest.callTitle || call?.title || 'N/A';
                                 const agency = interest.agency || call?.agency;
                                 const userIsPi = interest.userId === user.uid;
+                                const allInvestigators = [interest.userName, ...(interest.coPiNames || [])].join(', ');
 
                                 return (
                                 <Card key={interest.id}>
@@ -553,9 +554,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                             {interest.durationAmount && <span><strong className="text-muted-foreground">Details:</strong> {interest.durationAmount}</span>}
                                             {interest.sanctionDate && <span><strong className="text-muted-foreground">Sanction Date:</strong> {format(parseISO(interest.sanctionDate), 'PPP')}</span>}
                                         </div>
-                                        {interest.coPiNames && interest.coPiNames.length > 0 && (
-                                            <div className="text-sm pt-2"><strong className="text-muted-foreground">Co-PIs:</strong> {interest.coPiNames.join(', ')}</div>
-                                        )}
+                                        <div className="text-sm pt-2"><strong className="text-muted-foreground">Investigators:</strong> {allInvestigators}</div>
                                     </CardContent>
                                 </Card>
                                 )
