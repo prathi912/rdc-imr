@@ -5,6 +5,7 @@
 
 
 
+
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -130,7 +131,7 @@ export type Project = {
   pi_phoneNumber?: string;
   coPiDetails?: CoPiDetails[];
   coPiUids?: string[];
-  status: 'Draft' | 'Submitted' | 'Under Review' | 'Revision Needed' | 'Recommended' | 'Not Recommended' | 'In Progress' | 'Completed' | 'Pending Completion Approval' | 'Sanctioned';
+  status: 'Draft' | 'Submitted' | 'Under Review' | 'Revision Needed' | 'Sanctioned' | 'Not Recommended' | 'In Progress' | 'Completed' | 'Pending Completion Approval';
   teamInfo: string;
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string
@@ -376,6 +377,7 @@ export type LoginOtp = {
     
 
   
+
 
 
 

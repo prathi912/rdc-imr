@@ -199,7 +199,7 @@ export default function AnalyticsPage() {
     if (filteredProjects.length === 0) return [];
     
     const projectsToCount = submissionsByYearType === 'sanctions'
-        ? filteredProjects.filter(p => ['Recommended', 'In Progress', 'Completed', 'Sanctioned'].includes(p.status) && p.grant)
+        ? filteredProjects.filter(p => ['Sanctioned', 'In Progress', 'Completed'].includes(p.status) && p.grant)
         : filteredProjects;
 
     const yearCounts = projectsToCount.reduce((acc, project) => {

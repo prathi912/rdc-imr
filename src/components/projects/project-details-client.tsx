@@ -100,7 +100,7 @@ interface ProjectDetailsClientProps {
 
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
   Submitted: "secondary",
-  Recommended: "default",
+  Sanctioned: "default",
   "In Progress": "default",
   "Under Review": "secondary",
   "Revision Needed": "secondary",
@@ -271,7 +271,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const canRequestClosure = useMemo(() => {
     if (!isPI) return false
     const normalizedStatus = project.status.toLowerCase()
-    const allowedStatuses = ["recommended", "in progress", "completed", "sanctioned", "pending completion approval"]
+    const allowedStatuses = ["sanctioned", "in progress", "completed", "pending completion approval"]
     return allowedStatuses.includes(normalizedStatus) && normalizedStatus !== "pending completion approval"
   }, [isPI, project.status])
 
@@ -403,7 +403,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           const emailHtml = `
             <div style="font-family: Arial, sans-serif; line-height: 1.6;">
                 <h2>Congratulations, ${project.pi}!</h2>
-                <p>We are pleased to inform you that your Intramural Research (IMR) project, <strong>"${project.title}"</strong>, has been recommended and a grant has been awarded.</p>
+                <p>We are pleased to inform you that your Intramural Research (IMR) project, <strong>"${project.title}"</strong>, has been sanctioned and a grant has been awarded.</p>
                 <h3>Grant Details:</h3>
                 <ul>
                     <li><strong>Sanction Number:</strong> ${newGrant.sanctionNumber}</li>
@@ -610,7 +610,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setProject(updatedProject)
   }
 
-  const handleApprovalClick = (status: "Recommended" | "Not Recommended") => {
+  const handleApprovalClick = (status: "Sanctioned" | "Not Recommended") => {
     if (!allEvaluationsIn) {
       setShowApprovalAlert(true)
       return
@@ -660,7 +660,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     <>
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
-        {isAdmin && project.status === "Recommended" && (
+        {isAdmin && (project.status === "Sanctioned") && (
           <Button onClick={handlePrint} disabled={isPrinting}>
             {isPrinting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -683,7 +683,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Under Review" && <Clock className="mr-2 h-4 w-4" />}
                 {project.status === "Revision Needed" && <Edit className="mr-2 h-4 w-4" />}
                 {project.status === "Pending Completion Approval" && <Clock className="mr-2 h-4 w-4" />}
-                {(project.status === "Recommended" || project.status === "Completed") && (
+                {(project.status === "Sanctioned" || project.status === "Completed") && (
                   <Check className="mr-2 h-4 w-4" />
                 )}
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
@@ -699,8 +699,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleApprovalClick("Recommended")}>
-                          <Check className="mr-2 h-4 w-4" /> Recommend
+                        <DropdownMenuItem onClick={() => handleApprovalClick("Sanctioned")}>
+                          <Check className="mr-2 h-4 w-4" /> Sanction
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleApprovalClick("Not Recommended")}>
                           <X className="mr-2 h-4 w-4 text-destructive" />{" "}
@@ -760,7 +760,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DialogContent>
                 </Dialog>
               )}
-              {isSuperAdmin && project.status === "Recommended" && (
+              {isSuperAdmin && project.status === "Sanctioned" && (
                 <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline">
@@ -803,7 +803,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DialogContent>
                 </Dialog>
               )}
-              {isAdmin && project.status === "Recommended" && !project.grant && (
+              {isAdmin && project.status === "Sanctioned" && !project.grant && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -1214,7 +1214,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       </Card>
 
       {isAdmin &&
-        ["Recommended", "In Progress", "Completed", "Pending Completion Approval"].includes(project.status) && (
+        ["Sanctioned", "In Progress", "Completed", "Pending Completion Approval"].includes(project.status) && (
           <Card className="mt-8">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -1282,7 +1282,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           <AlertDialogHeader>
             <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
             <AlertDialogDescription>
-              This project cannot be Recommended or Not Recommended until all assigned evaluations have been submitted.
+              This project cannot be Sanctioned or Not Recommended until all assigned evaluations have been submitted.
               There are currently {evaluations.length || 0} of {project.meetingDetails?.assignedEvaluators?.length || 0}{" "}
               required evaluations complete.
             </AlertDialogDescription>
