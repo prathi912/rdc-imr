@@ -3002,6 +3002,7 @@ type EmrUploadData = {
   'PI Name': string;
   'PI Email': string;
   'Duration of Project': string;
+  'sanction_date'?: string | number | Date;
   [key: string]: any;
 };
 
@@ -3078,6 +3079,16 @@ export async function bulkUploadEmrProjects(
           };
       });
 
+      let sanctionDate;
+      if (row.sanction_date) {
+        if (row.sanction_date instanceof Date) { sanctionDate = row.sanction_date.toISOString(); } 
+        else if (typeof row.sanction_date === "number") { sanctionDate = excelDateToJSDate(row.sanction_date).toISOString(); } 
+        else if (typeof row.sanction_date === "string") {
+          const parsedDate = new Date(row.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'));
+          sanctionDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : undefined;
+        }
+      }
+
       const interestDoc: Omit<EmrInterest, 'id'> = {
         callId: 'BULK_UPLOADED',
         callTitle: projectTitle,
@@ -3095,6 +3106,7 @@ export async function bulkUploadEmrProjects(
         durationAmount: `Amount: ${row['Total Amount']?.toLocaleString('en-IN')} | Duration: ${row['Duration of Project']}`,
         isBulkUploaded: true,
         isOpenToPi: false,
+        sanctionDate: sanctionDate,
       };
 
       await adminDb.collection('emrInterests').add(interestDoc);

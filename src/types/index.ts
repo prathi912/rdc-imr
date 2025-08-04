@@ -4,8 +4,9 @@
 
 
 
+
 export type CoPiDetails = {
-    uid?: string; // Will exist for registered users
+    uid?: string | null; // Will exist for registered users
     name: string;
     email: string;
 };
@@ -352,6 +353,7 @@ export type EmrInterest = {
     durationAmount?: string;
     isOpenToPi?: boolean;
     proofUrl?: string;
+    sanctionDate?: string; // ISO String
 };
 
 export type EmrEvaluation = {
@@ -374,6 +376,7 @@ export type LoginOtp = {
     
 
   
+
 
 
 

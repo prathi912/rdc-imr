@@ -8,8 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload } from 'lucide-react';
-import { format } from 'date-fns';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload, CalendarDays } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '../ui/dialog';
@@ -19,6 +19,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../ui/label';
 import { Separator } from '../ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Calendar } from '../ui/calendar';
+import { cn } from '@/lib/utils';
 
 function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
@@ -250,8 +253,10 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [title, setTitle] = useState(interest.callTitle || '');
+    const [agency, setAgency] = useState(interest.agency || '');
+    const [durationAmount, setDurationAmount] = useState(interest.durationAmount || '');
+    const [sanctionDate, setSanctionDate] = useState<Date | undefined>(interest.sanctionDate ? parseISO(interest.sanctionDate) : undefined);
     const [coPis, setCoPis] = useState<CoPiDetails[]>(interest.coPiDetails || []);
-    // Similar co-pi search logic as in AddEditPaperDialog
     const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
     const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
     const [isSearching, setIsSearching] = useState(false);
@@ -286,6 +291,9 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
         try {
             const updates: Partial<EmrInterest> = {
                 callTitle: title,
+                agency: agency,
+                durationAmount: durationAmount,
+                sanctionDate: sanctionDate ? sanctionDate.toISOString() : undefined,
                 coPiDetails: coPis,
                 coPiUids: coPis.map(c => c.uid).filter(Boolean) as string[],
                 coPiNames: coPis.map(c => c.name),
@@ -307,10 +315,30 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-xl">
                 <DialogHeader><DialogTitle>Edit EMR Project Details</DialogTitle></DialogHeader>
-                <div className="space-y-4 py-4">
+                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
                     <div><Label>Project Title</Label><Input value={title} onChange={e => setTitle(e.target.value)} /></div>
+                    <div><Label>Funding Agency</Label><Input value={agency} onChange={e => setAgency(e.target.value)} /></div>
+                    <div><Label>Amount & Duration</Label><Input value={durationAmount} onChange={e => setDurationAmount(e.target.value)} placeholder="e.g., Amount: 50,00,000 | Duration: 3 Years"/></div>
+                    <div>
+                        <Label>Date of Sanction</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn("w-full justify-start text-left font-normal", !sanctionDate && "text-muted-foreground")}
+                                >
+                                    <CalendarDays className="mr-2 h-4 w-4" />
+                                    {sanctionDate ? format(sanctionDate, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar mode="single" selected={sanctionDate} onSelect={setSanctionDate} initialFocus />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
                     <div>
                         <Label>Co-PIs</Label>
                         <div className="flex gap-2 mt-1">
@@ -513,7 +541,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                     <CardContent className="p-4 space-y-2">
                                         <div className="flex justify-between items-start">
                                             <p className="font-semibold flex-1">{projectTitle}</p>
-                                            {isOwner && interest.isBulkUploaded && userIsPi && (
+                                            {isOwner && interest.isBulkUploaded && (
                                                 <Button size="sm" variant="outline" onClick={() => setInterestToEdit(interest)}>
                                                     <Edit className="h-4 w-4 mr-2"/> Edit
                                                 </Button>
@@ -523,6 +551,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                         <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
                                             {agency && <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>}
                                             {interest.durationAmount && <span><strong className="text-muted-foreground">Details:</strong> {interest.durationAmount}</span>}
+                                            {interest.sanctionDate && <span><strong className="text-muted-foreground">Sanction Date:</strong> {format(parseISO(interest.sanctionDate), 'PPP')}</span>}
                                         </div>
                                         {interest.coPiNames && interest.coPiNames.length > 0 && (
                                             <div className="text-sm pt-2"><strong className="text-muted-foreground">Co-PIs:</strong> {interest.coPiNames.join(', ')}</div>
