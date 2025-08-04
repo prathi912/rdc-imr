@@ -2860,6 +2860,17 @@ export async function generateOfficeNotingForm(
     for (let i = 0; i < 4; i++) {
       coPiData[`co-pi${i + 1}`] = coPiNames[i] || '';
     }
+    
+    const phaseData: { [key: string]: string } = {};
+    let totalAmount = 0;
+    for (let i = 0; i < 4; i++) {
+        if (formData.phases[i]) {
+            phaseData[`phase${i + 1}_amount`] = formData.phases[i].amount.toLocaleString('en-IN');
+            totalAmount += formData.phases[i].amount;
+        } else {
+            phaseData[`phase${i + 1}_amount`] = 'N/A';
+        }
+    }
 
     const data = {
       pi_name: project.pi,
@@ -2870,10 +2881,10 @@ export async function generateOfficeNotingForm(
       ...coPiData,
       project_title: project.title,
       project_duration: formData.projectDuration,
-      phases: formData.phases.map(p => ({
-        phase_name: p.name,
-        phase_amount: p.amount.toLocaleString('en-IN')
-      })),
+      ...phaseData,
+      total_amount: totalAmount.toLocaleString('en-IN'),
+      presentation_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
+      presentation_time: project.meetingDetails?.time || 'N/A',
     };
 
     doc.setData(data);
@@ -2946,7 +2957,7 @@ export async function bulkUploadPapers(
     if (!papersMap.has(title)) {
       papersMap.set(title, { url: row.url, authors: [] });
     }
-    papersMap.get(title)!.authors.push({ email: row.author_email, type: string });
+    papersMap.get(title)!.authors.push({ email: row.author_email, type: row.author_type });
   }
 
   const successfulPapers: { title: string; authors: string[] }[] = [];
