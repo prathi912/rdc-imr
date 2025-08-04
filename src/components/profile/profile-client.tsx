@@ -506,19 +506,20 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                 const call = fundingCalls.find(c => c.id === interest.callId);
                                 const projectTitle = interest.callTitle || call?.title || 'N/A';
                                 const agency = interest.agency || call?.agency;
+                                const userIsPi = interest.userId === user.uid;
 
                                 return (
                                 <Card key={interest.id}>
                                     <CardContent className="p-4 space-y-2">
                                         <div className="flex justify-between items-start">
                                             <p className="font-semibold flex-1">{projectTitle}</p>
-                                            {isOwner && interest.isBulkUploaded && interest.isOpenToPi && (
+                                            {isOwner && interest.isBulkUploaded && userIsPi && (
                                                 <Button size="sm" variant="outline" onClick={() => setInterestToEdit(interest)}>
                                                     <Edit className="h-4 w-4 mr-2"/> Edit
                                                 </Button>
                                             )}
                                         </div>
-                                        <p className="text-sm text-muted-foreground">Role: {interest.userId === user.uid ? 'PI' : 'Co-PI'}</p>
+                                        <p className="text-sm text-muted-foreground">Role: {userIsPi ? 'PI' : 'Co-PI'}</p>
                                         <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
                                             {agency && <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>}
                                             {interest.durationAmount && <span><strong className="text-muted-foreground">Details:</strong> {interest.durationAmount}</span>}
