@@ -25,8 +25,8 @@ import {
   findUserByMisId,
   updateCoInvestigators,
   sendEmail,
+  generateOfficeNotingForm,
 } from "@/app/actions"
-import { generateRecommendationForm } from "@/app/document-actions"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
@@ -625,7 +625,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const handlePrint = async () => {
     setIsPrinting(true);
     try {
-        const result = await generateRecommendationForm(project.id);
+        const result = await generateOfficeNotingForm(project.id);
         if (result.success && result.fileData) {
             const byteCharacters = atob(result.fileData);
             const byteNumbers = new Array(byteCharacters.length);
@@ -638,12 +638,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `IMR_Recommendation_${project.pi.replace(/\s/g, '_')}.docx`;
+            a.download = `IMR_Office_Noting_${project.pi.replace(/\s/g, '_')}.docx`;
             document.body.appendChild(a);
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
-            toast({ title: "Download Started", description: "Recommendation form is being downloaded." });
+            toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
         } else {
             throw new Error(result.error || "Failed to generate form.");
         }
@@ -660,14 +660,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     <>
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
-        {isAdmin && project.status === "Under Review" && (
+        {isAdmin && project.status === "Recommended" && (
           <Button onClick={handlePrint} disabled={isPrinting}>
             {isPrinting ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Download className="mr-2 h-4 w-4" />
             )}
-            Download Recommendation Form
+            Download Office Notings
           </Button>
         )}
       </div>

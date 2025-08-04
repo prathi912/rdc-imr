@@ -2821,7 +2821,7 @@ export async function submitToAgency(
     }
 }
 
-export async function generateRecommendationForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
+export async function generateOfficeNotingForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
     const projectSnap = await getDoc(projectRef);
@@ -2829,44 +2829,45 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
       return { success: false, error: 'Project not found.' };
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
-    
-    const evaluationsRef = projectRef.collection('evaluations');
-    const evaluationsSnap = await adminGetDocs(evaluationsRef);
-    const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
-    
+
+    const piUserRef = adminDb.collection('users').doc(project.pi_uid);
+    const piUserSnap = await getDoc(piUserRef);
+    const piUser = piUserSnap.exists() ? piUserSnap.data() as User : null;
+
     const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
     if (!fs.existsSync(templatePath)) {
-      return { success: false, error: 'Recommendation form template not found on the server.' };
+      return { success: false, error: 'Office Notings form template not found on the server.' };
     }
     const content = fs.readFileSync(templatePath, 'binary');
 
     const zip = new PizZip(content);
-    const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-    });
+    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
-    const recommendationText = evaluations.map(e => {
-        return `${e.evaluatorName} (${e.recommendation}):\n${e.comments}`;
-    }).join('\n\n');
+    const coPiData: { [key: string]: string } = {};
+    const coPiNames = project.coPiDetails?.map(c => c.name) || [];
+    for (let i = 0; i < 4; i++) {
+      coPiData[`co-pi${i + 1}`] = coPiNames[i] || '';
+    }
 
     const data = {
-        pi_name: project.pi,
-        submission_date: new Date(project.submissionDate).toLocaleDateString(),
-        project_title: project.title,
-        faculty: project.faculty,
-        department: project.departmentName,
-        institute: project.institute,
-        grant_amount: project.grant?.totalAmount.toLocaleString('en-IN') || 'N/A',
-        evaluator_comments: recommendationText || 'No evaluations submitted yet.'
+      pi_name: project.pi,
+      pi_designation: piUser?.designation || 'N/A',
+      pi_department: piUser?.department || project.departmentName || 'N/A',
+      pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || 'N/A',
+      pi_email: project.pi_email,
+      ...coPiData,
+      project_title: project.title,
     };
-    
+
     doc.setData(data);
 
     try {
       doc.render();
     } catch (error: any) {
       console.error('Docxtemplater render error:', error);
+      if (error.properties && error.properties.errors) {
+          console.error('Template errors:', JSON.stringify(error.properties.errors));
+      }
       return { success: false, error: 'Failed to render the document template.' };
     }
 
@@ -2875,11 +2876,12 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
 
     return { success: true, fileData: base64 };
   } catch (error: any) {
-    console.error('Error generating recommendation form:', error);
-    await logActivity('ERROR', 'Failed to generate recommendation form', { projectId, error: error.message, stack: error.stack });
+    console.error('Error generating office notings form:', error);
+    await logActivity('ERROR', 'Failed to generate office notings form', { projectId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
 }
+
 
 export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid: string): Promise<{ success: boolean; projects?: Project[]; error?: string }> {
     try {
