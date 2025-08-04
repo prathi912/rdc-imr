@@ -11,9 +11,9 @@ import { format, startOfToday, isToday, parseISO } from "date-fns"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-import type { Project, User, GrantDetails, Evaluation, GrantPhase } from "@/types"
+import type { Project, User, GrantDetails, Evaluation, GrantPhase, CoPiDetails } from "@/types"
 import { db } from "@/lib/config"
-import { doc, updateDoc, addDoc, collection, getDoc, getDocs, where, query } from "firebase/firestore"
+import { doc, updateDoc, addDoc, collection, getDocs, where, query } from "firebase/firestore"
 import {
   uploadFileToServer,
   updateProjectStatus,
@@ -62,7 +62,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 import {
@@ -783,7 +783,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DialogContent>
                 </Dialog>
               )}
-              {isSuperAdmin && project.status === "Sanctioned" && (
+              {isSuperAdmin && project.status === "Sanctioned" && !project.projectStartDate && (
                 <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline">
