@@ -29,7 +29,6 @@ type UploadResult = {
   successfulCount: number;
   failures: { projectTitle: string; piName: string; error: string }[];
   linkedUserCount: number;
-  linkedProjects: { projectTitle: string; linkedUserName: string }[];
 };
 
 export default function BulkUploadEmrPage() {
@@ -55,6 +54,10 @@ export default function BulkUploadEmrPage() {
     }
   }, [toast]);
 
+  useEffect(() => {
+    fetchHistoricalData();
+  }, [fetchHistoricalData]);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -65,7 +68,7 @@ export default function BulkUploadEmrPage() {
     reader.onload = (event) => {
       try {
         const binaryStr = event.target?.result;
-        const workbook = XLSX.read(binaryStr, { type: 'binary' });
+        const workbook = XLSX.read(binaryStr, { type: 'binary', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
@@ -166,18 +169,6 @@ export default function BulkUploadEmrPage() {
                     <h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" /> Successfully Added Projects ({uploadResult.successfulCount})</h3>
                     {uploadResult.successfulCount === 0 && <p className="text-sm text-muted-foreground mt-2">No new projects were added.</p>}
                     <p className="mt-2 text-sm text-muted-foreground">Projects linked to user profiles: {uploadResult.linkedUserCount}</p>
-                    {uploadResult.linkedProjects && uploadResult.linkedProjects.length > 0 && (
-                      <div className="mt-2 max-h-48 overflow-y-auto border border-gray-300 rounded p-2 bg-gray-50">
-                        <h4 className="font-semibold mb-1">Linked Projects Details:</h4>
-                        <ul className="list-disc list-inside text-sm max-h-40 overflow-y-auto">
-                          {uploadResult.linkedProjects.map((item: { projectTitle: string; linkedUserName: string }, index: number) => (
-                            <li key={index}>
-                              <strong>{item.projectTitle}</strong> linked to <em>{item.linkedUserName}</em>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
                 </div>
                  {uploadResult.failures.length > 0 && (
                      <Alert variant="destructive">
