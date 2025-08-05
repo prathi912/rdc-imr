@@ -3255,13 +3255,17 @@ export async function bulkUploadEmrProjects(
           };
       });
 
-      let sanctionDate;
+      let sanctionDate: string | undefined = undefined;
       if (row.sanction_date) {
-        if (row.sanction_date instanceof Date) { sanctionDate = row.sanction_date.toISOString(); } 
-        else if (typeof row.sanction_date === "number") { sanctionDate = excelDateToJSDate(row.sanction_date).toISOString(); } 
-        else if (typeof row.sanction_date === "string") {
+        if (row.sanction_date instanceof Date) { 
+            sanctionDate = row.sanction_date.toISOString(); 
+        } else if (typeof row.sanction_date === "number") { 
+            sanctionDate = excelDateToJSDate(row.sanction_date).toISOString(); 
+        } else if (typeof row.sanction_date === "string") {
           const parsedDate = new Date(row.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'));
-          sanctionDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : undefined;
+          if (!isNaN(parsedDate.getTime())) {
+              sanctionDate = parsedDate.toISOString();
+          }
         }
       }
 
@@ -3282,8 +3286,11 @@ export async function bulkUploadEmrProjects(
         durationAmount: `Amount: ${row['Total Amount']?.toLocaleString('en-IN')} | Duration: ${row['Duration of Project']}`,
         isBulkUploaded: true,
         isOpenToPi: false,
-        sanctionDate: sanctionDate,
       };
+
+      if (sanctionDate) {
+        interestDoc.sanctionDate = sanctionDate;
+      }
 
       await adminDb.collection('emrInterests').add(interestDoc);
       successfulCount++;
@@ -3316,4 +3323,3 @@ export async function updateEmrInterestDetails(interestId: string, updates: Part
         return { success: false, error: "Failed to update details." };
     }
 }
-
