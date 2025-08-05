@@ -3,12 +3,12 @@
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails } from '@/types';
-import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId, updateEmrInterestDetails } from '@/app/actions';
+import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId, updateEmrInterestDetails, uploadFileToServer } from '@/app/actions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload, CalendarDays } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload, CalendarDays, FileText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -249,6 +249,16 @@ function AddEditPaperDialog({
     )
 }
 
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
+
+
 function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: (updatedInterest: EmrInterest) => void; }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -256,6 +266,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
     const [agency, setAgency] = useState(interest.agency || '');
     const [durationAmount, setDurationAmount] = useState(interest.durationAmount || '');
     const [sanctionDate, setSanctionDate] = useState<Date | undefined>(interest.sanctionDate ? parseISO(interest.sanctionDate) : undefined);
+    const [proofFile, setProofFile] = useState<File | null>(null);
     const [coPis, setCoPis] = useState<CoPiDetails[]>(interest.coPiDetails || []);
     const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
     const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
@@ -289,6 +300,18 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
     const handleSave = async () => {
         setIsSubmitting(true);
         try {
+            let proofUrl = interest.proofUrl;
+            if (proofFile) {
+                const dataUrl = await fileToDataUrl(proofFile);
+                const path = `emr-proofs/${interest.id}/${proofFile.name}`;
+                const uploadResult = await uploadFileToServer(dataUrl, path);
+                if (uploadResult.success && uploadResult.url) {
+                    proofUrl = uploadResult.url;
+                } else {
+                    throw new Error(uploadResult.error || "Failed to upload proof.");
+                }
+            }
+
             const updates: Partial<EmrInterest> = {
                 callTitle: title,
                 agency: agency,
@@ -297,6 +320,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                 coPiDetails: coPis,
                 coPiUids: coPis.map(c => c.uid).filter(Boolean) as string[],
                 coPiNames: coPis.map(c => c.name),
+                proofUrl,
             };
             const result = await updateEmrInterestDetails(interest.id, updates);
             if (result.success) {
@@ -337,6 +361,11 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                                 <Calendar mode="single" selected={sanctionDate} onSelect={setSanctionDate} initialFocus />
                             </PopoverContent>
                         </Popover>
+                    </div>
+                     <div>
+                        <Label>Proof of Sanction (PDF)</Label>
+                        {interest.proofUrl && <a href={interest.proofUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block mb-2">View current proof</a>}
+                        <Input type="file" accept=".pdf" onChange={(e) => setProofFile(e.target.files?.[0] || null)} />
                     </div>
 
                     <div>
@@ -542,7 +571,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                     <CardContent className="p-4 space-y-2">
                                         <div className="flex justify-between items-start">
                                             <p className="font-semibold flex-1">{projectTitle}</p>
-                                            {isOwner && interest.isBulkUploaded && (
+                                            {isOwner && interest.isBulkUploaded && interest.userId === user.uid && (
                                                 <Button size="sm" variant="outline" onClick={() => setInterestToEdit(interest)}>
                                                     <Edit className="h-4 w-4 mr-2"/> Edit
                                                 </Button>
@@ -553,6 +582,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                             {agency && <span><strong className="text-muted-foreground">Agency:</strong> {agency}</span>}
                                             {interest.durationAmount && <span><strong className="text-muted-foreground">Details:</strong> {interest.durationAmount}</span>}
                                             {interest.sanctionDate && <span><strong className="text-muted-foreground">Sanction Date:</strong> {format(parseISO(interest.sanctionDate), 'PPP')}</span>}
+                                            {interest.proofUrl && <span><strong className="text-muted-foreground">Proof:</strong> <a href={interest.proofUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">View Document</a></span>}
                                         </div>
                                         <div className="text-sm pt-2"><strong className="text-muted-foreground">Investigators:</strong> {allInvestigators}</div>
                                     </CardContent>

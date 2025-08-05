@@ -9,6 +9,7 @@
 
 
 
+
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
