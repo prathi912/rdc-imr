@@ -1,15 +1,4 @@
 
-
-
-
-
-
-
-
-
-
-
-
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -343,7 +332,7 @@ export type EmrInterest = {
     coPiDetails?: CoPiDetails[];
     coPiUids?: string[];
     coPiNames?: string[];
-    status: 'Registered' | 'PPT Submitted' | 'Revision Submitted' | 'Evaluation Pending' | 'Evaluation Done' | 'Recommended' | 'Not Recommended' | 'Revision Needed' | 'Endorsement Submitted' | 'Endorsement Signed' | 'Process Complete' | 'Submitted to Agency' | 'Sanctioned';
+    status: 'Registered' | 'PPT Submitted' | 'Revision Submitted' | 'Evaluation Pending' | 'Evaluation Done' | 'Recommended' | 'Not Recommended' | 'Revision Needed' | 'Endorsement Submitted' | 'Endorsement Signed' | 'Process Complete' | 'Submitted to Agency' | 'Sanctioned' | 'Not Sanctioned';
     adminRemarks?: string;
     revisedPptUrl?: string;
     meetingSlot?: {
@@ -355,6 +344,7 @@ export type EmrInterest = {
     agencyReferenceNumber?: string;
     agencyAcknowledgementUrl?: string;
     submittedToAgencyAt?: string;
+    finalProofUrl?: string;
     isBulkUploaded?: boolean;
     agency?: string;
     durationAmount?: string;
@@ -380,18 +370,4 @@ export type LoginOtp = {
     otp: string;
     expiresAt: number; // Store as timestamp
 };
-    
 
-  
-
-
-
-
-
-
-
-    
-
-  
-
-  

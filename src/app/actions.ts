@@ -2893,6 +2893,55 @@ export async function submitToAgency(
     }
 }
 
+export async function updateEmrFinalStatus(
+  interestId: string,
+  status: 'Sanctioned' | 'Not Sanctioned',
+  proofUrl: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId || !status || !proofUrl) {
+      return { success: false, error: 'Interest ID, status, and proof are required.' };
+    }
+
+    const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    const interestSnap = await interestRef.get();
+    if (!interestSnap.exists) {
+        return { success: false, error: "Interest registration not found." };
+    }
+    const interest = interestSnap.data() as EmrInterest;
+
+    await interestRef.update({
+      status: status,
+      finalProofUrl: proofUrl,
+    });
+    await logActivity('INFO', 'EMR final status updated', { interestId, userId: interest.userId, newStatus: status });
+
+    // Notify Super Admins
+    const superAdminUsersSnapshot = await adminGetDocs(adminQuery(adminDb.collection("users"), adminWhere("role", "==", "Super-admin")));
+    if (!superAdminUsersSnapshot.empty) {
+      const batch = adminDb.batch();
+      const notificationTitle = `EMR Outcome: "${interest.callTitle || 'A project'}" was ${status} for ${interest.userName}.`;
+      superAdminUsersSnapshot.forEach((userDoc) => {
+        const notificationRef = adminDb.collection("notifications").doc();
+        batch.set(notificationRef, {
+          uid: userDoc.id,
+          title: notificationTitle,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+        });
+      });
+      await batch.commit();
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error updating EMR final status:', error);
+    await logActivity('ERROR', 'Failed to update EMR final status', { interestId, status, error: error.message, stack: error.stack });
+    return { success: false, error: 'Failed to update final status.' };
+  }
+}
+
+
 function formatWithOrdinal(date: Date) {
     const day = format(date, 'd');
     const month = format(date, 'MMMM');
@@ -3267,3 +3316,4 @@ export async function updateEmrInterestDetails(interestId: string, updates: Part
         return { success: false, error: "Failed to update details." };
     }
 }
+
