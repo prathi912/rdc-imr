@@ -3,6 +3,7 @@ export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
     email: string;
+    cvUrl?: string; // URL to the uploaded CV for this Co-PI
 };
 
 
@@ -129,7 +130,6 @@ export type Project = {
   timelineAndOutcomes: string;
   submissionDate: string; // Should be ISO string
   proposalUrl?: string;
-  cvUrl?: string;
   ethicsUrl?: string;
   grant?: GrantDetails;
   completionReportUrl?: string;
@@ -370,4 +370,3 @@ export type LoginOtp = {
     otp: string;
     expiresAt: number; // Store as timestamp
 };
-

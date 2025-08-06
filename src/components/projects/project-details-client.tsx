@@ -154,7 +154,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [project, setProject] = useState(initialProject)
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [user, setUser] = useState<User | null>(null)
-  const [coPiUsers, setCoPiUsers] = useState<User[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
@@ -181,7 +180,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   // Co-PI management state
   const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
   const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null)
-  const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([])
+  const [coPiList, setCoPiList] = useState<CoPiDetails[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isSavingCoPis, setIsSavingCoPis] = useState(false)
 
@@ -243,18 +242,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }, [])
 
   useEffect(() => {
-    const fetchCoPiUsers = async () => {
-      if (project.coPiUids && project.coPiUids.length > 0) {
-        const usersRef = collection(db, "users")
-        const q = query(usersRef, where("__name__", "in", project.coPiUids))
-        const querySnapshot = await getDocs(q)
-        const fetchedUsers = querySnapshot.docs.map((coPiDoc) => ({ uid: coPiDoc.id, ...coPiDoc.data() }) as User)
-        setCoPiUsers(fetchedUsers)
-        setCoPiList(fetchedUsers.map((u) => ({ uid: u.uid, name: u.name })))
-      }
+    if (project.coPiDetails) {
+        setCoPiList(project.coPiDetails);
     }
-    fetchCoPiUsers()
-  }, [project.coPiUids])
+  }, [project.coPiDetails]);
+
 
   useEffect(() => {
     durationForm.reset({
@@ -345,9 +337,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself as a Co-PI." })
         return
       }
-      setCoPiList([...coPiList, foundCoPi])
+      setCoPiList([...coPiList, { ...foundCoPi, email: foundCoPi.email || '' }]);
     }
-    setFoundCoPi(null)
+    setFoundCoPi(null);
     setCoPiSearchTerm("")
   }
 
@@ -357,11 +349,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const handleSaveCoPis = async () => {
     setIsSavingCoPis(true)
-    const coPiUids = coPiList.map((coPi) => coPi.uid)
+    const coPiUids = coPiList.map((coPi) => coPi.uid).filter(Boolean) as string[]
     const result = await updateCoInvestigators(project.id, coPiUids)
     if (result.success) {
       toast({ title: "Success", description: "Co-PI list has been updated." })
-      setProject((prev) => ({ ...prev, coPiUids }))
+      setProject((prev) => ({ ...prev, coPiUids, coPiDetails: coPiList }))
     } else {
       toast({ variant: "destructive", title: "Error", description: result.error })
     }
@@ -788,7 +780,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   <DialogTrigger asChild>
                     <Button variant="outline">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {project.projectStartDate ? "Update Duration" : "Set Duration"}
+                      Set Duration
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
@@ -1069,7 +1061,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             </div>
           </div>
           <Separator />
-          {(project.teamInfo || (coPiUsers && coPiUsers.length > 0) || isPI) && (
+          {(project.teamInfo || (project.coPiDetails && project.coPiDetails.length > 0) || isPI) && (
             <>
               <div className="space-y-4">
                   <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -1100,9 +1092,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                                   <Label>Current Co-PI(s)</Label>
                                   {coPiList.length > 0 ? (
                                       coPiList.map((coPi) => (
-                                          <div key={coPi.uid} className="flex items-center justify-between p-2 bg-background rounded-md">
+                                          <div key={coPi.email} className="flex items-center justify-between p-2 bg-background rounded-md">
                                               <p className="text-sm font-medium">{coPi.name}</p>
-                                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>Remove</Button>
+                                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid!)}>Remove</Button>
                                           </div>
                                       ))
                                   ) : (
@@ -1116,18 +1108,21 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                           </CardContent>
                       </Card>
                   )}
-                   {coPiUsers.length > 0 && (
+                   {project.coPiDetails && project.coPiDetails.length > 0 && (
                       <div className="space-y-2">
                           <h4 className="font-semibold text-base">Co-Principal Investigators:</h4>
-                          <ul className="list-disc list-inside pl-4 text-muted-foreground">
-                              {coPiUsers.map(coPi => (
-                                <li key={coPi.uid}>
-                                  {coPi.misId ? (
-                                    <Link href={`/profile/${coPi.misId}`} className="text-primary hover:underline" target="_blank">
+                          <ul className="list-disc list-inside pl-4 text-muted-foreground space-y-1">
+                              {project.coPiDetails.map(coPi => (
+                                <li key={coPi.email}>
+                                  {coPi.uid ? (
+                                    <Link href={`/profile/${allUsers.find(u => u.uid === coPi.uid)?.misId}`} className="text-primary hover:underline" target="_blank">
                                       {coPi.name}
                                     </Link>
                                   ) : (
                                     coPi.name
+                                  )}
+                                  {coPi.cvUrl && (
+                                     <Button variant="link" asChild className="p-0 h-auto ml-2"><a href={coPi.cvUrl} target="_blank" rel="noopener noreferrer">View CV</a></Button>
                                   )}
                                 </li>
                               ))}
@@ -1145,7 +1140,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           </div>
           {canViewDocuments && (
             <>
-              {(project.proposalUrl || project.cvUrl || project.ethicsUrl) && (
+              {(project.proposalUrl || project.ethicsUrl) && (
                 <>
                   <Separator />
                   <div className="space-y-2">
@@ -1156,15 +1151,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                           <Button variant="link" asChild className="p-0 h-auto">
                             <a href={project.proposalUrl} target="_blank" rel="noopener noreferrer">
                               View Project Proposal
-                            </a>
-                          </Button>
-                        </li>
-                      )}
-                      {project.cvUrl && (
-                        <li>
-                          <Button variant="link" asChild className="p-0 h-auto">
-                            <a href={project.cvUrl} target="_blank" rel="noopener noreferrer">
-                              View Team CVs
                             </a>
                           </Button>
                         </li>
