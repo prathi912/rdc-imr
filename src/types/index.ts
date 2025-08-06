@@ -1,9 +1,9 @@
-
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
     email: string;
-    cvUrl?: string; // URL to the uploaded CV for this Co-PI
+    cvUrl?: string; // URL to the uploaded CV
+    cvFileName?: string; // Original filename for display
 };
 
 
@@ -332,7 +332,7 @@ export type EmrInterest = {
     coPiDetails?: CoPiDetails[];
     coPiUids?: string[];
     coPiNames?: string[];
-    status: 'Registered' | 'PPT Submitted' | 'Revision Submitted' | 'Evaluation Pending' | 'Evaluation Done' | 'Recommended' | 'Not Recommended' | 'Revision Needed' | 'Endorsement Submitted' | 'Endorsement Signed' | 'Process Complete' | 'Submitted to Agency' | 'Sanctioned' | 'Not Sanctioned';
+    status: 'Registered' | 'PPT Submitted' | 'Revision Submitted' | 'Evaluation Pending' | 'Evaluation Done' | 'Recommended' | 'Not Recommended' | 'Revision Needed' | 'Endorsement Submitted' | 'Endorsement Signed' | 'Process Complete' | 'Submitted to Agency' | 'Sanctioned';
     adminRemarks?: string;
     revisedPptUrl?: string;
     meetingSlot?: {
@@ -344,7 +344,6 @@ export type EmrInterest = {
     agencyReferenceNumber?: string;
     agencyAcknowledgementUrl?: string;
     submittedToAgencyAt?: string;
-    finalProofUrl?: string;
     isBulkUploaded?: boolean;
     agency?: string;
     durationAmount?: string;

@@ -1,51 +1,35 @@
+"use client"
 
-'use client';
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useForm, useFieldArray } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { format } from "date-fns"
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm, FormProvider } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
-import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle, ChevronDown, Upload } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import type { User, Project, CoPiDetails } from '@/types';
-import { Checkbox } from '@/components/ui/checkbox';
-import { db } from '@/lib/config';
-import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
-import { uploadFileToServer, findUserByMisId, saveProjectSubmission } from '@/app/actions';
-import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
-import Link from 'next/link';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Separator } from '../ui/separator';
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Separator } from "@/components/ui/separator"
+import { useToast } from "@/hooks/use-toast"
 
-interface SubmissionFormProps {
-  project?: Project;
-}
+import { saveProjectSubmission, findUserByMisId, uploadFileToServer } from "@/app/actions"
+import type { Project, User, CoPiDetails } from "@/types"
+import { AlertCircle, Loader2, Plus, X, FileText, Upload } from 'lucide-react'
 
-const steps = [
-  { id: 1, title: 'Project Details', icon: Microscope },
-  { id: 2, title: 'Team Info', icon: Users },
-  { id: 3, title: 'File Uploads', icon: FileText },
-  { id: 4, title: 'Timeline & Outcomes', icon: GanttChartSquare },
-];
+const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const ACCEPTED_FILE_TYPES = ["application/pdf"]
 
-const sdgGoalsList = [
+const sdgGoals = [
   "Goal 1: No Poverty",
-  "Goal 2: Zero Hunger",
+  "Goal 2: Zero Hunger", 
   "Goal 3: Good Health and Well-being",
   "Goal 4: Quality Education",
   "Goal 5: Gender Equality",
@@ -60,509 +44,737 @@ const sdgGoalsList = [
   "Goal 14: Life Below Water",
   "Goal 15: Life on Land",
   "Goal 16: Peace and Justice Strong Institutions",
-  "Goal 17: Partnerships for the Goals",
-];
+  "Goal 17: Partnerships to achieve the Goal"
+]
 
+const projectSchema = z.object({
+  title: z.string().min(10, "Title must be at least 10 characters long"),
+  abstract: z.string().min(100, "Abstract must be at least 100 characters long"),
+  type: z.string().min(1, "Please select a project type"),
+  teamInfo: z.string().min(50, "Team information must be at least 50 characters long"),
+  timelineAndOutcomes: z.string().min(100, "Timeline and outcomes must be at least 100 characters long"),
+  proposalFile: z.any().refine((file) => file instanceof File, "Project proposal is required"),
+  ethicsFile: z.any().optional(),
+  sdgGoals: z.array(z.string()).optional(),
+  coPiDetails: z.array(z.object({
+    uid: z.string().optional(),
+    name: z.string().min(1, "Co-PI name is required"),
+    email: z.string().email("Valid email is required"),
+    cvFile: z.any().refine((file) => file instanceof File, "CV is required for each Co-PI")
+  })).optional()
+})
+
+type ProjectFormData = z.infer<typeof projectSchema>
+
+interface SubmissionFormProps {
+  user: User
+  existingProject?: Project
+}
 
 const fileToDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
-};
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = (error) => reject(error)
+    reader.readAsDataURL(file)
+  })
+}
 
-export function SubmissionForm({ project }: SubmissionFormProps) {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [user, setUser] = useState<User | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
-  const { toast } = useToast();
-  const router = useRouter();
-  const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
-  const [coPiList, setCoPiList] = useState<CoPiDetails[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [coPiCvFiles, setCoPiCvFiles] = useState<Record<string, File>>({});
+export function SubmissionForm({ user, existingProject }: SubmissionFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDraft, setIsDraft] = useState(false)
+  const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
+  const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string; email: string } | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
+  const { toast } = useToast()
+  const router = useRouter()
 
-  const formSchema = useMemo(() => z.object({
-    // Step 1
-    title: z.string().min(5, 'Title must be at least 5 characters.'),
-    abstract: z.string().min(20, 'Abstract must be at least 20 characters.'),
-    projectType: z.string().min(1, 'Please select a category.'),
-    sdgGoals: z.array(z.string()).optional(),
-    // Step 2
-    studentInfo: z.string().optional(),
-    // Step 3
-    proposalUpload: z.any().refine((files) => {
-        return !!project?.proposalUrl || (files && files.length > 0);
-    }, 'Project proposal is required.'),
-    ethicsUpload: z.any().optional(),
-    // Step 4
-    expectedOutcomes: z.string().min(10, 'Please describe the expected outcomes.'),
-    guidelinesAgreement: z.boolean().refine(val => val === true, {
-      message: "You must agree to the guidelines to submit.",
-    }),
-  }), [project]);
-
-  type FormData = z.infer<typeof formSchema>;
-  
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<ProjectFormData>({
+    resolver: zodResolver(projectSchema),
     defaultValues: {
-      title: '',
-      abstract: '',
-      projectType: '',
-      studentInfo: '',
-      expectedOutcomes: '',
-      guidelinesAgreement: false,
-      sdgGoals: [],
-    },
-  });
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        if (!parsedUser.bankDetails) {
-            setBankDetailsMissing(true);
-        }
+      title: existingProject?.title || "",
+      abstract: existingProject?.abstract || "",
+      type: existingProject?.type || "",
+      teamInfo: existingProject?.teamInfo || "",
+      timelineAndOutcomes: existingProject?.timelineAndOutcomes || "",
+      sdgGoals: existingProject?.sdgGoals || [],
+      coPiDetails: existingProject?.coPiDetails?.map(coPi => ({
+        uid: coPi.uid,
+        name: coPi.name,
+        email: coPi.email,
+        cvFile: null // Will need to be re-uploaded for existing projects
+      })) || []
     }
-  }, []);
+  })
 
-  useEffect(() => {
-    if (project) {
-        const teamInfo = project.teamInfo || '';
-        const studentRegex = /Students: (.*)/;
-        const studentMatch = teamInfo.match(studentRegex);
+  const { fields: coPiFields, append: appendCoPi, remove: removeCoPi } = useFieldArray({
+    control: form.control,
+    name: "coPiDetails"
+  })
 
-        form.reset({
-            title: project.title,
-            abstract: project.abstract,
-            projectType: project.type,
-            studentInfo: studentMatch ? studentMatch[1].trim() : '',
-            expectedOutcomes: project.timelineAndOutcomes,
-            guidelinesAgreement: project.status !== 'Draft',
-            sdgGoals: project.sdgGoals || [],
-        });
-        
-        if (project.coPiDetails) {
-            setCoPiList(project.coPiDetails);
-        }
+  const validateFile = (file: File, type: 'proposal' | 'ethics' | 'cv') => {
+    if (!ACCEPTED_FILE_TYPES.includes(file.type)) {
+      return "Only PDF files are allowed"
     }
-  }, [project, form, toast]);
-
-  const handleNext = async () => {
-    const fieldsToValidate = {
-      1: ['title', 'abstract', 'projectType'],
-      2: [],
-      3: ['proposalUpload'],
-      4: ['expectedOutcomes', 'guidelinesAgreement'],
-    }[currentStep] as (keyof FormData)[];
-
-    const isValid = await form.trigger(fieldsToValidate);
-    if (isValid) {
-      if (currentStep < 4) {
-        setCurrentStep(currentStep + 1);
-      }
+    if (file.size > MAX_FILE_SIZE) {
+      return "File size must be less than 5MB"
     }
-  };
+    return null
+  }
 
-  const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-  
   const handleSearchCoPi = async () => {
-    if (!coPiSearchTerm) return;
-    setIsSearching(true);
-    setFoundCoPi(null);
+    if (!coPiSearchTerm.trim()) return
+    
+    setIsSearching(true)
+    setFoundCoPi(null)
+    
     try {
-        const result = await findUserByMisId(coPiSearchTerm);
-        if (result.success) {
-            if (result.user) {
-                setFoundCoPi({ ...result.user });
-            } else if (result.staff) {
-                setFoundCoPi({ ...result.staff });
-            }
-        } else {
-            toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
-        }
+      const result = await findUserByMisId(coPiSearchTerm.trim())
+      if (result.success && result.user) {
+        setFoundCoPi({
+          uid: result.user.uid,
+          name: result.user.name,
+          email: result.user.email || ""
+        })
+      } else if (result.success && result.staff) {
+        setFoundCoPi({
+          uid: "",
+          name: result.staff.name,
+          email: result.staff.email
+        })
+      } else {
+        toast({
+          variant: "destructive",
+          title: "User Not Found",
+          description: result.error || "No user found with this MIS ID"
+        })
+      }
     } catch (error) {
-        toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+      toast({
+        variant: "destructive",
+        title: "Search Failed",
+        description: "An error occurred while searching"
+      })
     } finally {
-        setIsSearching(false);
+      setIsSearching(false)
     }
-  };
+  }
 
   const handleAddCoPi = () => {
-    if (foundCoPi && !coPiList.some(coPi => coPi.email === foundCoPi.email)) {
-        if (user && foundCoPi.email === user.email) {
-            toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
-            return;
-        }
-        setCoPiList([...coPiList, foundCoPi]);
-    }
-    setFoundCoPi(null);
-    setCoPiSearchTerm('');
-  };
-
-  const handleRemoveCoPi = (emailToRemove: string) => {
-    setCoPiList(coPiList.filter(coPi => coPi.email !== emailToRemove));
-    setCoPiCvFiles(prev => {
-        const newFiles = { ...prev };
-        delete newFiles[emailToRemove];
-        return newFiles;
-    });
-  };
-
-  const handleCoPiCvChange = (email: string, file: File | null) => {
-    if (file) {
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-            toast({ variant: 'destructive', title: 'File too large', description: 'CV file must be smaller than 5MB.' });
-            return;
-        }
-        setCoPiCvFiles(prev => ({ ...prev, [email]: file }));
-    }
-  };
-
-  const handleSave = async (status: 'Draft' | 'Submitted') => {
-    if (!user || !user.faculty || !user.institute || !user.department) {
+    if (!foundCoPi) return
+    
+    // Check if Co-PI is already added
+    const existingCoPi = form.getValues("coPiDetails")?.find(
+      coPi => coPi.email === foundCoPi.email
+    )
+    
+    if (existingCoPi) {
       toast({
-        variant: 'destructive',
-        title: 'Profile Incomplete',
-        description: 'Please complete your profile in Settings before submitting.',
-      });
-      return;
-    }
-    if (status === 'Submitted' && !user.bankDetails) {
-        toast({
-            variant: 'destructive',
-            title: 'Bank Details Missing',
-            description: 'You must add your bank details in Settings to submit a project.',
-        });
-        return;
-    }
-    if (status === 'Submitted' && coPiList.some(coPi => !coPiCvFiles[coPi.email] && !coPi.cvUrl)) {
-        toast({
-            variant: 'destructive',
-            title: 'CVs Missing',
-            description: 'Please upload a CV for each Co-PI before submitting.',
-        });
-        return;
+        variant: "destructive",
+        title: "Co-PI Already Added",
+        description: "This Co-PI is already in the list"
+      })
+      return
     }
 
+    // Check if trying to add self
+    if (foundCoPi.email === user.email) {
+      toast({
+        variant: "destructive",
+        title: "Cannot Add Self",
+        description: "You cannot add yourself as a Co-PI"
+      })
+      return
+    }
 
-    setIsSaving(true);
-    setProgress(5);
-    const data = form.getValues();
+    appendCoPi({
+      uid: foundCoPi.uid || undefined,
+      name: foundCoPi.name,
+      email: foundCoPi.email,
+      cvFile: null
+    })
+
+    setFoundCoPi(null)
+    setCoPiSearchTerm("")
+  }
+
+  const uploadFiles = async (formData: ProjectFormData) => {
+    const uploadedFiles: { [key: string]: string } = {}
+
+    // Upload proposal file
+    if (formData.proposalFile) {
+      const proposalDataUrl = await fileToDataUrl(formData.proposalFile)
+      const proposalPath = `proposals/${user.uid}/${Date.now()}-${formData.proposalFile.name}`
+      const proposalResult = await uploadFileToServer(proposalDataUrl, proposalPath)
+      
+      if (!proposalResult.success || !proposalResult.url) {
+        throw new Error(proposalResult.error || "Failed to upload proposal")
+      }
+      uploadedFiles.proposalUrl = proposalResult.url
+    }
+
+    // Upload ethics file if provided
+    if (formData.ethicsFile) {
+      const ethicsDataUrl = await fileToDataUrl(formData.ethicsFile)
+      const ethicsPath = `ethics/${user.uid}/${Date.now()}-${formData.ethicsFile.name}`
+      const ethicsResult = await uploadFileToServer(ethicsDataUrl, ethicsPath)
+      
+      if (!ethicsResult.success || !ethicsResult.url) {
+        throw new Error(ethicsResult.error || "Failed to upload ethics approval")
+      }
+      uploadedFiles.ethicsUrl = ethicsResult.url
+    }
+
+    // Upload Co-PI CVs
+    const coPiDetailsWithCvs: CoPiDetails[] = []
+    if (formData.coPiDetails && formData.coPiDetails.length > 0) {
+      for (let i = 0; i < formData.coPiDetails.length; i++) {
+        const coPi = formData.coPiDetails[i]
+        let cvUrl = ""
+        let cvFileName = ""
+
+        if (coPi.cvFile) {
+          const cvDataUrl = await fileToDataUrl(coPi.cvFile)
+          const cvPath = `co-pi-cvs/${user.uid}/${Date.now()}-${coPi.name.replace(/\s+/g, '_')}-${coPi.cvFile.name}`
+          const cvResult = await uploadFileToServer(cvDataUrl, cvPath)
+          
+          if (!cvResult.success || !cvResult.url) {
+            throw new Error(`Failed to upload CV for ${coPi.name}`)
+          }
+          cvUrl = cvResult.url
+          cvFileName = coPi.cvFile.name
+        }
+
+        coPiDetailsWithCvs.push({
+          uid: coPi.uid || null,
+          name: coPi.name,
+          email: coPi.email,
+          cvUrl,
+          cvFileName
+        })
+      }
+    }
+
+    return { ...uploadedFiles, coPiDetailsWithCvs }
+  }
+
+  const onSubmit = async (data: ProjectFormData, saveAsDraft = false) => {
+    setIsSubmitting(true)
+    setIsDraft(saveAsDraft)
 
     try {
-      let projectId = project?.id || doc(collection(db, 'projects')).id;
+      // Validate files
+      if (data.proposalFile) {
+        const proposalError = validateFile(data.proposalFile, 'proposal')
+        if (proposalError) {
+          throw new Error(`Proposal file error: ${proposalError}`)
+        }
+      }
 
-      const uploadFile = async (file: File, folder: string, subfolder?: string): Promise<string> => {
-        const path = subfolder ? `projects/${projectId}/${folder}/${subfolder}/${file.name}` : `projects/${projectId}/${folder}/${file.name}`;
-        const dataUrl = await fileToDataUrl(file);
-        const result = await uploadFileToServer(dataUrl, path);
-        if (result.success && result.url) return result.url;
-        throw new Error(result.error || `Failed to upload ${file.name}`);
-      };
-      
-      const updatedCoPiList = await Promise.all(coPiList.map(async (coPi) => {
-          const cvFile = coPiCvFiles[coPi.email];
-          if (cvFile) {
-              const cvUrl = await uploadFile(cvFile, 'co-pi-cvs', coPi.email);
-              return { ...coPi, cvUrl };
+      if (data.ethicsFile) {
+        const ethicsError = validateFile(data.ethicsFile, 'ethics')
+        if (ethicsError) {
+          throw new Error(`Ethics file error: ${ethicsError}`)
+        }
+      }
+
+      // Validate Co-PI CVs
+      if (data.coPiDetails && data.coPiDetails.length > 0) {
+        for (const coPi of data.coPiDetails) {
+          if (!coPi.cvFile) {
+            throw new Error(`CV is required for Co-PI: ${coPi.name}`)
           }
-          return coPi;
-      }));
-      setCoPiList(updatedCoPiList);
-      setProgress(30);
-
-      let proposalUrl = project?.proposalUrl;
-      if (data.proposalUpload?.[0]) {
-        proposalUrl = await uploadFile(data.proposalUpload[0], 'proposal');
-        setProgress(60);
+          const cvError = validateFile(coPi.cvFile, 'cv')
+          if (cvError) {
+            throw new Error(`CV error for ${coPi.name}: ${cvError}`)
+          }
+        }
       }
 
-      let ethicsUrl = project?.ethicsUrl;
-      if (data.ethicsUpload?.[0]) {
-        ethicsUrl = await uploadFile(data.ethicsUpload[0], 'ethics');
-        setProgress(90);
-      }
-      
-      const teamInfoParts = [];
-      if (data.studentInfo && data.studentInfo.trim() !== '') teamInfoParts.push(`Students: ${data.studentInfo}`);
-      const teamInfo = teamInfoParts.join('; ');
-      
-      const coPiUids = updatedCoPiList.filter(coPi => coPi.uid).map(coPi => coPi.uid!);
+      // Upload files
+      const uploadResults = await uploadFiles(data)
 
-      const projectData: Omit<Project, 'id' | 'cvUrl'> = {
-        title: data.title, abstract: data.abstract, type: data.projectType,
-        faculty: user.faculty, institute: user.institute, departmentName: user.department,
-        pi: user.name, pi_uid: user.uid, pi_email: user.email, pi_phoneNumber: user.phoneNumber,
-        coPiDetails: updatedCoPiList,
-        coPiUids: coPiUids,
-        teamInfo, timelineAndOutcomes: data.expectedOutcomes, status: status,
-        submissionDate: project?.submissionDate || new Date().toISOString(), proposalUrl, ethicsUrl,
+      // Prepare project data
+      const projectData: Omit<Project, 'id'> = {
+        title: data.title,
+        abstract: data.abstract,
+        type: data.type,
+        faculty: user.faculty || "",
+        institute: user.institute || "",
+        departmentName: user.department || "",
+        pi: user.name,
+        pi_uid: user.uid,
+        pi_email: user.email,
+        pi_phoneNumber: user.phoneNumber,
+        teamInfo: data.teamInfo,
+        timelineAndOutcomes: data.timelineAndOutcomes,
+        status: saveAsDraft ? "Draft" : "Submitted",
+        submissionDate: new Date().toISOString(),
+        proposalUrl: uploadResults.proposalUrl,
+        ethicsUrl: uploadResults.ethicsUrl,
         sdgGoals: data.sdgGoals,
-      };
-
-      const result = await saveProjectSubmission(projectId, projectData as any);
-      
-      if (!result.success) {
-          throw new Error(result.error);
+        coPiDetails: uploadResults.coPiDetailsWithCvs,
+        coPiUids: uploadResults.coPiDetailsWithCvs.map(coPi => coPi.uid).filter((uid): uid is string => !!uid)
       }
 
-      setProgress(100);
-      
-      if (status === 'Draft') {
-        toast({ title: 'Draft Saved!', description: "You can continue editing from 'My Projects'." });
-        if (!project?.id) router.push(`/dashboard/edit-submission/${projectId}`);
+      const projectId = existingProject?.id || `project_${Date.now()}_${user.uid}`
+      const result = await saveProjectSubmission(projectId, projectData)
+
+      if (result.success) {
+        toast({
+          title: saveAsDraft ? "Draft Saved" : "Project Submitted",
+          description: saveAsDraft 
+            ? "Your project has been saved as a draft" 
+            : "Your project has been submitted successfully"
+        })
+        router.push("/dashboard/my-projects")
       } else {
-        toast({ title: 'Project Submitted!', description: 'Your project is now under review.' });
-        router.push('/dashboard/my-projects');
+        throw new Error(result.error || "Failed to save project")
       }
     } catch (error: any) {
-      console.error('Error saving project: ', error);
-      toast({ variant: 'destructive', title: 'Save Failed', description: error.message || 'An error occurred.' });
+      console.error("Submission error:", error)
+      toast({
+        variant: "destructive",
+        title: "Submission Failed",
+        description: error.message || "An error occurred while submitting your project"
+      })
     } finally {
-      setIsSaving(false);
-      setProgress(0);
+      setIsSubmitting(false)
+      setIsDraft(false)
     }
-  };
-
-  const onFinalSubmit = () => handleSave('Submitted');
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>{project ? 'Edit Submission' : 'New Submission'} - Step {currentStep}: {steps[currentStep - 1].title}</CardTitle>
-            <CardDescription>Follow the steps to complete your submission.</CardDescription>
-          </div>
-          <div className="text-right">
-            <p className="text-sm font-medium text-muted-foreground">Progress</p>
-            <Progress value={(currentStep / 4) * 100} className="w-32 mt-1" />
-          </div>
-        </div>
-      </CardHeader>
-      <FormProvider {...form}>
-        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
-          <CardContent className="space-y-8">
-            {bankDetailsMissing && (
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Bank Details Required</AlertTitle>
-                    <AlertDescription>
-                        You must add your salary bank account details in your profile before you can submit a project.
-                        <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
-                    </AlertDescription>
-                </Alert>
-            )}
-            {currentStep === 1 && (
-              <div className="space-y-4 animate-in fade-in-0">
-                <FormField name="title" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Project Title</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField name="abstract" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Abstract</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
-                <FormField name="projectType" control={form.control} render={({ field }) => (
-                    <FormItem><FormLabel>Category</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Unidisciplinary">Unidisciplinary</SelectItem><SelectItem value="Multi-Disciplinary">Multi-Disciplinary</SelectItem><SelectItem value="Inter-Disciplinary">Inter-Disciplinary</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                )} />
-                <Separator />
+    <div className="max-w-4xl mx-auto p-6 space-y-8">
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {existingProject ? "Edit Project Submission" : "New Project Submission"}
+          </CardTitle>
+          <CardDescription>
+            Fill out all required fields to submit your research project proposal
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((data) => onSubmit(data, false))} className="space-y-6">
+              
+              {/* Basic Project Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Project Information</h3>
+                
                 <FormField
                   control={form.control}
-                  name="sdgGoals"
+                  name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>UN Sustainable Development Goals (SDGs)</FormLabel>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="w-full justify-between font-normal">
-                              {field.value?.length > 0 ? `${field.value.length} selected` : "Select relevant goals"}
-                              <ChevronDown className="h-4 w-4 opacity-50" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-60 overflow-y-auto">
-                              <DropdownMenuLabel>Select all that apply</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              {sdgGoalsList.map((goal) => (
-                                <DropdownMenuCheckboxItem
-                                  key={goal}
-                                  checked={field.value?.includes(goal)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), goal])
-                                      : field.onChange(field.value?.filter((value) => value !== goal));
-                                  }}
-                                  onSelect={(e) => e.preventDefault()}
-                                >
-                                  {goal}
-                                </DropdownMenuCheckboxItem>
-                              ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                       <FormMessage />
+                      <FormLabel>Project Title *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter your project title" />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
-                 <div className="p-4 border rounded-lg bg-muted/50 text-sm text-muted-foreground">
-                    <p><span className="font-semibold text-foreground">Faculty:</span> {user?.faculty || 'Not set'}</p>
-                    <p><span className="font-semibold text-foreground">Institute:</span> {user?.institute || 'Not set'}</p>
-                    <p><span className="font-semibold text-foreground">Department:</span> {user?.department || 'Not set'}</p>
-                    <p className="mt-2 text-xs">This information is from your profile. You can change it in <a href="/dashboard/settings" className="underline">Settings</a>.</p>
-                </div>
+
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project Type *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select project type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Research">Research</SelectItem>
+                          <SelectItem value="Inter-Disciplinary">Inter-Disciplinary</SelectItem>
+                          <SelectItem value="Innovation">Innovation</SelectItem>
+                          <SelectItem value="Development">Development</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="abstract"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Abstract *</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          {...field} 
+                          placeholder="Provide a detailed abstract of your project (minimum 100 characters)"
+                          rows={6}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {field.value?.length || 0} characters (minimum 100 required)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            )}
-            {currentStep === 2 && (
-              <div className="space-y-4 animate-in fade-in-0">
-                <FormItem>
-                  <FormLabel>Principal Investigator (PI)</FormLabel>
-                  <Input disabled value={user?.name || 'Loading...'} />
-                </FormItem>
-                 <div className="space-y-2">
-                    <FormLabel>Co-PIs</FormLabel>
+
+              <Separator />
+
+              {/* Team Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Team Information</h3>
+                
+                <FormField
+                  control={form.control}
+                  name="teamInfo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Team Information *</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          {...field} 
+                          placeholder="Describe your team members, their roles, and qualifications (minimum 50 characters)"
+                          rows={4}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {field.value?.length || 0} characters (minimum 50 required)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Co-PI Management */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-medium">Co-Principal Investigators</Label>
+                  
+                  {/* Search and Add Co-PI */}
+                  <div className="space-y-2">
+                    <Label className="text-sm">Search & Add Co-PI by MIS ID</Label>
                     <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="Search by Co-PI's MIS ID"
+                      <Input 
+                        placeholder="Enter Co-PI's MIS ID" 
                         value={coPiSearchTerm}
                         onChange={(e) => setCoPiSearchTerm(e.target.value)}
                       />
-                      <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
-                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+                      <Button 
+                        type="button" 
+                        onClick={handleSearchCoPi} 
+                        disabled={isSearching || !coPiSearchTerm.trim()}
+                      >
+                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
                       </Button>
                     </div>
+                    
                     {foundCoPi && (
-                      <div className="flex items-center justify-between p-2 border rounded-md">
-                        <p>{foundCoPi.name}</p>
-                        <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
+                      <div className="flex items-center justify-between p-3 border rounded-md bg-muted/50">
+                        <div>
+                          <p className="font-medium">{foundCoPi.name}</p>
+                          <p className="text-sm text-muted-foreground">{foundCoPi.email}</p>
+                        </div>
+                        <Button type="button" size="sm" onClick={handleAddCoPi}>
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
                       </div>
                     )}
-                    <div className="space-y-2 pt-2">
-                      {coPiList.map(coPi => (
-                        <div key={coPi.email} className="p-3 border rounded-lg bg-secondary/50">
-                            <div className="flex items-center justify-between">
-                                <p className="text-sm font-medium">{coPi.name} {!coPi.uid && <span className="text-xs text-muted-foreground">(Not Registered)</span>}</p>
-                                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveCoPi(coPi.email)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                  </div>
+
+                  {/* Co-PI List */}
+                  {coPiFields.length > 0 && (
+                    <div className="space-y-3">
+                      <Label className="text-sm">Added Co-PIs</Label>
+                      {coPiFields.map((field, index) => (
+                        <div key={field.id} className="p-4 border rounded-md space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium">{form.watch(`coPiDetails.${index}.name`)}</p>
+                              <p className="text-sm text-muted-foreground">{form.watch(`coPiDetails.${index}.email`)}</p>
                             </div>
-                            <div className="mt-2">
-                                <FormLabel htmlFor={`cv-${coPi.email}`} className="text-xs">CV (PDF, max 5MB)</FormLabel>
-                                <div className="flex items-center gap-2">
-                                    <Input 
-                                        id={`cv-${coPi.email}`} 
-                                        type="file" 
-                                        accept=".pdf" 
-                                        onChange={(e) => handleCoPiCvChange(coPi.email, e.target.files ? e.target.files[0] : null)}
-                                        className="text-xs h-8"
+                            <Button 
+                              type="button" 
+                              variant="destructive" 
+                              size="sm"
+                              onClick={() => removeCoPi(index)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          
+                          {/* CV Upload for this Co-PI */}
+                          <FormField
+                            control={form.control}
+                            name={`coPiDetails.${index}.cvFile`}
+                            render={({ field: { onChange, value, ...field } }) => (
+                              <FormItem>
+                                <FormLabel className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4" />
+                                  CV (PDF, max 5MB) *
+                                </FormLabel>
+                                <FormControl>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      {...field}
+                                      type="file"
+                                      accept=".pdf"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0]
+                                        if (file) {
+                                          const error = validateFile(file, 'cv')
+                                          if (error) {
+                                            toast({
+                                              variant: "destructive",
+                                              title: "Invalid File",
+                                              description: error
+                                            })
+                                            return
+                                          }
+                                          onChange(file)
+                                        }
+                                      }}
+                                      className="flex-1"
                                     />
-                                    {coPi.cvUrl && <a href={coPi.cvUrl} target="_blank" rel="noreferrer"><Button variant="outline" size="sm">View Current</Button></a>}
-                                </div>
-                            </div>
+                                    {value && (
+                                      <Badge variant="secondary" className="flex items-center gap-1">
+                                        <FileText className="h-3 w-3" />
+                                        {value.name}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </div>
                       ))}
                     </div>
+                  )}
                 </div>
-                <FormField name="studentInfo" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Student Members</FormLabel><FormControl><Textarea {...field} placeholder="List student names and roles..." /></FormControl><FormMessage /></FormItem>
-                )} />
               </div>
-            )}
-            {currentStep === 3 && (
-              <div className="space-y-6 animate-in fade-in-0">
-                <FormField
-                  name="proposalUpload"
-                  control={form.control}
-                  render={({ field: { value, onChange, ...fieldProps } }) => (
-                    <FormItem>
-                      <FormLabel>Project Proposal (PDF)<span className="text-destructive"> *</span></FormLabel>
-                       {project?.proposalUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.proposalUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded Proposal</a>. Uploading a new file will replace it.</p>}
-                      <FormControl>
-                        <Input {...fieldProps} type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} />
-                      </FormControl>
-                       <FormDescription>Below 5 MB</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  name="ethicsUpload"
-                  control={form.control}
-                  render={({ field: { value, onChange, ...fieldProps } }) => (
-                    <FormItem>
-                      <FormLabel>Ethics Approval (PDF, if applicable)</FormLabel>
-                       {project?.ethicsUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.ethicsUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded Ethics Approval</a>. Uploading a new file will replace it.</p>}
-                      <FormControl>
-                        <Input {...fieldProps} type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} />
-                      </FormControl>
-                      <FormDescription>Below 5 MB</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
-            {currentStep === 4 && (
-              <div className="space-y-6 animate-in fade-in-0">
-                <FormField name="expectedOutcomes" control={form.control} render={({ field }) => (
-                  <FormItem><FormLabel>Expected Outcomes & Impact</FormLabel><FormControl><Textarea rows={5} {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+
+              <Separator />
+
+              {/* Timeline and Outcomes */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Project Details</h3>
+                
                 <FormField
                   control={form.control}
-                  name="guidelinesAgreement"
+                  name="timelineAndOutcomes"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormItem>
+                      <FormLabel>Timeline and Expected Outcomes *</FormLabel>
                       <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        <Textarea 
+                          {...field} 
+                          placeholder="Describe your project timeline, milestones, and expected outcomes (minimum 100 characters)"
+                          rows={6}
+                        />
                       </FormControl>
-                      <div className="space-y-1 leading-none">
-                        <FormLabel>Declaration</FormLabel>
-                        <FormMessage />
-                          <p className="text-sm text-muted-foreground">
-                          I declare that I have gone through all the guidelines of the{" "}
-                          <a
-                            href="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/Notification%201446_Revision%20in%20the%20Research%20%26%20Development%20Policy%20of%20the%20University%20%281%29.pdf"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-medium text-primary underline-offset-4 hover:underline"
-                          >
-                            Research Policy of Parul University
-                          </a>
-                          .
-                        </p>
+                      <FormDescription>
+                        {field.value?.length || 0} characters (minimum 100 required)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* SDG Goals */}
+                <FormField
+                  control={form.control}
+                  name="sdgGoals"
+                  render={() => (
+                    <FormItem>
+                      <FormLabel>UN Sustainable Development Goals (Optional)</FormLabel>
+                      <FormDescription>
+                        Select the SDG goals that align with your project
+                      </FormDescription>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 border rounded-md">
+                        {sdgGoals.map((goal) => (
+                          <FormField
+                            key={goal}
+                            control={form.control}
+                            name="sdgGoals"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value?.includes(goal)}
+                                    onCheckedChange={(checked) => {
+                                      const currentValue = field.value || []
+                                      if (checked) {
+                                        field.onChange([...currentValue, goal])
+                                      } else {
+                                        field.onChange(currentValue.filter((value) => value !== goal))
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal cursor-pointer">
+                                  {goal}
+                                </FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                        ))}
                       </div>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-            )}
-          </CardContent>
-          <CardFooter className="flex-col items-stretch gap-4 border-t pt-6">
-            {isSaving && (
-              <div className="w-full flex items-center gap-4 text-sm text-muted-foreground">
-                <Progress value={progress} className="w-full" />
-                <span>{`${Math.round(progress)}%`}</span>
+
+              <Separator />
+
+              {/* File Uploads */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Document Uploads</h3>
+                
+                <FormField
+                  control={form.control}
+                  name="proposalFile"
+                  render={({ field: { onChange, value, ...field } }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Project Proposal (PDF, max 5MB) *
+                      </FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            {...field}
+                            type="file"
+                            accept=".pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                const error = validateFile(file, 'proposal')
+                                if (error) {
+                                  toast({
+                                    variant: "destructive",
+                                    title: "Invalid File",
+                                    description: error
+                                  })
+                                  return
+                                }
+                                onChange(file)
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          {value && (
+                            <Badge variant="secondary" className="flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              {value.name}
+                            </Badge>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ethicsFile"
+                  render={({ field: { onChange, value, ...field } }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        <Upload className="h-4 w-4" />
+                        Ethics Approval (PDF, max 5MB) - Optional
+                      </FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            {...field}
+                            type="file"
+                            accept=".pdf"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                const error = validateFile(file, 'ethics')
+                                if (error) {
+                                  toast({
+                                    variant: "destructive",
+                                    title: "Invalid File",
+                                    description: error
+                                  })
+                                  return
+                                }
+                                onChange(file)
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          {value && (
+                            <Badge variant="secondary" className="flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              {value.name}
+                            </Badge>
+                          )}
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Upload if your project involves human subjects or ethical considerations
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            )}
-            <div className="flex justify-between">
-              <Button type="button" variant="outline" onClick={handlePrevious} disabled={currentStep === 1 || isSaving}>Previous</Button>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="ghost" onClick={() => handleSave('Draft')} disabled={isSaving}>
-                  {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Saving...</> : 'Save as Draft'}
+
+              {/* Validation Summary */}
+              {coPiFields.length > 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Please ensure all Co-PIs have their CVs uploaded before submitting the project.
+                    Each CV must be a PDF file under 5MB.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Submit Buttons */}
+              <div className="flex gap-4 pt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onSubmit(form.getValues(), true)}
+                  disabled={isSubmitting}
+                >
+                  {isDraft && isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving Draft...
+                    </>
+                  ) : (
+                    "Save as Draft"
+                  )}
                 </Button>
-                {currentStep < 4 && <Button type="button" onClick={handleNext} disabled={isSaving}>Next</Button>}
-                {currentStep === 4 && <Button type="submit" disabled={isSaving || !form.watch('guidelinesAgreement') || bankDetailsMissing}>{isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Submitting...</> : "Submit Project"}</Button>}
+                
+                <Button type="submit" disabled={isSubmitting}>
+                  {!isDraft && isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Project"
+                  )}
+                </Button>
               </div>
-            </div>
-          </CardFooter>
-        </form>
-      </FormProvider>
-    </Card>
-  );
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }

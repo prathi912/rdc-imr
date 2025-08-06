@@ -1,4 +1,3 @@
-
 "use client"
 
 import type React from "react"
@@ -11,9 +10,9 @@ import { format, startOfToday, isToday, parseISO } from "date-fns"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-import type { Project, User, GrantDetails, Evaluation, GrantPhase, CoPiDetails } from "@/types"
+import type { Project, User, GrantDetails, Evaluation, GrantPhase } from "@/types"
 import { db } from "@/lib/config"
-import { doc, updateDoc, addDoc, collection, getDocs, where, query } from "firebase/firestore"
+import { doc, updateDoc, addDoc, collection, getDoc, getDocs, where, query } from "firebase/firestore"
 import {
   uploadFileToServer,
   updateProjectStatus,
@@ -62,27 +61,10 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-import {
-  Check,
-  ChevronDown,
-  Clock,
-  X,
-  DollarSign,
-  FileCheck2,
-  CalendarIcon,
-  Edit,
-  UserCog,
-  Banknote,
-  AlertCircle,
-  Users,
-  Loader2,
-  Printer,
-  Download,
-  Plus,
-} from "lucide-react"
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText } from 'lucide-react'
 
 import { GrantManagement } from "./grant-management"
 import { EvaluationForm } from "./evaluation-form"
@@ -154,6 +136,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [project, setProject] = useState(initialProject)
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [user, setUser] = useState<User | null>(null)
+  const [coPiUsers, setCoPiUsers] = useState<User[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
@@ -180,7 +163,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   // Co-PI management state
   const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
   const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null)
-  const [coPiList, setCoPiList] = useState<CoPiDetails[]>([])
+  const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isSavingCoPis, setIsSavingCoPis] = useState(false)
 
@@ -242,11 +225,18 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }, [])
 
   useEffect(() => {
-    if (project.coPiDetails) {
-        setCoPiList(project.coPiDetails);
+    const fetchCoPiUsers = async () => {
+      if (project.coPiUids && project.coPiUids.length > 0) {
+        const usersRef = collection(db, "users")
+        const q = query(usersRef, where("__name__", "in", project.coPiUids))
+        const querySnapshot = await getDocs(q)
+        const fetchedUsers = querySnapshot.docs.map((coPiDoc) => ({ uid: coPiDoc.id, ...coPiDoc.data() }) as User)
+        setCoPiUsers(fetchedUsers)
+        setCoPiList(fetchedUsers.map((u) => ({ uid: u.uid, name: u.name })))
+      }
     }
-  }, [project.coPiDetails]);
-
+    fetchCoPiUsers()
+  }, [project.coPiUids])
 
   useEffect(() => {
     durationForm.reset({
@@ -264,6 +254,16 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const isSuperAdmin = user?.role === "Super-admin"
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid)
   const canViewDocuments = isPI || isCoPi || isAdmin || isAssignedEvaluator
+
+  // Check if user can view Co-PI CVs (evaluators on evaluation day or super admins always)
+  const canViewCoPiCVs = useMemo(() => {
+    if (!user) return false
+    if (isSuperAdmin) return true
+    if (isAssignedEvaluator && project.meetingDetails?.date) {
+      return isToday(parseISO(project.meetingDetails.date))
+    }
+    return false
+  }, [user, isSuperAdmin, isAssignedEvaluator, project.meetingDetails])
 
   const isMeetingToday = project.meetingDetails?.date ? isToday(parseISO(project.meetingDetails.date)) : false
   const showEvaluationForm = user && project.status === "Under Review" && isAssignedEvaluator && isMeetingToday
@@ -337,9 +337,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself as a Co-PI." })
         return
       }
-      setCoPiList([...coPiList, { ...foundCoPi, email: foundCoPi.email || '' }]);
+      setCoPiList([...coPiList, foundCoPi])
     }
-    setFoundCoPi(null);
+    setFoundCoPi(null)
     setCoPiSearchTerm("")
   }
 
@@ -349,11 +349,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const handleSaveCoPis = async () => {
     setIsSavingCoPis(true)
-    const coPiUids = coPiList.map((coPi) => coPi.uid).filter(Boolean) as string[]
+    const coPiUids = coPiList.map((coPi) => coPi.uid)
     const result = await updateCoInvestigators(project.id, coPiUids)
     if (result.success) {
       toast({ title: "Success", description: "Co-PI list has been updated." })
-      setProject((prev) => ({ ...prev, coPiUids, coPiDetails: coPiList }))
+      setProject((prev) => ({ ...prev, coPiUids }))
     } else {
       toast({ variant: "destructive", title: "Error", description: result.error })
     }
@@ -775,12 +775,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DialogContent>
                 </Dialog>
               )}
-              {isSuperAdmin && project.status === "Sanctioned" && !project.projectStartDate && (
+              {isSuperAdmin && project.status === "Sanctioned" && (
                 <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline">
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      Set Duration
+                      {project.projectStartDate ? "Update Duration" : "Set Duration"}
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
@@ -1092,9 +1092,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                                   <Label>Current Co-PI(s)</Label>
                                   {coPiList.length > 0 ? (
                                       coPiList.map((coPi) => (
-                                          <div key={coPi.email} className="flex items-center justify-between p-2 bg-background rounded-md">
+                                          <div key={coPi.uid} className="flex items-center justify-between p-2 bg-background rounded-md">
                                               <p className="text-sm font-medium">{coPi.name}</p>
-                                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid!)}>Remove</Button>
+                                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>Remove</Button>
                                           </div>
                                       ))
                                   ) : (
@@ -1111,22 +1111,34 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                    {project.coPiDetails && project.coPiDetails.length > 0 && (
                       <div className="space-y-2">
                           <h4 className="font-semibold text-base">Co-Principal Investigators:</h4>
-                          <ul className="list-disc list-inside pl-4 text-muted-foreground space-y-1">
-                              {project.coPiDetails.map(coPi => (
-                                <li key={coPi.email}>
-                                  {coPi.uid ? (
-                                    <Link href={`/profile/${allUsers.find(u => u.uid === coPi.uid)?.misId}`} className="text-primary hover:underline" target="_blank">
-                                      {coPi.name}
-                                    </Link>
-                                  ) : (
-                                    coPi.name
-                                  )}
-                                  {coPi.cvUrl && (
-                                     <Button variant="link" asChild className="p-0 h-auto ml-2"><a href={coPi.cvUrl} target="_blank" rel="noopener noreferrer">View CV</a></Button>
-                                  )}
-                                </li>
-                              ))}
-                          </ul>
+                          <div className="space-y-2">
+                              {project.coPiDetails.map((coPi, index) => {
+                                  const coPiUser = coPiUsers.find(u => u.uid === coPi.uid);
+                                  return (
+                                      <div key={index} className="flex items-center justify-between p-2 bg-muted/30 rounded-md">
+                                          <div className="flex items-center gap-2">
+                                              <span className="text-sm font-medium">
+                                                  {coPiUser?.misId ? (
+                                                      <Link href={`/profile/${coPiUser.misId}`} className="text-primary hover:underline" target="_blank">
+                                                          {coPi.name}
+                                                      </Link>
+                                                  ) : (
+                                                      coPi.name
+                                                  )}
+                                              </span>
+                                          </div>
+                                          {canViewCoPiCVs && coPi.cvUrl && (
+                                              <Button variant="outline" size="sm" asChild>
+                                                  <a href={coPi.cvUrl} target="_blank" rel="noopener noreferrer">
+                                                      <FileText className="mr-2 h-4 w-4" />
+                                                      View CV
+                                                  </a>
+                                              </Button>
+                                          )}
+                                      </div>
+                                  );
+                              })}
+                          </div>
                       </div>
                   )}
                   {project.teamInfo && <p className="text-muted-foreground whitespace-pre-wrap">{project.teamInfo}</p>}

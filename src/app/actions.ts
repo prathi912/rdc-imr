@@ -7,7 +7,7 @@ import { generateEvaluationPrompts, type EvaluationPromptsInput } from "@/ai/flo
 import { findJournalWebsite, type JournalWebsiteInput } from "@/ai/flows/journal-website-finder"
 import { chat as chatAgent, type ChatInput } from "@/ai/flows/chat-agent"
 import { adminDb, adminStorage } from "@/lib/admin"
-import { FieldValue, getDoc as adminGetDoc, collection as adminCollection, query as adminQuery, where as adminWhere, getDocs as adminGetDocs } from "firebase-admin/firestore"
+import { FieldValue } from 'firebase-admin/firestore';
 import admin from 'firebase-admin';
 import type { Project, IncentiveClaim, User, GrantDetails, GrantPhase, Transaction, EmrInterest, FundingCall, EmrEvaluation, Evaluation, Author, ResearchPaper, SystemSettings, LoginOtp, CoPiDetails } from "@/types"
 import { sendEmail as sendEmailUtility } from "@/lib/email"
@@ -18,6 +18,7 @@ import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, set
 import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import { getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -862,9 +863,9 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
   try {
     const adminRoles = ["admin", "Super-admin", "CRO"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
+    const q = usersRef.where("role", "in", adminRoles)
 
-    const adminUsersSnapshot = await adminGetDocs(q)
+    const adminUsersSnapshot = await q.get()
     if (adminUsersSnapshot.empty) {
       console.log("No admin users found to notify.")
       return { success: true, message: "No admins to notify." }
@@ -897,7 +898,7 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
 
 export async function notifySuperAdminsOnEvaluation(projectId: string, projectName: string, evaluatorName: string) {
   try {
-    const superAdminUsersSnapshot = await adminGetDocs(adminQuery(adminDb.collection("users"), adminWhere("role", "==", "Super-admin")))
+    const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get()
     if (superAdminUsersSnapshot.empty) {
       console.log("No Super-admin users found to notify.")
       return { success: true, message: "No Super-admins to notify." }
@@ -931,9 +932,9 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
   try {
     const adminRoles = ["admin", "Super-admin"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
+    const q = usersRef.where("role", "in", adminRoles)
 
-    const adminUsersSnapshot = await adminGetDocs(q)
+    const adminUsersSnapshot = await q.get()
     if (adminUsersSnapshot.empty) {
       console.log("No admin users found to notify for completion request.")
       return { success: true, message: "No admins to notify." }
@@ -965,13 +966,9 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
 
 export async function checkMisIdExists(misId: string, currentUid: string): Promise<{ exists: boolean }> {
   try {
-    if (!misId || typeof misId !== 'string' || misId.trim() === '') {
-      return { exists: false };
-    }
-    
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, adminWhere("misId", "==", misId.trim()), admin.firestore.limit(1))
-    const querySnapshot = await adminGetDocs(q)
+    const q = usersRef.where("misId", "==", misId).limit(1)
+    const querySnapshot = await q.get()
 
     if (querySnapshot.empty) {
       return { exists: false }
@@ -999,13 +996,13 @@ export async function checkHODUniqueness(department: string, institute: string, 
             return { exists: false }; // Cannot check if required fields are missing
         }
         const usersRef = adminDb.collection("users");
-        const q = adminQuery(usersRef,
-            adminWhere("designation", "==", "HOD"),
-            adminWhere("department", "==", department),
-            adminWhere("institute", "==", institute),
-            admin.firestore.limit(1));
+        const q = usersRef
+            .where("designation", "==", "HOD")
+            .where("department", "==", department)
+            .where("institute", "==", institute)
+            .limit(1);
 
-        const querySnapshot = await adminGetDocs(q);
+        const querySnapshot = await q.get();
 
         if (querySnapshot.empty) {
             return { exists: false };
@@ -1522,9 +1519,9 @@ export async function linkHistoricalData(
     }
 
     const projectsRef = adminDb.collection("projects")
-    const q = adminQuery(projectsRef, adminWhere("pi_email", "==", email), adminWhere("pi_uid", "in", ["", null]))
+    const q = projectsRef.where("pi_email", "==", email).where("pi_uid", "in", ["", null])
 
-    const projectsSnapshot = await adminGetDocs(q)
+    const projectsSnapshot = await q.get()
 
     if (projectsSnapshot.empty) {
       return { success: true, count: 0 }
@@ -1559,9 +1556,9 @@ export async function linkEmrInterestsToNewUser(uid: string, email: string): Pro
 
     const lowercasedEmail = email.toLowerCase();
     const interestsRef = adminDb.collection("emrInterests");
-    const q = adminQuery(interestsRef, adminWhere("userEmail", "==", lowercasedEmail), adminWhere("userId", "in", ["", null]));
+    const q = interestsRef.where("userEmail", "==", lowercasedEmail).where("userId", "in", ["", null]);
 
-    const snapshot = await adminGetDocs(q);
+    const snapshot = await q.get();
 
     if (snapshot.empty) {
       return { success: true, count: 0 };
@@ -1608,9 +1605,9 @@ export async function updateProjectWithRevision(
     // Notify admins
     const adminRoles = ["admin", "Super-admin", "CRO"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
+    const q = usersRef.where("role", "in", adminRoles)
 
-    const adminUsersSnapshot = await adminGetDocs(q)
+    const adminUsersSnapshot = await q.get()
     if (!adminUsersSnapshot.empty) {
       const batch = adminDb.batch()
       const notificationTitle = `Revision Submitted for "${project.title}" by ${project.pi}`
@@ -1701,8 +1698,8 @@ export async function findUserByMisId(
 
     // 1. Check registered users in Firestore
     const usersRef = adminDb.collection("users");
-    const q = adminQuery(usersRef, adminWhere("misId", "==", misId), admin.firestore.limit(1));
-    const querySnapshot = await adminGetDocs(q);
+    const q = usersRef.where("misId", "==", misId).limit(1);
+    const querySnapshot = await q.get();
 
     if (!querySnapshot.empty) {
       const userDoc = querySnapshot.docs[0];
@@ -1922,81 +1919,6 @@ export async function updatePhaseStatus(
   }
 }
 
-export async function requestNextPhaseDisbursement(
-    projectId: string,
-    phaseId: string
-): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
-    try {
-        const projectRef = adminDb.collection("projects").doc(projectId);
-        const projectSnap = await projectRef.get();
-
-        if (!projectSnap.exists) {
-            return { success: false, error: "Project not found." };
-        }
-
-        const project = projectSnap.data() as Project;
-        if (!project.grant) {
-            return { success: false, error: "Project does not have grant details." };
-        }
-
-        const phaseIndex = project.grant.phases.findIndex((p) => p.id === phaseId);
-        if (phaseIndex === -1) {
-            return { success: false, error: "Phase not found." };
-        }
-
-        // Server-side validation of 80% utilization
-        const currentPhase = project.grant.phases[phaseIndex];
-        const totalUtilized = currentPhase.transactions?.reduce((acc, t) => acc + t.amount, 0) || 0;
-        const utilizationPercentage = (totalUtilized / currentPhase.amount) * 100;
-
-        if (utilizationPercentage < 80) {
-            return { success: false, error: "Utilization must be at least 80% to request the next phase." };
-        }
-
-        // Update current phase status
-        const updatedPhases = [...project.grant.phases];
-        updatedPhases[phaseIndex] = {
-            ...currentPhase,
-            status: "Utilization Submitted",
-            utilizationSubmissionDate: new Date().toISOString(),
-        };
-
-        const updatedGrant = { ...project.grant, phases: updatedPhases };
-        await projectRef.update({ grant: updatedGrant });
-        await logActivity('INFO', 'Next grant phase disbursement requested', { projectId, phaseId });
-
-        // Notify admins
-        const adminRoles = ["admin", "Super-admin", "CRO"];
-        const usersRef = adminDb.collection("users");
-        const adminQuerySnapshot = await adminGetDocs(adminQuery(usersRef, adminWhere("role", "in", adminRoles)));
-
-        if (!adminQuerySnapshot.empty) {
-            const batch = adminDb.batch();
-            const notificationTitle = `${project.pi} has requested the next grant phase for "${project.title}".`;
-            adminQuerySnapshot.forEach((userDoc) => {
-                const notificationRef = adminDb.collection("notifications").doc();
-                batch.set(notificationRef, {
-                    uid: userDoc.id,
-                    projectId: projectId,
-                    title: notificationTitle,
-                    createdAt: new Date().toISOString(),
-                    isRead: false,
-                });
-            });
-            await batch.commit();
-        }
-        
-        const updatedProject = { ...project, grant: updatedGrant };
-        return { success: true, updatedProject };
-        
-    } catch (error: any) {
-        console.error("Error requesting next phase:", error);
-        await logActivity('ERROR', 'Failed to request next phase', { projectId, phaseId, error: error.message, stack: error.stack });
-        return { success: false, error: error.message || "Failed to request the next phase." };
-    }
-}
-
-
 export async function updateCoInvestigators(
   projectId: string,
   coPiUids: string[],
@@ -2021,8 +1943,8 @@ export async function updateCoInvestigators(
 
     if (newCoPis.length > 0) {
       const usersRef = adminDb.collection("users");
-        const usersQuery = adminQuery(usersRef, adminWhere(admin.firestore.FieldPath.documentId(), "in", newCoPis));
-      const newCoPiDocs = await adminGetDocs(usersQuery);
+        const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", newCoPis);
+      const newCoPiDocs = await usersQuery.get();
       
       const batch = adminDb.batch();
 
@@ -2091,15 +2013,15 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
     }
     
     const interestsRef = adminDb.collection('emrInterests');
-    const q = adminQuery(interestsRef, adminWhere('callId', '==', callId), adminWhere('userId', '==', user.uid));
-    const docSnap = await adminGetDocs(q);
+    const q = interestsRef.where('callId', '==', callId).where('userId', '==', user.uid);
+    const docSnap = await q.get();
     if (!docSnap.empty) {
         return { success: false, error: "You have already registered your interest for this call." };
     }
     
     // Check if this is the first registration for this call
-    const allInterestsForCallQuery = adminQuery(interestsRef, adminWhere('callId', '==', callId));
-    const allInterestsSnapshot = await adminGetDocs(allInterestsForCallQuery);
+    const allInterestsForCallQuery = interestsRef.where('callId', '==', callId);
+    const allInterestsSnapshot = await allInterestsForCallQuery.get();
     const isFirstInterest = allInterestsSnapshot.empty;
 
     // Use a transaction to get the next sequential ID
@@ -2144,12 +2066,13 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
     if (isFirstInterest) {
         const adminRoles = ["admin", "Super-admin"];
         const usersRef = adminDb.collection("users");
-        const adminQuerySnapshot = await adminGetDocs(adminQuery(usersRef, adminWhere("role", "in", adminRoles)));
+        const adminQuery = usersRef.where("role", "in", adminRoles);
+        const adminUsersSnapshot = await adminQuery.get();
         
-        if (!adminQuerySnapshot.empty) {
+        if (!adminUsersSnapshot.empty) {
             const batch = adminDb.batch();
             const notificationTitle = `First registration for "${callTitle}". Time to schedule a meeting.`;
-            adminQuerySnapshot.forEach((userDoc) => {
+            adminUsersSnapshot.forEach((userDoc) => {
                 const notificationRef = adminDb.collection("notifications").doc();
                 batch.set(notificationRef, {
                     uid: userDoc.id,
@@ -2166,10 +2089,11 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
      // Notify Co-PIs
     if (coPis && coPis.length > 0) {
         const usersRef = adminDb.collection("users");
-        const usersQuerySnapshot = await adminGetDocs(adminQuery(usersRef, adminWhere(admin.firestore.FieldPath.documentId(), "in", coPis.map(p => p.uid))));
+        const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", coPis.map(p => p.uid));
+        const coPiDocs = await usersQuery.get();
         const batch = adminDb.batch();
 
-        for (const userDoc of usersQuerySnapshot.docs) {
+        for (const userDoc of coPiDocs.docs) {
             const coPi = userDoc.data() as User;
             const notificationRef = adminDb.collection("notifications").doc();
             batch.set(notificationRef, {
@@ -2240,8 +2164,8 @@ export async function scheduleEmrMeeting(
     for (const userId of applicantUids) {
       // Find the interest document for this user and call
       const interestsRef = adminDb.collection('emrInterests');
-      const q = adminQuery(interestsRef, adminWhere('callId', '==', callId), adminWhere('userId', '==', userId));
-      const interestSnapshot = await adminGetDocs(q);
+      const q = interestsRef.where('callId', '==', callId).where('userId', '==', userId);
+      const interestSnapshot = await q.get();
 
       if (interestSnapshot.empty) continue;
       
@@ -2530,7 +2454,7 @@ export async function addEmrEvaluation(
     const interestSnap = await adminDb.collection('emrInterests').doc(interestId).get();
     if(interestSnap.exists) {
       const interest = interestSnap.data() as EmrInterest;
-      const superAdminUsersSnapshot = await adminGetDocs(adminQuery(adminDb.collection("users"), adminWhere("role", "==", "Super-admin")));
+      const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
       if (!superAdminUsersSnapshot.empty) {
         const batch = adminDb.batch();
         const notificationTitle = `EMR evaluation submitted for ${interest.userName} by ${evaluator.name}`;
@@ -2686,7 +2610,7 @@ export async function updateEmrStatus(
 ): Promise<{ success: boolean, error?: string }> {
   try {
     const interestRef = adminDb.collection("emrInterests").doc(interestId)
-    const updateData: { [key: any]: any } = { status }
+    const updateData: { [key: string]: any } = { status }
 
     if (adminRemarks) {
       updateData.adminRemarks = adminRemarks
@@ -2799,7 +2723,7 @@ export async function uploadRevisedEmrPpt(interestId: string, pptDataUrl: string
 
 export async function notifySuperAdminsOnNewUser(userName: string, role: string) {
   try {
-    const superAdminUsersSnapshot = await adminGetDocs(adminQuery(adminDb.collection("users"), adminWhere("role", "==", "Super-admin")));
+    const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
     if (superAdminUsersSnapshot.empty) {
       console.log("No Super-admin users found to notify.");
       return { success: true, message: "No Super-admins to notify." };
@@ -2870,13 +2794,13 @@ export async function submitToAgency(
   interestId: string, 
   referenceNumber: string, 
   acknowledgementUrl?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean, error?: string }> {
     try {
         if (!interestId || !referenceNumber) {
             return { success: false, error: "Interest ID and reference number are required." };
         }
         const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const updateData: { [key: any]: any } = {
+        const updateData: { [key: string]: any } = {
             agencyReferenceNumber: referenceNumber,
             status: 'Submitted to Agency',
             submittedToAgencyAt: new Date().toISOString(),
@@ -2894,79 +2818,6 @@ export async function submitToAgency(
         await logActivity('ERROR', 'Failed to log EMR submission to agency', { interestId, error: error.message, stack: error.stack });
         return { success: false, error: "Failed to log submission to agency." };
     }
-}
-
-export async function updateEmrFinalStatus(
-  interestId: string,
-  status: 'Sanctioned' | 'Not Sanctioned',
-  proofUrl: string
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    if (!interestId || !status || !proofUrl) {
-      return { success: false, error: 'Interest ID, status, and proof are required.' };
-    }
-
-    const interestRef = adminDb.collection('emrInterests').doc(interestId);
-    const interestSnap = await interestRef.get();
-    if (!interestSnap.exists) {
-        return { success: false, error: "Interest registration not found." };
-    }
-    const interest = interestSnap.data() as EmrInterest;
-
-    await interestRef.update({
-      status: status,
-      finalProofUrl: proofUrl,
-    });
-    await logActivity('INFO', 'EMR final status updated', { interestId, userId: interest.userId, newStatus: status });
-
-    // Notify Super Admins
-    const superAdminUsersSnapshot = await adminGetDocs(adminQuery(adminDb.collection("users"), adminWhere("role", "==", "Super-admin")));
-    if (!superAdminUsersSnapshot.empty) {
-      const batch = adminDb.batch();
-      const notificationTitle = `EMR Outcome: "${interest.callTitle || 'A project'}" was ${status} for ${interest.userName}.`;
-      superAdminUsersSnapshot.forEach((userDoc) => {
-        const notificationRef = adminDb.collection("notifications").doc();
-        batch.set(notificationRef, {
-          uid: userDoc.id,
-          title: notificationTitle,
-          createdAt: new Date().toISOString(),
-          isRead: false,
-        });
-      });
-      await batch.commit();
-    }
-
-    return { success: true };
-  } catch (error: any) {
-    console.error('Error updating EMR final status:', error);
-    await logActivity('ERROR', 'Failed to update EMR final status', { interestId, status, error: error.message, stack: error.stack });
-    return { success: false, error: 'Failed to update final status.' };
-  }
-}
-
-
-function formatWithOrdinal(date: Date) {
-    const day = format(date, 'd');
-    const month = format(date, 'MMMM');
-    const year = format(date, 'yyyy');
-
-    const getOrdinalSuffix = (d: string) => {
-        const i = parseInt(d, 10);
-        const j = i % 10,
-            k = i % 100;
-        if (j == 1 && k != 11) {
-            return "st";
-        }
-        if (j == 2 && k != 12) {
-            return "nd";
-        }
-        if (j == 3 && k != 13) {
-            return "rd";
-        }
-        return "th";
-    };
-
-    return `${month} ${day}${getOrdinalSuffix(day)}, ${year}`;
 }
 
 export async function generateOfficeNotingForm(
@@ -3032,7 +2883,7 @@ export async function generateOfficeNotingForm(
       project_duration: formData.projectDuration,
       ...phaseData,
       total_amount: totalAmount.toLocaleString('en-IN'),
-      presentation_date: project.meetingDetails?.date ? formatWithOrdinal(parseISO(project.meetingDetails.date)) : 'N/A',
+      presentation_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
       presentation_time: project.meetingDetails?.time || 'N/A',
     };
 
@@ -3065,8 +2916,8 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid:
         const projectsRef = adminDb.collection('projects');
         const q = adminQuery(
             projectsRef,
-            adminWhere('pi_uid', '==', piUid),
-            adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid)
+            where('pi_uid', '==', piUid),
+            where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid)
         );
 
         const snapshot = await adminGetDocs(q);
@@ -3258,17 +3109,13 @@ export async function bulkUploadEmrProjects(
           };
       });
 
-      let sanctionDate: string | undefined = undefined;
+      let sanctionDate;
       if (row.sanction_date) {
-        if (row.sanction_date instanceof Date) { 
-            sanctionDate = row.sanction_date.toISOString(); 
-        } else if (typeof row.sanction_date === "number") { 
-            sanctionDate = excelDateToJSDate(row.sanction_date).toISOString(); 
-        } else if (typeof row.sanction_date === "string") {
+        if (row.sanction_date instanceof Date) { sanctionDate = row.sanction_date.toISOString(); } 
+        else if (typeof row.sanction_date === "number") { sanctionDate = excelDateToJSDate(row.sanction_date).toISOString(); } 
+        else if (typeof row.sanction_date === "string") {
           const parsedDate = new Date(row.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'));
-          if (!isNaN(parsedDate.getTime())) {
-              sanctionDate = parsedDate.toISOString();
-          }
+          sanctionDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : undefined;
         }
       }
 
@@ -3289,11 +3136,8 @@ export async function bulkUploadEmrProjects(
         durationAmount: `Amount: ${row['Total Amount']?.toLocaleString('en-IN')} | Duration: ${row['Duration of Project']}`,
         isBulkUploaded: true,
         isOpenToPi: false,
+        sanctionDate: sanctionDate,
       };
-
-      if (sanctionDate) {
-        interestDoc.sanctionDate = sanctionDate;
-      }
 
       await adminDb.collection('emrInterests').add(interestDoc);
       successfulCount++;
