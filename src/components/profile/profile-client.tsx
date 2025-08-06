@@ -537,12 +537,14 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                     </TabsList>
                     <TabsContent value="projects">
                         <div className="space-y-4 mt-4">
-                            {projects.length > 0 ? projects.map(project => (
+                            {projects.length > 0 ? projects.map(project => {
+                                const isPI = project.pi_uid === user.uid || project.pi_email === user.email;
+                                return (
                                 <Card key={project.id}>
                                     <CardContent className="p-4">
                                         <div className="flex items-center gap-2 mb-1">
                                             <p className="font-semibold">{project.title}</p>
-                                            {project.pi_uid === user.uid ? (
+                                            {isPI ? (
                                                 <Badge variant="secondary">PI</Badge>
                                             ) : (
                                                 <Badge variant="outline">Co-PI</Badge>
@@ -552,7 +554,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                         <Badge variant="outline" className="mt-2">{project.status}</Badge>
                                     </CardContent>
                                 </Card>
-                            )) : (
+                            )}) : (
                                 <Card><CardContent className="p-6 text-center text-muted-foreground">No intramural research projects found.</CardContent></Card>
                             )}
                         </div>
@@ -571,7 +573,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                     <CardContent className="p-4 space-y-2">
                                         <div className="flex justify-between items-start">
                                             <p className="font-semibold flex-1">{projectTitle}</p>
-                                            {isOwner && interest.isBulkUploaded && interest.userId === user.uid && (
+                                            {isOwner && interest.isBulkUploaded && userIsPi && (
                                                 <Button size="sm" variant="outline" onClick={() => setInterestToEdit(interest)}>
                                                     <Edit className="h-4 w-4 mr-2"/> Edit
                                                 </Button>
