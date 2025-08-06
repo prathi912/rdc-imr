@@ -863,9 +863,9 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
   try {
     const adminRoles = ["admin", "Super-admin", "CRO"]
     const usersRef = adminDb.collection("users")
-    const q = usersRef.where("role", "in", adminRoles)
+    const q = adminQuery(usersRef, where("role", "in", adminRoles))
 
-    const adminUsersSnapshot = await q.get()
+    const adminUsersSnapshot = await getDocs(q)
     if (adminUsersSnapshot.empty) {
       console.log("No admin users found to notify.")
       return { success: true, message: "No admins to notify." }
@@ -932,9 +932,9 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
   try {
     const adminRoles = ["admin", "Super-admin"]
     const usersRef = adminDb.collection("users")
-    const q = usersRef.where("role", "in", adminRoles)
+    const q = adminQuery(usersRef, where("role", "in", adminRoles))
 
-    const adminUsersSnapshot = await q.get()
+    const adminUsersSnapshot = await getDocs(q)
     if (adminUsersSnapshot.empty) {
       console.log("No admin users found to notify for completion request.")
       return { success: true, message: "No admins to notify." }
@@ -1608,9 +1608,9 @@ export async function updateProjectWithRevision(
     // Notify admins
     const adminRoles = ["admin", "Super-admin", "CRO"]
     const usersRef = adminDb.collection("users")
-    const q = usersRef.where("role", "in", adminRoles)
+    const q = adminQuery(usersRef, where("role", "in", adminRoles))
 
-    const adminUsersSnapshot = await q.get()
+    const adminUsersSnapshot = await getDocs(q)
     if (!adminUsersSnapshot.empty) {
       const batch = adminDb.batch()
       const notificationTitle = `Revision Submitted for "${project.title}" by ${project.pi}`
@@ -3185,3 +3185,81 @@ export async function updateEmrInterestDetails(interestId: string, updates: Part
     }
 }
 
+export async function signAndUploadEndorsement(interestId: string, signedEndorsementUrl: string, fileName: string): Promise<{ success: boolean, error?: string }> {
+    try {
+        if (!interestId || !signedEndorsementUrl) {
+            return { success: false, error: "Interest ID and signed endorsement form URL are required." };
+        }
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        await interestRef.update({
+            signedEndorsementUrl: signedEndorsementUrl,
+            status: 'Endorsement Signed',
+            endorsementSignedAt: new Date().toISOString(),
+        });
+
+        const interestSnap = await interestRef.get();
+        if (interestSnap.exists()) {
+            const interest = interestSnap.data() as EmrInterest;
+            await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
+            // You can add email notification logic here if needed, similar to other functions.
+        }
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error signing endorsement form:", error);
+        await logActivity('ERROR', 'Failed to sign and upload EMR endorsement form', { interestId, error: error.message, stack: error.stack });
+        return { success: false, error: "Failed to sign and upload endorsement form." };
+    }
+}
+
+export async function updateEmrFinalStatus(interestId: string, status: 'Sanctioned' | 'Not Sanctioned', proofDataUrl: string, fileName: string): Promise<{ success: boolean, error?: string }> {
+    try {
+        if (!interestId || !status || !proofDataUrl) {
+            return { success: false, error: "Interest ID, status, and proof are required." };
+        }
+
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        const interestSnap = await interestRef.get();
+        if (!interestSnap.exists()) {
+            return { success: false, error: "Interest registration not found." };
+        }
+        const interest = interestSnap.data() as EmrInterest;
+
+        // Upload proof
+        const path = `emr-final-proofs/${interest.callId}/${interest.userId}/${fileName}`;
+        const uploadResult = await uploadFileToServer(proofDataUrl, path);
+        if (!uploadResult.success || !uploadResult.url) {
+            throw new Error(uploadResult.error || "Failed to upload final proof.");
+        }
+
+        // Update interest document
+        await interestRef.update({
+            status,
+            finalProofUrl: uploadResult.url,
+        });
+
+        // Notify Super Admins
+        const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
+        if (!superAdminUsersSnapshot.empty) {
+            const batch = adminDb.batch();
+            const notificationTitle = `EMR final status for ${interest.userName} updated to: ${status}`;
+            superAdminUsersSnapshot.forEach((userDoc) => {
+                const notificationRef = adminDb.collection("notifications").doc();
+                batch.set(notificationRef, {
+                    uid: userDoc.id,
+                    title: notificationTitle,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
+                });
+            });
+            await batch.commit();
+        }
+
+        await logActivity('INFO', 'EMR final status updated', { interestId, userId: interest.userId, newStatus: status });
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error updating EMR final status:", error);
+        await logActivity('ERROR', 'Failed to update EMR final status', { interestId, status, error: error.message, stack: error.stack });
+        return { success: false, error: "Failed to update final status." };
+    }
+}
