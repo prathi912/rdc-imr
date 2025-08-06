@@ -965,8 +965,12 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
 
 export async function checkMisIdExists(misId: string, currentUid: string): Promise<{ exists: boolean }> {
   try {
+    if (!misId || typeof misId !== 'string' || misId.trim() === '') {
+      return { exists: false };
+    }
+    
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, adminWhere("misId", "==", misId), admin.firestore.limit(1))
+    const q = adminQuery(usersRef, adminWhere("misId", "==", misId.trim()), admin.firestore.limit(1))
     const querySnapshot = await adminGetDocs(q)
 
     if (querySnapshot.empty) {
@@ -1964,13 +1968,12 @@ export async function requestNextPhaseDisbursement(
         // Notify admins
         const adminRoles = ["admin", "Super-admin", "CRO"];
         const usersRef = adminDb.collection("users");
-        const adminQuery = query(usersRef, where("role", "in", adminRoles));
-        const adminUsersSnapshot = await getDocs(adminQuery);
+        const adminQuerySnapshot = await adminGetDocs(adminQuery(usersRef, adminWhere("role", "in", adminRoles)));
 
-        if (!adminUsersSnapshot.empty) {
+        if (!adminQuerySnapshot.empty) {
             const batch = adminDb.batch();
             const notificationTitle = `${project.pi} has requested the next grant phase for "${project.title}".`;
-            adminUsersSnapshot.forEach((userDoc) => {
+            adminQuerySnapshot.forEach((userDoc) => {
                 const notificationRef = adminDb.collection("notifications").doc();
                 batch.set(notificationRef, {
                     uid: userDoc.id,
@@ -2683,7 +2686,7 @@ export async function updateEmrStatus(
 ): Promise<{ success: boolean, error?: string }> {
   try {
     const interestRef = adminDb.collection("emrInterests").doc(interestId)
-    const updateData: { [key: string]: any } = { status }
+    const updateData: { [key: any]: any } = { status }
 
     if (adminRemarks) {
       updateData.adminRemarks = adminRemarks
@@ -2867,13 +2870,13 @@ export async function submitToAgency(
   interestId: string, 
   referenceNumber: string, 
   acknowledgementUrl?: string
-): Promise<{ success: boolean, error?: string }> {
+): Promise<{ success: boolean; error?: string }> {
     try {
         if (!interestId || !referenceNumber) {
             return { success: false, error: "Interest ID and reference number are required." };
         }
         const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const updateData: { [key: string]: any } = {
+        const updateData: { [key: any]: any } = {
             agencyReferenceNumber: referenceNumber,
             status: 'Submitted to Agency',
             submittedToAgencyAt: new Date().toISOString(),
