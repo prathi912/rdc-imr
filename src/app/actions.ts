@@ -966,6 +966,9 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
 
 export async function checkMisIdExists(misId: string, currentUid: string): Promise<{ exists: boolean }> {
   try {
+    if (!misId || typeof misId !== 'string' || misId.trim() === '') {
+      return { exists: false };
+    }
     const usersRef = adminDb.collection("users")
     const q = usersRef.where("misId", "==", misId).limit(1)
     const querySnapshot = await q.get()
@@ -2839,12 +2842,14 @@ export async function generateOfficeNotingForm(
     const piUserSnap = await piUserRef.get();
     const piUser = piUserSnap.exists ? piUserSnap.data() as User : null;
     
-    // Save the duration and phases to the project document
-    await projectRef.update({
-        projectDuration: formData.projectDuration,
-        phases: formData.phases,
-    });
-
+    let coPi1User: User | null = null;
+    if (project.coPiDetails && project.coPiDetails.length > 0 && project.coPiDetails[0].uid) {
+      const coPi1UserRef = adminDb.collection('users').doc(project.coPiDetails[0].uid!);
+      const coPi1UserSnap = await coPi1UserRef.get();
+      if (coPi1UserSnap.exists) {
+        coPi1User = coPi1UserSnap.data() as User;
+      }
+    }
 
     const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
     if (!fs.existsSync(templatePath)) {
@@ -2879,6 +2884,8 @@ export async function generateOfficeNotingForm(
       pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || 'N/A',
       pi_email: project.pi_email,
       ...coPiData,
+      copi_designation: coPi1User?.designation || 'N/A',
+      copi_department: coPi1User?.department || 'N/A',
       project_title: project.title,
       project_duration: formData.projectDuration,
       ...phaseData,
@@ -2901,6 +2908,13 @@ export async function generateOfficeNotingForm(
 
     const buf = doc.getZip().generate({ type: 'nodebuffer' });
     const base64 = buf.toString('base64');
+    
+    if (project.status === 'Recommended') {
+      await projectRef.update({
+          projectDuration: formData.projectDuration,
+          phases: formData.phases,
+      });
+    }
 
     return { success: true, fileData: base64 };
   } catch (error: any) {
@@ -3170,3 +3184,4 @@ export async function updateEmrInterestDetails(interestId: string, updates: Part
         return { success: false, error: "Failed to update details." };
     }
 }
+
