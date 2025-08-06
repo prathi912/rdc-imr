@@ -69,6 +69,15 @@ export default function NotificationsPage() {
     if (title.includes('Review') || title.includes('Not Recommended')) return GanttChartSquare;
     return Bell;
   }
+  
+  const getNotificationLink = (notification: NotificationType) => {
+    if (!notification.projectId) return null;
+    if (notification.projectId.startsWith('/')) {
+      return notification.projectId; // It's a full path
+    }
+    // It's a project ID
+    return `/dashboard/project/${notification.projectId}`;
+  };
 
   return (
     <div className="container mx-auto max-w-4xl py-10">
@@ -89,6 +98,12 @@ export default function NotificationsPage() {
                <div className="space-y-4">
                 {notifications.map((notification) => {
                   const Icon = getIcon(notification.title);
+                  const link = getNotificationLink(notification);
+                  
+                  const NotificationTitle = () => (
+                    <p className="font-semibold break-words">{notification.title}</p>
+                  );
+
                   return (
                     <div
                       key={notification.id}
@@ -102,9 +117,13 @@ export default function NotificationsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                            <div className="flex-1">
-                             <Link href={`/dashboard/project/${notification.projectId}`} className="hover:underline">
-                                 <p className="font-semibold break-words">{notification.title}</p>
-                             </Link>
+                             {link ? (
+                               <Link href={link} className="hover:underline">
+                                 <NotificationTitle />
+                               </Link>
+                             ) : (
+                               <NotificationTitle />
+                             )}
                              <p className="text-sm text-muted-foreground mt-1">
                                  {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
                              </p>
