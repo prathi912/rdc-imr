@@ -1964,8 +1964,8 @@ export async function requestNextPhaseDisbursement(
         // Notify admins
         const adminRoles = ["admin", "Super-admin", "CRO"];
         const usersRef = adminDb.collection("users");
-        const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles));
-        const adminUsersSnapshot = await adminGetDocs(q);
+        const adminQuery = query(usersRef, where("role", "in", adminRoles));
+        const adminUsersSnapshot = await getDocs(adminQuery);
 
         if (!adminUsersSnapshot.empty) {
             const batch = adminDb.batch();

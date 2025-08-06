@@ -421,18 +421,22 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
 
     useEffect(() => {
         const fetchDomain = async () => {
-            const titles = [...projects.map(p => p.title), ...researchPapers.map(p => p.title)];
-            if (titles.length > 0 && !user.researchDomain) {
+            const imrTitles = projects.map(p => p.title);
+            const emrTitles = emrInterests.map(i => i.callTitle || fundingCalls.find(c => c.id === i.callId)?.title).filter(Boolean) as string[];
+            const paperTitles = researchPapers.map(p => p.title);
+            const allTitles = [...new Set([...imrTitles, ...emrTitles, ...paperTitles])];
+
+            if (allTitles.length > 0 && !user.researchDomain) {
                 setLoadingDomain(true);
                 try {
-                    const result = await getResearchDomain({ paperTitles: titles });
+                    const result = await getResearchDomain({ paperTitles: allTitles });
                     if (result.success) { setDomain(result.domain); }
                 } catch (error) { console.error("Error fetching research domain:", error); } 
                 finally { setLoadingDomain(false); }
             }
         };
         fetchDomain();
-    }, [projects, researchPapers, user.researchDomain]);
+    }, [projects, emrInterests, researchPapers, user.researchDomain, fundingCalls]);
     
     const handlePaperSuccess = (paper: ResearchPaper, isNew: boolean) => {
         if (isNew) { setResearchPapers(prev => [paper, ...prev]); } 
