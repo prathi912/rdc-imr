@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '../ui/form'
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus } from '@/app/actions';
+import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement } from '@/app/actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +72,73 @@ const bulkEditSchema = z.object({
     durationAmount: z.string().optional(),
     isOpenToPi: z.boolean().default(false),
 });
+
+const signEndorsementSchema = z.object({
+    signedEndorsement: z.any().refine(files => files?.length > 0, "A signed PDF is required."),
+});
+
+function SignEndorsementDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const form = useForm<z.infer<typeof signEndorsementSchema>>({
+        resolver: zodResolver(signEndorsementSchema),
+    });
+
+    const handleSubmit = async (values: z.infer<typeof signEndorsementSchema>) => {
+        setIsSubmitting(true);
+        try {
+            const file = values.signedEndorsement[0];
+            const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`;
+            const result = await signAndUploadEndorsement(interest.id, dataUrl, file.name);
+
+            if (result.success) {
+                toast({ title: 'Success', description: 'Endorsement has been signed and uploaded.' });
+                onUpdate();
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Upload Signed Endorsement</DialogTitle>
+                    <DialogDescription>
+                        Please upload the scanned, signed endorsement form. This will mark the status as "Endorsement Signed" and notify the PI.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="sign-endorsement-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
+                        <FormField
+                            control={form.control}
+                            name="signedEndorsement"
+                            render={({ field: { onChange, value, ...rest } }) => (
+                                <FormItem>
+                                    <Label>Signed Endorsement Form (PDF)</Label>
+                                    <Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...rest} />
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="sign-endorsement-form" disabled={isSubmitting}>
+                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : 'Confirm & Upload'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function BulkEditDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
     const { toast } = useToast();
@@ -150,6 +217,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
+    const [isSignEndorsementDialogOpen, setIsSignEndorsementDialogOpen] = useState(false);
 
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
@@ -212,6 +280,11 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const handleOpenBulkEditDialog = (interest: EmrInterest) => {
         setInterestToUpdate(interest);
         setIsBulkEditDialogOpen(true);
+    };
+    
+    const handleOpenSignDialog = (interest: EmrInterest) => {
+        setInterestToUpdate(interest);
+        setIsSignEndorsementDialogOpen(true);
     };
 
 
@@ -313,11 +386,8 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                     )}
                                                     {isMeetingScheduled && (
                                                         <>
-                                                            {interest.status === 'Recommended' && (
-                                                                <DropdownMenuItem disabled>Recommended</DropdownMenuItem> // Now it's the PI's turn
-                                                            )}
                                                             {interest.status === 'Endorsement Submitted' && (
-                                                                <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Endorsement Signed')}>Mark as Endorsement Signed</DropdownMenuItem>
+                                                                <DropdownMenuItem onSelect={() => handleOpenSignDialog(interest)}>Mark as Endorsement Signed</DropdownMenuItem>
                                                             )}
                                                             
                                                             {!isPostDecision && (
@@ -412,12 +482,20 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 allUsers={allUsers}
              />
              {interestToUpdate && (
-                <BulkEditDialog 
-                    interest={interestToUpdate} 
-                    isOpen={isBulkEditDialogOpen} 
-                    onOpenChange={setIsBulkEditDialogOpen}
-                    onUpdate={onActionComplete}
-                />
+                 <>
+                    <BulkEditDialog 
+                        interest={interestToUpdate} 
+                        isOpen={isBulkEditDialogOpen} 
+                        onOpenChange={setIsBulkEditDialogOpen}
+                        onUpdate={onActionComplete}
+                    />
+                    <SignEndorsementDialog
+                        interest={interestToUpdate}
+                        isOpen={isSignEndorsementDialogOpen}
+                        onOpenChange={setIsSignEndorsementDialogOpen}
+                        onUpdate={onActionComplete}
+                    />
+                 </>
              )}
         </Card>
     );
