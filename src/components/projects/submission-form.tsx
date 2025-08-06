@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle, ChevronDown } from 'lucide-react';
+import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle, ChevronDown, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Project, CoPiDetails } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -85,6 +85,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
   const [coPiList, setCoPiList] = useState<CoPiDetails[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [coPiCvFiles, setCoPiCvFiles] = useState<Record<string, File>>({});
 
   const formSchema = useMemo(() => z.object({
     // Step 1
@@ -94,9 +95,6 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     sdgGoals: z.array(z.string()).optional(),
     // Step 2
     studentInfo: z.string().optional(),
-    cvUpload: z.any().refine((files) => {
-        return !!project?.cvUrl || (files && files.length > 0);
-    }, 'CVs upload is required (single ZIP file).'),
     // Step 3
     proposalUpload: z.any().refine((files) => {
         return !!project?.proposalUrl || (files && files.length > 0);
@@ -161,7 +159,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     const fieldsToValidate = {
       1: ['title', 'abstract', 'projectType'],
       2: [],
-      3: ['proposalUpload', 'cvUpload'],
+      3: ['proposalUpload'],
       4: ['expectedOutcomes', 'guidelinesAgreement'],
     }[currentStep] as (keyof FormData)[];
 
@@ -175,7 +173,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
 
   const handlePrevious = () => {
     if (currentStep > 1) {
-      setCurrentStep(currentStep + 1);
+      setCurrentStep(currentStep - 1);
     }
   };
   
@@ -215,8 +213,22 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
 
   const handleRemoveCoPi = (emailToRemove: string) => {
     setCoPiList(coPiList.filter(coPi => coPi.email !== emailToRemove));
+    setCoPiCvFiles(prev => {
+        const newFiles = { ...prev };
+        delete newFiles[emailToRemove];
+        return newFiles;
+    });
   };
 
+  const handleCoPiCvChange = (email: string, file: File | null) => {
+    if (file) {
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            toast({ variant: 'destructive', title: 'File too large', description: 'CV file must be smaller than 5MB.' });
+            return;
+        }
+        setCoPiCvFiles(prev => ({ ...prev, [email]: file }));
+    }
+  };
 
   const handleSave = async (status: 'Draft' | 'Submitted') => {
     if (!user || !user.faculty || !user.institute || !user.department) {
@@ -235,6 +247,15 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         });
         return;
     }
+    if (status === 'Submitted' && coPiList.some(coPi => !coPiCvFiles[coPi.email] && !coPi.cvUrl)) {
+        toast({
+            variant: 'destructive',
+            title: 'CVs Missing',
+            description: 'Please upload a CV for each Co-PI before submitting.',
+        });
+        return;
+    }
+
 
     setIsSaving(true);
     setProgress(5);
@@ -243,19 +264,24 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     try {
       let projectId = project?.id || doc(collection(db, 'projects')).id;
 
-      const uploadFile = async (file: File, folder: string): Promise<string> => {
+      const uploadFile = async (file: File, folder: string, subfolder?: string): Promise<string> => {
+        const path = subfolder ? `projects/${projectId}/${folder}/${subfolder}/${file.name}` : `projects/${projectId}/${folder}/${file.name}`;
         const dataUrl = await fileToDataUrl(file);
-        const path = `projects/${projectId}/${folder}/${file.name}`;
         const result = await uploadFileToServer(dataUrl, path);
         if (result.success && result.url) return result.url;
         throw new Error(result.error || `Failed to upload ${file.name}`);
       };
-
-      let cvUrl = project?.cvUrl;
-      if (data.cvUpload?.[0]) {
-        cvUrl = await uploadFile(data.cvUpload[0], 'cv');
-        setProgress(30);
-      }
+      
+      const updatedCoPiList = await Promise.all(coPiList.map(async (coPi) => {
+          const cvFile = coPiCvFiles[coPi.email];
+          if (cvFile) {
+              const cvUrl = await uploadFile(cvFile, 'co-pi-cvs', coPi.email);
+              return { ...coPi, cvUrl };
+          }
+          return coPi;
+      }));
+      setCoPiList(updatedCoPiList);
+      setProgress(30);
 
       let proposalUrl = project?.proposalUrl;
       if (data.proposalUpload?.[0]) {
@@ -273,20 +299,20 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       if (data.studentInfo && data.studentInfo.trim() !== '') teamInfoParts.push(`Students: ${data.studentInfo}`);
       const teamInfo = teamInfoParts.join('; ');
       
-      const coPiUids = coPiList.filter(coPi => coPi.uid).map(coPi => coPi.uid!);
+      const coPiUids = updatedCoPiList.filter(coPi => coPi.uid).map(coPi => coPi.uid!);
 
-      const projectData: Omit<Project, 'id'> = {
+      const projectData: Omit<Project, 'id' | 'cvUrl'> = {
         title: data.title, abstract: data.abstract, type: data.projectType,
         faculty: user.faculty, institute: user.institute, departmentName: user.department,
         pi: user.name, pi_uid: user.uid, pi_email: user.email, pi_phoneNumber: user.phoneNumber,
-        coPiDetails: coPiList, // Store details for all
-        coPiUids: coPiUids, // Store UIDs for registered users
+        coPiDetails: updatedCoPiList,
+        coPiUids: coPiUids,
         teamInfo, timelineAndOutcomes: data.expectedOutcomes, status: status,
-        submissionDate: project?.submissionDate || new Date().toISOString(), proposalUrl, cvUrl, ethicsUrl,
+        submissionDate: project?.submissionDate || new Date().toISOString(), proposalUrl, ethicsUrl,
         sdgGoals: data.sdgGoals,
       };
 
-      const result = await saveProjectSubmission(projectId, projectData);
+      const result = await saveProjectSubmission(projectId, projectData as any);
       
       if (!result.success) {
           throw new Error(result.error);
@@ -421,9 +447,24 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                     )}
                     <div className="space-y-2 pt-2">
                       {coPiList.map(coPi => (
-                        <div key={coPi.email} className="flex items-center justify-between p-2 bg-secondary rounded-md">
-                           <p className="text-sm font-medium">{coPi.name} {!coPi.uid && <span className="text-xs text-muted-foreground">(Not Registered)</span>}</p>
-                           <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.email)}>Remove</Button>
+                        <div key={coPi.email} className="p-3 border rounded-lg bg-secondary/50">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm font-medium">{coPi.name} {!coPi.uid && <span className="text-xs text-muted-foreground">(Not Registered)</span>}</p>
+                                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleRemoveCoPi(coPi.email)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                            </div>
+                            <div className="mt-2">
+                                <FormLabel htmlFor={`cv-${coPi.email}`} className="text-xs">CV (PDF, max 5MB)</FormLabel>
+                                <div className="flex items-center gap-2">
+                                    <Input 
+                                        id={`cv-${coPi.email}`} 
+                                        type="file" 
+                                        accept=".pdf" 
+                                        onChange={(e) => handleCoPiCvChange(coPi.email, e.target.files ? e.target.files[0] : null)}
+                                        className="text-xs h-8"
+                                    />
+                                    {coPi.cvUrl && <a href={coPi.cvUrl} target="_blank" rel="noreferrer"><Button variant="outline" size="sm">View Current</Button></a>}
+                                </div>
+                            </div>
                         </div>
                       ))}
                     </div>
@@ -431,21 +472,6 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                 <FormField name="studentInfo" control={form.control} render={({ field }) => (
                   <FormItem><FormLabel>Student Members</FormLabel><FormControl><Textarea {...field} placeholder="List student names and roles..." /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField
-                  name="cvUpload"
-                  control={form.control}
-                  render={({ field: { value, onChange, ...fieldProps } }) => (
-                    <FormItem>
-                      <FormLabel>Upload CVs (single ZIP file)<span className="text-destructive"> *</span></FormLabel>
-                      {project?.cvUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.cvUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded CVs</a>. Uploading a new file will replace it.</p>}
-                      <FormControl>
-                        <Input {...fieldProps} type="file" accept=".zip" onChange={(e) => onChange(e.target.files)} />
-                      </FormControl>
-                      <FormDescription>Below 5 MB</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
             )}
             {currentStep === 3 && (
