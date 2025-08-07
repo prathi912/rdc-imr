@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
@@ -635,12 +636,25 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                                 </TooltipProvider>
                                             )}
                                         </div>
-                                        <div className="flex flex-wrap gap-2 items-center">
-                                            {paper.authors.map((author: Author) => (
-                                                <Badge key={author.email} variant={author.role === 'First Author' ? 'default' : 'secondary'}>
-                                                    {author.name} {author.isExternal && '(Ext)'}
-                                                </Badge>
-                                            ))}
+                                        <div className="border rounded-lg overflow-hidden">
+                                          <Table>
+                                              <TableHeader>
+                                                  <TableRow>
+                                                      <TableHead>Author Name</TableHead>
+                                                      <TableHead>Role</TableHead>
+                                                      <TableHead>Email</TableHead>
+                                                  </TableRow>
+                                              </TableHeader>
+                                              <TableBody>
+                                                  {paper.authors.map((author: Author) => (
+                                                      <TableRow key={author.email}>
+                                                          <TableCell>{author.name} {author.isExternal && <span className="text-xs text-muted-foreground">(Ext)</span>}</TableCell>
+                                                          <TableCell><Badge variant={author.role === 'First Author' ? 'default' : 'secondary'}>{author.role}</Badge></TableCell>
+                                                          <TableCell>{author.email}</TableCell>
+                                                      </TableRow>
+                                                  ))}
+                                              </TableBody>
+                                          </Table>
                                         </div>
                                     </CardContent>
                                 </Card>
