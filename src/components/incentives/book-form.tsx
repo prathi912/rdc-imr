@@ -165,10 +165,30 @@ export function BookForm() {
       const bookProofUrl = await uploadFileHelper(data.bookProof?.[0], 'book-proof');
       const scopusProofUrl = await uploadFileHelper(data.scopusProof?.[0], 'book-scopus-proof');
 
-      const { bookProof, scopusProof, ...restOfData } = data;
-
       const claimData: Omit<IncentiveClaim, 'id'> = {
-        ...restOfData,
+        bookApplicationType: data.bookApplicationType,
+        publicationTitle: data.publicationTitle,
+        bookAuthors: data.bookAuthors,
+        bookTitleForChapter: data.bookTitleForChapter,
+        bookEditor: data.bookEditor,
+        totalPuAuthors: data.totalPuAuthors,
+        totalPuStudents: data.totalPuStudents,
+        puStudentNames: data.puStudentNames,
+        bookChapterPages: data.bookChapterPages,
+        bookTotalPages: data.bookTotalPages,
+        publisherName: data.publisherName,
+        publisherCity: data.publisherCity,
+        publisherCountry: data.publisherCountry,
+        publisherType: data.publisherType,
+        isScopusIndexed: data.isScopusIndexed,
+        authorRole: data.authorRole,
+        isbn: data.isbn,
+        bookType: data.bookType,
+        publisherWebsite: data.publisherWebsite,
+        publicationOrderInYear: data.publicationOrderInYear,
+        bookSelfDeclaration: data.bookSelfDeclaration,
+        authorType: data.authorType,
+        totalAuthors: data.totalAuthors,
         orcidId: user.orcidId,
         claimType: 'Books',
         benefitMode: 'incentives',
@@ -180,8 +200,11 @@ export function BookForm() {
         submissionDate: new Date().toISOString(),
         bankDetails: user.bankDetails,
         bookProofUrl,
-        scopusProofUrl,
       };
+
+      if (scopusProofUrl) {
+        claimData.scopusProofUrl = scopusProofUrl;
+      }
 
       await addDoc(collection(db, 'incentiveClaims'), claimData);
       toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
