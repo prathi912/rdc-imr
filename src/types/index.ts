@@ -184,13 +184,14 @@ export type IncentiveClaim = {
     bankDetails?: UserBankDetails;
     originalClaimId?: string; // Link to the primary author's claim
     misId?: string;
+    orcidId?: string;
+    calculatedIncentive?: number;
     
     // Main selector
     claimType: string;
 
     // Common fields
     benefitMode: string;
-    orcidId?: string;
     
     // Research Paper Fields
     publicationType?: string;
@@ -261,6 +262,7 @@ export type IncentiveClaim = {
     bookChapterPages?: number;
     bookTotalPages?: number;
     bookTotalChapters?: number;
+    chaptersInSameBook?: number;
     publicationYear?: number;
     authorRole?: 'Author' | 'Editor';
     totalPuStudents?: number;
@@ -277,7 +279,6 @@ export type IncentiveClaim = {
     bookProofUrl?: string;
     scopusProofUrl?: string;
     publicationOrderInYear?: 'First' | 'Second' | 'Third';
-    bookType?: 'Textbook' | 'Reference Book';
     bookSelfDeclaration?: boolean;
 
     // Professional Body Membership fields

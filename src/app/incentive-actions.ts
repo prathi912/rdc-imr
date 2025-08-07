@@ -13,7 +13,7 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
   try {
     const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
     const claimSnap = await claimRef.get();
-    if (!claimSnap.exists) {
+    if (!claimSnap.exists()) {
       return { success: false, error: 'Incentive claim not found.' };
     }
     const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
@@ -29,7 +29,7 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     
     userSnap = await userRef.get();
 
-    if (!userSnap.exists) {
+    if (!userSnap.exists()) {
         return { success: false, error: 'Claimant user profile not found.' };
     }
     const user = userSnap.data() as User;
@@ -91,4 +91,80 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     console.error('Error generating book incentive form:', error);
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
+}
+
+function getBaseIncentive(claimData: Partial<IncentiveClaim>, isChapter: boolean): number {
+    const isScopus = claimData.isScopusIndexed === true;
+    const pubType = claimData.publisherType;
+    const pages = isChapter ? (claimData.bookChapterPages || 0) : (claimData.bookTotalPages || 0);
+
+    if (isChapter) {
+        if (isScopus) return 6000;
+        if (pubType === 'National') {
+            if (pages > 20) return 2500;
+            if (pages >= 10) return 1500;
+            if (pages >= 5) return 500;
+        } else if (pubType === 'International') {
+            if (pages > 20) return 3000;
+            if (pages >= 10) return 2000;
+            if (pages >= 5) return 1000;
+        }
+    } else { // Full Book
+        if (isScopus) return 18000;
+        if (pubType === 'National') {
+            if (pages > 350) return 3000;
+            if (pages >= 200) return 2500;
+            if (pages >= 100) return 2000;
+            return 1000;
+        } else if (pubType === 'International') {
+            if (pages > 350) return 6000;
+            if (pages >= 200) return 3500;
+            return 2000;
+        }
+    }
+    return 0;
+}
+
+
+export async function calculateIncentive(claimData: Partial<IncentiveClaim>): Promise<{ success: boolean; amount?: number; error?: string }> {
+    try {
+        const isChapter = claimData.bookApplicationType === 'Book Chapter';
+        let baseIncentive = getBaseIncentive(claimData, isChapter);
+
+        // Adjust for Editor role
+        if (claimData.authorRole === 'Editor') {
+            baseIncentive /= 2;
+        }
+
+        let totalIncentive = baseIncentive;
+        
+        // Handle multiple chapters
+        if (isChapter && claimData.chaptersInSameBook && claimData.chaptersInSameBook > 1) {
+            const n = claimData.chaptersInSameBook;
+            // To calculate the cap, we need to know the full book's incentive
+            const fullBookData = { ...claimData, bookTotalPages: 999 }; // Assume max page count for cap
+            const baseBookIncentive = getBaseIncentive(fullBookData, false);
+            
+            let sum = 0;
+            for (let k = 1; k <= n; k++) {
+                sum += baseIncentive / k;
+                if (sum >= baseBookIncentive) {
+                    sum = baseBookIncentive;
+                    break;
+                }
+            }
+            totalIncentive = Math.min(sum, baseBookIncentive);
+        }
+
+        // Split among multiple PU authors
+        const internalAuthorsCount = claimData.bookCoAuthors?.filter(a => !a.isExternal).length || 0;
+        if (internalAuthorsCount > 1) {
+            totalIncentive /= internalAuthorsCount;
+        }
+
+        return { success: true, amount: Math.round(totalIncentive) };
+    } catch (error: any) {
+        console.error("Error calculating incentive:", error);
+        return { success: false, error: error.message || "An unknown error occurred during calculation." };
+    }
 }
