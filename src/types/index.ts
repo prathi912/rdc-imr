@@ -162,6 +162,12 @@ export type Notification = {
   isRead: boolean;
 };
 
+export type BookCoAuthor = {
+    name: string;
+    type: 'Internal' | 'External';
+    role: 'First Author' | 'Corresponding Author' | 'Co-Author' | 'First & Corresponding Author';
+};
+
 export type IncentiveClaim = {
     id: string;
     uid: string;
@@ -241,7 +247,7 @@ export type IncentiveClaim = {
     // Book/Book Chapter Fields
     bookApplicationType?: 'Book Chapter' | 'Book';
     publicationTitle?: string; // Title of the book chapter/Book
-    bookAuthors?: string;
+    bookCoAuthors?: BookCoAuthor[];
     bookTitleForChapter?: string; // Title of the Book (for Book Chapter)
     bookEditor?: string; // Name Of the Editor (for Book Chapter)
     bookChapterPages?: number;

@@ -37,7 +37,7 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
         linebreaks: true,
     });
 
-    const coAuthors = claim.bookAuthors?.split(',').map(a => a.trim()).filter(a => a !== user.name) || [];
+    const coAuthors = claim.bookCoAuthors?.map(a => a.name) || [];
     const coAuthorData: { [key: string]: string } = {};
     for (let i = 0; i < 6; i++) {
         coAuthorData[`coauthor${i + 1}`] = coAuthors[i] || '';

@@ -44,7 +44,6 @@ type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'subm
 function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null }) {
     const { toast } = useToast();
     const [isPrinting, setIsPrinting] = useState(false);
-    const [isPrintingBookForm, setIsPrintingBookForm] = useState(false);
 
     if (!claim) return null;
 
@@ -82,40 +81,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
         }
     };
 
-    const handlePrintBookForm = async () => {
-      if (!claim) return;
-      setIsPrintingBookForm(true);
-      try {
-        const result = await generateBookIncentiveForm(claim.id);
-        if (result.success && result.fileData) {
-          const byteCharacters = atob(result.fileData);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `Office_Noting_Book_Claim_${claim.userName.replace(/\s/g, '_')}.docx`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
-          toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
-        } else {
-          throw new Error(result.error || "Failed to generate form.");
-        }
-      } catch (error: any) {
-        console.error("Book form generation error:", error);
-        toast({ variant: 'destructive', title: "Generation Failed", description: error.message });
-      } finally {
-        setIsPrintingBookForm(false);
-      }
-    };
-
     const renderDetail = (label: string, value?: string | number | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         let displayValue = String(value);
@@ -148,7 +113,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
     }
 
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
-    const canPrintBookForm = (currentUser?.role === 'Super-admin' || currentUser?.role === 'admin') && claim.claimType === 'Books';
 
 
     return (
@@ -258,18 +222,17 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                             {renderDetail("Application Type", claim.bookApplicationType)}
                             {renderDetail("Title", claim.publicationTitle)}
                             {claim.bookApplicationType === 'Book Chapter' && renderDetail("Book Title", claim.bookTitleForChapter)}
-                            {renderDetail("Author(s)", claim.bookAuthors)}
+                            {renderDetail("Author(s)", claim.bookCoAuthors?.map(a => a.name).join(', '))}
                             {claim.bookApplicationType === 'Book Chapter' && renderDetail("Editor(s)", claim.bookEditor)}
                             {renderDetail("Publisher", claim.publisherName)}
                             {renderDetail("Publisher Type", claim.publisherType)}
                             {renderDetail("Publisher Website", claim.publisherWebsite)}
-                            {renderDetail("ISBN", claim.isbn)}
+                            {renderDetail("ISBN", claim.isbnPrint || claim.isbnElectronic)}
                             {renderDetail("Publication Year Order", claim.publicationOrderInYear)}
                             {renderDetail("Total PU Authors", claim.totalPuAuthors)}
                             {renderDetail("Total PU Students", claim.totalPuStudents)}
                             {renderDetail("Student Names", claim.puStudentNames)}
                             {claim.bookApplicationType === 'Book Chapter' ? renderDetail("Chapter Pages", claim.bookChapterPages) : renderDetail("Total Book Pages", claim.bookTotalPages)}
-                            {renderDetail("Self Published", claim.isSelfPublished)}
                             {renderDetail("Scopus Indexed", claim.isScopusIndexed)}
                             {renderDetail("Book Type", claim.bookType)}
                             {renderDetail("Author/Editor Role", claim.authorRole)}
@@ -340,12 +303,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                     )}
                 </div>
                 <DialogFooter className="gap-2">
-                    {canPrintBookForm && (
-                        <Button onClick={handlePrintBookForm} disabled={isPrintingBookForm} variant="secondary">
-                            {isPrintingBookForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-                            Download Notings Form
-                        </Button>
-                    )}
                     <Button onClick={handlePrint} disabled={isPrinting}>
                         {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                         Export to Excel
@@ -369,6 +326,7 @@ export default function ManageIncentiveClaimsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [claimTypeFilter, setClaimTypeFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
+  const [isPrintingBookForm, setIsPrintingBookForm] = useState<string | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -512,6 +470,40 @@ export default function ManageIncentiveClaimsPage() {
     toast({ title: "Export Started", description: `Downloading ${sortedAndFilteredClaims.length} claims.` });
   };
   
+  const handlePrintBookForm = async (claim: IncentiveClaim) => {
+      if (!claim) return;
+      setIsPrintingBookForm(claim.id);
+      try {
+        const result = await generateBookIncentiveForm(claim.id);
+        if (result.success && result.fileData) {
+          const byteCharacters = atob(result.fileData);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Office_Noting_Book_Claim_${claim.userName.replace(/\s/g, '_')}.docx`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
+        } else {
+          throw new Error(result.error || "Failed to generate form.");
+        }
+      } catch (error: any) {
+        console.error("Book form generation error:", error);
+        toast({ variant: 'destructive', title: "Generation Failed", description: error.message });
+      } finally {
+        setIsPrintingBookForm(null);
+      }
+    };
+  
   const renderTable = () => (
     <div className="overflow-x-auto">
       <Table>
@@ -556,27 +548,35 @@ export default function ManageIncentiveClaimsPage() {
                   <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                    <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button aria-haspopup="true" size="icon" variant="ghost">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Toggle menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => setSelectedClaim(claim)}>View Details</DropdownMenuItem>
-                      <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                        {STATUSES.map(status => (
-                          <DropdownMenuItem 
-                              key={status} 
-                              onClick={() => handleStatusChange(claim.id, status)}
-                              disabled={claim.status === status}
-                          >
-                              {status}
-                          </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    <div className="flex items-center justify-end gap-2">
+                        {claim.claimType === 'Books' && claim.status === 'Pending' && (
+                            <Button onClick={() => handlePrintBookForm(claim)} disabled={isPrintingBookForm === claim.id} size="sm" variant="outline">
+                                {isPrintingBookForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                                Notings
+                            </Button>
+                        )}
+                        <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button aria-haspopup="true" size="icon" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Toggle menu</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setSelectedClaim(claim)}>View Details</DropdownMenuItem>
+                          <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                            {STATUSES.map(status => (
+                              <DropdownMenuItem 
+                                  key={status} 
+                                  onClick={() => handleStatusChange(claim.id, status)}
+                                  disabled={claim.status === status}
+                              >
+                                  {status}
+                              </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                 </TableCell>
               </TableRow>
             ))}
