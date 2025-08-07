@@ -398,6 +398,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 width={150}
                 height={50}
                 className="mx-auto"
+                style={{ height: 'auto' }}
             />
         </SidebarFooter>
         {isRearrangeEnabled && isDirty && (

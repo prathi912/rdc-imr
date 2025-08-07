@@ -79,7 +79,6 @@ type BookFormValues = z.infer<typeof bookSchema>;
 
 const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
-
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -219,7 +218,7 @@ export function BookForm() {
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
       }
-      if (form.getValues('bookCoAuthors').length === 0) {
+      if (fields.length === 0) {
         append({ 
             name: parsedUser.name, 
             email: parsedUser.email,
@@ -229,7 +228,7 @@ export function BookForm() {
         });
       }
     }
-  }, [form, append]);
+  }, [form, append, fields.length]);
 
   const bookApplicationType = form.watch('bookApplicationType');
   const publicationMode = form.watch('publicationMode');
