@@ -130,6 +130,7 @@ export function PatentForm() {
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
+            misId: user.misId,
             orcidId: user.orcidId,
             claimType: 'Patents',
             benefitMode: 'incentives',

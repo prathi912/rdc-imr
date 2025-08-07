@@ -182,6 +182,7 @@ export type IncentiveClaim = {
     faculty: string;
     bankDetails?: UserBankDetails;
     originalClaimId?: string; // Link to the primary author's claim
+    misId?: string;
     
     // Main selector
     claimType: string;

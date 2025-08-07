@@ -101,6 +101,8 @@ export function MembershipForm() {
 
       const claimData: Omit<IncentiveClaim, 'id'> = {
         ...data,
+        misId: user.misId,
+        orcidId: user.orcidId,
         claimType: 'Membership of Professional Bodies',
         benefitMode: 'reimbursement',
         uid: user.uid,

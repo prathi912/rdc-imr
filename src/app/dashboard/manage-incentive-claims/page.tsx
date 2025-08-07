@@ -125,6 +125,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                 <div className="max-h-[70vh] overflow-y-auto pr-4 space-y-2 text-sm">
                     {renderDetail("Claimant Name", claim.userName)}
                     {renderDetail("Claimant Email", claim.userEmail)}
+                    {renderDetail("MIS ID", claim.misId)}
                     {renderDetail("ORCID ID", claim.orcidId)}
                     {renderDetail("Claim Type", claim.claimType)}
                     {renderDetail("Status", claim.status)}
@@ -227,12 +228,16 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                             {renderDetail("Publisher", claim.publisherName)}
                             {renderDetail("Publisher Type", claim.publisherType)}
                             {renderDetail("Publisher Website", claim.publisherWebsite)}
-                            {renderDetail("Publication Year", claim.publicationYear)}
-                            {renderDetail("Mode of Publication", claim.publicationMode)}
-                            {renderDetail("ISBN (Print)", claim.isbnPrint)}
-                            {renderDetail("ISBN (Electronic)", claim.isbnElectronic)}
+                            {claim.publicationMode === 'Print Only' && renderDetail("ISBN (Print)", claim.isbnPrint)}
+                            {claim.publicationMode === 'Electronic Only' && renderDetail("ISBN (Electronic)", claim.isbnElectronic)}
+                            {claim.publicationMode === 'Print & Electronic' && (
+                                <>
+                                {renderDetail("ISBN (Print)", claim.isbnPrint)}
+                                {renderDetail("ISBN (Electronic)", claim.isbnElectronic)}
+                                </>
+                            )}
                             {renderDetail("Publication Year Order", claim.publicationOrderInYear)}
-                            {renderDetail("Total PU Authors", claim.totalPuAuthors)}
+                            {renderDetail("Total PU Authors", claim.bookCoAuthors?.filter(a => !a.isExternal).length)}
                             {renderDetail("Total PU Students", claim.totalPuStudents)}
                             {renderDetail("Student Names", claim.puStudentNames)}
                             {claim.bookApplicationType === 'Book Chapter' ? renderDetail("Chapter Pages", claim.bookChapterPages) : renderDetail("Total Book Pages", claim.bookTotalPages)}
@@ -551,7 +556,7 @@ export default function ManageIncentiveClaimsPage() {
                 </TableCell>
                 <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                        {claim.claimType === 'Books' && claim.status === 'Pending' && (
+                        {(claim.claimType === 'Books' || claim.claimType === 'Book Chapter') && claim.status === 'Pending' && (
                             <Button onClick={() => handlePrintBookForm(claim)} disabled={isPrintingBookForm === claim.id} size="sm" variant="outline">
                                 {isPrintingBookForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                                 Notings

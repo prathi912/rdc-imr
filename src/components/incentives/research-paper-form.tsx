@@ -208,6 +208,8 @@ export function ResearchPaperForm() {
     try {
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
+            misId: user.misId,
+            orcidId: user.orcidId,
             claimType: 'Research Papers',
             benefitMode: 'incentives',
             uid: user.uid,

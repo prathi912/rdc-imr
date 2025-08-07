@@ -135,6 +135,7 @@ export function ApcForm() {
 
       const claimData: Omit<IncentiveClaim, 'id'> = {
         ...data,
+        misId: user.misId,
         orcidId: user.orcidId,
         claimType: 'Seed Money for APC',
         benefitMode: 'reimbursement',
@@ -179,7 +180,7 @@ export function ApcForm() {
             )}
 
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
-                <h3 className="font-semibold text-sm -mb-2">ARTICLE &amp; JOURNAL DETAILS</h3>
+                <h3 className="font-semibold text-sm -mb-2">ARTICLE & JOURNAL DETAILS</h3>
                 <Separator />
                 <FormField control={form.control} name="apcTypeOfArticle" render={({ field }) => ( <FormItem><FormLabel>Type of Article</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-6">{articleTypes.map(type => (<FormItem key={type} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={type} /></FormControl><FormLabel className="font-normal">{type}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
                 {watchArticleType === 'Other' && <FormField name="apcOtherArticleType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Please specify other article type</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
@@ -200,7 +201,7 @@ export function ApcForm() {
             </div>
 
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
-                <h3 className="font-semibold text-sm -mb-2">FINANCIAL &amp; DECLARATION DETAILS</h3>
+                <h3 className="font-semibold text-sm -mb-2">FINANCIAL & DECLARATION DETAILS</h3>
                 <Separator />
                 <FormField name="apcApcWaiverRequested" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Whether APC waiver was requested</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
                 {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>If yes, give proof</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
@@ -208,7 +209,7 @@ export function ApcForm() {
                   <FormField name="apcAmountClaimed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount claimed (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                   <FormField name="apcTotalAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total amount of APC (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
-                <FormField name="apcInvoiceProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attachment Proof (Invoice, Receipt, Payment Proof &amp; Abstract)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="apcInvoiceProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attachment Proof (Invoice, Receipt, Payment Proof & Abstract)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
                  <FormField control={form.control} name="apcSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
             </div>
           </CardContent>
