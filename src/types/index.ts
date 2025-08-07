@@ -1,5 +1,6 @@
 
 
+
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -178,7 +179,7 @@ export type IncentiveClaim = {
     uid: string;
     userName: string;
     userEmail: string;
-    status: 'Pending' | 'Accepted' | 'Rejected';
+    status: 'Pending' | 'Accepted' | 'Rejected' | 'Draft';
     submissionDate: string; // ISO String
     faculty: string;
     bankDetails?: UserBankDetails;
@@ -280,6 +281,7 @@ export type IncentiveClaim = {
     scopusProofUrl?: string;
     publicationOrderInYear?: 'First' | 'Second' | 'Third';
     bookSelfDeclaration?: boolean;
+    bookType?: 'Textbook' | 'Reference Book';
 
     // Professional Body Membership fields
     professionalBodyName?: string;

@@ -12,7 +12,7 @@ import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2 } from 'lucide-react';
+import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -32,7 +32,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 
 
-function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
+function UserClaimsList({ claims, claimType }: { claims: IncentiveClaim[], claimType: 'draft' | 'other' }) {
     if (claims.length === 0) {
         return (
             <Card>
@@ -47,6 +47,19 @@ function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
         return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
     };
 
+    const getClaimEditHref = (claim: IncentiveClaim): string => {
+        const typeMap: { [key: string]: string } = {
+            'Research Papers': 'research-paper',
+            'Patents': 'patent',
+            'Conference Presentations': 'conference',
+            'Books': 'book',
+            'Membership of Professional Bodies': 'membership',
+            'Seed Money for APC': 'apc',
+        };
+        const slug = typeMap[claim.claimType] || '';
+        return `/dashboard/incentive-claim/${slug}?claimId=${claim.id}`;
+    }
+
     return (
         <div className="space-y-4">
             {claims.map(claim => (
@@ -59,7 +72,16 @@ function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
                             {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
                             <p className="text-sm text-muted-foreground pt-1">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
                         </div>
-                        <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                        {claimType === 'draft' ? (
+                            <Button asChild variant="outline" size="sm">
+                                <Link href={getClaimEditHref(claim)}>
+                                    <Edit className="mr-2 h-4 w-4"/>
+                                    Continue
+                                </Link>
+                            </Button>
+                        ) : (
+                            <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                        )}
                     </CardContent>
                 </Card>
             ))}
@@ -103,6 +125,9 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                 status: 'Pending',
                 submissionDate: new Date().toISOString(),
                 bankDetails: currentUser.bankDetails,
+                misId: currentUser.misId,
+                orcidId: currentUser.orcidId,
+                faculty: currentUser.faculty || '',
             };
             
             await addDoc(collection(db, 'incentiveClaims'), newClaim);
@@ -311,6 +336,7 @@ export default function IncentiveClaimPage() {
     }
   }, []);
 
+  const draftClaims = userClaims.filter(c => c.status === 'Draft');
   const pendingClaims = userClaims.filter(c => c.status === 'Pending');
   const acceptedClaims = userClaims.filter(c => c.status === 'Accepted');
   const rejectedClaims = userClaims.filter(c => c.status === 'Rejected');
@@ -324,9 +350,10 @@ export default function IncentiveClaimPage() {
       />
       <div className="mt-8">
         <Tabs defaultValue="apply" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="apply">Apply for Incentive</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="apply">Apply</TabsTrigger>
             <TabsTrigger value="co-author">Co-Author Claims ({coAuthorClaims.length})</TabsTrigger>
+            <TabsTrigger value="draft">Drafts ({draftClaims.length})</TabsTrigger>
             <TabsTrigger value="pending">Pending ({pendingClaims.length})</TabsTrigger>
             <TabsTrigger value="accepted">Accepted ({acceptedClaims.length})</TabsTrigger>
             <TabsTrigger value="rejected">Rejected ({rejectedClaims.length})</TabsTrigger>
@@ -353,17 +380,20 @@ export default function IncentiveClaimPage() {
               ))}
             </div>
           </TabsContent>
-          <TabsContent value="co-author">
+           <TabsContent value="co-author">
             {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} onClaimApplied={() => fetchAllData(user!.uid)} />}
           </TabsContent>
+          <TabsContent value="draft">
+             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" />}
+          </TabsContent>
           <TabsContent value="pending">
-             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={pendingClaims} />}
+             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={pendingClaims} claimType="other" />}
           </TabsContent>
           <TabsContent value="accepted">
-            {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={acceptedClaims} />}
+            {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={acceptedClaims} claimType="other" />}
           </TabsContent>
           <TabsContent value="rejected">
-            {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={rejectedClaims} />}
+            {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={rejectedClaims} claimType="other" />}
           </TabsContent>
         </Tabs>
       </div>
