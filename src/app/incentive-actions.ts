@@ -7,22 +7,19 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
-// Correctly use the adminDb methods directly without separate imports for doc/getDoc
-//
-// const { getDoc, doc } = require('firebase-admin/firestore'); // Incorrect
 
 export async function generateBookIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
-    const claimRef = adminDb.collection('incentiveClaims').doc(claimId); // Correct admin syntax
-    const claimSnap = await claimRef.get(); // Correct admin syntax
+    const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
+    const claimSnap = await claimRef.get();
     if (!claimSnap.exists) {
       return { success: false, error: 'Incentive claim not found.' };
     }
     const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
 
-    const userRef = adminDb.collection('users').doc(claim.uid); // Correct admin syntax
-    const userSnap = await userRef.get(); // Correct admin syntax
-    if (!userSnap.exists()) {
+    const userRef = adminDb.collection('users').doc(claim.uid);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
         return { success: false, error: 'Claimant user profile not found.' };
     }
     const user = userSnap.data() as User;
