@@ -252,7 +252,6 @@ export type IncentiveClaim = {
     bookEditor?: string; // Name Of the Editor (for Book Chapter)
     bookChapterPages?: number;
     bookTotalPages?: number;
-    bookType?: 'Textbook' | 'Reference Book';
     authorRole?: 'Author' | 'Editor';
     totalPuAuthors?: number;
     totalPuStudents?: number;

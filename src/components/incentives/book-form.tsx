@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
@@ -66,7 +66,6 @@ const bookSchema = z
     publicationMode: z.enum(['Print Only', 'Electronic Only', 'Print & Electronic']).optional(),
     isbnPrint: z.string().optional(),
     isbnElectronic: z.string().optional(),
-    bookType: z.enum(['Textbook', 'Reference Book']).optional(),
     publisherWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     bookProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.'),
     scopusProof: z.any().optional(),
@@ -134,7 +133,6 @@ export function BookForm() {
       publicationMode: undefined,
       isbnPrint: '',
       isbnElectronic: '',
-      bookType: undefined,
       publisherWebsite: '',
       bookProof: undefined,
       scopusProof: undefined,
@@ -143,7 +141,7 @@ export function BookForm() {
     },
   });
 
-  const { fields, append, remove } = useForm({
+  const { fields, append, remove } = useFieldArray({
       control: form.control,
       name: "bookCoAuthors",
   });
@@ -192,7 +190,7 @@ export function BookForm() {
       const bookProofUrl = await uploadFileHelper(data.bookProof?.[0], 'book-proof');
       const scopusProofUrl = await uploadFileHelper(data.scopusProof?.[0], 'book-scopus-proof');
 
-      const claimData: Omit<IncentiveClaim, 'id' | 'bookProof' | 'scopusProof'> = {
+      const claimData: Omit<IncentiveClaim, 'id'> = {
         bookApplicationType: data.bookApplicationType,
         publicationTitle: data.publicationTitle,
         bookCoAuthors: data.bookCoAuthors,
@@ -230,10 +228,6 @@ export function BookForm() {
         bookProofUrl,
       };
       
-      if (data.bookType) {
-        claimData.bookType = data.bookType;
-      }
-
       if (scopusProofUrl) {
         claimData.scopusProofUrl = scopusProofUrl;
       }
@@ -274,10 +268,10 @@ export function BookForm() {
 
                 {/* Co-Authors Dynamic Array */}
                 <div>
-                    <FormLabel>Co-Author(s)</FormLabel>
+                    <FormLabel>Author(s)</FormLabel>
                     <div className="space-y-4 mt-2">
-                        {form.getValues('bookCoAuthors').map((author, index) => (
-                            <div key={index} className="flex flex-col md:flex-row gap-4 border p-4 rounded-md">
+                        {fields.map((field, index) => (
+                            <div key={field.id} className="flex flex-col md:flex-row gap-4 border p-4 rounded-md">
                                 <FormField
                                     control={form.control}
                                     name={`bookCoAuthors.${index}.name`}
@@ -301,7 +295,7 @@ export function BookForm() {
                             </div>
                         ))}
                     </div>
-                    <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => form.setValue('bookCoAuthors', [...form.getValues('bookCoAuthors'), { name: '', type: 'Internal', role: 'Co-Author' }])}>
+                    <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ name: '', type: 'Internal', role: 'Co-Author' })}>
                         <Plus className="mr-2 h-4 w-4" /> Add Co-Author
                     </Button>
                 </div>
@@ -329,7 +323,6 @@ export function BookForm() {
                 {(publicationMode === 'Print Only' || publicationMode === 'Print & Electronic') && <FormField name="isbnPrint" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number (Print)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
                 {(publicationMode === 'Electronic Only' || publicationMode === 'Print & Electronic') && <FormField name="isbnElectronic" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number (Electronic)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
                 
-                {bookApplicationType === 'Book' && <FormField name="bookType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether Textbook or Reference Book</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Textbook" /></FormControl><FormLabel className="font-normal">Textbook</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Reference Book" /></FormControl><FormLabel className="font-normal">Reference Book</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />}
                 <FormField name="publisherWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Publisher Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publicationOrderInYear" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select publication order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
                 <FormField name="bookProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach copy of Book / Book Chapter (First Page, Publisher Page, Index, Abstract) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />

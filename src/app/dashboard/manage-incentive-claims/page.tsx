@@ -234,7 +234,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                             {renderDetail("Student Names", claim.puStudentNames)}
                             {claim.bookApplicationType === 'Book Chapter' ? renderDetail("Chapter Pages", claim.bookChapterPages) : renderDetail("Total Book Pages", claim.bookTotalPages)}
                             {renderDetail("Scopus Indexed", claim.isScopusIndexed)}
-                            {renderDetail("Book Type", claim.bookType)}
                             {renderDetail("Author/Editor Role", claim.authorRole)}
                             {renderLinkDetail("Publication Proof", claim.bookProofUrl)}
                             {renderLinkDetail("Scopus Proof", claim.scopusProofUrl)}
