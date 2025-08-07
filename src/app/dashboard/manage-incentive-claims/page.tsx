@@ -227,7 +227,10 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                             {renderDetail("Publisher", claim.publisherName)}
                             {renderDetail("Publisher Type", claim.publisherType)}
                             {renderDetail("Publisher Website", claim.publisherWebsite)}
-                            {renderDetail("ISBN", claim.isbnPrint || claim.isbnElectronic)}
+                            {renderDetail("Publication Year", claim.publicationYear)}
+                            {renderDetail("Mode of Publication", claim.publicationMode)}
+                            {renderDetail("ISBN (Print)", claim.isbnPrint)}
+                            {renderDetail("ISBN (Electronic)", claim.isbnElectronic)}
                             {renderDetail("Publication Year Order", claim.publicationOrderInYear)}
                             {renderDetail("Total PU Authors", claim.totalPuAuthors)}
                             {renderDetail("Total PU Students", claim.totalPuStudents)}
