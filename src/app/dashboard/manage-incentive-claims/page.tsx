@@ -34,6 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { updateIncentiveClaimStatus, exportClaimToExcel } from '@/app/actions';
+import { generateBookIncentiveForm } from '@/app/incentive-actions';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
@@ -43,6 +44,7 @@ type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'subm
 function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null }) {
     const { toast } = useToast();
     const [isPrinting, setIsPrinting] = useState(false);
+    const [isPrintingBookForm, setIsPrintingBookForm] = useState(false);
 
     if (!claim) return null;
 
@@ -80,6 +82,40 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
         }
     };
 
+    const handlePrintBookForm = async () => {
+      if (!claim) return;
+      setIsPrintingBookForm(true);
+      try {
+        const result = await generateBookIncentiveForm(claim.id);
+        if (result.success && result.fileData) {
+          const byteCharacters = atob(result.fileData);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Office_Noting_Book_Claim_${claim.userName.replace(/\s/g, '_')}.docx`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
+        } else {
+          throw new Error(result.error || "Failed to generate form.");
+        }
+      } catch (error: any) {
+        console.error("Book form generation error:", error);
+        toast({ variant: 'destructive', title: "Generation Failed", description: error.message });
+      } finally {
+        setIsPrintingBookForm(false);
+      }
+    };
+
     const renderDetail = (label: string, value?: string | number | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         let displayValue = String(value);
@@ -112,6 +148,8 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
     }
 
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
+    const canPrintBookForm = (currentUser?.role === 'Super-admin' || currentUser?.role === 'admin') && claim.claimType === 'Books';
+
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -301,10 +339,16 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                         </>
                     )}
                 </div>
-                <DialogFooter>
+                <DialogFooter className="gap-2">
+                    {canPrintBookForm && (
+                        <Button onClick={handlePrintBookForm} disabled={isPrintingBookForm} variant="secondary">
+                            {isPrintingBookForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                            Download Notings Form
+                        </Button>
+                    )}
                     <Button onClick={handlePrint} disabled={isPrinting}>
                         {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-                        Print
+                        Export to Excel
                     </Button>
                 </DialogFooter>
             </DialogContent>
