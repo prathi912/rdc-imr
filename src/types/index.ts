@@ -1,5 +1,4 @@
 
-
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -44,10 +43,10 @@ export type User = {
 };
 
 export type Author = {
-  uid?: string; // Present for internal authors who are registered on the portal
+  uid?: string | null; // Present for internal authors who are registered on the portal
   email: string;
   name: string;
-  role: 'First Author' | 'Corresponding Author' | 'Co-Author';
+  role: 'First Author' | 'Corresponding Author' | 'Co-Author' | 'First & Corresponding Author';
   isExternal: boolean;
 };
 
@@ -170,6 +169,7 @@ export type BookCoAuthor = {
     uid?: string | null;
     role: 'First Author' | 'Corresponding Author' | 'Co-Author' | 'First & Corresponding Author';
     status?: 'Pending' | 'Applied';
+    isExternal: boolean;
 };
 
 export type IncentiveClaim = {
@@ -257,8 +257,8 @@ export type IncentiveClaim = {
     bookEditor?: string; // Name Of the Editor (for Book Chapter)
     bookChapterPages?: number;
     bookTotalPages?: number;
+    publicationYear?: number;
     authorRole?: 'Author' | 'Editor';
-    totalPuAuthors?: number;
     totalPuStudents?: number;
     puStudentNames?: string;
     publisherName?: string;

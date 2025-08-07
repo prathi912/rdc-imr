@@ -37,7 +37,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
-import type { User, IncentiveClaim, BookCoAuthor } from '@/types';
+import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { uploadFileToServer, findUserByMisId } from '@/app/actions';
 import { Loader2, AlertCircle, Plus, Trash2, Search } from 'lucide-react';
 
@@ -50,6 +50,7 @@ const bookSchema = z
         email: z.string().email('Invalid email format.'),
         uid: z.string().optional().nullable(),
         role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
+        isExternal: z.boolean(),
     })).min(1, 'At least one author is required.'),
     bookTitleForChapter: z.string().optional(),
     bookEditor: z.string().optional(),
@@ -57,6 +58,7 @@ const bookSchema = z
     puStudentNames: z.string().optional(),
     bookChapterPages: z.coerce.number().optional(),
     bookTotalPages: z.coerce.number().optional(),
+    publicationYear: z.coerce.number().min(1900, 'Please enter a valid year.').max(new Date().getFullYear(), 'Year cannot be in the future.'),
     publisherName: z.string().min(2, 'Publisher name is required.'),
     publisherCity: z.string().optional(),
     publisherCountry: z.string().optional(),
@@ -107,7 +109,7 @@ export function BookForm() {
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   
   const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-  const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string; email: string; } | null>(null);
+  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
   const form = useForm<BookFormValues>({
@@ -122,6 +124,7 @@ export function BookForm() {
       puStudentNames: '',
       bookChapterPages: 0,
       bookTotalPages: 0,
+      publicationYear: new Date().getFullYear(),
       publisherName: '',
       publisherCity: '',
       publisherCountry: '',
@@ -157,7 +160,8 @@ export function BookForm() {
             name: parsedUser.name, 
             email: parsedUser.email,
             uid: parsedUser.uid,
-            role: 'First Author' 
+            role: 'First Author',
+            isExternal: false,
         });
       }
     }
@@ -191,16 +195,17 @@ export function BookForm() {
       const bookProofUrl = await uploadFileHelper(bookProof, 'book-proof');
       const scopusProofUrl = await uploadFileHelper(scopusProof, 'book-scopus-proof');
 
-      const claimData: Omit<IncentiveClaim, 'id' | 'totalPuAuthors' | 'authorType' | 'totalAuthors' > = {
+      const claimData: Omit<IncentiveClaim, 'id'> = {
         bookApplicationType: data.bookApplicationType,
         publicationTitle: data.publicationTitle,
-        bookCoAuthors: data.bookCoAuthors,
+        bookCoAuthors: data.bookCoAuthors.map(a => ({...a, status: 'Pending'})),
         bookTitleForChapter: data.bookTitleForChapter,
         bookEditor: data.bookEditor,
         totalPuStudents: data.totalPuStudents,
         puStudentNames: data.puStudentNames,
         bookChapterPages: data.bookChapterPages,
         bookTotalPages: data.bookTotalPages,
+        publicationYear: data.publicationYear,
         publisherName: data.publisherName,
         publisherCity: data.publisherCity,
         publisherCountry: data.publisherCountry,
@@ -230,7 +235,7 @@ export function BookForm() {
         claimData.scopusProofUrl = scopusProofUrl;
       }
       
-      await addDoc(collection(db, 'incentiveClaims'), claimData);
+      await addDoc(collection(db, 'incentiveClaims'), claimData as any);
       toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
       router.push('/dashboard/incentive-claim');
     } catch (error: any) {
@@ -251,7 +256,7 @@ export function BookForm() {
             if (result.user) {
                 setFoundCoPi({ ...result.user });
             } else if (result.staff) {
-                setFoundCoPi({ ...result.staff, uid: '' });
+                setFoundCoPi({ ...result.staff, uid: undefined });
             }
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
@@ -273,7 +278,8 @@ export function BookForm() {
             name: foundCoPi.name, 
             email: foundCoPi.email,
             uid: foundCoPi.uid,
-            role: 'Co-Author'
+            role: 'Co-Author',
+            isExternal: !foundCoPi.uid,
         });
     }
     setFoundCoPi(null);
@@ -357,7 +363,7 @@ export function BookForm() {
                             </div>
                         )}
                     </div>
-                     <FormMessage>{form.formState.errors.bookCoAuthors?.message}</FormMessage>
+                     <FormMessage>{form.formState.errors.bookCoAuthors?.message || form.formState.errors.bookCoAuthors?.root?.message}</FormMessage>
                 </div>
 
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookEditor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the Editor (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
@@ -366,6 +372,7 @@ export function BookForm() {
                   <FormField name="puStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Students from PU</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
                 {bookApplicationType === 'Book Chapter' ? (<FormField name="bookChapterPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book chapter</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />) : (<FormField name="bookTotalPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />)}
+                <FormField name="publicationYear" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Year of Publication</FormLabel><FormControl><Input type="number" placeholder={String(new Date().getFullYear())} {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publisherName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the publisher</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

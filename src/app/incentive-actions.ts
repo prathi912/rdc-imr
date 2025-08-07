@@ -37,11 +37,13 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
         linebreaks: true,
     });
 
-    const coAuthors = claim.bookCoAuthors?.map(a => a.name) || [];
+    const coAuthors = claim.bookCoAuthors?.filter(a => a.email !== user.email).map(a => a.name) || [];
     const coAuthorData: { [key: string]: string } = {};
     for (let i = 0; i < 6; i++) {
         coAuthorData[`coauthor${i + 1}`] = coAuthors[i] || '';
     }
+    
+    const internalAuthorsCount = claim.bookCoAuthors?.filter(a => !a.isExternal).length || 0;
 
     const data = {
         name: claim.userName,
@@ -50,11 +52,11 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
         institute: user.institute || 'N/A',
         booktitle: claim.publicationTitle || claim.bookTitleForChapter,
         ...coAuthorData,
-        authors_pu: claim.totalPuAuthors || 'N/A',
+        authors_pu: internalAuthorsCount,
         applicant_type: claim.authorRole || 'N/A',
-        total_chapters: claim.bookApplicationType === 'Book Chapter' ? 1 : 'N/A', // Assuming 1 for a single chapter claim, N/A for a book
+        total_chapters: claim.bookApplicationType === 'Book Chapter' ? 1 : 'N/A',
         total_pages: claim.bookTotalPages || claim.bookChapterPages || 'N/A',
-        publication_year: new Date(claim.submissionDate).getFullYear(), // Assuming submission year is publication year
+        publication_year: claim.publicationYear,
         publisher_name: claim.publisherName,
         publisher_city: claim.publisherCity || 'N/A',
         publisher_country: claim.publisherCountry || 'N/A',
