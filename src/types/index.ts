@@ -1,4 +1,5 @@
 
+
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -276,6 +277,7 @@ export type IncentiveClaim = {
     bookProofUrl?: string;
     scopusProofUrl?: string;
     publicationOrderInYear?: 'First' | 'Second' | 'Third';
+    bookType?: 'Textbook' | 'Reference Book';
     bookSelfDeclaration?: boolean;
 
     // Professional Body Membership fields

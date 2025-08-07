@@ -6,28 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardFooter,
-} from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -39,7 +22,7 @@ import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { uploadFileToServer, findUserByMisId } from '@/app/actions';
-import { Loader2, AlertCircle, Plus, Trash2, Search } from 'lucide-react';
+import { Loader2, AlertCircle, Plus, Trash2, Search, Edit } from 'lucide-react';
 
 const bookSchema = z
   .object({
@@ -73,6 +56,7 @@ const bookSchema = z
     bookProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.'),
     scopusProof: z.any().optional(),
     publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
+    bookType: z.enum(['Textbook', 'Reference Book'], { required_error: 'Please select the book type.' }),
     bookSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
   })
   .refine(data => !(data.bookApplicationType === 'Book Chapter') || (!!data.bookTitleForChapter && data.bookTitleForChapter.length > 2), { message: 'Book title is required for a book chapter.', path: ['bookTitleForChapter'] })
@@ -103,6 +87,78 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
+function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => void }) {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | BookCoAuthor[]) => {
+        if (!value && value !== 0 && value !== false) return null;
+        
+        let displayValue: React.ReactNode = String(value);
+        if (typeof value === 'boolean') {
+            displayValue = value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            if (value.length > 0 && typeof value[0] === 'object') {
+                 displayValue = (
+                    <ul className="list-disc pl-5">
+                        {(value as BookCoAuthor[]).map((author, idx) => (
+                            <li key={idx}><strong>{author.name}</strong> ({author.role}) - {author.email}</li>
+                        ))}
+                    </ul>
+                );
+            } else {
+                displayValue = (value as string[]).join(', ');
+            }
+        }
+
+        return (
+            <div className="grid grid-cols-3 gap-2 py-1.5">
+                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
+                <dd className="col-span-2">{displayValue}</dd>
+            </div>
+        );
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Review Your Application</CardTitle>
+                        <CardDescription>Please review the details below before final submission.</CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={onEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {renderDetail("Application Type", data.bookApplicationType)}
+                {renderDetail("Title", data.publicationTitle)}
+                {renderDetail("Book Title (for Chapter)", data.bookTitleForChapter)}
+                {renderDetail("Authors", data.bookCoAuthors)}
+                {renderDetail("Editor", data.bookEditor)}
+                {renderDetail("Total PU Students", data.totalPuStudents)}
+                {renderDetail("PU Student Names", data.puStudentNames)}
+                {renderDetail("Total Chapters", data.bookTotalChapters)}
+                {renderDetail("Chapter Pages", data.bookChapterPages)}
+                {renderDetail("Total Pages", data.bookTotalPages)}
+                {renderDetail("Year of Publication", data.publicationYear)}
+                {renderDetail("Publisher", data.publisherName)}
+                {renderDetail("Publisher City", data.publisherCity)}
+                {renderDetail("Publisher Country", data.publisherCountry)}
+                {renderDetail("Publisher Type", data.publisherType)}
+                {renderDetail("Book Type", data.bookType)}
+                {renderDetail("Scopus Indexed", data.isScopusIndexed)}
+                {renderDetail("Applicant Role", data.authorRole)}
+                {renderDetail("Publication Mode", data.publicationMode)}
+                {renderDetail("Print ISBN", data.isbnPrint)}
+                {renderDetail("Electronic ISBN", data.isbnElectronic)}
+                {renderDetail("Publisher Website", data.publisherWebsite)}
+                {renderDetail("Publication Order in Year", data.publicationOrderInYear)}
+                {renderDetail("Proof of Publication", data.bookProof?.[0]?.name)}
+                {renderDetail("Scopus Proof", data.scopusProof?.[0]?.name)}
+            </CardContent>
+        </Card>
+    );
+}
+
 export function BookForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -113,6 +169,7 @@ export function BookForm() {
   const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
   const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
 
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
@@ -141,11 +198,12 @@ export function BookForm() {
       bookProof: undefined,
       scopusProof: undefined,
       publicationOrderInYear: undefined,
+      bookType: undefined,
       bookSelfDeclaration: false,
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
       control: form.control,
       name: "bookCoAuthors",
   });
@@ -173,6 +231,20 @@ export function BookForm() {
   const bookApplicationType = form.watch('bookApplicationType');
   const publicationMode = form.watch('publicationMode');
   const isScopusIndexed = form.watch('isScopusIndexed');
+  
+  const handleProceedToReview = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+      setCurrentStep(2);
+    } else {
+        toast({
+            variant: 'destructive',
+            title: 'Validation Error',
+            description: 'Please correct the errors before proceeding.',
+        });
+    }
+  };
+
 
   async function onSubmit(data: BookFormValues) {
     if (!user || !user.faculty || !user.bankDetails) {
@@ -201,30 +273,9 @@ export function BookForm() {
       const coAuthorUids = data.bookCoAuthors.map(a => a.uid).filter(Boolean) as string[];
 
       const claimData: Partial<IncentiveClaim> = {
-        bookApplicationType: data.bookApplicationType,
-        publicationTitle: data.publicationTitle,
-        bookCoAuthors: data.bookCoAuthors.map(a => ({...a, status: 'Pending'})),
+        ...data,
         coAuthorUids,
-        bookTitleForChapter: data.bookTitleForChapter,
-        bookEditor: data.bookEditor,
-        totalPuStudents: Number(data.totalPuStudents || 0),
-        puStudentNames: data.puStudentNames,
-        bookChapterPages: Number(data.bookChapterPages || 0),
-        bookTotalPages: Number(data.bookTotalPages || 0),
-        bookTotalChapters: Number(data.bookTotalChapters || 0),
-        publicationYear: data.publicationYear,
-        publisherName: data.publisherName,
-        publisherCity: data.publisherCity,
-        publisherCountry: data.publisherCountry,
-        publisherType: data.publisherType,
-        isScopusIndexed: data.isScopusIndexed,
-        authorRole: data.authorRole,
-        publicationMode: data.publicationMode,
-        isbnPrint: data.isbnPrint,
-        isbnElectronic: data.isbnElectronic,
-        publisherWebsite: data.publisherWebsite,
-        publicationOrderInYear: data.publicationOrderInYear,
-        bookSelfDeclaration: data.bookSelfDeclaration,
+        misId: user.misId,
         orcidId: user.orcidId,
         claimType: 'Books',
         benefitMode: 'incentives',
@@ -242,7 +293,6 @@ export function BookForm() {
         claimData.scopusProofUrl = scopusProofUrl;
       }
       
-      // Remove any undefined fields to prevent Firestore errors
       Object.keys(claimData).forEach(key => {
         if ((claimData as any)[key] === undefined) {
             delete (claimData as any)[key];
@@ -300,11 +350,28 @@ export function BookForm() {
     setCoPiSearchTerm('');
   };
 
+  if (currentStep === 2) {
+    return (
+        <Card>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+                <CardContent className="pt-6">
+                    <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+                    </Button>
+                </CardFooter>
+            </form>
+        </Card>
+    );
+  }
 
   return (
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form>
           <CardContent className="space-y-6 pt-6">
             {bankDetailsMissing && (
               <Alert variant="destructive">
@@ -400,6 +467,7 @@ export function BookForm() {
                     </div>
                 )}
                 <FormField name="publisherType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether National/International Publisher</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="National" /></FormControl><FormLabel className="font-normal">National</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="International" /></FormControl><FormLabel className="font-normal">International</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="bookType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether Textbook or Reference Book</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Textbook" /></FormControl><FormLabel className="font-normal">Textbook</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Reference Book" /></FormControl><FormLabel className="font-normal">Reference Book</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="isScopusIndexed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether Scopus Indexed</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book' && <FormField name="authorRole" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Applicant Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your role" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Author">Author</SelectItem><SelectItem value="Editor">Editor</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />}
                 {bookApplicationType === 'Book' && (
@@ -416,9 +484,8 @@ export function BookForm() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing}>
+                Proceed to Review
             </Button>
           </CardFooter>
         </form>
