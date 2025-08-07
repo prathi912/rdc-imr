@@ -1,4 +1,5 @@
 
+
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -168,6 +169,7 @@ export type BookCoAuthor = {
     email: string;
     uid?: string | null;
     role: 'First Author' | 'Corresponding Author' | 'Co-Author' | 'First & Corresponding Author';
+    status?: 'Pending' | 'Applied';
 };
 
 export type IncentiveClaim = {
@@ -179,6 +181,7 @@ export type IncentiveClaim = {
     submissionDate: string; // ISO String
     faculty: string;
     bankDetails?: UserBankDetails;
+    originalClaimId?: string; // Link to the primary author's claim
     
     // Main selector
     claimType: string;
@@ -255,6 +258,7 @@ export type IncentiveClaim = {
     bookChapterPages?: number;
     bookTotalPages?: number;
     authorRole?: 'Author' | 'Editor';
+    totalPuAuthors?: number;
     totalPuStudents?: number;
     puStudentNames?: string;
     publisherName?: string;

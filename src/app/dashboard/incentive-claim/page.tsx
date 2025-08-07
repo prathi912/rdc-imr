@@ -9,11 +9,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import type { User, IncentiveClaim } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/config';
-import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote } from 'lucide-react';
+import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 
 function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
     if (claims.length === 0) {
@@ -49,6 +60,110 @@ function UserClaimsList({ claims }: { claims: IncentiveClaim[] }) {
         </div>
     );
 }
+
+function CoAuthorClaimsList({ claims, currentUser }: { claims: IncentiveClaim[], currentUser: User | null }) {
+    const { toast } = useToast();
+    const [claimToApply, setClaimToApply] = useState<IncentiveClaim | null>(null);
+    const [isApplying, setIsApplying] = useState(false);
+
+    const handleApply = async () => {
+        if (!claimToApply || !currentUser || !currentUser.bankDetails) {
+            toast({ variant: 'destructive', title: 'Action Required', description: 'Please complete your bank details in settings before applying.' });
+            return;
+        }
+        setIsApplying(true);
+        try {
+            const { id, uid, userName, userEmail, status, submissionDate, ...originalClaimData } = claimToApply;
+
+            const newClaim: Omit<IncentiveClaim, 'id'> = {
+                ...originalClaimData,
+                originalClaimId: id,
+                uid: currentUser.uid,
+                userName: currentUser.name,
+                userEmail: currentUser.email,
+                status: 'Pending',
+                submissionDate: new Date().toISOString(),
+                bankDetails: currentUser.bankDetails,
+            };
+
+            await addDoc(collection(db, 'incentiveClaims'), newClaim);
+            
+            // This part is tricky without a server action to update the original claim atomically.
+            // For now, we'll assume a cloud function or manual process handles updating the co-author status on the original claim.
+
+            toast({ title: 'Success', description: 'Your claim has been submitted based on the original publication details.' });
+            setClaimToApply(null);
+            // Optionally, refresh the list if needed, but for now we just close the dialog.
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Could not submit your claim.' });
+        } finally {
+            setIsApplying(false);
+        }
+    };
+    
+    if (claims.length === 0) {
+        return (
+            <Card>
+                <CardContent className="pt-6">
+                    <p className="text-center text-muted-foreground">You have not been listed as a co-author on any book incentive claims yet.</p>
+                </CardContent>
+            </Card>
+        );
+    }
+    
+    const getMyCoAuthorDetails = (claim: IncentiveClaim) => {
+        return claim.bookCoAuthors?.find(a => a.uid === currentUser?.uid);
+    }
+
+    return (
+      <>
+        <div className="space-y-4">
+            {claims.map(claim => {
+                 const myDetails = getMyCoAuthorDetails(claim);
+                 const myStatus = myDetails?.status;
+                 const canApply = myStatus === 'Pending';
+
+                return (
+                 <Card key={claim.id}>
+                    <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                         <div className="flex-1 space-y-2">
+                            <p className="font-semibold">{claim.publicationTitle}</p>
+                            <p className="text-sm text-muted-foreground">Primary Author: <span className="font-medium text-foreground">{claim.userName}</span></p>
+                             <div className="flex items-center gap-2">
+                                <Badge variant="outline">{claim.bookApplicationType}</Badge>
+                                {myStatus === 'Applied' && <Badge variant="default"><CheckSquare className="h-4 w-4 mr-2"/> Applied</Badge>}
+                             </div>
+                        </div>
+                        <Button onClick={() => setClaimToApply(claim)} disabled={!canApply}>
+                            {canApply ? 'View & Apply' : 'View Details'}
+                        </Button>
+                    </CardContent>
+                </Card>
+            )})}
+        </div>
+        {claimToApply && (
+            <AlertDialog open={!!claimToApply} onOpenChange={() => setClaimToApply(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Apply for Co-Author Incentive</AlertDialogTitle>
+                        <AlertDialogDescription>
+                           You are applying for an incentive for the publication: "{claimToApply.publicationTitle}". Your details will be used for the application.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                     <p className="text-sm text-muted-foreground">This action will create a new incentive claim under your name using the publication details from the original author's submission.</p>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleApply} disabled={isApplying}>
+                           {isApplying ? <><Loader2 className="h-4 w-4 animate-spin mr-2"/> Submitting...</> : 'Confirm & Apply'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        )}
+      </>
+    );
+}
+
 
 const claimTypes = [
   {
@@ -94,6 +209,7 @@ export default function IncentiveClaimPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userClaims, setUserClaims] = useState<IncentiveClaim[]>([]);
+  const [coAuthorClaims, setCoAuthorClaims] = useState<IncentiveClaim[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -102,6 +218,7 @@ export default function IncentiveClaimPage() {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
       fetchUserClaims(parsedUser.uid);
+      fetchCoAuthorClaims(parsedUser.uid);
     } else {
         setLoading(false);
     }
@@ -122,6 +239,19 @@ export default function IncentiveClaimPage() {
           setLoading(false);
       }
   };
+  
+  const fetchCoAuthorClaims = async (uid: string) => {
+    try {
+        const claimsRef = collection(db, 'incentiveClaims');
+        const q = query(claimsRef, where('bookCoAuthors', 'array-contains-any', [{ uid: uid, status: 'Pending' }]));
+        const snapshot = await getDocs(q);
+        const claims = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
+            .filter(claim => claim.bookCoAuthors?.some(author => author.uid === uid && author.status === 'Pending'));
+        setCoAuthorClaims(claims);
+    } catch (error) {
+        console.error("Error fetching co-author claims:", error);
+    }
+  };
 
   const pendingClaims = userClaims.filter(c => c.status === 'Pending');
   const acceptedClaims = userClaims.filter(c => c.status === 'Accepted');
@@ -136,8 +266,9 @@ export default function IncentiveClaimPage() {
       />
       <div className="mt-8">
         <Tabs defaultValue="apply" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="apply">Apply for Incentive</TabsTrigger>
+            <TabsTrigger value="co-author">Co-Author Claims ({coAuthorClaims.length})</TabsTrigger>
             <TabsTrigger value="pending">Pending ({pendingClaims.length})</TabsTrigger>
             <TabsTrigger value="accepted">Accepted ({acceptedClaims.length})</TabsTrigger>
             <TabsTrigger value="rejected">Rejected ({rejectedClaims.length})</TabsTrigger>
@@ -163,6 +294,9 @@ export default function IncentiveClaimPage() {
                 </Link>
               ))}
             </div>
+          </TabsContent>
+          <TabsContent value="co-author">
+            {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} />}
           </TabsContent>
           <TabsContent value="pending">
              {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={pendingClaims} />}
