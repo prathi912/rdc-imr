@@ -37,15 +37,19 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
-import type { User, IncentiveClaim } from '@/types';
+import type { User, IncentiveClaim, BookCoAuthor } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Plus, Trash2 } from 'lucide-react';
 
 const bookSchema = z
   .object({
     bookApplicationType: z.enum(['Book Chapter', 'Book'], { required_error: 'Please select an application type.' }),
     publicationTitle: z.string().min(3, 'Title is required.'),
-    bookAuthors: z.string().min(3, 'Author names are required.'),
+    bookCoAuthors: z.array(z.object({
+        name: z.string().min(2, 'Author name is required.'),
+        type: z.enum(['Internal', 'External']),
+        role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
+    })).min(1, 'At least one author is required.'),
     bookTitleForChapter: z.string().optional(),
     bookEditor: z.string().optional(),
     totalPuAuthors: z.coerce.number().optional(),
@@ -89,6 +93,8 @@ const authorTypeOptions = [
   'First & Corresponding Author',
   'Co-Author',
 ];
+const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
+
 
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -111,7 +117,7 @@ export function BookForm() {
     defaultValues: {
       bookApplicationType: undefined,
       publicationTitle: '',
-      bookAuthors: '',
+      bookCoAuthors: [],
       bookTitleForChapter: '',
       bookEditor: '',
       totalPuAuthors: 0,
@@ -137,6 +143,11 @@ export function BookForm() {
     },
   });
 
+  const { fields, append, remove } = useForm({
+      control: form.control,
+      name: "bookCoAuthors",
+  });
+
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -145,8 +156,16 @@ export function BookForm() {
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
       }
+      // Add the current user as the first author by default
+      if (form.getValues('bookCoAuthors').length === 0) {
+        form.setValue('bookCoAuthors', [{ 
+            name: parsedUser.name, 
+            type: 'Internal', 
+            role: 'First Author' 
+        }]);
+      }
     }
-  }, []);
+  }, [form]);
 
   const bookApplicationType = form.watch('bookApplicationType');
   const publicationMode = form.watch('publicationMode');
@@ -173,10 +192,10 @@ export function BookForm() {
       const bookProofUrl = await uploadFileHelper(data.bookProof?.[0], 'book-proof');
       const scopusProofUrl = await uploadFileHelper(data.scopusProof?.[0], 'book-scopus-proof');
 
-      const claimData: Omit<IncentiveClaim, 'id'> = {
+      const claimData: Omit<IncentiveClaim, 'id' | 'bookProof' | 'scopusProof'> = {
         bookApplicationType: data.bookApplicationType,
         publicationTitle: data.publicationTitle,
-        bookAuthors: data.bookAuthors,
+        bookCoAuthors: data.bookCoAuthors,
         bookTitleForChapter: data.bookTitleForChapter,
         bookEditor: data.bookEditor,
         totalPuAuthors: data.totalPuAuthors,
@@ -193,7 +212,6 @@ export function BookForm() {
         publicationMode: data.publicationMode,
         isbnPrint: data.isbnPrint,
         isbnElectronic: data.isbnElectronic,
-        bookType: data.bookType,
         publisherWebsite: data.publisherWebsite,
         publicationOrderInYear: data.publicationOrderInYear,
         bookSelfDeclaration: data.bookSelfDeclaration,
@@ -211,11 +229,15 @@ export function BookForm() {
         bankDetails: user.bankDetails,
         bookProofUrl,
       };
+      
+      if (data.bookType) {
+        claimData.bookType = data.bookType;
+      }
 
       if (scopusProofUrl) {
         claimData.scopusProofUrl = scopusProofUrl;
       }
-
+      
       await addDoc(collection(db, 'incentiveClaims'), claimData);
       toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
       router.push('/dashboard/incentive-claim');
@@ -249,7 +271,41 @@ export function BookForm() {
                 <FormField name="bookApplicationType" control={form.control} render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Type of Application</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Book Chapter" /></FormControl><FormLabel className="font-normal">Book Chapter Publication</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Book" /></FormControl><FormLabel className="font-normal">Book Publication</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publicationTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the {bookApplicationType || 'Publication'}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookTitleForChapter" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Book (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
-                <FormField name="bookAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Author(s)</FormLabel><FormControl><Textarea placeholder="Comma-separated list of authors" {...field} /></FormControl><FormMessage /></FormItem> )} />
+
+                {/* Co-Authors Dynamic Array */}
+                <div>
+                    <FormLabel>Co-Author(s)</FormLabel>
+                    <div className="space-y-4 mt-2">
+                        {form.getValues('bookCoAuthors').map((author, index) => (
+                            <div key={index} className="flex flex-col md:flex-row gap-4 border p-4 rounded-md">
+                                <FormField
+                                    control={form.control}
+                                    name={`bookCoAuthors.${index}.name`}
+                                    render={({ field }) => (<FormItem className="flex-1"><FormLabel>Name</FormLabel><FormControl><Input {...field} readOnly={index === 0} /></FormControl><FormMessage /></FormItem>)}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name={`bookCoAuthors.${index}.type`}
+                                    render={({ field }) => (<FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Internal">Internal (PU)</SelectItem><SelectItem value="External">External</SelectItem></SelectContent></Select><FormMessage /></FormItem>)}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name={`bookCoAuthors.${index}.role`}
+                                    render={({ field }) => (<FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl><SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}
+                                />
+                                {index > 0 && (
+                                    <Button type="button" variant="destructive" size="icon" className="mt-8 self-end" onClick={() => remove(index)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => form.setValue('bookCoAuthors', [...form.getValues('bookCoAuthors'), { name: '', type: 'Internal', role: 'Co-Author' }])}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Co-Author
+                    </Button>
+                </div>
+
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookEditor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the Editor (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField name="totalPuAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Authors from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
