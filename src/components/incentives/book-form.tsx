@@ -38,8 +38,8 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, BookCoAuthor } from '@/types';
-import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import { uploadFileToServer, findUserByMisId } from '@/app/actions';
+import { Loader2, AlertCircle, Plus, Trash2, Search } from 'lucide-react';
 
 const bookSchema = z
   .object({
@@ -47,12 +47,12 @@ const bookSchema = z
     publicationTitle: z.string().min(3, 'Title is required.'),
     bookCoAuthors: z.array(z.object({
         name: z.string().min(2, 'Author name is required.'),
-        type: z.enum(['Internal', 'External']),
+        email: z.string().email('Invalid email format.'),
+        uid: z.string().optional().nullable(),
         role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
     })).min(1, 'At least one author is required.'),
     bookTitleForChapter: z.string().optional(),
     bookEditor: z.string().optional(),
-    totalPuAuthors: z.coerce.number().optional(),
     totalPuStudents: z.coerce.number().optional(),
     puStudentNames: z.string().optional(),
     bookChapterPages: z.coerce.number().optional(),
@@ -71,8 +71,6 @@ const bookSchema = z
     scopusProof: z.any().optional(),
     publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
     bookSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
-    authorType: z.string().optional(),
-    totalAuthors: z.string().optional(),
   })
   .refine(data => !(data.bookApplicationType === 'Book Chapter') || (!!data.bookTitleForChapter && data.bookTitleForChapter.length > 2), { message: 'Book title is required for a book chapter.', path: ['bookTitleForChapter'] })
   .refine(data => !(data.isScopusIndexed) || (!!data.scopusProof && data.scopusProof.length > 0), { message: 'Proof of Scopus indexing is required if selected.', path: ['scopusProof'] })
@@ -81,17 +79,14 @@ const bookSchema = z
   .refine(data => !(data.bookApplicationType === 'Book') || !!data.publicationMode, { message: 'Mode of publication is required for book publications.', path: ['publicationMode']})
   .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Print Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnPrint && data.isbnPrint.length >= 10), { message: 'A valid Print ISBN is required.', path: ['isbnPrint']})
   .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Electronic Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnElectronic && data.isbnElectronic.length >= 10), { message: 'A valid Electronic ISBN is required.', path: ['isbnElectronic']})
-  .refine(data => !(data.bookApplicationType === 'Book') || !!data.authorRole, { message: 'Applicant type is required for book publications.', path: ['authorRole'] });
+  .refine(data => !(data.bookApplicationType === 'Book') || !!data.authorRole, { message: 'Applicant type is required for book publications.', path: ['authorRole'] })
+  .refine(data => {
+      const firstAuthors = data.bookCoAuthors.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+      return firstAuthors.length <= 1;
+  }, { message: 'Only one author can be designated as the First Author.', path: ['bookCoAuthors'] });
 
 type BookFormValues = z.infer<typeof bookSchema>;
 
-const authorCountOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
-const authorTypeOptions = [
-  'First Author',
-  'Corresponding Author',
-  'First & Corresponding Author',
-  'Co-Author',
-];
 const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
 
@@ -111,6 +106,10 @@ export function BookForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   
+  const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+  const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string; email: string; } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
     defaultValues: {
@@ -119,7 +118,6 @@ export function BookForm() {
       bookCoAuthors: [],
       bookTitleForChapter: '',
       bookEditor: '',
-      totalPuAuthors: 0,
       totalPuStudents: 0,
       puStudentNames: '',
       bookChapterPages: 0,
@@ -141,7 +139,7 @@ export function BookForm() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
       control: form.control,
       name: "bookCoAuthors",
   });
@@ -154,16 +152,16 @@ export function BookForm() {
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
       }
-      // Add the current user as the first author by default
       if (form.getValues('bookCoAuthors').length === 0) {
-        form.setValue('bookCoAuthors', [{ 
+        append({ 
             name: parsedUser.name, 
-            type: 'Internal', 
+            email: parsedUser.email,
+            uid: parsedUser.uid,
             role: 'First Author' 
-        }]);
+        });
       }
     }
-  }, [form]);
+  }, [form, append]);
 
   const bookApplicationType = form.watch('bookApplicationType');
   const publicationMode = form.watch('publicationMode');
@@ -186,17 +184,19 @@ export function BookForm() {
         }
         return result.url;
       };
+      
+      const bookProof = data.bookProof?.[0];
+      const scopusProof = data.scopusProof?.[0];
+      
+      const bookProofUrl = await uploadFileHelper(bookProof, 'book-proof');
+      const scopusProofUrl = await uploadFileHelper(scopusProof, 'book-scopus-proof');
 
-      const bookProofUrl = await uploadFileHelper(data.bookProof?.[0], 'book-proof');
-      const scopusProofUrl = await uploadFileHelper(data.scopusProof?.[0], 'book-scopus-proof');
-
-      const claimData: Omit<IncentiveClaim, 'id'> = {
+      const claimData: Omit<IncentiveClaim, 'id' | 'totalPuAuthors' | 'authorType' | 'totalAuthors' > = {
         bookApplicationType: data.bookApplicationType,
         publicationTitle: data.publicationTitle,
         bookCoAuthors: data.bookCoAuthors,
         bookTitleForChapter: data.bookTitleForChapter,
         bookEditor: data.bookEditor,
-        totalPuAuthors: data.totalPuAuthors,
         totalPuStudents: data.totalPuStudents,
         puStudentNames: data.puStudentNames,
         bookChapterPages: data.bookChapterPages,
@@ -213,8 +213,6 @@ export function BookForm() {
         publisherWebsite: data.publisherWebsite,
         publicationOrderInYear: data.publicationOrderInYear,
         bookSelfDeclaration: data.bookSelfDeclaration,
-        authorType: data.authorType,
-        totalAuthors: data.totalAuthors,
         orcidId: user.orcidId,
         claimType: 'Books',
         benefitMode: 'incentives',
@@ -242,6 +240,46 @@ export function BookForm() {
       setIsSubmitting(false);
     }
   }
+  
+  const handleSearchCoPi = async () => {
+    if (!coPiSearchTerm) return;
+    setIsSearching(true);
+    setFoundCoPi(null);
+    try {
+        const result = await findUserByMisId(coPiSearchTerm);
+        if (result.success) {
+            if (result.user) {
+                setFoundCoPi({ ...result.user });
+            } else if (result.staff) {
+                setFoundCoPi({ ...result.staff, uid: '' });
+            }
+        } else {
+            toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+        }
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+    } finally {
+        setIsSearching(false);
+    }
+  };
+
+  const handleAddCoPi = () => {
+    if (foundCoPi && !fields.some(field => field.email === foundCoPi.email)) {
+        if (user && foundCoPi.email === user.email) {
+            toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
+            return;
+        }
+        append({ 
+            name: foundCoPi.name, 
+            email: foundCoPi.email,
+            uid: foundCoPi.uid,
+            role: 'Co-Author'
+        });
+    }
+    setFoundCoPi(null);
+    setCoPiSearchTerm('');
+  };
+
 
   return (
     <Card>
@@ -265,47 +303,68 @@ export function BookForm() {
                 <FormField name="bookApplicationType" control={form.control} render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Type of Application</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Book Chapter" /></FormControl><FormLabel className="font-normal">Book Chapter Publication</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Book" /></FormControl><FormLabel className="font-normal">Book Publication</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publicationTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the {bookApplicationType || 'Publication'}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookTitleForChapter" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Book (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
-
-                {/* Co-Authors Dynamic Array */}
-                <div>
-                    <FormLabel>Author(s)</FormLabel>
-                    <div className="space-y-4 mt-2">
+                 
+                 {/* Author Management Section */}
+                <div className="space-y-4">
+                    <FormLabel>Author(s) & Roles</FormLabel>
+                    <div className="space-y-4">
                         {fields.map((field, index) => (
-                            <div key={field.id} className="flex flex-col md:flex-row gap-4 border p-4 rounded-md">
-                                <FormField
-                                    control={form.control}
-                                    name={`bookCoAuthors.${index}.name`}
-                                    render={({ field }) => (<FormItem className="flex-1"><FormLabel>Name</FormLabel><FormControl><Input {...field} readOnly={index === 0} /></FormControl><FormMessage /></FormItem>)}
-                                />
-                                <FormField
-                                    control={form.control}
-                                    name={`bookCoAuthors.${index}.type`}
-                                    render={({ field }) => (<FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Internal">Internal (PU)</SelectItem><SelectItem value="External">External</SelectItem></SelectContent></Select><FormMessage /></FormItem>)}
-                                />
+                            <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-4 rounded-md items-end">
+                                <FormItem className="md:col-span-2">
+                                    <FormLabel>Name</FormLabel>
+                                    <FormControl><Input value={field.name} readOnly /></FormControl>
+                                </FormItem>
                                 <FormField
                                     control={form.control}
                                     name={`bookCoAuthors.${index}.role`}
-                                    render={({ field }) => (<FormItem><FormLabel>Role</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl><SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Role</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl>
+                                                <SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
                                 />
                                 {index > 0 && (
-                                    <Button type="button" variant="destructive" size="icon" className="mt-8 self-end" onClick={() => remove(index)}>
-                                        <Trash2 className="h-4 w-4" />
+                                    <Button type="button" variant="destructive" className="md:col-start-4" onClick={() => remove(index)}>
+                                        <Trash2 className="h-4 w-4 mr-2" /> Remove
                                     </Button>
                                 )}
                             </div>
                         ))}
                     </div>
-                    <Button type="button" variant="outline" size="sm" className="mt-4" onClick={() => append({ name: '', type: 'Internal', role: 'Co-Author' })}>
-                        <Plus className="mr-2 h-4 w-4" /> Add Co-Author
-                    </Button>
+                    
+                    <Separator className="my-4" />
+
+                    <div className="space-y-2 p-4 border rounded-md">
+                        <FormLabel>Add Internal Co-Author</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
+                            <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
+                                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+                            </Button>
+                        </div>
+                        {foundCoPi && (
+                            <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                                <div>
+                                    <p>{foundCoPi.name}</p>
+                                    {!foundCoPi.uid && <p className="text-xs text-muted-foreground">Not registered, but found in staff data.</p>}
+                                </div>
+                                <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
+                            </div>
+                        )}
+                    </div>
+                     <FormMessage>{form.formState.errors.bookCoAuthors?.message}</FormMessage>
                 </div>
 
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookEditor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the Editor (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField name="totalPuAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Authors from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                   <FormField name="totalPuStudents" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Students from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField name="puStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Students from PU</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
-                <FormField name="puStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Students from PU</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book Chapter' ? (<FormField name="bookChapterPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book chapter</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />) : (<FormField name="bookTotalPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />)}
                 <FormField name="publisherName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the publisher</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book' && (
@@ -327,10 +386,6 @@ export function BookForm() {
                 <FormField name="publicationOrderInYear" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select publication order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
                 <FormField name="bookProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach copy of Book / Book Chapter (First Page, Publisher Page, Index, Abstract) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
                 {isScopusIndexed && <FormField name="scopusProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof of indexed in Scopus (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="totalAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Authors</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
-                  <FormField control={form.control} name="authorType" render={({ field }) => ( <FormItem><FormLabel>Author Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
-                </div>
                 <FormField control={form.control} name="bookSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
             </div>
           </CardContent>

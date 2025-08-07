@@ -1,3 +1,4 @@
+
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -164,7 +165,8 @@ export type Notification = {
 
 export type BookCoAuthor = {
     name: string;
-    type: 'Internal' | 'External';
+    email: string;
+    uid?: string | null;
     role: 'First Author' | 'Corresponding Author' | 'Co-Author' | 'First & Corresponding Author';
 };
 
@@ -182,8 +184,6 @@ export type IncentiveClaim = {
     claimType: string;
 
     // Common fields
-    totalAuthors?: string;
-    authorType?: string;
     benefitMode: string;
     orcidId?: string;
     
@@ -198,6 +198,8 @@ export type IncentiveClaim = {
     paperTitle?: string;
     publicationPhase?: string;
     relevantLink?: string;
+    authorType?: string;
+    totalAuthors?: string;
 
     // Patent Fields
     patentTitle?: string;
@@ -253,7 +255,6 @@ export type IncentiveClaim = {
     bookChapterPages?: number;
     bookTotalPages?: number;
     authorRole?: 'Author' | 'Editor';
-    totalPuAuthors?: number;
     totalPuStudents?: number;
     puStudentNames?: string;
     publisherName?: string;
