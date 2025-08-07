@@ -126,6 +126,7 @@ export function BookForm() {
       puStudentNames: '',
       bookChapterPages: 0,
       bookTotalPages: 0,
+      bookTotalChapters: 0,
       publicationYear: new Date().getFullYear(),
       publisherName: '',
       publisherCity: '',
@@ -203,11 +204,11 @@ export function BookForm() {
         bookCoAuthors: data.bookCoAuthors.map(a => ({...a, status: 'Pending'})),
         bookTitleForChapter: data.bookTitleForChapter,
         bookEditor: data.bookEditor,
-        totalPuStudents: data.totalPuStudents,
+        totalPuStudents: Number(data.totalPuStudents || 0),
         puStudentNames: data.puStudentNames,
-        bookChapterPages: data.bookChapterPages,
-        bookTotalPages: data.bookTotalPages,
-        bookTotalChapters: data.bookTotalChapters,
+        bookChapterPages: Number(data.bookChapterPages || 0),
+        bookTotalPages: Number(data.bookTotalPages || 0),
+        bookTotalChapters: Number(data.bookTotalChapters || 0),
         publicationYear: data.publicationYear,
         publisherName: data.publisherName,
         publisherCity: data.publisherCity,
@@ -237,6 +238,13 @@ export function BookForm() {
       if (scopusProofUrl) {
         claimData.scopusProofUrl = scopusProofUrl;
       }
+      
+      // Remove any undefined fields to prevent Firestore errors
+      Object.keys(claimData).forEach(key => {
+        if ((claimData as any)[key] === undefined) {
+            delete (claimData as any)[key];
+        }
+      });
       
       await addDoc(collection(db, 'incentiveClaims'), claimData as any);
       toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
