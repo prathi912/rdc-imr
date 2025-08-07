@@ -36,7 +36,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl } from '@/app/actions';
 import { Loader2, AlertCircle, Bot } from 'lucide-react';
@@ -85,6 +85,7 @@ export function ResearchPaperForm() {
   const [isFetchingWos, setIsFetchingWos] = useState(false);
   const [isFindingWebsite, setIsFindingWebsite] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
+  const [orcidMissing, setOrcidMissing] = useState(false);
   
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
@@ -110,6 +111,9 @@ export function ResearchPaperForm() {
       setUser(parsedUser);
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
+      }
+      if (!parsedUser.orcidId) {
+        setOrcidMissing(true);
       }
     }
   }, []);
@@ -199,49 +203,75 @@ export function ResearchPaperForm() {
     } catch (error: any) { toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' }); } finally { setIsFindingWebsite(false); }
   };
 
-  async function onSubmit(data: ResearchPaperFormValues) {
-    if (!user || !user.faculty || !user.bankDetails) {
-        toast({ variant: 'destructive', title: 'Bank Details Missing', description: 'You must add your bank details in Settings to submit a claim.' });
+  async function handleSave(status: 'Draft' | 'Pending') {
+    if (!user || !user.faculty) return;
+    if (status === 'Pending' && (bankDetailsMissing || orcidMissing)) {
+        toast({
+            variant: 'destructive',
+            title: 'Profile Incomplete',
+            description: 'Please add your bank details and ORCID iD in Settings before submitting a claim.',
+        });
         return;
     }
+    
     setIsSubmitting(true);
     try {
-        const claimData: Omit<IncentiveClaim, 'id'> = {
-            ...data,
-            misId: user.misId,
-            orcidId: user.orcidId,
-            claimType: 'Research Papers',
-            benefitMode: 'incentives',
-            uid: user.uid,
-            userName: user.name,
-            userEmail: user.email,
-            faculty: user.faculty,
-            status: 'Pending',
-            submissionDate: new Date().toISOString(),
-            bankDetails: user.bankDetails,
-        };
-        await addDoc(collection(db, 'incentiveClaims'), claimData);
+      const data = form.getValues();
+      const claimId = doc(collection(db, 'incentiveClaims')).id;
+
+      const claimData: Omit<IncentiveClaim, 'id'> = {
+        ...data,
+        misId: user.misId,
+        orcidId: user.orcidId,
+        claimType: 'Research Papers',
+        benefitMode: 'incentives',
+        uid: user.uid,
+        userName: user.name,
+        userEmail: user.email,
+        faculty: user.faculty,
+        status,
+        submissionDate: new Date().toISOString(),
+        bankDetails: user.bankDetails,
+      };
+      
+      await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
+      
+      if (status === 'Draft') {
+        toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
+        router.push(`/dashboard/incentive-claim/research-paper?claimId=${claimId}`);
+      } else {
         toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
         router.push('/dashboard/incentive-claim');
+      }
     } catch (error: any) {
-        console.error('Error submitting claim: ', error);
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit claim. Please try again.' });
+      console.error('Error submitting claim: ', error);
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit claim. Please try again.' });
     } finally {
-        setIsSubmitting(false);
+      setIsSubmitting(false);
     }
   }
 
   return (
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
           <CardContent className="space-y-6 pt-6">
-             {bankDetailsMissing && (
+            {bankDetailsMissing && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Bank Details Required</AlertTitle>
                     <AlertDescription>
                         Please add your salary bank account details in your profile before you can submit a claim.
+                        <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
+                    </AlertDescription>
+                </Alert>
+            )}
+             {orcidMissing && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>ORCID iD Required</AlertTitle>
+                    <AlertDescription>
+                        An ORCID iD is mandatory for submitting incentive claims. Please add it to your profile.
                         <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
                     </AlertDescription>
                 </Alert>
@@ -259,7 +289,6 @@ export function ResearchPaperForm() {
                 <FormField control={form.control} name="journalWebsite" render={({ field }) => ( <FormItem><FormLabel>Journal Website Link</FormLabel><FormControl><Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="paperTitle" render={({ field }) => ( <FormItem><FormLabel>Title of the Paper published</FormLabel><FormControl><Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="impactFactor" render={({ field }) => ( <FormItem><FormLabel>Impact factor</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormMessage /></FormItem> )}/>
-                
                 <FormField
                   control={form.control}
                   name="authorType"
@@ -284,8 +313,17 @@ export function ResearchPaperForm() {
                 <FormField control={form.control} name="publicationPhase" render={({ field }) => ( <FormItem><FormLabel>Publication Phase</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
             </div>
           </CardContent>
-          <CardFooter>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
+          <CardFooter className="flex justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleSave('Draft')}
+              disabled={isSubmitting || bankDetailsMissing || orcidMissing}
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save as Draft
+            </Button>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidMissing}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>

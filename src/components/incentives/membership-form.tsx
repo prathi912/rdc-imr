@@ -27,7 +27,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -57,6 +57,7 @@ export function MembershipForm() {
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
+  const [orcidMissing, setOrcidMissing] = useState(false);
   
   const form = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipSchema),
@@ -76,61 +77,80 @@ export function MembershipForm() {
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
       }
+      if (!parsedUser.orcidId) {
+        setOrcidMissing(true);
+      }
     }
   }, []);
 
-  async function onSubmit(data: MembershipFormValues) {
-    if (!user || !user.faculty || !user.bankDetails) {
-      toast({ variant: 'destructive', title: 'Bank Details Missing', description: 'You must add your bank details in Settings to submit a claim.' });
-      return;
+  async function handleSave(status: 'Draft' | 'Pending') {
+    if (!user || !user.faculty) return;
+    if (status === 'Pending' && (bankDetailsMissing || orcidMissing)) {
+        toast({
+            variant: 'destructive',
+            title: 'Profile Incomplete',
+            description: 'Please add your bank details and ORCID iD in Settings before submitting a claim.',
+        });
+        return;
     }
+    
     setIsSubmitting(true);
     try {
-      const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
-        if (!file || !user) return undefined;
-        const dataUrl = await fileToDataUrl(file);
-        const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
-        const result = await uploadFileToServer(dataUrl, path);
-        if (!result.success || !result.url) {
-          throw new Error(result.error || `File upload failed for ${folderName}`);
+        const data = form.getValues();
+        const claimId = doc(collection(db, 'incentiveClaims')).id;
+
+        const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
+            if (!file || !user) return undefined;
+            const dataUrl = await fileToDataUrl(file);
+            const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
+            const result = await uploadFileToServer(dataUrl, path);
+            if (!result.success || !result.url) {
+                throw new Error(result.error || `File upload failed for ${folderName}`);
+            }
+            return result.url;
+        };
+
+        const membershipProofUrl = await uploadFileHelper(data.membershipProof?.[0], 'membership-proof');
+
+        const claimData: Omit<IncentiveClaim, 'id'> = {
+            ...data,
+            misId: user.misId,
+            orcidId: user.orcidId,
+            claimType: 'Membership of Professional Bodies',
+            benefitMode: 'reimbursement',
+            uid: user.uid,
+            userName: user.name,
+            userEmail: user.email,
+            faculty: user.faculty,
+            status,
+            submissionDate: new Date().toISOString(),
+            bankDetails: user.bankDetails,
+        };
+
+        if (membershipProofUrl) claimData.membershipProofUrl = membershipProofUrl;
+
+        await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
+
+        if (status === 'Draft') {
+          toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
+          router.push(`/dashboard/incentive-claim/membership?claimId=${claimId}`);
+        } else {
+          toast({ title: 'Success', description: 'Your incentive claim for membership has been submitted.' });
+          router.push('/dashboard/incentive-claim');
         }
-        return result.url;
-      };
 
-      const membershipProofUrl = await uploadFileHelper(data.membershipProof?.[0], 'membership-proof');
-
-      const claimData: Omit<IncentiveClaim, 'id'> = {
-        ...data,
-        misId: user.misId,
-        orcidId: user.orcidId,
-        claimType: 'Membership of Professional Bodies',
-        benefitMode: 'reimbursement',
-        uid: user.uid,
-        userName: user.name,
-        userEmail: user.email,
-        faculty: user.faculty,
-        status: 'Pending',
-        submissionDate: new Date().toISOString(),
-        bankDetails: user.bankDetails,
-      };
-
-      if (membershipProofUrl) claimData.membershipProofUrl = membershipProofUrl;
-
-      await addDoc(collection(db, 'incentiveClaims'), claimData);
-      toast({ title: 'Success', description: 'Your incentive claim for membership has been submitted.' });
-      router.push('/dashboard/incentive-claim');
     } catch (error: any) {
-      console.error('Error submitting claim: ', error);
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit claim. Please try again.' });
+        console.error('Error submitting claim: ', error);
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit claim. Please try again.' });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   }
 
   return (
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)}>
+        <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
           <CardContent className="space-y-6 pt-6">
             {bankDetailsMissing && (
               <Alert variant="destructive">
@@ -142,7 +162,16 @@ export function MembershipForm() {
                 </AlertDescription>
               </Alert>
             )}
-
+            {orcidMissing && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>ORCID iD Required</AlertTitle>
+                    <AlertDescription>
+                        An ORCID iD is mandatory for submitting incentive claims. Please add it to your profile.
+                        <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
+                    </AlertDescription>
+                </Alert>
+            )}
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">MEMBERSHIP DETAILS</h3>
                 <Separator />
@@ -152,8 +181,17 @@ export function MembershipForm() {
                 <FormField control={form.control} name="membershipSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby certify that this is the only application for Professional Body Membership incentive in the current calendar year.</p></div></FormItem> )} />
             </div>
           </CardContent>
-          <CardFooter>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
+          <CardFooter className="flex justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleSave('Draft')}
+              disabled={isSubmitting || bankDetailsMissing || orcidMissing}
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save as Draft
+            </Button>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidMissing}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>
