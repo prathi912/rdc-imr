@@ -252,7 +252,8 @@ export type IncentiveClaim = {
     totalPuStudents?: number;
     puStudentNames?: string;
     publisherName?: string;
-    isSelfPublished?: boolean;
+    publisherCity?: string;
+    publisherCountry?: string;
     publisherType?: 'National' | 'International';
     isScopusIndexed?: boolean;
     isbn?: string;
