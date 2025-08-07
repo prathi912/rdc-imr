@@ -165,8 +165,10 @@ export function BookForm() {
       const bookProofUrl = await uploadFileHelper(data.bookProof?.[0], 'book-proof');
       const scopusProofUrl = await uploadFileHelper(data.scopusProof?.[0], 'book-scopus-proof');
 
+      const { bookProof, scopusProof, ...restOfData } = data;
+
       const claimData: Omit<IncentiveClaim, 'id'> = {
-        ...data,
+        ...restOfData,
         orcidId: user.orcidId,
         claimType: 'Books',
         benefitMode: 'incentives',
@@ -177,10 +179,9 @@ export function BookForm() {
         status: 'Pending',
         submissionDate: new Date().toISOString(),
         bankDetails: user.bankDetails,
+        bookProofUrl,
+        scopusProofUrl,
       };
-
-      if (bookProofUrl) claimData.bookProofUrl = bookProofUrl;
-      if (scopusProofUrl) claimData.scopusProofUrl = scopusProofUrl;
 
       await addDoc(collection(db, 'incentiveClaims'), claimData);
       toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
