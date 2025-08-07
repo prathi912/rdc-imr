@@ -18,8 +18,17 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     }
     const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
 
-    const userRef = adminDb.collection('users').doc(claim.uid);
-    const userSnap = await userRef.get();
+    let userRef;
+    let userSnap;
+    // If it's a co-author claim, fetch the current applicant's details. Otherwise, fetch the original claimant's.
+    if (claim.originalClaimId) {
+        userRef = adminDb.collection('users').doc(claim.uid);
+    } else {
+        userRef = adminDb.collection('users').doc(claim.uid);
+    }
+    
+    userSnap = await userRef.get();
+
     if (!userSnap.exists) {
         return { success: false, error: 'Claimant user profile not found.' };
     }
@@ -46,7 +55,7 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     const internalAuthorsCount = claim.bookCoAuthors?.filter(a => !a.isExternal).length || 0;
 
     const data = {
-        name: claim.userName,
+        name: user.name, // Use the current applicant's name
         designation: user.designation || 'N/A',
         department: user.department || 'N/A',
         institute: user.institute || 'N/A',
@@ -54,7 +63,7 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
         ...coAuthorData,
         authors_pu: internalAuthorsCount,
         applicant_type: claim.authorRole || 'N/A',
-        total_chapters: claim.bookApplicationType === 'Book Chapter' ? 1 : 'N/A',
+        total_chapters: claim.bookApplicationType === 'Book Chapter' ? 1 : (claim.bookTotalChapters || 'N/A'),
         total_pages: claim.bookTotalPages || claim.bookChapterPages || 'N/A',
         publication_year: claim.publicationYear,
         publisher_name: claim.publisherName,

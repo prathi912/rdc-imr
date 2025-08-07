@@ -56,6 +56,7 @@ const bookSchema = z
     bookEditor: z.string().optional(),
     totalPuStudents: z.coerce.number().optional(),
     puStudentNames: z.string().optional(),
+    bookTotalChapters: z.coerce.number().optional(),
     bookChapterPages: z.coerce.number().optional(),
     bookTotalPages: z.coerce.number().optional(),
     publicationYear: z.coerce.number().min(1900, 'Please enter a valid year.').max(new Date().getFullYear(), 'Year cannot be in the future.'),
@@ -82,6 +83,7 @@ const bookSchema = z
   .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Print Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnPrint && data.isbnPrint.length >= 10), { message: 'A valid Print ISBN is required.', path: ['isbnPrint']})
   .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Electronic Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnElectronic && data.isbnElectronic.length >= 10), { message: 'A valid Electronic ISBN is required.', path: ['isbnElectronic']})
   .refine(data => !(data.bookApplicationType === 'Book') || !!data.authorRole, { message: 'Applicant type is required for book publications.', path: ['authorRole'] })
+  .refine(data => !(data.bookApplicationType === 'Book') || (data.bookTotalChapters && data.bookTotalChapters > 0), { message: 'Total chapters are required for book publications.', path: ['bookTotalChapters'] })
   .refine(data => {
       const firstAuthors = data.bookCoAuthors.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
       return firstAuthors.length <= 1;
@@ -195,7 +197,7 @@ export function BookForm() {
       const bookProofUrl = await uploadFileHelper(bookProof, 'book-proof');
       const scopusProofUrl = await uploadFileHelper(scopusProof, 'book-scopus-proof');
 
-      const claimData: Omit<IncentiveClaim, 'id'> = {
+      const claimData: Partial<IncentiveClaim> = {
         bookApplicationType: data.bookApplicationType,
         publicationTitle: data.publicationTitle,
         bookCoAuthors: data.bookCoAuthors.map(a => ({...a, status: 'Pending'})),
@@ -205,6 +207,7 @@ export function BookForm() {
         puStudentNames: data.puStudentNames,
         bookChapterPages: data.bookChapterPages,
         bookTotalPages: data.bookTotalPages,
+        bookTotalChapters: data.bookTotalChapters,
         publicationYear: data.publicationYear,
         publisherName: data.publisherName,
         publisherCity: data.publisherCity,
@@ -371,7 +374,12 @@ export function BookForm() {
                   <FormField name="totalPuStudents" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Students from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                   <FormField name="puStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Students from PU</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
-                {bookApplicationType === 'Book Chapter' ? (<FormField name="bookChapterPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book chapter</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />) : (<FormField name="bookTotalPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />)}
+                {bookApplicationType === 'Book Chapter' ? (<FormField name="bookChapterPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book chapter</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />) : (
+                    <>
+                        <FormField name="bookTotalChapters" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of chapters of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="bookTotalPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    </>
+                )}
                 <FormField name="publicationYear" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Year of Publication</FormLabel><FormControl><Input type="number" placeholder={String(new Date().getFullYear())} {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publisherName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the publisher</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book' && (
