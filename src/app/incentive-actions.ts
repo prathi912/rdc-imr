@@ -7,7 +7,6 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
-import { getDoc as adminGetDoc, doc as adminDoc } from "firebase-admin/firestore";
 
 
 export async function generateBookIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
@@ -60,6 +59,8 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
         publisher_city: claim.publisherCity || 'N/A',
         publisher_country: claim.publisherCountry || 'N/A',
         publisher_type: claim.publisherType,
+        isbn_print: claim.isbnPrint || 'N/A',
+        isbn_electronic: claim.isbnElectronic || 'N/A',
     };
     
     doc.setData(data);

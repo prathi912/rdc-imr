@@ -247,7 +247,7 @@ export type IncentiveClaim = {
     bookChapterPages?: number;
     bookTotalPages?: number;
     bookType?: 'Textbook' | 'Reference Book';
-    authorRole?: 'Editor' | 'Author';
+    authorRole?: 'Author' | 'Editor';
     totalPuAuthors?: number;
     totalPuStudents?: number;
     puStudentNames?: string;
@@ -256,7 +256,9 @@ export type IncentiveClaim = {
     publisherCountry?: string;
     publisherType?: 'National' | 'International';
     isScopusIndexed?: boolean;
-    isbn?: string;
+    publicationMode?: 'Print Only' | 'Electronic Only' | 'Print & Electronic';
+    isbnPrint?: string;
+    isbnElectronic?: string;
     publisherWebsite?: string;
     bookProofUrl?: string;
     scopusProofUrl?: string;

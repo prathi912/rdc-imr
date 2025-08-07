@@ -59,7 +59,9 @@ const bookSchema = z
     publisherType: z.enum(['National', 'International'], { required_error: 'Publisher type is required.' }),
     isScopusIndexed: z.boolean().optional(),
     authorRole: z.enum(['Editor', 'Author']).optional(),
-    isbn: z.string().min(10, 'A valid ISBN is required.'),
+    publicationMode: z.enum(['Print Only', 'Electronic Only', 'Print & Electronic']).optional(),
+    isbnPrint: z.string().optional(),
+    isbnElectronic: z.string().optional(),
     bookType: z.enum(['Textbook', 'Reference Book']).optional(),
     publisherWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     bookProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.'),
@@ -73,6 +75,9 @@ const bookSchema = z
   .refine(data => !(data.isScopusIndexed) || (!!data.scopusProof && data.scopusProof.length > 0), { message: 'Proof of Scopus indexing is required if selected.', path: ['scopusProof'] })
   .refine(data => !(data.bookApplicationType === 'Book') || (!!data.publisherCity && data.publisherCity.length > 0), { message: 'Publisher city is required for book publications.', path: ['publisherCity']})
   .refine(data => !(data.bookApplicationType === 'Book') || (!!data.publisherCountry && data.publisherCountry.length > 0), { message: 'Publisher country is required for book publications.', path: ['publisherCountry']})
+  .refine(data => !(data.bookApplicationType === 'Book') || !!data.publicationMode, { message: 'Mode of publication is required for book publications.', path: ['publicationMode']})
+  .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Print Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnPrint && data.isbnPrint.length >= 10), { message: 'A valid Print ISBN is required.', path: ['isbnPrint']})
+  .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Electronic Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnElectronic && data.isbnElectronic.length >= 10), { message: 'A valid Electronic ISBN is required.', path: ['isbnElectronic']})
   .refine(data => !(data.bookApplicationType === 'Book') || !!data.authorRole, { message: 'Applicant type is required for book publications.', path: ['authorRole'] });
 
 type BookFormValues = z.infer<typeof bookSchema>;
@@ -120,7 +125,9 @@ export function BookForm() {
       publisherType: undefined,
       isScopusIndexed: false,
       authorRole: undefined,
-      isbn: '',
+      publicationMode: undefined,
+      isbnPrint: '',
+      isbnElectronic: '',
       bookType: undefined,
       publisherWebsite: '',
       bookProof: undefined,
@@ -142,6 +149,7 @@ export function BookForm() {
   }, []);
 
   const bookApplicationType = form.watch('bookApplicationType');
+  const publicationMode = form.watch('publicationMode');
   const isScopusIndexed = form.watch('isScopusIndexed');
 
   async function onSubmit(data: BookFormValues) {
@@ -182,7 +190,9 @@ export function BookForm() {
         publisherType: data.publisherType,
         isScopusIndexed: data.isScopusIndexed,
         authorRole: data.authorRole,
-        isbn: data.isbn,
+        publicationMode: data.publicationMode,
+        isbnPrint: data.isbnPrint,
+        isbnElectronic: data.isbnElectronic,
         bookType: data.bookType,
         publisherWebsite: data.publisherWebsite,
         publicationOrderInYear: data.publicationOrderInYear,
@@ -257,7 +267,12 @@ export function BookForm() {
                 <FormField name="publisherType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether National/International Publisher</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="National" /></FormControl><FormLabel className="font-normal">National</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="International" /></FormControl><FormLabel className="font-normal">International</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="isScopusIndexed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether Scopus Indexed</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book' && <FormField name="authorRole" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Applicant Type</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select your role" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Author">Author</SelectItem><SelectItem value="Editor">Editor</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />}
-                <FormField name="isbn" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number of the Book</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                {bookApplicationType === 'Book' && (
+                  <FormField name="publicationMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Mode of Publication</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Print Only" /></FormControl><FormLabel className="font-normal">Print Only</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Electronic Only" /></FormControl><FormLabel className="font-normal">Electronic Only</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Print & Electronic" /></FormControl><FormLabel className="font-normal">Print & Electronic</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                )}
+                {(publicationMode === 'Print Only' || publicationMode === 'Print & Electronic') && <FormField name="isbnPrint" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number (Print)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
+                {(publicationMode === 'Electronic Only' || publicationMode === 'Print & Electronic') && <FormField name="isbnElectronic" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number (Electronic)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
+                
                 {bookApplicationType === 'Book' && <FormField name="bookType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Whether Textbook or Reference Book</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Textbook" /></FormControl><FormLabel className="font-normal">Textbook</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Reference Book" /></FormControl><FormLabel className="font-normal">Reference Book</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />}
                 <FormField name="publisherWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Publisher Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publicationOrderInYear" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select publication order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
