@@ -280,13 +280,14 @@ export default function IncentiveClaimPage() {
   const fetchCoAuthorClaims = async (uid: string) => {
     try {
         const claimsRef = collection(db, 'incentiveClaims');
-        // Query for claims where the current user is a co-author and their status is still 'Pending'.
-        const q = query(claimsRef, where('bookCoAuthors', 'array-contains', { uid: uid, status: 'Pending' }));
+        const q = query(claimsRef, where('coAuthorUids', 'array-contains', uid));
         const snapshot = await getDocs(q);
         
-        // Additional client-side filtering to ensure correctness (Firestore array-contains with objects is exact match)
-        const claims = snapshot.docs.map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
-            .filter(claim => claim.bookCoAuthors?.some(author => author.uid === uid && author.status === 'Pending'));
+        const claims = snapshot.docs
+            .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
+            .filter(claim => 
+                claim.bookCoAuthors?.some(author => author.uid === uid && author.status === 'Pending')
+            );
         
         setCoAuthorClaims(claims);
     } catch (error) {

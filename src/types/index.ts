@@ -253,6 +253,7 @@ export type IncentiveClaim = {
     bookApplicationType?: 'Book Chapter' | 'Book';
     publicationTitle?: string; // Title of the book chapter/Book
     bookCoAuthors?: BookCoAuthor[];
+    coAuthorUids?: string[]; // For efficient querying
     bookTitleForChapter?: string; // Title of the Book (for Book Chapter)
     bookEditor?: string; // Name Of the Editor (for Book Chapter)
     bookChapterPages?: number;

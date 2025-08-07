@@ -83,7 +83,7 @@ const bookSchema = z
   .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Print Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnPrint && data.isbnPrint.length >= 10), { message: 'A valid Print ISBN is required.', path: ['isbnPrint']})
   .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Electronic Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnElectronic && data.isbnElectronic.length >= 10), { message: 'A valid Electronic ISBN is required.', path: ['isbnElectronic']})
   .refine(data => !(data.bookApplicationType === 'Book') || !!data.authorRole, { message: 'Applicant type is required for book publications.', path: ['authorRole'] })
-  .refine(data => !(data.bookApplicationType === 'Book') || (data.bookTotalChapters && data.bookTotalChapters > 0), { message: 'Total chapters are required for book publications.', path: ['bookTotalChapters'] })
+  .refine(data => !(data.bookApplicationType === 'Book') || (data.bookTotalChapters !== undefined && data.bookTotalChapters >= 0), { message: 'Total chapters are required for book publications.', path: ['bookTotalChapters'] })
   .refine(data => {
       const firstAuthors = data.bookCoAuthors.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
       return firstAuthors.length <= 1;
@@ -197,11 +197,14 @@ export function BookForm() {
       
       const bookProofUrl = await uploadFileHelper(bookProof, 'book-proof');
       const scopusProofUrl = await uploadFileHelper(scopusProof, 'book-scopus-proof');
+      
+      const coAuthorUids = data.bookCoAuthors.map(a => a.uid).filter(Boolean) as string[];
 
       const claimData: Partial<IncentiveClaim> = {
         bookApplicationType: data.bookApplicationType,
         publicationTitle: data.publicationTitle,
         bookCoAuthors: data.bookCoAuthors.map(a => ({...a, status: 'Pending'})),
+        coAuthorUids,
         bookTitleForChapter: data.bookTitleForChapter,
         bookEditor: data.bookEditor,
         totalPuStudents: Number(data.totalPuStudents || 0),
