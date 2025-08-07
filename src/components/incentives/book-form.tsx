@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -23,6 +23,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { uploadFileToServer, findUserByMisId } from '@/app/actions';
 import { Loader2, AlertCircle, Plus, Trash2, Search, Edit } from 'lucide-react';
+import { calculateIncentive } from '@/app/incentive-actions';
 
 const bookSchema = z
   .object({
@@ -39,9 +40,10 @@ const bookSchema = z
     bookEditor: z.string().optional(),
     totalPuStudents: z.coerce.number().optional(),
     puStudentNames: z.string().optional(),
-    bookTotalChapters: z.coerce.number().optional(),
     bookChapterPages: z.coerce.number().optional(),
     bookTotalPages: z.coerce.number().optional(),
+    bookTotalChapters: z.coerce.number().optional(),
+    chaptersInSameBook: z.coerce.number().optional(),
     publicationYear: z.coerce.number().min(1900, 'Please enter a valid year.').max(new Date().getFullYear(), 'Year cannot be in the future.'),
     publisherName: z.string().min(2, 'Publisher name is required.'),
     publisherCity: z.string().optional(),
@@ -184,6 +186,7 @@ export function BookForm() {
       bookChapterPages: 0,
       bookTotalPages: 0,
       bookTotalChapters: 0,
+      chaptersInSameBook: 1,
       publicationYear: new Date().getFullYear(),
       publisherName: '',
       publisherCity: '',
@@ -253,6 +256,8 @@ export function BookForm() {
     }
     setIsSubmitting(true);
     try {
+      const calculationResult = await calculateIncentive(data);
+
       const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
         if (!file || !user) return undefined;
         const dataUrl = await fileToDataUrl(file);
@@ -274,6 +279,7 @@ export function BookForm() {
 
       const claimData: Partial<IncentiveClaim> = {
         ...data,
+        calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
         coAuthorUids,
         misId: user.misId,
         orcidId: user.orcidId,
@@ -452,7 +458,7 @@ export function BookForm() {
                   <FormField name="totalPuStudents" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Students from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                   <FormField name="puStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Students from PU</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
-                {bookApplicationType === 'Book Chapter' ? (<FormField name="bookChapterPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book chapter</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />) : (
+                {bookApplicationType === 'Book Chapter' ? (<><FormField name="bookChapterPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book chapter</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} /><FormField name="chaptersInSameBook" control={form.control} render={({ field }) => ( <FormItem><FormLabel>No. of chapters in the same book by applicant</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} /></>) : (
                     <>
                         <FormField name="bookTotalChapters" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of chapters of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="bookTotalPages" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total No. of pages of the book</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
