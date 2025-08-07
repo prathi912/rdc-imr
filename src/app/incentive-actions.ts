@@ -7,7 +7,7 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
-import { getDoc, doc as adminDoc, collection, query, where, getDocs as adminGetDocs } from "firebase-admin/firestore";
+import { getDoc as adminGetDoc, doc as adminDoc } from "firebase-admin/firestore";
 
 
 export async function generateBookIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
@@ -26,7 +26,7 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     }
     const user = userSnap.data() as User;
     
-    const templatePath = path.join(process.cwd(), 'Templates', 'INCENTIVE_BOOK_PUBLICATION.docx');
+    const templatePath = path.join(process.cwd(), 'public', 'templates', 'INCENTIVE_BOOK_PUBLICATION.docx');
     if (!fs.existsSync(templatePath)) {
       return { success: false, error: 'Book incentive form template not found on the server.' };
     }
