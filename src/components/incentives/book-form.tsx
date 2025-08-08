@@ -283,8 +283,8 @@ export function BookForm() {
         ...restOfData,
         calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
         coAuthorUids,
-        misId: user.misId,
-        orcidId: user.orcidId,
+        misId: user.misId || null,
+        orcidId: user.orcidId || null,
         claimType: 'Books',
         benefitMode: 'incentives',
         uid: user.uid,
@@ -293,7 +293,7 @@ export function BookForm() {
         faculty: user.faculty,
         status: 'Pending',
         submissionDate: new Date().toISOString(),
-        bankDetails: user.bankDetails,
+        bankDetails: user.bankDetails || null,
         bookProofUrl,
       };
       
@@ -301,6 +301,7 @@ export function BookForm() {
         claimData.scopusProofUrl = scopusProofUrl;
       }
       
+      // Sanitize object to remove any undefined values before sending to Firestore
       Object.keys(claimData).forEach(key => {
         if ((claimData as any)[key] === undefined) {
             delete (claimData as any)[key];
