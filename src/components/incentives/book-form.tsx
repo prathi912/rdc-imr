@@ -268,16 +268,19 @@ export function BookForm() {
         return result.url;
       };
       
-      const bookProof = data.bookProof?.[0];
-      const scopusProof = data.scopusProof?.[0];
+      const bookProofFile = data.bookProof?.[0];
+      const scopusProofFile = data.scopusProof?.[0];
       
-      const bookProofUrl = await uploadFileHelper(bookProof, 'book-proof');
-      const scopusProofUrl = await uploadFileHelper(scopusProof, 'book-scopus-proof');
+      const bookProofUrl = await uploadFileHelper(bookProofFile, 'book-proof');
+      const scopusProofUrl = await uploadFileHelper(scopusProofFile, 'book-scopus-proof');
       
       const coAuthorUids = data.bookCoAuthors.map(a => a.uid).filter(Boolean) as string[];
 
+      // Create a clean data object without the file objects
+      const { bookProof, scopusProof, ...restOfData } = data;
+
       const claimData: Partial<IncentiveClaim> = {
-        ...data,
+        ...restOfData,
         calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
         coAuthorUids,
         misId: user.misId,
