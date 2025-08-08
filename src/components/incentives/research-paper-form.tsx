@@ -221,8 +221,8 @@ export function ResearchPaperForm() {
 
       const claimData: Omit<IncentiveClaim, 'id'> = {
         ...data,
-        misId: user.misId,
-        orcidId: user.orcidId,
+        misId: user.misId || null,
+        orcidId: user.orcidId || null,
         claimType: 'Research Papers',
         benefitMode: 'incentives',
         uid: user.uid,
@@ -231,7 +231,7 @@ export function ResearchPaperForm() {
         faculty: user.faculty,
         status,
         submissionDate: new Date().toISOString(),
-        bankDetails: user.bankDetails,
+        bankDetails: user.bankDetails || null,
       };
       
       await setDoc(doc(db, 'incentiveClaims', claimId), claimData);

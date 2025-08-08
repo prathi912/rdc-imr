@@ -393,7 +393,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </SidebarContent>
          <SidebarFooter className="hidden md:flex mt-auto group-data-[collapsible=icon]:hidden">
             <Image
-                src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/PU-WATERMARK.svg"
+                src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/PU-WATERMARK.svg"
                 alt="Parul University Logo"
                 width={150}
                 height={50}

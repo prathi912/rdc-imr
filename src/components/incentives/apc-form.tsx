@@ -148,8 +148,8 @@ export function ApcForm() {
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
-            misId: user.misId,
-            orcidId: user.orcidId,
+            misId: user.misId || null,
+            orcidId: user.orcidId || null,
             claimType: 'Seed Money for APC',
             benefitMode: 'reimbursement',
             uid: user.uid,
@@ -158,7 +158,7 @@ export function ApcForm() {
             faculty: user.faculty,
             status,
             submissionDate: new Date().toISOString(),
-            bankDetails: user.bankDetails,
+            bankDetails: user.bankDetails || null,
         };
 
         if (apcApcWaiverProofUrl) claimData.apcApcWaiverProofUrl = apcApcWaiverProofUrl;

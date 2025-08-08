@@ -76,7 +76,7 @@ export async function getAllUsers(): Promise<User[]> {
 
 const EMAIL_STYLES = {
   background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
-  logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/RDC-PU-LOGO.png" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
+  logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20b.svg" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
   footer: `
     <p style="color:#b0bec5; margin-top: 30px;">Best Regards,</p>
     <p style="color:#b0bec5;">Research & Development Cell Team,</p>

@@ -143,8 +143,8 @@ export function PatentForm() {
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
-            misId: user.misId,
-            orcidId: user.orcidId,
+            misId: user.misId || null,
+            orcidId: user.orcidId || null,
             claimType: 'Patents',
             benefitMode: 'incentives',
             uid: user.uid,
@@ -153,7 +153,7 @@ export function PatentForm() {
             faculty: user.faculty,
             status,
             submissionDate: new Date().toISOString(),
-            bankDetails: user.bankDetails,
+            bankDetails: user.bankDetails || null,
         };
 
         if (patentApprovalProofUrl) claimData.patentApprovalProofUrl = patentApprovalProofUrl;

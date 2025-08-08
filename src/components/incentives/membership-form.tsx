@@ -114,8 +114,8 @@ export function MembershipForm() {
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
-            misId: user.misId,
-            orcidId: user.orcidId,
+            misId: user.misId || null,
+            orcidId: user.orcidId || null,
             claimType: 'Membership of Professional Bodies',
             benefitMode: 'reimbursement',
             uid: user.uid,
@@ -124,7 +124,7 @@ export function MembershipForm() {
             faculty: user.faculty,
             status,
             submissionDate: new Date().toISOString(),
-            bankDetails: user.bankDetails,
+            bankDetails: user.bankDetails || null,
         };
 
         if (membershipProofUrl) claimData.membershipProofUrl = membershipProofUrl;

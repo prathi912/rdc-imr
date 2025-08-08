@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
           html: `
                 <div style="background-color:#121212; color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;">
                   <div style="text-align:center; margin-bottom:20px;">
-                    <img src="https://rdc-full.vercel.app/assets/RDC-PU-LOGO-WHITE.svg" alt="RDC-PU Logo" style="max-width:300px; height:auto;" />
+                    <img src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-WHITE.svg" alt="RDC-PU Logo" style="max-width:300px; height:auto;" />
                   </div>
 
                   <p style="color:#ffffff;">Dear ${project.pi},</p>

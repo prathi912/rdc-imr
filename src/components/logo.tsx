@@ -10,7 +10,7 @@ export function Logo({ variant = 'public' }: LogoProps) {
       <div className="flex items-center justify-center p-6" style={{ maxHeight: 40 }}>
         {/* Expanded Light mode logo */}
         <Image
-          src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20b.svg"
+          src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20b.svg"
           alt="Parul Research Portal Logo"
           width={250}
           height={70}
@@ -19,7 +19,7 @@ export function Logo({ variant = 'public' }: LogoProps) {
         />
         {/* Expanded Dark mode logo */}
         <Image
-          src="https://c9lfgwsokvjlngjd.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20W.svg"
+          src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20W.svg"
           alt="Parul Research Portal Logo"
           width={250}
           height={70}
@@ -38,7 +38,7 @@ export function Logo({ variant = 'public' }: LogoProps) {
   return (
     <div className="flex items-center justify-center p-2" style={{ minHeight: 49 }}>
       <Image
-        src="https://rdc-full.vercel.app/assets/RDC-PU-LOGO-DARK.svg"
+        src="hhttps://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-BLACK.svg"
         alt="Parul Research Portal Logo"
         width={350}
         height={100}
@@ -46,7 +46,7 @@ export function Logo({ variant = 'public' }: LogoProps) {
         priority
       />
       <Image
-        src="https://rdc-full.vercel.app/assets/RDC-PU-LOGO-WHITE.svg"
+        src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-WHITE.svg"
         alt="Parul Research Portal Logo"
         width={350}
         height={100}
