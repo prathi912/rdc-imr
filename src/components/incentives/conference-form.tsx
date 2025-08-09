@@ -114,7 +114,7 @@ export function ConferenceForm() {
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
-  const [orcidMissing, setOrcidMissing] = useState(false);
+  const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   
   const form = useForm<ConferenceFormValues>({
     resolver: zodResolver(conferenceSchema),
@@ -154,12 +154,8 @@ export function ConferenceForm() {
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
-      if (!parsedUser.bankDetails) {
-        setBankDetailsMissing(true);
-      }
-      if (!parsedUser.orcidId) {
-        setOrcidMissing(true);
-      }
+      setBankDetailsMissing(!parsedUser.bankDetails);
+      setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
     }
   }, []);
 
@@ -170,12 +166,16 @@ export function ConferenceForm() {
   const wonPrize = form.watch('wonPrize');
 
   async function handleSave(status: 'Draft' | 'Pending') {
-    if (!user || !user.faculty) return;
-    if (status === 'Pending' && (bankDetailsMissing || orcidMissing)) {
+    if (!user || !user.faculty) {
+      toast({ variant: 'destructive', title: 'Error', description: 'User information not found. Please log in again.' });
+      return;
+    }
+    // Re-check profile completeness on submission
+    if (status === 'Pending' && (!user.bankDetails || !user.orcidId || !user.misId)) {
         toast({
             variant: 'destructive',
             title: 'Profile Incomplete',
-            description: 'Please add your bank details and ORCID iD in Settings before submitting a claim.',
+            description: 'Please add your bank details, ORCID iD, and MIS ID in Settings before submitting a claim.',
         });
         return;
     }
@@ -196,8 +196,8 @@ export function ConferenceForm() {
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...data,
-            misId: user.misId,
-            orcidId: user.orcidId,
+            misId: user.misId || null,
+            orcidId: user.orcidId || null,
             claimType: 'Conference Presentations',
             benefitMode: 'reimbursement',
             uid: user.uid,
@@ -206,7 +206,7 @@ export function ConferenceForm() {
             faculty: user.faculty,
             status,
             submissionDate: new Date().toISOString(),
-            bankDetails: user.bankDetails,
+            bankDetails: user.bankDetails || null,
         };
 
         const govtFundingRequestProofUrl = await uploadFileHelper(data.govtFundingRequestProof?.[0], 'conference-funding-proof');
@@ -246,22 +246,12 @@ export function ConferenceForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
           <CardContent className="space-y-6 pt-6">
-            {bankDetailsMissing && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Bank Details Required</AlertTitle>
-                <AlertDescription>
-                  Please add your salary bank account details in your profile before you can submit a claim.
-                  <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
-                </AlertDescription>
-              </Alert>
-            )}
-             {orcidMissing && (
+            {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>ORCID iD Required</AlertTitle>
+                    <AlertTitle>Profile Incomplete</AlertTitle>
                     <AlertDescription>
-                        An ORCID iD is mandatory for submitting incentive claims. Please add it to your profile.
+                        An ORCID iD, MIS ID, and bank details are mandatory for submitting incentive claims. Please add them to your profile.
                         <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
                     </AlertDescription>
                 </Alert>
@@ -290,8 +280,8 @@ export function ConferenceForm() {
                         <FormField name="abstractUpload" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Full Abstract (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="participationCertificate" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Participation/Presentation Certificate (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField control={form.control} name="totalAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Authors</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
-                          <FormField control={form.control} name="authorType" render={({ field }) => ( <FormItem><FormLabel>Author Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                          <FormField control={form.control} name="totalAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Authors</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                          <FormField control={form.control} name="authorType" render={({ field }) => ( <FormItem><FormLabel>Author Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
                         </div>
                     </div>
                 </div>
@@ -310,12 +300,12 @@ export function ConferenceForm() {
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
-              disabled={isSubmitting || bankDetailsMissing || orcidMissing}
+              disabled={isSubmitting}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidMissing}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>

@@ -85,7 +85,7 @@ export function ResearchPaperForm() {
   const [isFetchingWos, setIsFetchingWos] = useState(false);
   const [isFindingWebsite, setIsFindingWebsite] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
-  const [orcidMissing, setOrcidMissing] = useState(false);
+  const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
@@ -109,12 +109,8 @@ export function ResearchPaperForm() {
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
-      if (!parsedUser.bankDetails) {
-        setBankDetailsMissing(true);
-      }
-      if (!parsedUser.orcidId) {
-        setOrcidMissing(true);
-      }
+      setBankDetailsMissing(!parsedUser.bankDetails);
+      setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
     }
   }, []);
 
@@ -204,12 +200,16 @@ export function ResearchPaperForm() {
   };
 
   async function handleSave(status: 'Draft' | 'Pending') {
-    if (!user || !user.faculty) return;
-    if (status === 'Pending' && (bankDetailsMissing || orcidMissing)) {
+    if (!user || !user.faculty) {
+      toast({ variant: 'destructive', title: 'Error', description: 'User information not found. Please log in again.' });
+      return;
+    }
+    // Re-check profile completeness on submission
+    if (status === 'Pending' && (!user.bankDetails || !user.orcidId || !user.misId)) {
         toast({
             variant: 'destructive',
             title: 'Profile Incomplete',
-            description: 'Please add your bank details and ORCID iD in Settings before submitting a claim.',
+            description: 'Please add your bank details, ORCID iD, and MIS ID in Settings before submitting a claim.',
         });
         return;
     }
@@ -256,22 +256,12 @@ export function ResearchPaperForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
           <CardContent className="space-y-6 pt-6">
-            {bankDetailsMissing && (
+            {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Bank Details Required</AlertTitle>
+                    <AlertTitle>Profile Incomplete</AlertTitle>
                     <AlertDescription>
-                        Please add your salary bank account details in your profile before you can submit a claim.
-                        <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
-                    </AlertDescription>
-                </Alert>
-            )}
-             {orcidMissing && (
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>ORCID iD Required</AlertTitle>
-                    <AlertDescription>
-                        An ORCID iD is mandatory for submitting incentive claims. Please add it to your profile.
+                        An ORCID iD, MIS ID, and bank details are mandatory for submitting incentive claims. Please add them to your profile.
                         <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
                     </AlertDescription>
                 </Alert>
@@ -279,23 +269,23 @@ export function ResearchPaperForm() {
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">RESEARCH PAPER DETAILS</h3>
                 <Separator />
-                <FormField control={form.control} name="publicationType" render={({ field }) => ( <FormItem><FormLabel>Please Select</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="Select publication type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Referred paper in journal listed by WOS/Scopus">Referred paper in journal listed by WOS/Scopus</SelectItem></SelectContent></Select><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="indexType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Select Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting || bankDetailsMissing}>{availableIndexTypes.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="relevantLink" render={({ field }) => ( <FormItem><FormLabel>Relevant Link (e.g., DOI, Scopus URL)</FormLabel><div className="flex items-center gap-2"><FormControl><Input placeholder="https://www.scopus.com/record/display.uri?eid=..." {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><Button type="button" variant="outline" size="sm" onClick={handleFetchScopusData} disabled={isSubmitting || bankDetailsMissing || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')} title="Fetch data from Scopus">{isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}Scopus</Button><Button type="button" variant="outline" size="sm" onClick={handleFetchWosData} disabled={isSubmitting || bankDetailsMissing || isFetchingWos || !relevantLink || (indexType !== 'wos' && indexType !== 'both')} title="Fetch data from Web of Science">{isFetchingWos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}WoS</Button></div><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="journalClassification" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Journal Classification</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting || bankDetailsMissing}>{availableClassifications.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
-                {(indexType === 'wos' || indexType === 'both') && (<FormField control={form.control} name="wosType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Type of WoS</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6" disabled={isSubmitting || bankDetailsMissing}>{wosTypeOptions.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>)}
+                <FormField control={form.control} name="publicationType" render={({ field }) => ( <FormItem><FormLabel>Please Select</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Select publication type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Referred paper in journal listed by WOS/Scopus">Referred paper in journal listed by WOS/Scopus</SelectItem></SelectContent></Select><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="indexType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Select Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>{availableIndexTypes.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="relevantLink" render={({ field }) => ( <FormItem><FormLabel>Relevant Link (e.g., DOI, Scopus URL)</FormLabel><div className="flex items-center gap-2"><FormControl><Input placeholder="https://www.scopus.com/record/display.uri?eid=..." {...field} disabled={isSubmitting} /></FormControl><Button type="button" variant="outline" size="sm" onClick={handleFetchScopusData} disabled={isSubmitting || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')} title="Fetch data from Scopus">{isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}Scopus</Button><Button type="button" variant="outline" size="sm" onClick={handleFetchWosData} disabled={isSubmitting || isFetchingWos || !relevantLink || (indexType !== 'wos' && indexType !== 'both')} title="Fetch data from Web of Science">{isFetchingWos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}WoS</Button></div><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="journalClassification" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Journal Classification</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>{availableClassifications.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
+                {(indexType === 'wos' || indexType === 'both') && (<FormField control={form.control} name="wosType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Type of WoS</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6" disabled={isSubmitting}>{wosTypeOptions.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>)}
                 <Separator />
-                <FormField control={form.control} name="journalName" render={({ field }) => ( <FormItem><FormLabel>Name of Journal/Proceedings</FormLabel><div className="flex items-center gap-2"><FormControl><Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><Button type="button" variant="outline" size="icon" onClick={handleFindWebsite} disabled={isSubmitting || bankDetailsMissing || isFindingWebsite || !journalName} title="Find Journal Website with AI">{isFindingWebsite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}<span className="sr-only">Find Website</span></Button></div><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="journalWebsite" render={({ field }) => ( <FormItem><FormLabel>Journal Website Link</FormLabel><FormControl><Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="paperTitle" render={({ field }) => ( <FormItem><FormLabel>Title of the Paper published</FormLabel><FormControl><Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="impactFactor" render={({ field }) => ( <FormItem><FormLabel>Impact factor</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting || bankDetailsMissing} /></FormControl><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="journalName" render={({ field }) => ( <FormItem><FormLabel>Name of Journal/Proceedings</FormLabel><div className="flex items-center gap-2"><FormControl><Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting} /></FormControl><Button type="button" variant="outline" size="icon" onClick={handleFindWebsite} disabled={isSubmitting || isFindingWebsite || !journalName} title="Find Journal Website with AI">{isFindingWebsite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}<span className="sr-only">Find Website</span></Button></div><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="journalWebsite" render={({ field }) => ( <FormItem><FormLabel>Journal Website Link</FormLabel><FormControl><Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="paperTitle" render={({ field }) => ( <FormItem><FormLabel>Title of the Paper published</FormLabel><FormControl><Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting} /></FormControl><FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="impactFactor" render={({ field }) => ( <FormItem><FormLabel>Impact factor</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem> )}/>
                 <FormField
                   control={form.control}
                   name="authorType"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Your Author Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="-- Please Select --" />
@@ -310,7 +300,7 @@ export function ResearchPaperForm() {
                   )}
                 />
                 
-                <FormField control={form.control} name="publicationPhase" render={({ field }) => ( <FormItem><FormLabel>Publication Phase</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting || bankDetailsMissing}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="publicationPhase" render={({ field }) => ( <FormItem><FormLabel>Publication Phase</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
@@ -318,12 +308,12 @@ export function ResearchPaperForm() {
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
-              disabled={isSubmitting || bankDetailsMissing || orcidMissing}
+              disabled={isSubmitting}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidMissing}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>

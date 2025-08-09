@@ -74,18 +74,18 @@ export function MembershipForm() {
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
-      if (!parsedUser.bankDetails) {
-        setBankDetailsMissing(true);
-      }
-      if (!parsedUser.orcidId || !parsedUser.misId) {
-        setOrcidOrMisIdMissing(true);
-      }
+      setBankDetailsMissing(!parsedUser.bankDetails);
+      setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
     }
   }, []);
 
   async function handleSave(status: 'Draft' | 'Pending') {
-    if (!user || !user.faculty) return;
-    if (status === 'Pending' && (bankDetailsMissing || orcidOrMisIdMissing)) {
+    if (!user || !user.faculty) {
+      toast({ variant: 'destructive', title: 'Error', description: 'User information not found. Please log in again.' });
+      return;
+    }
+    // Re-check profile completeness on submission
+    if (status === 'Pending' && (!user.bankDetails || !user.orcidId || !user.misId)) {
         toast({
             variant: 'destructive',
             title: 'Profile Incomplete',
@@ -152,22 +152,12 @@ export function MembershipForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
           <CardContent className="space-y-6 pt-6">
-            {bankDetailsMissing && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Bank Details Required</AlertTitle>
-                <AlertDescription>
-                  Please add your salary bank account details in your profile before you can submit a claim.
-                  <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
-                </AlertDescription>
-              </Alert>
-            )}
-            {orcidOrMisIdMissing && (
+            {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>ORCID iD & MIS ID Required</AlertTitle>
+                    <AlertTitle>Profile Incomplete</AlertTitle>
                     <AlertDescription>
-                        An ORCID iD and MIS ID are mandatory for submitting incentive claims. Please add them to your profile.
+                        An ORCID iD, MIS ID, and bank details are mandatory for submitting incentive claims. Please add them to your profile.
                         <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
                     </AlertDescription>
                 </Alert>
@@ -186,12 +176,12 @@ export function MembershipForm() {
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
-              disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}
+              disabled={isSubmitting}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>
