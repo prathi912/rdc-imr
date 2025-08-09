@@ -24,6 +24,8 @@ import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { uploadFileToServer, findUserByMisId } from '@/app/actions';
 import { Loader2, AlertCircle, Plus, Trash2, Search, Edit } from 'lucide-react';
 import { calculateIncentive } from '@/app/incentive-actions';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Badge } from '../ui/badge';
 
 const bookSchema = z
   .object({
@@ -97,13 +99,28 @@ function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => v
             displayValue = value ? 'Yes' : 'No';
         }
         if (Array.isArray(value)) {
-            if (value.length > 0 && typeof value[0] === 'object') {
+            if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
                  displayValue = (
-                    <ul className="list-disc pl-5">
-                        {(value as BookCoAuthor[]).map((author, idx) => (
-                            <li key={idx}><strong>{author.name}</strong> ({author.role}) - {author.email}</li>
-                        ))}
-                    </ul>
+                    <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Author Name</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Email</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {(value as BookCoAuthor[]).map((author, idx) => (
+                                    <TableRow key={idx}>
+                                        <TableCell>{author.name}</TableCell>
+                                        <TableCell><Badge variant="secondary">{author.role}</Badge></TableCell>
+                                        <TableCell>{author.email}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 );
             } else {
                 displayValue = (value as string[]).join(', ');
@@ -111,7 +128,7 @@ function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => v
         }
 
         return (
-            <div className="grid grid-cols-3 gap-2 py-1.5">
+            <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
                 <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
                 <dd className="col-span-2">{displayValue}</dd>
             </div>
