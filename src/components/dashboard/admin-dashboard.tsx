@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { Button } from '../ui/button';
 import { ArrowRight } from 'lucide-react';
 import { db } from '@/lib/config';
-import { collection, getDocs, query, where,getCountFromServer } from 'firebase/firestore';
+import { collection, getDocs, query, where,getCountFromServer, or } from 'firebase/firestore';
 import type { Project, User } from '@/types';
 import { Skeleton } from '../ui/skeleton';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
@@ -68,7 +68,7 @@ export function AdminDashboard() {
             const projectsRef = collection(db, "projects");
             const usersRef = collection(db, "users");
             const emrInterestsRef = collection(db, "emrInterests");
-            const sanctionedEmrQuery = query(emrInterestsRef, where('status', '==', 'Sanctioned'));
+            const sanctionedEmrQuery = query(emrInterestsRef, or(where('status', '==', 'Sanctioned'), where('status', '==', 'SANCTIONED')));
             
             const isPrincipal = user.designation === 'Principal';
             const isHod = user.designation === 'HOD';
