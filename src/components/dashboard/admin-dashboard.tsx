@@ -68,6 +68,7 @@ export function AdminDashboard() {
             const projectsRef = collection(db, "projects");
             const usersRef = collection(db, "users");
             const emrInterestsRef = collection(db, "emrInterests");
+            const sanctionedEmrQuery = query(emrInterestsRef, where('status', '==', 'Sanctioned'));
             
             const isPrincipal = user.designation === 'Principal';
             const isHod = user.designation === 'HOD';
@@ -105,7 +106,7 @@ export function AdminDashboard() {
             
             const [usersSnapshot, emrSnapshot] = await Promise.all([
               getDocs(usersRef),
-              getCountFromServer(emrInterestsRef)
+              getCountFromServer(sanctionedEmrQuery)
             ]);
 
             const totalImrProjects = allProjects.length;
