@@ -308,12 +308,12 @@ export function ResearchPaperForm() {
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
-              disabled={isSubmitting}
+              disabled={isSubmitting || orcidOrMisIdMissing}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || orcidOrMisIdMissing}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>
