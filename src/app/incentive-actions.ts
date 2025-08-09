@@ -34,9 +34,13 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     }
     const user = userSnap.data() as User;
     
-    const templatePath = path.join(process.cwd(), 'public', 'templates', 'INCENTIVE_BOOK_PUBLICATION.docx');
+    const templateName = claim.bookApplicationType === 'Book Chapter' 
+        ? 'INCENTIVE_BOOK_CHAPTER.docx' 
+        : 'INCENTIVE_BOOK_PUBLICATION.docx';
+    const templatePath = path.join(process.cwd(), 'public', 'templates', templateName);
+
     if (!fs.existsSync(templatePath)) {
-      return { success: false, error: 'Book incentive form template not found on the server.' };
+      return { success: false, error: `Template file ${templateName} not found on the server.` };
     }
     const content = fs.readFileSync(templatePath, 'binary');
 
