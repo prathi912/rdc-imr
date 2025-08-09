@@ -57,7 +57,7 @@ export function MembershipForm() {
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
-  const [orcidMissing, setOrcidMissing] = useState(false);
+  const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   
   const form = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipSchema),
@@ -77,19 +77,19 @@ export function MembershipForm() {
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
       }
-      if (!parsedUser.orcidId) {
-        setOrcidMissing(true);
+      if (!parsedUser.orcidId || !parsedUser.misId) {
+        setOrcidOrMisIdMissing(true);
       }
     }
   }, []);
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) return;
-    if (status === 'Pending' && (bankDetailsMissing || orcidMissing)) {
+    if (status === 'Pending' && (bankDetailsMissing || orcidOrMisIdMissing)) {
         toast({
             variant: 'destructive',
             title: 'Profile Incomplete',
-            description: 'Please add your bank details and ORCID iD in Settings before submitting a claim.',
+            description: 'Please add your bank details, ORCID iD, and MIS ID in Settings before submitting a claim.',
         });
         return;
     }
@@ -162,12 +162,12 @@ export function MembershipForm() {
                 </AlertDescription>
               </Alert>
             )}
-            {orcidMissing && (
+            {orcidOrMisIdMissing && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>ORCID iD Required</AlertTitle>
+                    <AlertTitle>ORCID iD & MIS ID Required</AlertTitle>
                     <AlertDescription>
-                        An ORCID iD is mandatory for submitting incentive claims. Please add it to your profile.
+                        An ORCID iD and MIS ID are mandatory for submitting incentive claims. Please add them to your profile.
                         <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
                     </AlertDescription>
                 </Alert>
@@ -186,12 +186,12 @@ export function MembershipForm() {
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
-              disabled={isSubmitting || bankDetailsMissing || orcidMissing}
+              disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidMissing}>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>
