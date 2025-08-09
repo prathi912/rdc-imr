@@ -19,7 +19,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { uploadFileToServer, findUserByMisId } from '@/app/actions';
 import { Loader2, AlertCircle, Plus, Trash2, Search, Edit } from 'lucide-react';
@@ -248,76 +248,88 @@ export function BookForm() {
   };
 
 
-  async function onSubmit(data: BookFormValues) {
-    if (!user || !user.faculty || !user.bankDetails) {
-      toast({ variant: 'destructive', title: 'Bank Details Missing', description: 'You must add your bank details in Settings to submit a claim.' });
-      return;
+  async function handleSave(status: 'Draft' | 'Pending') {
+    if (!user || !user.faculty) return;
+    if (status === 'Pending' && bankDetailsMissing) {
+        toast({
+            variant: 'destructive',
+            title: 'Bank Details Missing',
+            description: 'You must add your bank details in Settings to submit a claim.',
+        });
+        return;
     }
     setIsSubmitting(true);
     try {
-      const calculationResult = await calculateIncentive(data);
+        const data = form.getValues();
+        const calculationResult = await calculateIncentive(data);
 
-      const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
-        if (!file || !user) return undefined;
-        const dataUrl = await fileToDataUrl(file);
-        const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
-        const result = await uploadFileToServer(dataUrl, path);
-        if (!result.success || !result.url) {
-          throw new Error(result.error || `File upload failed for ${folderName}`);
+        const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
+            if (!file || !user) return undefined;
+            const dataUrl = await fileToDataUrl(file);
+            const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
+            const result = await uploadFileToServer(dataUrl, path);
+            if (!result.success || !result.url) {
+                throw new Error(result.error || `File upload failed for ${folderName}`);
+            }
+            return result.url;
+        };
+        
+        const bookProofFile = data.bookProof?.[0];
+        const scopusProofFile = data.scopusProof?.[0];
+        
+        const bookProofUrl = await uploadFileHelper(bookProofFile, 'book-proof');
+        const scopusProofUrl = await uploadFileHelper(scopusProofFile, 'book-scopus-proof');
+        
+        const coAuthorUids = data.bookCoAuthors.map(a => a.uid).filter(Boolean) as string[];
+
+        // Create a clean data object without the file objects
+        const { bookProof, scopusProof, ...restOfData } = data;
+
+        const claimData: Partial<IncentiveClaim> = {
+            ...restOfData,
+            calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
+            coAuthorUids,
+            misId: user.misId || null,
+            orcidId: user.orcidId || null,
+            claimType: 'Books',
+            benefitMode: 'incentives',
+            uid: user.uid,
+            userName: user.name,
+            userEmail: user.email,
+            faculty: user.faculty,
+            status,
+            submissionDate: new Date().toISOString(),
+            bankDetails: user.bankDetails || null,
+        };
+        
+        if (bookProofUrl) claimData.bookProofUrl = bookProofUrl;
+        if (scopusProofUrl) claimData.scopusProofUrl = scopusProofUrl;
+        
+        Object.keys(claimData).forEach(key => {
+            if ((claimData as any)[key] === undefined) {
+                delete (claimData as any)[key];
+            }
+        });
+        
+        const claimId = doc(collection(db, 'incentiveClaims')).id;
+        await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
+        
+        if (status === 'Draft') {
+            toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
+            router.push(`/dashboard/incentive-claim`);
+        } else {
+            toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
+            router.push('/dashboard/incentive-claim');
         }
-        return result.url;
-      };
-      
-      const bookProofFile = data.bookProof?.[0];
-      const scopusProofFile = data.scopusProof?.[0];
-      
-      const bookProofUrl = await uploadFileHelper(bookProofFile, 'book-proof');
-      const scopusProofUrl = await uploadFileHelper(scopusProofFile, 'book-scopus-proof');
-      
-      const coAuthorUids = data.bookCoAuthors.map(a => a.uid).filter(Boolean) as string[];
-
-      // Create a clean data object without the file objects
-      const { bookProof, scopusProof, ...restOfData } = data;
-
-      const claimData: Partial<IncentiveClaim> = {
-        ...restOfData,
-        calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
-        coAuthorUids,
-        misId: user.misId || null,
-        orcidId: user.orcidId || null,
-        claimType: 'Books',
-        benefitMode: 'incentives',
-        uid: user.uid,
-        userName: user.name,
-        userEmail: user.email,
-        faculty: user.faculty,
-        status: 'Pending',
-        submissionDate: new Date().toISOString(),
-        bankDetails: user.bankDetails || null,
-        bookProofUrl,
-      };
-      
-      if (scopusProofUrl) {
-        claimData.scopusProofUrl = scopusProofUrl;
-      }
-      
-      // Sanitize object to remove any undefined values before sending to Firestore
-      Object.keys(claimData).forEach(key => {
-        if ((claimData as any)[key] === undefined) {
-            delete (claimData as any)[key];
-        }
-      });
-      
-      await addDoc(collection(db, 'incentiveClaims'), claimData as any);
-      toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
-      router.push('/dashboard/incentive-claim');
     } catch (error: any) {
-      console.error('Error submitting claim: ', error);
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit claim. Please try again.' });
+        console.error('Error submitting claim: ', error);
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit claim. Please try again.' });
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
   }
+
+  const onFinalSubmit = () => handleSave('Pending');
   
   const handleSearchCoPi = async () => {
     if (!coPiSearchTerm) return;
@@ -362,7 +374,7 @@ export function BookForm() {
   if (currentStep === 2) {
     return (
         <Card>
-            <form onSubmit={form.handleSubmit(onSubmit)}>
+            <form onSubmit={form.handleSubmit(onFinalSubmit)}>
                 <CardContent className="pt-6">
                     <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
                 </CardContent>
@@ -492,7 +504,16 @@ export function BookForm() {
                 <FormField control={form.control} name="bookSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleSave('Draft')}
+              disabled={isSubmitting || bankDetailsMissing}
+            >
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Save as Draft
+            </Button>
             <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing}>
                 Proceed to Review
             </Button>
