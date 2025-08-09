@@ -11,7 +11,7 @@ export function Logo({ variant = 'public' }: LogoProps) {
         {/* Expanded Light mode logo */}
         <Image
           src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20b.svg"
-          alt="Parul Research Portal Logo"
+          alt="RDC Logo"
           width={250}
           height={70}
           className="block dark:hidden group-data-[collapsible=icon]:hidden"
@@ -20,7 +20,7 @@ export function Logo({ variant = 'public' }: LogoProps) {
         {/* Expanded Dark mode logo */}
         <Image
           src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Research%20%26%20Development%20%E2%80%A8Cell%20W.svg"
-          alt="Parul Research Portal Logo"
+          alt="RDC Logo"
           width={250}
           height={70}
           className="hidden dark:block group-data-[collapsible=icon]:hidden"
@@ -39,7 +39,7 @@ export function Logo({ variant = 'public' }: LogoProps) {
     <div className="flex items-center justify-center p-2" style={{ minHeight: 49 }}>
       <Image
         src="hhttps://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-BLACK.svg"
-        alt="Parul Research Portal Logo"
+        alt="RDC Logo"
         width={350}
         height={100}
         className="block dark:hidden"
@@ -47,7 +47,7 @@ export function Logo({ variant = 'public' }: LogoProps) {
       />
       <Image
         src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-WHITE.svg"
-        alt="Parul Research Portal Logo"
+        alt="RDC Logo"
         width={350}
         height={100}
         className="hidden dark:block"

@@ -1,4 +1,4 @@
-# **App Name**: Parul Research Portal
+# **App Name**: PU Research Projects Portal
 
 ## Core Features:
 

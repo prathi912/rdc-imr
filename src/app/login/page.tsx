@@ -247,7 +247,7 @@ export default function LoginPage() {
               </div>
               <CardTitle className="text-2xl font-bold">Welcome Back!</CardTitle>
               <CardDescription>
-                Sign in to access the Research Portal.
+                Sign in to access the Research Projects Portal.
               </CardDescription>
             </CardHeader>
             <CardContent>

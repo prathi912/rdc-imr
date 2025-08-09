@@ -81,14 +81,24 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
         }
     };
 
-    const renderDetail = (label: string, value?: string | number | boolean | string[]) => {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | { name: string, email: string, role: string }[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
-        let displayValue = String(value);
+        let displayValue: React.ReactNode = String(value);
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
         }
         if (Array.isArray(value)) {
-            displayValue = value.join(', ');
+             if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
+                displayValue = (
+                    <ul className="list-disc pl-5">
+                        {(value as { name: string, email: string, role: string }[]).map((author, idx) => (
+                            <li key={idx}><strong>{author.name}</strong> ({author.role}) - {author.email}</li>
+                        ))}
+                    </ul>
+                );
+            } else {
+                 displayValue = (value as string[]).join(', ');
+            }
         }
         return (
             <div className="grid grid-cols-3 gap-2 py-1">
@@ -223,7 +233,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                             {renderDetail("Application Type", claim.bookApplicationType)}
                             {renderDetail("Title", claim.publicationTitle)}
                             {claim.bookApplicationType === 'Book Chapter' && renderDetail("Book Title", claim.bookTitleForChapter)}
-                            {renderDetail("Author(s)", claim.bookCoAuthors?.map(a => a.name).join(', '))}
+                            {renderDetail("Author(s)", claim.bookCoAuthors)}
                             {claim.bookApplicationType === 'Book Chapter' && renderDetail("Editor(s)", claim.bookEditor)}
                             {renderDetail("Publisher", claim.publisherName)}
                             {renderDetail("Publisher Type", claim.publisherType)}
@@ -295,6 +305,7 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                     {renderDetail("Author Type", claim.authorType)}
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Total Authors", claim.totalAuthors)}
+                     {claim.claimType === 'Books' && renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     
                     {canViewBankDetails && claim.bankDetails && (
                         <>

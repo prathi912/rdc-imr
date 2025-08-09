@@ -257,7 +257,7 @@ export default function SignupPage() {
               </div>
               <CardTitle className="text-2xl font-bold">Create an Account</CardTitle>
               <CardDescription>
-                Join the Parul University Research Portal.
+                Join the Parul University Research Projects Portal.
               </CardDescription>
             </CardHeader>
             <CardContent>
