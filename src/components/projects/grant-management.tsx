@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useForm } from "react-hook-form"
@@ -59,7 +60,7 @@ const transactionSchema = z
     isGstRegistered: z.boolean().default(false),
     gstNumber: z.string().optional(),
     description: z.string().min(10, "Description is required."),
-    invoice: z.any().optional(), // For file input
+    invoice: z.any().refine((files) => files?.length > 0, "An invoice file is required."),
   })
   .refine(
     (data) => {
@@ -531,7 +532,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   control={transactionForm.control}
                   render={({ field: { onChange, value, ...field } }) => (
                     <FormItem>
-                      <FormLabel>Invoice (Optional)</FormLabel>
+                      <FormLabel>Invoice</FormLabel>
                       <FormControl>
                         <Input
                           type="file"
