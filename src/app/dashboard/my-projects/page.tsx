@@ -138,7 +138,7 @@ export default function MyProjectsPage() {
     return myProjects.filter((p) => p.title.toLowerCase().includes(searchTerm.toLowerCase()))
   }, [myProjects, searchTerm])
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="container mx-auto py-10">
         <PageHeader title="My Projects" description="A list of all projects you have submitted or are associated with." />
@@ -185,7 +185,7 @@ export default function MyProjectsPage() {
                 </CardContent>
               </Card>
             ) : (
-              <ProjectList projects={filteredImrProjects} userRole={user!.role} />
+              <ProjectList projects={filteredImrProjects} currentUser={user} />
             )}
           </TabsContent>
           <TabsContent value="emr">

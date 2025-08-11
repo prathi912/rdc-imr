@@ -27,7 +27,7 @@ import { parseISO } from 'date-fns';
 
 interface ProjectListProps {
   projects: Project[];
-  userRole: User['role'];
+  currentUser: User;
   allUsers?: User[];
 }
 
@@ -42,7 +42,8 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
 };
 
 
-export function ProjectList({ projects, userRole, allUsers = [] }: ProjectListProps) {
+export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectListProps) {
+  const userRole = currentUser.role;
   const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(userRole);
   const isEvaluator = userRole === 'Evaluator';
 
@@ -122,9 +123,12 @@ export function ProjectList({ projects, userRole, allUsers = [] }: ProjectListPr
               {sortedProjects.map((project) => {
                 const displayDate = project.submissionDate;
                 const piUser = usersMap.get(project.pi_uid);
+                const isPI = currentUser.uid === project.pi_uid || currentUser.email === project.pi_email;
+                const isCoPi = project.coPiUids?.includes(currentUser.uid) || false;
+                const canEditDraft = (isPI || isCoPi) && project.status === 'Draft';
                
                 let actionButton;
-                if (project.status === 'Draft') {
+                if (canEditDraft) {
                   actionButton = (
                     <Tooltip>
                       <TooltipTrigger asChild>
