@@ -283,8 +283,12 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {(grant.phases || []).map((phase) => {
+        {(grant.phases || []).map((phase, index) => {
           const totalUtilized = phase.transactions?.reduce((acc, t) => acc + t.amount, 0) || 0
+          const utilizationPercentage = phase.amount > 0 ? (totalUtilized / phase.amount) * 100 : 0;
+          const hasReachedThreshold = utilizationPercentage >= 80;
+          const nextPhaseIsPending = grant.phases && index + 1 < grant.phases.length && grant.phases[index + 1].status === 'Pending Disbursement';
+
           return (
             <Card key={phase.id} className="bg-muted/30">
               <CardHeader>
@@ -348,7 +352,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   <div className="flex items-center gap-2">
                     <BadgeCent className="h-4 w-4 text-blue-600" />
                     <div>
-                      <p className="text-sm text-muted-foreground">Utilized</p>
+                      <p className="text-sm text-muted-foreground">Utilized ({utilizationPercentage.toFixed(2)}%)</p>
                       <p className="font-semibold">₹{totalUtilized.toLocaleString("en-IN")}</p>
                     </div>
                   </div>
@@ -453,6 +457,17 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         Add First Expense
                       </Button>
                     )}
+                  </div>
+                )}
+
+                 {phase.status === 'Disbursed' && hasReachedThreshold && nextPhaseIsPending && (
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      onClick={() => handlePhaseStatusUpdate(phase.id, 'Utilization Submitted')}
+                      disabled={isSubmitting}
+                    >
+                      Submit Utilization & Request Next Phase
+                    </Button>
                   </div>
                 )}
 
