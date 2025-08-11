@@ -43,6 +43,9 @@ const statusVariant: { [key: string]: 'default' | 'secondary' | 'destructive' | 
 
 
 export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectListProps) {
+  if (!currentUser) {
+    return null; // Or a loading state
+  }
   const userRole = currentUser.role;
   const isAdmin = ['admin', 'CRO', 'Super-admin'].includes(userRole);
   const isEvaluator = userRole === 'Evaluator';

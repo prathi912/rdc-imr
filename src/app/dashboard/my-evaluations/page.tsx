@@ -80,7 +80,7 @@ export default function MyEvaluationsPage() {
         />
       </div>
       <div className="mt-4">
-        {loading ? (
+        {loading || !user ? (
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-4">
@@ -91,7 +91,7 @@ export default function MyEvaluationsPage() {
             </CardContent>
           </Card>
         ) : filteredProjects.length > 0 ? (
-          <ProjectList projects={filteredProjects} userRole="Evaluator" />
+          <ProjectList projects={filteredProjects} currentUser={user} />
         ) : (
            <Card>
             <CardContent className="pt-6 text-center text-muted-foreground">

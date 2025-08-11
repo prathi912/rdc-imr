@@ -427,7 +427,7 @@ export default function AllProjectsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={filteredProjects} userRole={user!.role} allUsers={users} />
+          <ProjectList projects={filteredProjects} currentUser={user!} allUsers={users} />
         )}
       </div>
     </div>

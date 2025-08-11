@@ -99,10 +99,10 @@ export default function EvaluatorDashboardPage() {
             <TabsTrigger value="emr">EMR Presentations</TabsTrigger>
           </TabsList>
           <TabsContent value="imr" className="mt-4">
-            {loading ? (
+            {loading || !user ? (
               <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
             ) : imrProjectsToReview.length > 0 ? (
-              <ProjectList projects={imrProjectsToReview} userRole="Evaluator" />
+              <ProjectList projects={imrProjectsToReview} currentUser={user} />
             ) : (
               <Card><CardContent className="py-12 text-center text-muted-foreground">No IMR projects are currently awaiting your evaluation.</CardContent></Card>
             )}

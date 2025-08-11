@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/config';
 import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
-import type { Project } from '@/types';
+import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -15,8 +15,14 @@ export default function PendingReviewsPage() {
   const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setCurrentUser(JSON.parse(storedUser));
+    }
+
     async function getPendingProjects() {
       try {
         const projectsCol = collection(db, 'projects');
@@ -60,7 +66,7 @@ export default function PendingReviewsPage() {
         />
       </div>
       <div className="mt-4">
-         {loading ? (
+         {loading || !currentUser ? (
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-4">
@@ -71,7 +77,7 @@ export default function PendingReviewsPage() {
             </CardContent>
           </Card>
         ) : (
-          <ProjectList projects={filteredProjects} userRole="admin" />
+          <ProjectList projects={filteredProjects} currentUser={currentUser} />
         )}
       </div>
     </div>

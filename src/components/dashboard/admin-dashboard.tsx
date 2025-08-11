@@ -166,6 +166,10 @@ export function AdminDashboard() {
     ...(isPrincipal || isHod || isCro ? [] : [{ title: 'Total Users', value: stats.totalUsers.toString(), icon: Users, loading: loading }]),
   ];
 
+  if (!user) {
+    return <Skeleton className="h-[600px] w-full" />;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <h2 className="text-3xl font-bold tracking-tight">
@@ -217,7 +221,7 @@ export function AdminDashboard() {
                     </Button>
                     </Link>
                 </div>
-                {loading ? <Skeleton className="h-[400px] w-full" /> : <ProjectList projects={recentProjects} userRole="admin" />}
+                {loading ? <Skeleton className="h-[400px] w-full" /> : <ProjectList projects={recentProjects} currentUser={user} />}
             </div>
             <div className="lg:col-span-2 animate-in fade-in-0 slide-in-from-bottom-4" style={{ animationFillMode: 'backwards', animationDelay: '700ms' }}>
                 <div className="mb-4 flex items-center justify-between">

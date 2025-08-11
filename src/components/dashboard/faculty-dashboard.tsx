@@ -46,7 +46,7 @@ export function FacultyDashboard({ user }: { user: User }) {
       const [projectsSnapshot, interestsSnapshot, callsSnapshot] = await Promise.all([
           getDocs(projectsQuery),
           getDocs(emrQuery),
-          getDocs(callsQuery)
+          getDocs(callsSnapshot)
       ]);
 
       const userProjects = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
@@ -152,7 +152,7 @@ export function FacultyDashboard({ user }: { user: User }) {
         {loading ? (
           <Skeleton className="h-48 w-full" />
         ) : (
-          <ProjectList projects={recentProjects} userRole="faculty" />
+          <ProjectList projects={recentProjects} currentUser={user} />
         )}
       </div>
     </div>
