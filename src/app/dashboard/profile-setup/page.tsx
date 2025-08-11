@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -26,6 +27,7 @@ import Link from 'next/link';
 import { Combobox } from '@/components/ui/combobox';
 
 const profileSetupSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters.'),
   faculty: z.string().min(1, 'Please select a faculty.'),
   institute: z.string().min(1, 'Please select an institute.'),
   department: z.string().optional(),
@@ -95,6 +97,7 @@ export default function ProfileSetupPage() {
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
     defaultValues: {
+      name: '',
       faculty: '',
       institute: '',
       department: '',
@@ -142,6 +145,7 @@ export default function ProfileSetupPage() {
             return;
           }
           setUser(appUser);
+          form.setValue('name', appUser.name); // Set initial name for the form
           setPreviewUrl(appUser.photoURL || null);
 
           // Pre-fetch user type based on email to determine if MIS ID is needed.
@@ -164,7 +168,7 @@ export default function ProfileSetupPage() {
     });
 
     return () => unsubscribe();
-  }, [router, toast]);
+  }, [router, toast, form]);
 
   useEffect(() => {
     async function fetchDepartments() {
@@ -348,13 +352,19 @@ export default function ProfileSetupPage() {
                       </FormControl>
                   </div>
                   
-                  <div className="space-y-2">
-                      <Label>Full Name</Label>
-                      <Input value={user.name} disabled />
-                      <p className="text-sm text-muted-foreground">
-                          This name was set from your sign-up details. It can be changed in Settings after setup.
-                      </p>
-                  </div>
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your full name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <h3 className="text-lg font-semibold border-t pt-4">Academic & Contact Details</h3>
                   <FormField name="faculty" control={form.control} render={({ field }) => (
