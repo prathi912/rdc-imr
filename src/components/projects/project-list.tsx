@@ -167,7 +167,7 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
                 return (
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.title}</TableCell>
-                    <TableCell className="hidden sm:table-cell whitespace-nowrap">
+                    <TableCell className="hidden sm:table-cell">
                         <div>
                           {piUser?.misId ? (
                               <Link href={`/profile/${piUser.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
