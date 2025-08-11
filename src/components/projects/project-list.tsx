@@ -168,13 +168,20 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
                   <TableRow key={project.id}>
                     <TableCell className="font-medium">{project.title}</TableCell>
                     <TableCell className="hidden sm:table-cell whitespace-nowrap">
-                      {piUser?.misId ? (
-                          <Link href={`/profile/${piUser.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
-                              {project.pi}
-                          </Link>
-                      ) : (
-                          project.pi
-                      )}
+                        <div>
+                          {piUser?.misId ? (
+                              <Link href={`/profile/${piUser.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
+                                  {project.pi}
+                              </Link>
+                          ) : (
+                              project.pi
+                          )}
+                        </div>
+                        {piUser && (
+                            <div className="text-xs text-muted-foreground">
+                                {piUser.designation}, {piUser.institute}
+                            </div>
+                        )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell whitespace-nowrap">{new Date(displayDate).toLocaleDateString()}</TableCell>
                     <TableCell className="hidden md:table-cell">

@@ -353,14 +353,19 @@ export default function ManageUsersPage() {
 
                    return (
                     <TableRow key={user.uid}>
-                      <TableCell className="font-medium whitespace-nowrap">
-                        {user.misId ? (
-                            <Link href={`/profile/${user.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
-                                {user.name}
-                            </Link>
-                        ) : (
-                            user.name
-                        )}
+                      <TableCell className="font-medium">
+                        <div>
+                            {user.misId ? (
+                                <Link href={`/profile/${user.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
+                                    {user.name}
+                                </Link>
+                            ) : (
+                                user.name
+                            )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            {user.designation}, {user.institute}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                       <TableCell>
