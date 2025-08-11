@@ -1798,7 +1798,7 @@ export async function addTransaction(
     isGstRegistered: boolean
     gstNumber?: string
     description?: string
-    invoiceFile?: File
+    invoiceFile: File
   },
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
   try {
@@ -1888,11 +1888,19 @@ export async function updatePhaseStatus(
       return { success: false, error: "Project does not have grant details." }
     }
 
+    const phaseIndex = project.grant.phases.findIndex(p => p.id === phaseId);
+    if (phaseIndex === -1) {
+        return { success: false, error: "Phase not found." };
+    }
+
     const updatedPhases = project.grant.phases.map((phase) => {
       if (phase.id === phaseId) {
         const updatedPhase: GrantPhase = { ...phase, status: newStatus }
         if (newStatus === "Disbursed" && !phase.disbursementDate) {
           updatedPhase.disbursementDate = new Date().toISOString()
+        }
+        if (newStatus === 'Utilization Submitted') {
+            updatedPhase.utilizationSubmissionDate = new Date().toISOString();
         }
         return updatedPhase
       }
@@ -1903,15 +1911,41 @@ export async function updatePhaseStatus(
     await projectRef.update({ grant: updatedGrant })
     await logActivity('INFO', 'Grant phase status updated', { projectId, phaseId, newStatus });
 
-    // Add notification for grant phase status update
-    const notification = {
+    // Add notification for grant phase status update for the PI
+    const piNotification = {
       uid: project.pi_uid,
       projectId: projectId,
-      title: `The status of grant phase has been updated to "${newStatus}" for your project "${project.title}".`,
+      title: `Grant phase "${updatedPhases[phaseIndex].name}" for project "${project.title}" was updated to: ${newStatus}`,
       createdAt: new Date().toISOString(),
       isRead: false,
     }
-    await adminDb.collection("notifications").add(notification)
+    await adminDb.collection("notifications").add(piNotification)
+
+    // Add notification for admins if utilization is submitted
+    if (newStatus === 'Utilization Submitted') {
+        const adminRoles = ['Super-admin', 'admin'];
+        const usersRef = adminDb.collection('users');
+        const q = adminQuery(usersRef, adminWhere('role', 'in', adminRoles));
+        const adminUsersSnapshot = await getDocs(q);
+
+        if (!adminUsersSnapshot.empty) {
+            const batch = adminDb.batch();
+            const notificationTitle = `${project.pi} requested the next grant phase for "${project.title}".`;
+            adminUsersSnapshot.forEach(userDoc => {
+                const notificationRef = adminDb.collection('notifications').doc();
+                batch.set(notificationRef, {
+                    uid: userDoc.id,
+                    projectId,
+                    title: notificationTitle,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
+                });
+            });
+            await batch.commit();
+            await logActivity('INFO', 'Admins notified for next phase disbursement', { projectId });
+        }
+    }
+
 
     const updatedProject = { ...project, grant: updatedGrant }
     return { success: true, updatedProject }
