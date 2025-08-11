@@ -88,6 +88,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const canAddPhase = user.role === "admin" || user.role === "Super-admin"
   const canChangeStatus = user.role === "admin" || user.role === "Super-admin"
   const isPI = user.uid === project.pi_uid || user.email === project.pi_email
+  const isCoPi = project.coPiUids?.includes(user.uid) || false;
   const grant = project.grant
 
   const phaseForm = useForm<z.infer<typeof addPhaseSchema>>({
@@ -377,7 +378,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                           <Download className="mr-2 h-4 w-4" />
                           Export Excel
                         </Button>
-                        {isPI && phase.status === "Disbursed" && (
+                        {(isPI || isCoPi) && phase.status === "Disbursed" && (
                           <Button
                             size="sm"
                             onClick={() => {
@@ -441,7 +442,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground mb-4">No transactions recorded for this phase.</p>
                     {/* PIs can add transactions to disbursed phases */}
-                    {isPI && phase.status === "Disbursed" && (
+                    {(isPI || isCoPi) && phase.status === "Disbursed" && (
                       <Button
                         onClick={() => {
                           setCurrentPhaseId(phase.id)
