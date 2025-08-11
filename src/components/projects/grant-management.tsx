@@ -4,7 +4,7 @@
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import type { Project, User, GrantPhase } from "@/types"
+import type { Project, User, GrantPhase, Transaction } from "@/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -21,7 +21,9 @@ import {
   AlertCircle,
   BadgeCent,
   ChevronDown,
+  Download,
 } from "lucide-react"
+import * as XLSX from "xlsx"
 import {
   Dialog,
   DialogContent,
@@ -84,7 +86,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
 
   // Define roles for adding phases and changing status
   const canAddPhase = user.role === "admin" || user.role === "Super-admin"
-  const canChangeStatus = user.role === "admin" || user.role === "Super-admin" 
+  const canChangeStatus = user.role === "admin" || user.role === "Super-admin"
   const isPI = user.uid === project.pi_uid || user.email === project.pi_email
   const grant = project.grant
 
@@ -104,6 +106,32 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       description: "",
     },
   })
+
+  const handleExportTransactions = (phase: GrantPhase) => {
+    if (!phase.transactions || phase.transactions.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No Data",
+        description: "There are no transactions in this phase to export.",
+      })
+      return
+    }
+
+    const dataToExport = phase.transactions.map((t: Transaction) => ({
+      "Transaction Date": new Date(t.dateOfTransaction).toLocaleDateString(),
+      "Vendor Name": t.vendorName,
+      "Amount (₹)": t.amount,
+      "GST Registered": t.isGstRegistered ? "Yes" : "No",
+      "GST Number": t.gstNumber || "N/A",
+      "Description": t.description,
+      "Invoice URL": t.invoiceUrl || "N/A",
+    }))
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions")
+    XLSX.writeFile(workbook, `${project.title.replace(/\s+/g, "_")}_${phase.name.replace(/\s+/g, "_")}_Transactions.xlsx`)
+  }
 
   const handleAddPhase = async (values: z.infer<typeof addPhaseSchema>) => {
     if (!grant) return
@@ -340,19 +368,28 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         <FileText className="h-4 w-4" />
                         Transactions ({phase.transactions.length})
                       </h4>
-                      {/* PIs can add transactions to disbursed phases */}
-                      {isPI && phase.status === "Disbursed" && (
+                      <div className="flex items-center gap-2">
                         <Button
+                          variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setCurrentPhaseId(phase.id)
-                            setIsTransactionOpen(true)
-                          }}
+                          onClick={() => handleExportTransactions(phase)}
                         >
-                          <PlusCircle className="mr-2 h-4 w-4" />
-                          Add Expense
+                          <Download className="mr-2 h-4 w-4" />
+                          Export Excel
                         </Button>
-                      )}
+                        {isPI && phase.status === "Disbursed" && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setCurrentPhaseId(phase.id)
+                              setIsTransactionOpen(true)
+                            }}
+                          >
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Expense
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="overflow-x-auto">
                       <Table>
