@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { isFirebaseInitialized } from '@/lib/config';
 import { FirebaseNotConfigured } from '@/components/firebase-not-configured';
 import { AuthInitializer } from '@/components/AuthInitializer';
+import { Analytics } from '@vercel/analytics/react';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const sourceCodePro = Source_Code_Pro({ subsets: ['latin'], variable: '--font-source-code-pro' });
@@ -53,6 +54,7 @@ export default function RootLayout({
           </AuthInitializer>
           <Toaster />
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
