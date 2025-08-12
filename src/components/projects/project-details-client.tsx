@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -73,6 +74,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../ui/textarea"
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover"
 import { Calendar } from "../ui/calendar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip"
 
 interface ProjectDetailsClientProps {
   project: Project
@@ -625,6 +627,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       setShowApprovalAlert(true)
       return
     }
+     if (status === "Sanctioned" && (!project.projectStartDate || !project.projectEndDate)) {
+        toast({
+            variant: "destructive",
+            title: "Action Required",
+            description: "Please set the project duration before sanctioning the project.",
+        });
+        return;
+    }
     handleStatusUpdate(status)
   }
 
@@ -707,26 +717,38 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               {isAdmin && (
                 <>
                   {project.status === "Under Review" && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" disabled={isUpdating}>
-                          Update Status <ChevronDown className="ml-2 h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleApprovalClick("Sanctioned")}>
-                          <Check className="mr-2 h-4 w-4" /> Sanction
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleApprovalClick("Not Recommended")}>
-                          <X className="mr-2 h-4 w-4 text-destructive" />{" "}
-                          <span className="text-destructive">Not Recommend</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => setIsRevisionCommentDialogOpen(true)}>
-                          <Edit className="mr-2 h-4 w-4" /> Request Revision
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                     <TooltipProvider>
+                      <DropdownMenu>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="outline" disabled={isUpdating}>
+                                Update Status <ChevronDown className="ml-2 h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                          </TooltipTrigger>
+                           {!project.projectStartDate || !project.projectEndDate ? (
+                                <TooltipContent><p>Set project duration before sanctioning.</p></TooltipContent>
+                           ) : null}
+                        </Tooltip>
+                        <DropdownMenuContent align="end">
+                           <DropdownMenuItem 
+                              onClick={() => handleApprovalClick("Sanctioned")} 
+                              disabled={!project.projectStartDate || !project.projectEndDate}
+                           >
+                              <Check className="mr-2 h-4 w-4" /> Sanction
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleApprovalClick("Not Recommended")}>
+                            <X className="mr-2 h-4 w-4 text-destructive" />{" "}
+                            <span className="text-destructive">Not Recommend</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onSelect={() => setIsRevisionCommentDialogOpen(true)}>
+                            <Edit className="mr-2 h-4 w-4" /> Request Revision
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TooltipProvider>
                   )}
                   {project.status === "Pending Completion Approval" && (
                     <Button onClick={() => handleStatusUpdate("Completed")} disabled={isUpdating}>
@@ -775,7 +797,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DialogContent>
                 </Dialog>
               )}
-              {isSuperAdmin && project.status === "Sanctioned" && (
+              {isSuperAdmin && (
                 <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline">
