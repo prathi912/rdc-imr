@@ -7,13 +7,14 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
+import { getTemplateContent } from '@/lib/template-manager';
 
 
 export async function generateBookIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
     const claimSnap = await claimRef.get();
-    if (!claimSnap.exists) {
+    if (!claimSnap.exists()) {
       return { success: false, error: 'Incentive claim not found.' };
     }
     const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
@@ -29,7 +30,7 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     
     userSnap = await userRef.get();
 
-    if (!userSnap.exists) {
+    if (!userSnap.exists()) {
         return { success: false, error: 'Claimant user profile not found.' };
     }
     const user = userSnap.data() as User;
@@ -37,12 +38,11 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     const templateName = claim.bookApplicationType === 'Book Chapter' 
         ? 'INCENTIVE_BOOK_CHAPTER.docx' 
         : 'INCENTIVE_BOOK_PUBLICATION.docx';
-    const templatePath = path.join(process.cwd(), 'public', 'templates', templateName);
-
-    if (!fs.existsSync(templatePath)) {
-      return { success: false, error: `Template file ${templateName} not found on the server.` };
+    
+    const content = getTemplateContent(templateName);
+    if (!content) {
+        return { success: false, error: `Template file ${templateName} not found or couldn't be loaded.` };
     }
-    const content = fs.readFileSync(templatePath, 'binary');
 
     const zip = new PizZip(content);
     const doc = new Docxtemplater(zip, {
