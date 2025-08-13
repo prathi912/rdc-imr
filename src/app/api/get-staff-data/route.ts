@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
         },
       });
     } else {
-      return NextResponse.json({ success: false, error: 'User not found in staff data.' });
+      return NextResponse.json({ success: false, error: `User not found in ${fileName}.` });
     }
   } catch (error: any) {
     console.error(`Error fetching or processing ${fileName}:`, error);
