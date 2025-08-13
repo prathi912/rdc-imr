@@ -2,6 +2,7 @@
 
 
 
+
 export type CoPiDetails = {
     uid?: string | null; // Will exist for registered users
     name: string;
@@ -386,6 +387,8 @@ export type EmrEvaluation = {
 
 export type SystemSettings = {
     is2faEnabled: boolean;
+    allowedDomains?: string[];
+    croEmails?: string[];
 };
 
 export type LoginOtp = {

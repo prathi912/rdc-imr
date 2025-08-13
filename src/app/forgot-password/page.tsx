@@ -30,13 +30,7 @@ import { auth } from '@/lib/config';
 import { sendPasswordResetEmail } from 'firebase/auth';
 
 const forgotPasswordSchema = z.object({
-  email: z
-    .string()
-    .email('Invalid email address.')
-    .refine(
-      (email) => email.endsWith('@paruluniversity.ac.in') || email.endsWith('@goa.paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
-      'Only emails from paruluniversity.ac.in are allowed.'
-    ),
+  email: z.string().email('Invalid email address.'),
 });
 
 type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
@@ -53,10 +47,26 @@ export default function ForgotPasswordPage() {
 
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     try {
+      // Use the new API route to check if the user's domain is allowed first.
+      const checkRes = await fetch('/api/check-user-exists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email }),
+      });
+
+      const checkData = await checkRes.json();
+      
+      // We send the email regardless of existence to prevent email enumeration,
+      // but we block disallowed domains.
+      if (!checkRes.ok && checkData.error) {
+        toast({ variant: 'destructive', title: 'Access Denied', description: checkData.error });
+        return;
+      }
+
       await sendPasswordResetEmail(auth, data.email);
       toast({
         title: 'Check your email',
-        description: "If an account exists, we've sent a password reset link.",
+        description: "If an account exists for that email, we've sent a password reset link.",
       });
       router.push('/login');
     } catch (error: any) {
