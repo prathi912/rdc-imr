@@ -24,6 +24,8 @@ export function UserNav({ user, onLogout }: UserNavProps) {
     return null;
   }
 
+  const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -52,7 +54,7 @@ export function UserNav({ user, onLogout }: UserNavProps) {
              <DropdownMenuItem><LayoutDashboard className="mr-2 h-4 w-4" />Dashboard</DropdownMenuItem>
           </Link>
           {user.misId && (
-            <Link href={`/profile/${user.misId}`} passHref>
+            <Link href={profileLink} passHref>
               <DropdownMenuItem><UserIcon className="mr-2 h-4 w-4" />Profile</DropdownMenuItem>
             </Link>
           )}

@@ -64,12 +64,14 @@ const goaFaculties = [
 ];
 
 const goaInstitutes = [
-    "Faculty of Engineering, IT & CS",
-    "Faculty of Management Studies",
-    "Faculty of Pharmacy",
-    "Faculty of Applied and Health Sciences",
-    "Faculty of Nursing",
-    "Faculty of Physiotherapy"
+    "Parul College of Applied and Life Sciences",
+    "Parul College of Engineering",
+    "Parul College of Information Technology & Computer Science",
+    "Parul College of Management",
+    "Parul College of Nursing",
+    "Parul College of Pharmacy",
+    "Parul College of Physiotherapy",
+    "University Office"
 ];
 
 const institutes = [

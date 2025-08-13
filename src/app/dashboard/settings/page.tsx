@@ -1,56 +1,72 @@
+"use client"
 
-'use client';
+import type React from "react"
 
-import { useState, useEffect, useMemo } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import { useState, useEffect, useMemo } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 
-import { PageHeader } from '@/components/page-header';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
-import { useToast } from '@/hooks/use-toast';
-import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { db, auth } from '@/lib/config';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { uploadFileToServer, fetchOrcidData, checkHODUniqueness, getSystemSettings, updateSystemSettings } from '@/app/actions';
-import type { User, SystemSettings } from '@/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { onAuthStateChanged, type User as FirebaseUser, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Banknote, Bot, Loader2, ShieldCheck } from 'lucide-react';
-import { Combobox } from '@/components/ui/combobox';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { PageHeader } from "@/components/page-header"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
+import { useToast } from "@/hooks/use-toast"
+import { Separator } from "@/components/ui/separator"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { db, auth } from "@/lib/config"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
+import {
+  uploadFileToServer,
+  fetchOrcidData,
+  checkHODUniqueness,
+  getSystemSettings,
+  updateSystemSettings,
+} from "@/app/actions"
+import type { User, SystemSettings } from "@/types"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  onAuthStateChanged,
+  type User as FirebaseUser,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+  updatePassword,
+} from "firebase/auth"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Banknote, Bot, Loader2, ShieldCheck, Plus, X } from "lucide-react"
+import { Combobox } from "@/components/ui/combobox"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 
 const profileSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters.'),
+  name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email(),
-  faculty: z.string().min(1, 'Please select a faculty.'),
-  institute: z.string().min(1, 'Please select an institute.'),
+  faculty: z.string().min(1, "Please select a faculty."),
+  institute: z.string().min(1, "Please select an institute."),
   department: z.string().optional(),
-  designation: z.string().min(2, 'Designation is required.'),
+  designation: z.string().min(2, "Designation is required."),
   misId: z.string().optional(),
   orcidId: z.string().optional(),
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),
   googleScholarId: z.string().optional(),
   phoneNumber: z.string().optional(),
-});
-type ProfileFormValues = z.infer<typeof profileSchema>;
+})
+type ProfileFormValues = z.infer<typeof profileSchema>
 
-const passwordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required.'),
-  newPassword: z.string().min(8, 'New password must be at least 8 characters.'),
-  confirmPassword: z.string(),
-}).refine(data => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
-type PasswordFormValues = z.infer<typeof passwordSchema>;
+const passwordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required."),
+    newPassword: z.string().min(8, "New password must be at least 8 characters."),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  })
+type PasswordFormValues = z.infer<typeof passwordSchema>
 
 const bankDetailsSchema = z.object({
   beneficiaryName: z.string().min(2, "Beneficiary's name is required."),
@@ -59,18 +75,36 @@ const bankDetailsSchema = z.object({
   branchName: z.string().min(2, "Branch name is required."),
   city: z.string().min(2, "City is required."),
   ifscCode: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC code format."),
-});
-type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>;
+})
+type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>
 
 const faculties = [
-  "Faculty of Engineering & Technology", "Faculty of Diploma Studies", "Faculty of Applied Sciences",
-  "Faculty of IT & Computer Science", "Faculty of Agriculture", "Faculty of Architecture & Planning",
-  "Faculty of Design", "Faculty of Fine Arts", "Faculty of Arts", "Faculty of Commerce",
-  "Faculty of Social Work", "Faculty of Management Studies", "Faculty of Hotel Management & Catering Technology",
-  "Faculty of Law", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
-  "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health",
-  "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
-];
+  "Faculty of Engineering & Technology",
+  "Faculty of Diploma Studies",
+  "Faculty of Applied Sciences",
+  "Faculty of IT & Computer Science",
+  "Faculty of Agriculture",
+  "Faculty of Architecture & Planning",
+  "Faculty of Design",
+  "Faculty of Fine Arts",
+  "Faculty of Arts",
+  "Faculty of Commerce",
+  "Faculty of Social Work",
+  "Faculty of Management Studies",
+  "Faculty of Hotel Management & Catering Technology",
+  "Faculty of Law",
+  "Faculty of Medicine",
+  "Faculty of Homoeopathy",
+  "Faculty of Ayurved",
+  "Faculty of Nursing",
+  "Faculty of Pharmacy",
+  "Faculty of Physiotherapy",
+  "Faculty of Public Health",
+  "Parul Sevashram Hospital",
+  "RDC",
+  "University Office",
+  "Parul Aarogya Seva Mandal",
+]
 
 const institutes = [
   "Parul Institute of Technology",
@@ -120,305 +154,404 @@ const institutes = [
   "School of Pharmacy",
   "University Office",
   "Parul Aarogya Seva Mandal",
-];
+]
 
-const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"];
+const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"]
 
 const fileToDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
-};
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = (error) => reject(error)
+    reader.readAsDataURL(file)
+  })
+}
 
 export default function SettingsPage() {
-  const { toast } = useToast();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
-  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
-  const [isSubmittingBank, setIsSubmittingBank] = useState(false);
-  const [profilePicFile, setProfilePicFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isFetchingOrcid, setIsFetchingOrcid] = useState(false);
-  const [departments, setDepartments] = useState<string[]>([]);
-  const departmentOptions = departments.map(dept => ({ label: dept, value: dept }));
-  const isPrincipal = useMemo(() => user?.designation === 'Principal', [user]);
-  const isCro = useMemo(() => user?.role === 'CRO', [user]);
+  const { toast } = useToast()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false)
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false)
+  const [isSubmittingBank, setIsSubmittingBank] = useState(false)
+  const [profilePicFile, setProfilePicFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isFetchingOrcid, setIsFetchingOrcid] = useState(false)
+  const [departments, setDepartments] = useState<string[]>([])
+  const departmentOptions = departments.map((dept) => ({ label: dept, value: dept }))
+  const isPrincipal = useMemo(() => user?.designation === "Principal", [user])
+  const isCro = useMemo(() => user?.role === "CRO", [user])
 
-  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
+  const [newAllowedDomain, setNewAllowedDomain] = useState("")
+  const [newCroDomain, setNewCroDomain] = useState("")
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
-      name: '',
-      email: '',
-      faculty: '',
-      institute: '',
-      department: '',
-      designation: '',
-      misId: '',
-      orcidId: '',
-      scopusId: '',
-      vidwanId: '',
-      googleScholarId: '',
-      phoneNumber: '',
+      name: "",
+      email: "",
+      faculty: "",
+      institute: "",
+      department: "",
+      designation: "",
+      misId: "",
+      orcidId: "",
+      scopusId: "",
+      vidwanId: "",
+      googleScholarId: "",
+      phoneNumber: "",
     },
-  });
+  })
 
   const passwordForm = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
     defaultValues: {
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: '',
-    }
-  });
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    },
+  })
 
   const bankForm = useForm<BankDetailsFormValues>({
     resolver: zodResolver(bankDetailsSchema),
     defaultValues: {
-      beneficiaryName: '',
-      accountNumber: '',
-      bankName: '',
-      branchName: '',
-      city: '',
-      ifscCode: '',
+      beneficiaryName: "",
+      accountNumber: "",
+      bankName: "",
+      branchName: "",
+      city: "",
+      ifscCode: "",
     },
-  });
+  })
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
-        const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userDocSnap = await getDoc(userDocRef);
+        const userDocRef = doc(db, "users", firebaseUser.uid)
+        const userDocSnap = await getDoc(userDocRef)
         if (userDocSnap.exists()) {
-          const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
-          setUser(appUser);
-          setPreviewUrl(appUser.photoURL || null);
+          const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User
+          setUser(appUser)
+          setPreviewUrl(appUser.photoURL || null)
 
-          if (appUser.role === 'Super-admin') {
-              const settings = await getSystemSettings();
-              setSystemSettings(settings);
+          if (appUser.role === "Super-admin") {
+            const settings = await getSystemSettings()
+            setSystemSettings(settings)
           }
 
           profileForm.reset({
-            name: appUser.name || '',
-            email: appUser.email || '',
-            faculty: appUser.faculty || '',
-            institute: appUser.institute || '',
-            department: appUser.department || '',
-            designation: appUser.designation || '',
-            misId: appUser.misId || '',
-            orcidId: appUser.orcidId || '',
-            scopusId: appUser.scopusId || '',
-            vidwanId: appUser.vidwanId || '',
-            googleScholarId: appUser.googleScholarId || '',
-            phoneNumber: appUser.phoneNumber || '',
-          });
+            name: appUser.name || "",
+            email: appUser.email || "",
+            faculty: appUser.faculty || "",
+            institute: appUser.institute || "",
+            department: appUser.department || "",
+            designation: appUser.designation || "",
+            misId: appUser.misId || "",
+            orcidId: appUser.orcidId || "",
+            scopusId: appUser.scopusId || "",
+            vidwanId: appUser.vidwanId || "",
+            googleScholarId: appUser.googleScholarId || "",
+            phoneNumber: appUser.phoneNumber || "",
+          })
           if (appUser.bankDetails) {
-            bankForm.reset(appUser.bankDetails);
+            bankForm.reset(appUser.bankDetails)
           }
         }
       }
-      setLoading(false);
-    });
+      setLoading(false)
+    })
 
-    return () => unsubscribe();
+    return () => unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   useEffect(() => {
     async function fetchDepartments() {
       try {
-        const res = await fetch('/api/get-departments');
-        const result = await res.json();
+        const res = await fetch("/api/get-departments")
+        const result = await res.json()
         if (result.success) {
-          setDepartments(result.data);
+          setDepartments(result.data)
         }
       } catch (error) {
-        console.error("Failed to fetch departments", error);
+        console.error("Failed to fetch departments", error)
       }
     }
-    fetchDepartments();
-  }, []);
+    fetchDepartments()
+  }, [])
 
   async function onProfileSubmit(data: ProfileFormValues) {
-    if (!user) return;
-    setIsSubmittingProfile(true);
+    if (!user) return
+    setIsSubmittingProfile(true)
     try {
-        if (data.designation === 'HOD' && data.department && data.institute) {
-            const hodCheck = await checkHODUniqueness(data.department, data.institute, user.uid);
-            if (hodCheck.exists) {
-                toast({
-                    variant: 'destructive',
-                    title: 'HOD Already Exists',
-                    description: 'An HOD for this department and institute is already assigned. Please check internally or raise a query on the help page.',
-                    duration: 10000,
-                });
-                setIsSubmittingProfile(false);
-                return;
-            }
-        }
-        
-      const userDocRef = doc(db, 'users', user.uid);
-      const { email, ...updateData } = data;
-      for (const key in updateData) {
-        if ((updateData as any)[key] === undefined) {
-          (updateData as any)[key] = '';
+      if (data.designation === "HOD" && data.department && data.institute) {
+        const hodCheck = await checkHODUniqueness(data.department, data.institute, user.uid)
+        if (hodCheck.exists) {
+          toast({
+            variant: "destructive",
+            title: "HOD Already Exists",
+            description:
+              "An HOD for this department and institute is already assigned. Please check internally or raise a query on the help page.",
+            duration: 10000,
+          })
+          setIsSubmittingProfile(false)
+          return
         }
       }
-      await updateDoc(userDocRef, updateData);
-      const updatedUser = { ...user, ...updateData };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      toast({ title: 'Profile updated successfully!' });
+
+      const userDocRef = doc(db, "users", user.uid)
+      const { email, ...updateData } = data
+      for (const key in updateData) {
+        if ((updateData as any)[key] === undefined) {
+          ;(updateData as any)[key] = ""
+        }
+      }
+      await updateDoc(userDocRef, updateData)
+      const updatedUser = { ...user, ...updateData }
+      localStorage.setItem("user", JSON.stringify(updatedUser))
+      setUser(updatedUser)
+      toast({ title: "Profile updated successfully!" })
     } catch (error: any) {
-      console.error("Profile update error:", error);
-      toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'Could not update your profile.' });
+      console.error("Profile update error:", error)
+      toast({
+        variant: "destructive",
+        title: "Update Failed",
+        description: error.message || "Could not update your profile.",
+      })
     } finally {
-      setIsSubmittingProfile(false);
+      setIsSubmittingProfile(false)
     }
   }
 
   async function onBankDetailsSubmit(data: BankDetailsFormValues) {
-    if (!user) return;
-    setIsSubmittingBank(true);
+    if (!user) return
+    setIsSubmittingBank(true)
     try {
-      const userDocRef = doc(db, 'users', user.uid);
-      await updateDoc(userDocRef, { bankDetails: data });
-      const updatedUser = { ...user, bankDetails: data };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
-      toast({ title: 'Bank details updated successfully!' });
+      const userDocRef = doc(db, "users", user.uid)
+      await updateDoc(userDocRef, { bankDetails: data })
+      const updatedUser = { ...user, bankDetails: data }
+      localStorage.setItem("user", JSON.stringify(updatedUser))
+      setUser(updatedUser)
+      toast({ title: "Bank details updated successfully!" })
     } catch (error) {
-      console.error("Bank details update error:", error);
-      toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update your bank details.' });
+      console.error("Bank details update error:", error)
+      toast({ variant: "destructive", title: "Update Failed", description: "Could not update your bank details." })
     } finally {
-      setIsSubmittingBank(false);
+      setIsSubmittingBank(false)
     }
   }
 
   async function onPasswordSubmit(data: PasswordFormValues) {
-    setIsSubmittingPassword(true);
-    const currentUser = auth.currentUser;
+    setIsSubmittingPassword(true)
+    const currentUser = auth.currentUser
     if (!currentUser || !currentUser.email) {
       toast({
-        variant: 'destructive',
-        title: 'Authentication Error',
-        description: 'Could not find the current user. Please log in again.',
-      });
-      setIsSubmittingPassword(false);
-      return;
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "Could not find the current user. Please log in again.",
+      })
+      setIsSubmittingPassword(false)
+      return
     }
     try {
-      const credential = EmailAuthProvider.credential(currentUser.email, data.currentPassword);
-      await reauthenticateWithCredential(currentUser, credential);
-      await updatePassword(currentUser, data.newPassword);
-      toast({ title: 'Password updated successfully!' });
-      passwordForm.reset();
+      const credential = EmailAuthProvider.credential(currentUser.email, data.currentPassword)
+      await reauthenticateWithCredential(currentUser, credential)
+      await updatePassword(currentUser, data.newPassword)
+      toast({ title: "Password updated successfully!" })
+      passwordForm.reset()
     } catch (error: any) {
-      console.error("Password update error:", error);
-      if (error.code === 'auth/invalid-credential') {
+      console.error("Password update error:", error)
+      if (error.code === "auth/invalid-credential") {
         passwordForm.setError("currentPassword", {
           type: "manual",
-          message: "The current password you entered is incorrect."
-        });
-      } else if (error.code === 'auth/requires-recent-login') {
+          message: "The current password you entered is incorrect.",
+        })
+      } else if (error.code === "auth/requires-recent-login") {
         toast({
-          variant: 'destructive',
-          title: 'Update Failed',
-          description: 'For security, please log out and sign in again before changing your password.'
-        });
+          variant: "destructive",
+          title: "Update Failed",
+          description: "For security, please log out and sign in again before changing your password.",
+        })
       } else {
         toast({
-          variant: 'destructive',
-          title: 'Update Failed',
-          description: 'Could not update your password. Please try again.'
-        });
+          variant: "destructive",
+          title: "Update Failed",
+          description: "Could not update your password. Please try again.",
+        })
       }
     } finally {
-      setIsSubmittingPassword(false);
+      setIsSubmittingPassword(false)
     }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setProfilePicFile(file);
-      setPreviewUrl(URL.createObjectURL(file));
+      const file = e.target.files[0]
+      setProfilePicFile(file)
+      setPreviewUrl(URL.createObjectURL(file))
     }
-  };
+  }
 
   const handlePictureUpdate = async () => {
-    if (!profilePicFile || !user) return;
-    setIsUploading(true);
+    if (!profilePicFile || !user) return
+    setIsUploading(true)
     try {
-      const dataUrl = await fileToDataUrl(profilePicFile);
-      const path = `profile-pictures/${user.uid}`;
-      const result = await uploadFileToServer(dataUrl, path);
+      const dataUrl = await fileToDataUrl(profilePicFile)
+      const path = `profile-pictures/${user.uid}`
+      const result = await uploadFileToServer(dataUrl, path)
       if (!result.success || !result.url) {
-        throw new Error(result.error || "Upload failed");
+        throw new Error(result.error || "Upload failed")
       }
-      const photoURL = result.url;
-      const userDocRef = doc(db, 'users', user.uid);
-      await updateDoc(userDocRef, { photoURL });
-      const updatedUser = { ...user, photoURL };
-      setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      toast({ title: 'Profile picture updated!' });
-      setProfilePicFile(null);
+      const photoURL = result.url
+      const userDocRef = doc(db, "users", user.uid)
+      await updateDoc(userDocRef, { photoURL })
+      const updatedUser = { ...user, photoURL }
+      setUser(updatedUser)
+      localStorage.setItem("user", JSON.stringify(updatedUser))
+      toast({ title: "Profile picture updated!" })
+      setProfilePicFile(null)
     } catch (error) {
-      console.error("Error updating profile picture: ", error);
-      toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update your profile picture.' });
+      console.error("Error updating profile picture: ", error)
+      toast({ variant: "destructive", title: "Update Failed", description: "Could not update your profile picture." })
     } finally {
-      setIsUploading(false);
+      setIsUploading(false)
     }
-  };
+  }
 
   const handleFetchOrcid = async () => {
-    const orcidId = profileForm.getValues('orcidId');
+    const orcidId = profileForm.getValues("orcidId")
     if (!orcidId) {
-      toast({ variant: 'destructive', title: 'ORCID iD Missing', description: 'Please enter an ORCID iD to fetch data.' });
-      return;
+      toast({
+        variant: "destructive",
+        title: "ORCID iD Missing",
+        description: "Please enter an ORCID iD to fetch data.",
+      })
+      return
     }
-    setIsFetchingOrcid(true);
+    setIsFetchingOrcid(true)
     try {
-      const result = await fetchOrcidData(orcidId);
+      const result = await fetchOrcidData(orcidId)
       if (result.success && result.data) {
-        profileForm.setValue('name', result.data.name, { shouldValidate: true });
-        toast({ title: 'Success', description: 'Your name has been pre-filled from your ORCID profile.' });
+        profileForm.setValue("name", result.data.name, { shouldValidate: true })
+        toast({ title: "Success", description: "Your name has been pre-filled from your ORCID profile." })
       } else {
-        toast({ variant: 'destructive', title: 'Fetch Failed', description: result.error });
+        toast({ variant: "destructive", title: "Fetch Failed", description: result.error })
       }
     } catch (error: any) {
-      toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." })
     } finally {
-      setIsFetchingOrcid(false);
+      setIsFetchingOrcid(false)
     }
-  };
+  }
 
   const handle2faToggle = async (enabled: boolean) => {
-    if (!systemSettings) return;
-    setIsSavingSettings(true);
-    const newSettings = { ...systemSettings, is2faEnabled: enabled };
-    setSystemSettings(newSettings); // Optimistic update
-    const result = await updateSystemSettings(newSettings);
+    if (!systemSettings) return
+    setIsSavingSettings(true)
+    const newSettings = { ...systemSettings, is2faEnabled: enabled }
+    setSystemSettings(newSettings) // Optimistic update
+    const result = await updateSystemSettings(newSettings)
     if (result.success) {
-      toast({ title: 'System settings updated.' });
+      toast({ title: "System settings updated." })
     } else {
-      toast({ variant: 'destructive', title: 'Error', description: result.error });
+      toast({ variant: "destructive", title: "Error", description: result.error })
       // Revert optimistic update
-      setSystemSettings({ ...systemSettings, is2faEnabled: !enabled });
+      setSystemSettings({ ...systemSettings, is2faEnabled: !enabled })
     }
-    setIsSavingSettings(false);
-  };
+    setIsSavingSettings(false)
+  }
 
-  const isAcademicInfoLocked = isCro || isPrincipal;
+  const addAllowedDomain = async () => {
+    if (!systemSettings || !newAllowedDomain.trim()) return
+
+    const domain = newAllowedDomain.trim().startsWith("@") ? newAllowedDomain.trim() : `@${newAllowedDomain.trim()}`
+    const currentDomains = systemSettings.allowedDomains || []
+
+    if (currentDomains.includes(domain)) {
+      toast({
+        variant: "destructive",
+        title: "Domain exists",
+        description: "This domain is already in the allowed list.",
+      })
+      return
+    }
+
+    setIsSavingSettings(true)
+    const newSettings = { ...systemSettings, allowedDomains: [...currentDomains, domain] }
+    const result = await updateSystemSettings(newSettings)
+
+    if (result.success) {
+      setSystemSettings(newSettings)
+      setNewAllowedDomain("")
+      toast({ title: "Domain added successfully." })
+    } else {
+      toast({ variant: "destructive", title: "Error", description: result.error })
+    }
+    setIsSavingSettings(false)
+  }
+
+  const removeAllowedDomain = async (domainToRemove: string) => {
+    if (!systemSettings) return
+
+    setIsSavingSettings(true)
+    const currentDomains = systemSettings.allowedDomains || []
+    const newSettings = { ...systemSettings, allowedDomains: currentDomains.filter((d) => d !== domainToRemove) }
+    const result = await updateSystemSettings(newSettings)
+
+    if (result.success) {
+      setSystemSettings(newSettings)
+      toast({ title: "Domain removed successfully." })
+    } else {
+      toast({ variant: "destructive", title: "Error", description: result.error })
+    }
+    setIsSavingSettings(false)
+  }
+
+  const addCroDomain = async () => {
+    if (!systemSettings || !newCroDomain.trim()) return
+
+    const domain = newCroDomain.trim().startsWith("@") ? newCroDomain.trim() : `@${newCroDomain.trim()}`
+    const currentDomains = systemSettings.croDomains || []
+
+    if (currentDomains.includes(domain)) {
+      toast({ variant: "destructive", title: "Domain exists", description: "This domain is already in the CRO list." })
+      return
+    }
+
+    setIsSavingSettings(true)
+    const newSettings = { ...systemSettings, croDomains: [...currentDomains, domain] }
+    const result = await updateSystemSettings(newSettings)
+
+    if (result.success) {
+      setSystemSettings(newSettings)
+      setNewCroDomain("")
+      toast({ title: "CRO domain added successfully." })
+    } else {
+      toast({ variant: "destructive", title: "Error", description: result.error })
+    }
+    setIsSavingSettings(false)
+  }
+
+  const removeCroDomain = async (domainToRemove: string) => {
+    if (!systemSettings) return
+
+    setIsSavingSettings(true)
+    const currentDomains = systemSettings.croDomains || []
+    const newSettings = { ...systemSettings, croDomains: currentDomains.filter((d) => d !== domainToRemove) }
+    const result = await updateSystemSettings(newSettings)
+
+    if (result.success) {
+      setSystemSettings(newSettings)
+      toast({ title: "CRO domain removed successfully." })
+    } else {
+      toast({ variant: "destructive", title: "Error", description: result.error })
+    }
+    setIsSavingSettings(false)
+  }
+
+  const isAcademicInfoLocked = isCro || isPrincipal
 
   if (loading) {
     return (
@@ -456,38 +589,105 @@ export default function SettingsPage() {
           </Card>
         </div>
       </div>
-    );
+    )
   }
 
   return (
     <div className="container mx-auto py-10">
       <PageHeader title="Settings" description="Manage your account settings and preferences." />
       <div className="mt-8 space-y-8">
-        {user?.role === 'Super-admin' && systemSettings && (
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <ShieldCheck />
-                        <CardTitle>System Settings</CardTitle>
-                    </div>
-                    <CardDescription>Global settings for the application. Changes affect all users.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center justify-between rounded-lg border p-4">
-                        <div className="space-y-0.5">
-                            <Label className="text-base">Two-Factor Authentication (2FA)</Label>
-                            <p className="text-sm text-muted-foreground">
-                                {systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require users to verify their identity with an email OTP upon login.
-                            </p>
-                        </div>
-                        <Switch
-                            checked={systemSettings.is2faEnabled}
-                            onCheckedChange={handle2faToggle}
-                            disabled={isSavingSettings}
-                        />
-                    </div>
-                </CardContent>
-            </Card>
+        {user?.role === "Super-admin" && systemSettings && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <ShieldCheck />
+                <CardTitle>System Settings</CardTitle>
+              </div>
+              <CardDescription>Global settings for the application. Changes affect all users.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Two-Factor Authentication (2FA)</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require users to verify their identity with
+                    an email OTP upon login.
+                  </p>
+                </div>
+                <Switch
+                  checked={systemSettings.is2faEnabled}
+                  onCheckedChange={handle2faToggle}
+                  disabled={isSavingSettings}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base">Allowed Email Domains</Label>
+                <p className="text-sm text-muted-foreground">
+                  Users with these email domains can register and access the portal.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="@newcampus.paruluniversity.ac.in"
+                    value={newAllowedDomain}
+                    onChange={(e) => setNewAllowedDomain(e.target.value)}
+                  />
+                  <Button onClick={addAllowedDomain} disabled={isSavingSettings || !newAllowedDomain.trim()}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(systemSettings.allowedDomains || []).map((domain) => (
+                    <Badge key={domain} variant="secondary" className="flex items-center gap-1">
+                      {domain}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => removeAllowedDomain(domain)}
+                        disabled={isSavingSettings}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-base">CRO Auto-Assignment Domains</Label>
+                <p className="text-sm text-muted-foreground">
+                  Users with these email domains will automatically be assigned the CRO role upon signup.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="@newcampus.paruluniversity.ac.in"
+                    value={newCroDomain}
+                    onChange={(e) => setNewCroDomain(e.target.value)}
+                  />
+                  <Button onClick={addCroDomain} disabled={isSavingSettings || !newCroDomain.trim()}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {(systemSettings.croDomains || []).map((domain) => (
+                    <Badge key={domain} variant="outline" className="flex items-center gap-1">
+                      {domain}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
+                        onClick={() => removeCroDomain(domain)}
+                        disabled={isSavingSettings}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
         <Card>
           <CardHeader>
@@ -496,17 +696,23 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="flex items-center gap-6">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={previewUrl || user?.photoURL || undefined} alt={user?.name || ''} />
+              <AvatarImage src={previewUrl || user?.photoURL || undefined} alt={user?.name || ""} />
               <AvatarFallback>{user?.name?.[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="space-y-2">
-              <Input id="picture" type="file" onChange={handleFileChange} accept="image/png, image/jpeg" className="max-w-xs" />
+              <Input
+                id="picture"
+                type="file"
+                onChange={handleFileChange}
+                accept="image/png, image/jpeg"
+                className="max-w-xs"
+              />
               <p className="text-xs text-muted-foreground">PNG or JPG. 2MB max.</p>
             </div>
           </CardContent>
           <CardFooter className="border-t px-6 py-4">
             <Button onClick={handlePictureUpdate} disabled={isUploading || !profilePicFile}>
-              {isUploading ? 'Uploading...' : 'Save Picture'}
+              {isUploading ? "Uploading..." : "Save Picture"}
             </Button>
           </CardFooter>
         </Card>
@@ -520,53 +726,81 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={profileForm.control} name="name" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl><Input placeholder="Your name" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={profileForm.control} name="email" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl><Input placeholder="Your email" {...field} disabled /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  <FormField
+                    control={profileForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your name" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={profileForm.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your email" {...field} disabled />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-                <FormField name="faculty" control={profileForm.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Faculty</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your faculty" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {faculties.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField name="institute" control={profileForm.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Institute</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your institute" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {institutes.map(i => <SelectItem key={i} value={i}>{i}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  name="faculty"
+                  control={profileForm.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Faculty</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your faculty" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {faculties.map((f) => (
+                            <SelectItem key={f} value={f}>
+                              {f}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  name="institute"
+                  control={profileForm.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Institute</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isAcademicInfoLocked}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your institute" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {institutes.map((i) => (
+                            <SelectItem key={i} value={i}>
+                              {i}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={profileForm.control}
                   name="department"
@@ -575,7 +809,7 @@ export default function SettingsPage() {
                       <FormLabel>Department</FormLabel>
                       <Combobox
                         options={departmentOptions}
-                        value={field.value || ''}
+                        value={field.value || ""}
                         onChange={field.onChange}
                         placeholder="Select your department"
                         searchPlaceholder="Search departments..."
@@ -586,74 +820,127 @@ export default function SettingsPage() {
                     </FormItem>
                   )}
                 />
-                <FormField control={profileForm.control} name="designation" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Designation</FormLabel>
-                    <FormControl><Input placeholder="e.g., Professor" {...field} disabled={isPrincipal} /></FormControl>
-                    {isPrincipal && <FormDescription>The 'Principal' designation cannot be changed.</FormDescription>}
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  control={profileForm.control}
+                  name="designation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Designation</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Professor" {...field} disabled={isPrincipal} />
+                      </FormControl>
+                      {isPrincipal && <FormDescription>The 'Principal' designation cannot be changed.</FormDescription>}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <Separator />
                 <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={profileForm.control} name="misId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>MIS ID</FormLabel>
-                      <FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={profileForm.control} name="orcidId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>ORCID iD</FormLabel>
-                      <div className="flex items-center gap-2">
+                  <FormField
+                    control={profileForm.control}
+                    name="misId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>MIS ID</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
+                          <Input placeholder="Your MIS ID" {...field} />
                         </FormControl>
-                        <Button type="button" variant="outline" size="icon" onClick={handleFetchOrcid} disabled={isFetchingOrcid} title="Fetch data from ORCID">
-                          {isFetchingOrcid ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                        </Button>
-                      </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={profileForm.control}
+                    name="orcidId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ORCID iD</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={handleFetchOrcid}
+                            disabled={isFetchingOrcid}
+                            title="Fetch data from ORCID"
+                          >
+                            {isFetchingOrcid ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Bot className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={profileForm.control}
+                  name="scopusId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Scopus ID (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your Scopus Author ID" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
-                  )} />
-                </div>
-                <FormField control={profileForm.control} name="scopusId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Scopus ID (Optional)</FormLabel>
-                    <FormControl><Input placeholder="Your Scopus Author ID" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={profileForm.control} name="vidwanId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vidwan ID (Optional)</FormLabel>
-                    <FormControl><Input placeholder="Your Vidwan-ID" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={profileForm.control} name="googleScholarId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Google Scholar ID (Optional)</FormLabel>
-                    <FormControl><Input placeholder="Your Google Scholar Profile ID" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                  )}
+                />
+                <FormField
+                  control={profileForm.control}
+                  name="vidwanId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Vidwan ID (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your Vidwan-ID" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={profileForm.control}
+                  name="googleScholarId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Google Scholar ID (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your Google Scholar Profile ID" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <Separator />
-                <FormField control={profileForm.control} name="phoneNumber" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl><Input type="tel" placeholder="e.g. 9876543210" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  control={profileForm.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="e.g. 9876543210" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
               <CardFooter className="border-t px-6 py-4">
-                <Button type="submit" disabled={isSubmittingProfile}>{isSubmittingProfile ? 'Saving...' : 'Save Changes'}</Button>
+                <Button type="submit" disabled={isSubmittingProfile}>
+                  {isSubmittingProfile ? "Saving..." : "Save Changes"}
+                </Button>
               </CardFooter>
             </Card>
           </form>
@@ -667,65 +954,108 @@ export default function SettingsPage() {
                   <Banknote />
                   <CardTitle>Salary Bank Account Details</CardTitle>
                 </div>
-                <CardDescription>This information is required for grant disbursal. These details would be only visible to admin if your project is approved.</CardDescription>
+                <CardDescription>
+                  This information is required for grant disbursal. These details would be only visible to admin if your
+                  project is approved.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <FormField name="beneficiaryName" control={bankForm.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Beneficiary Name</FormLabel>
-                    <FormControl><Input placeholder="Name as per bank records" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField name="accountNumber" control={bankForm.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account Number</FormLabel>
-                    <FormControl><Input placeholder="Your bank account number" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField name="bankName" control={bankForm.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bank Name</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                <FormField
+                  name="beneficiaryName"
+                  control={bankForm.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Beneficiary Name</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your bank" />
-                        </SelectTrigger>
+                        <Input placeholder="Name as per bank records" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        {salaryBanks.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  name="accountNumber"
+                  control={bankForm.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Your bank account number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  name="bankName"
+                  control={bankForm.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bank Name</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select your bank" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {salaryBanks.map((b) => (
+                            <SelectItem key={b} value={b}>
+                              {b}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField name="branchName" control={bankForm.control} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Branch Name</FormLabel>
-                      <FormControl><Input placeholder="e.g., Akota" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField name="city" control={bankForm.control} render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>City</FormLabel>
-                      <FormControl><Input placeholder="e.g., Vadodara" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                  <FormField
+                    name="branchName"
+                    control={bankForm.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Branch Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Akota" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    name="city"
+                    control={bankForm.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Vadodara" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-                <FormField name="ifscCode" control={bankForm.control} render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>IFSC Code</FormLabel>
-                    <FormControl><Input placeholder="e.g., HDFC0000001" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  name="ifscCode"
+                  control={bankForm.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IFSC Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., HDFC0000001" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </CardContent>
               <CardFooter className="border-t px-6 py-4">
-                <Button type="submit" disabled={isSubmittingBank}>{isSubmittingBank ? 'Saving...' : 'Save Bank Details'}</Button>
+                <Button type="submit" disabled={isSubmittingBank}>
+                  {isSubmittingBank ? "Saving..." : "Save Bank Details"}
+                </Button>
               </CardFooter>
             </Card>
           </form>
@@ -745,7 +1075,9 @@ export default function SettingsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Current Password</FormLabel>
-                      <FormControl><Input type="password" {...field} /></FormControl>
+                      <FormControl>
+                        <Input type="password" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -757,7 +1089,9 @@ export default function SettingsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>New Password</FormLabel>
-                      <FormControl><Input type="password" {...field} /></FormControl>
+                      <FormControl>
+                        <Input type="password" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -768,19 +1102,23 @@ export default function SettingsPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Confirm New Password</FormLabel>
-                      <FormControl><Input type="password" {...field} /></FormControl>
+                      <FormControl>
+                        <Input type="password" {...field} />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </CardContent>
               <CardFooter className="border-t px-6 py-4">
-                <Button type="submit" disabled={isSubmittingPassword}>{isSubmittingPassword ? 'Updating...' : 'Update Password'}</Button>
+                <Button type="submit" disabled={isSubmittingPassword}>
+                  {isSubmittingPassword ? "Updating..." : "Update Password"}
+                </Button>
               </CardFooter>
             </Card>
           </form>
         </Form>
       </div>
     </div>
-  );
+  )
 }

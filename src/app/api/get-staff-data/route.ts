@@ -22,6 +22,7 @@ interface StaffData {
   'ORCID_ID'?: string | number;
   'Vidwan_ID'?: string | number;
   Type?: 'CRO' | 'Institutional' | 'faculty';
+  Campus?: 'Vadodara' | 'Ahmedabad' | 'Rajkot' | 'Goa';
 }
 
 export async function GET(request: NextRequest) {
@@ -33,14 +34,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email or MIS ID query parameter is required.' }, { status: 400 });
   }
   
-  // Construct the path to the file in the project's root directory.
-  const filePath = path.join(process.cwd(), 'staffdata.xlsx');
+  const isGoaUser = email?.endsWith('@goa.paruluniversity.ac.in');
+  const fileName = isGoaUser ? 'goastaffdata.xlsx' : 'staffdata.xlsx';
+  const filePath = path.join(process.cwd(), fileName);
 
   try {
-    // Check if the file exists before attempting to read it.
     if (!fs.existsSync(filePath)) {
         console.warn(`Staff data file not found at: ${filePath}. Pre-fill feature will be inactive.`);
-        return NextResponse.json({ success: false, error: 'Staff data source not found on the server.' }, { status: 404 });
+        return NextResponse.json({ success: false, error: `Staff data source '${fileName}' not found on the server.` }, { status: 404 });
     }
 
     const buffer = fs.readFileSync(filePath);
@@ -55,11 +56,9 @@ export async function GET(request: NextRequest) {
         userRecord = jsonData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
     }
     
-    // Fallback to email if not found by MIS ID, or if MIS ID was not provided
     if (!userRecord && email) {
         userRecord = jsonData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
     }
-
 
     if (userRecord) {
       const instituteName = userRecord.Type === 'Institutional' ? userRecord.Name : userRecord.Institute;
@@ -80,13 +79,14 @@ export async function GET(request: NextRequest) {
           orcidId: String(userRecord.ORCID_ID || ''),
           vidwanId: String(userRecord.Vidwan_ID || ''),
           type: userRecord.Type || 'faculty',
+          campus: userRecord.Campus || (isGoaUser ? 'Goa' : 'Vadodara'),
         },
       });
     } else {
       return NextResponse.json({ success: false, error: 'User not found in staff data.' });
     }
   } catch (error: any) {
-    console.error('Error fetching or processing staff data file:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Failed to process staff data.' }, { status: 500 });
+    console.error(`Error fetching or processing ${fileName}:`, error);
+    return NextResponse.json({ success: false, error: error.message || `Failed to process staff data from ${fileName}.` }, { status: 500 });
   }
 }

@@ -1511,7 +1511,6 @@ export async function exportClaimToExcel(
     return { success: false, error: error.message || "Failed to export data." }
   }
 }
-
 export async function linkHistoricalData(
   userData: Partial<User> & { uid: string; email: string },
 ): Promise<{ success: boolean; count: number; error?: string }> {
@@ -1522,7 +1521,9 @@ export async function linkHistoricalData(
     }
 
     const projectsRef = adminDb.collection("projects")
-    const q = projectsRef.where("pi_email", "==", email).where("pi_uid", "in", ["", null])
+    const q = projectsRef
+      .where("pi_email", "==", email)
+      .where("pi_uid", "in", ["", null])
 
     const projectsSnapshot = await q.get()
 
@@ -1538,18 +1539,33 @@ export async function linkHistoricalData(
       if (phoneNumber) updateData.pi_phoneNumber = phoneNumber
 
       batch.update(projectDoc.ref, updateData)
-    });
+    })
 
     await batch.commit()
 
-    await logActivity('INFO', 'Linked historical data for new user', { uid, email, count: projectsSnapshot.size });
+    await logActivity("INFO", "Linked historical data for new user", {
+      uid,
+      email,
+      count: projectsSnapshot.size,
+    })
+
     return { success: true, count: projectsSnapshot.size }
   } catch (error: any) {
     console.error("Error linking historical project data:", error)
-    await logActivity('ERROR', 'Failed to link historical data', { uid: userData.uid, email: userData.email, error: error.message, stack: error.stack });
-    return { success: false, count: 0, error: error.message || "Failed to link historical data." }
+    await logActivity("ERROR", "Failed to link historical data", {
+      uid: userData.uid,
+      email: userData.email,
+      error: error.message,
+      stack: error.stack,
+    })
+    return {
+      success: false,
+      count: 0,
+      error: error.message || "Failed to link historical data.",
+    }
   }
 }
+
 
 export async function linkEmrInterestsToNewUser(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
   try {
@@ -1728,6 +1744,29 @@ export async function findUserByMisId(
     console.error("Error finding user by MIS ID:", error);
     await logActivity('ERROR', 'Failed to find user by MIS ID', { misId, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to search for user." };
+  }
+}
+export async function isEmailDomainAllowed(email: string): Promise<{ allowed: boolean; isCro: boolean }> {
+  try {
+    const settings = await getSystemSettings()
+    const allowedDomains = settings.allowedDomains || ["@paruluniversity.ac.in", "@goa.paruluniversity.ac.in"]
+    const croDomains = settings.croDomains || ["@paruluniversity.ac.in"]
+
+    // Special case for primary super admin
+    if (email === "rathipranav07@gmail.com") {
+      return { allowed: true, isCro: false }
+    }
+
+    const isAllowed = allowedDomains.some((domain) => email.endsWith(domain))
+    const isCro = croDomains.some((domain) => email.endsWith(domain))
+
+    return { allowed: isAllowed, isCro }
+  } catch (error) {
+    console.error("Error checking email domain:", error)
+    // Default to original domains on error
+    const defaultAllowed = email.endsWith("@paruluniversity.ac.in") || email.endsWith("@goa.paruluniversity.ac.in")
+    const defaultIsCro = email.endsWith("@paruluniversity.ac.in")
+    return { allowed: defaultAllowed, isCro: defaultIsCro }
   }
 }
 

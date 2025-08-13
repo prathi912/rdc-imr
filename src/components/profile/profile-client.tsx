@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import Link from 'next/link';
 
 function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
@@ -458,6 +459,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
     };
     
     const isOwner = sessionUser?.uid === user.uid;
+    const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
 
     const StatItem = ({ value, label }: { value: number | string; label: string }) => (
         <div className="flex flex-col items-center">
