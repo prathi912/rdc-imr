@@ -41,7 +41,7 @@ const loginSchema = z.object({
     .string()
     .email('Invalid email address.')
     .refine(
-      (email) => email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
+      (email) => email.endsWith('@paruluniversity.ac.in') || email.endsWith('@goa.paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
       'Only emails from paruluniversity.ac.in are allowed.'
     ),
   password: z.string().min(1, 'Password is required.'),
@@ -201,7 +201,7 @@ export default function LoginPage() {
       const firebaseUser = result.user;
       const email = firebaseUser.email;
 
-      const isAllowed = email && (email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com');
+      const isAllowed = email && (email.endsWith('@paruluniversity.ac.in') || email.endsWith('@goa.paruluniversity.ac.in') || email === 'rathipranav07@gmail.com');
       
       if (email && /^\d+$/.test(email.split('@')[0]) && email !== 'rathipranav07@gmail.com') {
         await signOut(auth);

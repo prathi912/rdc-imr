@@ -40,7 +40,7 @@ const signupSchema = z.object({
     .string()
     .email('Invalid email address.')
     .refine(
-      (email) => email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
+      (email) => email.endsWith('@paruluniversity.ac.in') || email.endsWith('@goa.paruluniversity.ac.in') || email === 'rathipranav07@gmail.com',
       'Only emails from paruluniversity.ac.in domain are allowed.'
     )
     .refine(
@@ -213,7 +213,7 @@ export default function SignupPage() {
       const firebaseUser = result.user;
       const email = firebaseUser.email;
 
-      const isAllowedDomain = email && (email.endsWith('@paruluniversity.ac.in') || email === 'rathipranav07@gmail.com');
+      const isAllowedDomain = email && (email.endsWith('@paruluniversity.ac.in') || email.endsWith('@goa.paruluniversity.ac.in') || email === 'rathipranav07@gmail.com');
       
       if (email && /^\d+$/.test(email.split('@')[0]) && email !== 'rathipranav07@gmail.com' && email !== 'vicepresident_86@paruluniversity.ac.in') {
         await signOut(auth);
