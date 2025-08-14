@@ -14,7 +14,7 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { uploadFileToServer, checkMisIdExists, fetchOrcidData } from '@/app/actions';
+import { uploadFileToServer, checkMisIdExists, fetchOrcidData, checkHODUniqueness } from '@/app/actions';
 import type { User } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
@@ -260,6 +260,24 @@ export default function ProfileSetupPage() {
             variant: 'destructive',
             title: 'MIS ID Already Registered',
             description: 'This MIS ID is already associated with another account.',
+            duration: 8000,
+            });
+            setIsSubmitting(false);
+            return;
+        }
+      }
+      
+      if (data.designation === 'HOD' && data.department && data.institute) {
+        const hodCheck = await checkHODUniqueness(data.department, data.institute, user.uid);
+        if (hodCheck.exists) {
+            form.setError("designation", {
+                type: "manual",
+                message: "An HOD for this department and institute is already assigned. Please contact an admin."
+            });
+            toast({
+            variant: 'destructive',
+            title: 'HOD Already Exists',
+            description: "An HOD for this department and institute is already assigned.",
             duration: 8000,
             });
             setIsSubmitting(false);
