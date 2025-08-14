@@ -115,6 +115,15 @@ const faculties = [
   "Parul Aarogya Seva Mandal",
 ]
 
+const goaFaculties = [
+    "Faculty of Engineering, IT & CS",
+    "Faculty of Management Studies",
+    "Faculty of Pharmacy",
+    "Faculty of Applied and Health Sciences",
+    "Faculty of Nursing",
+    "Faculty of Physiotherapy"
+];
+
 const campuses = ["Rajkot", "Ahmedabad", "Vadodara", "Goa"];
 
 const institutes = [
@@ -245,6 +254,17 @@ export default function SettingsPage() {
         campus: '',
     },
   })
+
+  const selectedCampusForCro = croAssignmentForm.watch('campus');
+  const facultyOptionsForCro = selectedCampusForCro === 'Goa' ? goaFaculties : faculties;
+
+  useEffect(() => {
+    // When campus changes, reset faculty if it's not in the new list
+    const currentFaculty = croAssignmentForm.getValues('faculty');
+    if (currentFaculty && !facultyOptionsForCro.includes(currentFaculty)) {
+        croAssignmentForm.setValue('faculty', '');
+    }
+  }, [selectedCampusForCro, facultyOptionsForCro, croAssignmentForm]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -684,8 +704,8 @@ export default function SettingsPage() {
                 <Form {...croAssignmentForm}>
                     <form onSubmit={croAssignmentForm.handleSubmit(addCroAssignment)} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end p-4 border rounded-lg">
                         <FormField control={croAssignmentForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>CRO Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                        <FormField control={croAssignmentForm.control} name="faculty" render={({ field }) => ( <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => (<SelectItem key={f} value={f}>{f}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                         <FormField control={croAssignmentForm.control} name="campus" render={({ field }) => ( <FormItem><FormLabel>Campus</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select campus" /></SelectTrigger></FormControl><SelectContent>{campuses.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                        <FormField control={croAssignmentForm.control} name="faculty" render={({ field }) => ( <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl><SelectContent>{facultyOptionsForCro.map(f => (<SelectItem key={f} value={f}>{f}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
                         <Button type="submit" disabled={isSavingSettings}><Plus className="h-4 w-4 mr-2" /> Add CRO</Button>
                     </form>
                 </Form>
