@@ -1599,6 +1599,63 @@ export async function linkEmrInterestsToNewUser(uid: string, email: string): Pro
   }
 }
 
+export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    if (!uid || !email) {
+      return { success: false, count: 0, error: "User UID and Email are required." };
+    }
+
+    const lowercasedEmail = email.toLowerCase();
+    const interestsRef = adminDb.collection("emrInterests");
+    
+    // Find interests where the new user's email is in the coPiDetails array but their UID is not set.
+    const q = interestsRef.where('coPiDetails', 'array-contains', { email: lowercasedEmail, name: '', uid: null });
+
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) {
+      return { success: true, count: 0 };
+    }
+
+    const batch = adminDb.batch();
+    let updatedCount = 0;
+
+    snapshot.forEach(doc => {
+      const interest = doc.data() as EmrInterest;
+      let needsUpdate = false;
+      
+      const updatedCoPiDetails = (interest.coPiDetails || []).map(coPi => {
+        if (coPi.email.toLowerCase() === lowercasedEmail && !coPi.uid) {
+          needsUpdate = true;
+          return { ...coPi, uid: uid };
+        }
+        return coPi;
+      });
+
+      if (needsUpdate) {
+        const updatedCoPiUids = [...new Set([...(interest.coPiUids || []), uid])];
+        batch.update(doc.ref, {
+          coPiDetails: updatedCoPiDetails,
+          coPiUids: updatedCoPiUids,
+        });
+        updatedCount++;
+      }
+    });
+
+    if (updatedCount > 0) {
+      await batch.commit();
+      await logActivity('INFO', 'Linked EMR Co-PI interests to new user', { uid, email, count: updatedCount });
+    }
+
+    return { success: true, count: updatedCount };
+  } catch (error: any) {
+    console.error("Error linking EMR Co-PI interests:", error);
+    await logActivity('ERROR', 'Failed to link EMR Co-PI interests', { uid, email, error: error.message, stack: error.stack });
+    return { success: false, count: 0, error: "Failed to link EMR Co-PI interests." };
+  }
+}
+
+
 export async function updateProjectWithRevision(
   projectId: string,
   revisedProposalUrl: string,
@@ -3336,3 +3393,5 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
         return { success: false, error: "Failed to update final status." };
     }
 }
+
+  

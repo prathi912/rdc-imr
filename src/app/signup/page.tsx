@@ -30,6 +30,7 @@ import {
   linkPapersToNewUser,
   linkEmrInterestsToNewUser,
   isEmailDomainAllowed,
+  linkEmrCoPiInterestsToNewUser,
 } from "@/app/actions"
 import { Eye, EyeOff } from "lucide-react"
 
@@ -169,10 +170,16 @@ export default function SignupPage() {
         console.log(`Successfully linked ${paperResult.count} research papers for new user ${user.email}.`)
       }
 
-      const emrResult = await linkEmrInterestsToNewUser(user.uid, user.email)
-      if (emrResult.success && emrResult.count > 0) {
-        console.log(`Successfully linked ${emrResult.count} EMR interests for new user ${user.email}.`)
+      const emrInterestResult = await linkEmrInterestsToNewUser(user.uid, user.email)
+      if (emrInterestResult.success && emrInterestResult.count > 0) {
+        console.log(`Successfully linked ${emrInterestResult.count} EMR interests for new user ${user.email}.`)
       }
+      
+      const emrCoPiResult = await linkEmrCoPiInterestsToNewUser(user.uid, user.email);
+      if (emrCoPiResult.success && emrCoPiResult.count > 0) {
+        console.log(`Successfully linked ${emrCoPiResult.count} EMR Co-PI interests for new user ${user.email}.`);
+      }
+
     } catch (e) {
       console.error("Error calling linking actions:", e)
     }
@@ -404,3 +411,5 @@ export default function SignupPage() {
     </div>
   )
 }
+
+  
