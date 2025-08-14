@@ -29,8 +29,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send } from 'lucide-react';
-import type { FundingCall, User, EmrInterest } from '@/types';
+import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send, Search } from 'lucide-react';
+import type { FundingCall, User, EmrInterest, CoPiDetails } from '@/types';
 import { registerEmrInterest, withdrawEmrInterest, findUserByMisId, uploadEndorsementForm, uploadFileToServer, submitToAgency, updateEmrFinalStatus } from '@/app/actions';
 import { isAfter, parseISO, addDays, setHours, setMinutes, setSeconds, subDays } from 'date-fns';
 import { Label } from '../ui/label';
@@ -286,8 +286,8 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-    const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string } | null>(null);
-    const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([]);
+    const [foundCoPi, setFoundCoPi] = useState<{ uid: string; name: string; email: string; misId: string; } | null>(null);
+    const [coPiList, setCoPiList] = useState<CoPiDetails[]>([]);
     const [isSearching, setIsSearching] = useState(false);
 
     const form = useForm<z.infer<typeof registerInterestSchema>>({
@@ -321,8 +321,8 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
             } else {
                 toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
             }
-        } catch (error) {
-            toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Search Failed', description: error.message || 'An error occurred while searching.' });
         } finally {
             setIsSearching(false);
         }
@@ -334,7 +334,12 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
                 toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
                 return;
             }
-            setCoPiList([...coPiList, foundCoPi]);
+            setCoPiList([...coPiList, {
+                uid: foundCoPi.uid,
+                name: foundCoPi.name,
+                email: foundCoPi.email,
+                misId: foundCoPi.misId,
+            }]);
         }
         setFoundCoPi(null);
         setCoPiSearchTerm('');
@@ -357,7 +362,7 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
                         <div className="flex items-center gap-2">
                             <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
                             <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
-                                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
+                                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                             </Button>
                         </div>
                         {foundCoPi && (
@@ -373,7 +378,7 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
                             coPiList.map((coPi) => (
                                 <div key={coPi.uid} className="flex items-center justify-between p-2 bg-secondary rounded-md">
                                     <p className="text-sm font-medium">{coPi.name}</p>
-                                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid)}>Remove</Button>
+                                    <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.uid!)}>Remove</Button>
                                 </div>
                             ))
                         ) : (

@@ -864,7 +864,7 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
   try {
     const adminRoles = ["admin", "Super-admin", "CRO"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, where("role", "in", adminRoles))
+    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
 
     const adminUsersSnapshot = await adminGetDocs(q)
     if (adminUsersSnapshot.empty) {
@@ -933,7 +933,7 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
   try {
     const adminRoles = ["admin", "Super-admin"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, where("role", "in", adminRoles))
+    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
 
     const adminUsersSnapshot = await adminGetDocs(q)
     if (adminUsersSnapshot.empty) {
@@ -1731,7 +1731,7 @@ export async function updateProjectWithRevision(
     // Notify admins
     const adminRoles = ["admin", "Super-admin", "CRO"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, where("role", "in", adminRoles))
+    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
 
     const adminUsersSnapshot = await adminGetDocs(q)
     if (!adminUsersSnapshot.empty) {
@@ -1814,7 +1814,6 @@ export async function findUserByMisId(
 ): Promise<{ 
   success: boolean; 
   user?: { uid: string; name: string; email: string; misId: string; }; 
-  staff?: { name: string; email: string; misId: string; };
   error?: string 
 }> {
   try {
@@ -1836,16 +1835,7 @@ export async function findUserByMisId(
       return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email, misId: userData.misId! } };
     }
 
-    // 2. Fallback to staffdata.xlsx via API route
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
-    const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}`);
-    const staffResult = await response.json();
-
-    if (staffResult.success && staffResult.data) {
-        return { success: true, staff: { name: staffResult.data.name, email: staffResult.data.email, misId: staffResult.data.misId } };
-    }
-
-    return { success: false, error: "No registered user or staff member found with this MIS ID. Please ask them to sign up for the portal." };
+    return { success: false, error: "No registered user found with this MIS ID. Please ask them to sign up for the portal before adding them as a Co-PI." };
 
   } catch (error: any) {
     console.error("Error finding user by MIS ID:", error);
@@ -3109,8 +3099,8 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid:
         const projectsRef = adminDb.collection('projects');
         const q = adminQuery(
             projectsRef,
-            where('pi_uid', '==', piUid),
-            where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid)
+            adminWhere('pi_uid', '==', piUid),
+            adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid)
         );
 
         const snapshot = await adminGetDocs(q);
