@@ -101,11 +101,11 @@ export async function getSystemSettings(): Promise<SystemSettings> {
       return settingsSnap.data() as SystemSettings;
     }
     // Default settings if none are found
-    return { is2faEnabled: false };
+    return { is2faEnabled: false, allowedDomains: [], croDomains: [] };
   } catch (error) {
     console.error("Error fetching system settings:", error);
     // Return default settings on error to ensure app functionality
-    return { is2faEnabled: false };
+    return { is2faEnabled: false, allowedDomains: [], croDomains: [] };
   }
 }
 
@@ -1623,6 +1623,7 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
       let needsUpdate = false;
       
       const updatedCoPiDetails = (interest.coPiDetails || []).map(coPi => {
+        // Find the Co-PI entry that matches the new user's email and doesn't have a UID yet.
         if (coPi.email.toLowerCase() === lowercasedEmail && !coPi.uid) {
           needsUpdate = true;
           return { ...coPi, uid: uid };
@@ -1642,15 +1643,66 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
 
     if (updatedCount > 0) {
       await batch.commit();
-      await logActivity('INFO', 'Linked EMR Co-PI interests to new user', { uid, email, count: updatedCount });
+      await logActivity('INFO', 'Linked EMR Co-PI interests to new user by email', { uid, email, count: updatedCount });
     }
 
     return { success: true, count: updatedCount };
   } catch (error: any) {
-    console.error("Error linking EMR Co-PI interests:", error);
-    await logActivity('ERROR', 'Failed to link EMR Co-PI interests', { uid, email, error: error.message, stack: error.stack });
+    console.error("Error linking EMR Co-PI interests by email:", error);
+    await logActivity('ERROR', 'Failed to link EMR Co-PI interests by email', { uid, email, error: error.message, stack: error.stack });
     return { success: false, count: 0, error: "Failed to link EMR Co-PI interests." };
   }
+}
+
+export async function linkEmrInterestsByMisId(uid: string, misId: string): Promise<{ success: boolean; count: number; error?: string }> {
+    if (!uid || !misId) {
+        return { success: false, count: 0, error: "User UID and MIS ID are required." };
+    }
+
+    try {
+        const interestsRef = adminDb.collection("emrInterests");
+        const snapshot = await interestsRef.get();
+        
+        if (snapshot.empty) {
+            return { success: true, count: 0 };
+        }
+
+        const batch = adminDb.batch();
+        let updatedCount = 0;
+
+        snapshot.forEach(doc => {
+            const interest = doc.data() as EmrInterest;
+            let needsUpdate = false;
+            
+            const updatedCoPiDetails = (interest.coPiDetails || []).map(coPi => {
+                if (coPi.misId === misId && !coPi.uid) {
+                    needsUpdate = true;
+                    return { ...coPi, uid: uid };
+                }
+                return coPi;
+            });
+
+            if (needsUpdate) {
+                const updatedCoPiUids = [...new Set([...(interest.coPiUids || []), uid])];
+                batch.update(doc.ref, {
+                    coPiDetails: updatedCoPiDetails,
+                    coPiUids: updatedCoPiUids,
+                });
+                updatedCount++;
+            }
+        });
+
+        if (updatedCount > 0) {
+            await batch.commit();
+            await logActivity('INFO', 'Linked EMR Co-PI interests to new user by MIS ID', { uid, misId, count: updatedCount });
+        }
+
+        return { success: true, count: updatedCount };
+    } catch (error: any) {
+        console.error("Error linking EMR Co-PI interests by MIS ID:", error);
+        await logActivity('ERROR', 'Failed to link EMR Co-PI interests by MIS ID', { uid, misId, error: error.message, stack: error.stack });
+        return { success: false, count: 0, error: "Failed to link EMR Co-PI interests by MIS ID." };
+    }
 }
 
 
@@ -1761,8 +1813,8 @@ export async function findUserByMisId(
   misId: string,
 ): Promise<{ 
   success: boolean; 
-  user?: { uid: string; name: string; email: string; }; 
-  staff?: { name: string; email: string; };
+  user?: { uid: string; name: string; email: string; misId: string; }; 
+  staff?: { name: string; email: string; misId: string; };
   error?: string 
 }> {
   try {
@@ -1781,7 +1833,7 @@ export async function findUserByMisId(
        if (userData.role === 'admin' || userData.role === 'Super-admin') {
          return { success: false, error: "Administrators cannot be added as Co-PIs." };
       }
-      return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email } };
+      return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email, misId: userData.misId! } };
     }
 
     // 2. Fallback to staffdata.xlsx via API route
@@ -1790,7 +1842,7 @@ export async function findUserByMisId(
     const staffResult = await response.json();
 
     if (staffResult.success && staffResult.data) {
-        return { success: true, staff: { name: staffResult.data.name, email: staffResult.data.email } };
+        return { success: true, staff: { name: staffResult.data.name, email: staffResult.data.email, misId: staffResult.data.misId } };
     }
 
     return { success: false, error: "No registered user or staff member found with this MIS ID. Please ask them to sign up for the portal." };
@@ -1803,25 +1855,27 @@ export async function findUserByMisId(
 }
 export async function isEmailDomainAllowed(email: string): Promise<{ allowed: boolean; isCro: boolean }> {
   try {
-    const settings = await getSystemSettings()
-    const allowedDomains = settings.allowedDomains || ["@paruluniversity.ac.in", "@goa.paruluniversity.ac.in"]
-    const croDomains = settings.croDomains || ["@paruluniversity.ac.in"]
+    const settings = await getSystemSettings();
+    const allowedDomains = settings.allowedDomains || ["@paruluniversity.ac.in", "@goa.paruluniversity.ac.in"];
+    const croDomains = settings.croDomains || [];
 
     // Special case for primary super admin
     if (email === "rathipranav07@gmail.com") {
-      return { allowed: true, isCro: false }
+      return { allowed: true, isCro: false };
     }
 
-    const isAllowed = allowedDomains.some((domain) => email.endsWith(domain))
-    const isCro = croDomains.some((domain) => email.endsWith(domain))
+    const isAllowed = allowedDomains.some((domain) => email.endsWith(domain));
+    const isCro = croDomains.some((domain) => email.endsWith(domain));
 
-    return { allowed: isAllowed, isCro }
+    return { allowed: isAllowed, isCro };
   } catch (error) {
-    console.error("Error checking email domain:", error)
+    console.error("Error checking email domain:", error);
     // Default to original domains on error
-    const defaultAllowed = email.endsWith("@paruluniversity.ac.in") || email.endsWith("@goa.paruluniversity.ac.in")
-    const defaultIsCro = email.endsWith("@paruluniversity.ac.in")
-    return { allowed: defaultAllowed, isCro: defaultIsCro }
+    const defaultAllowed =
+      email.endsWith("@paruluniversity.ac.in") ||
+      email.endsWith("@goa.paruluniversity.ac.in");
+    const defaultIsCro = false; // Default to not CRO on error
+    return { allowed: defaultAllowed, isCro: defaultIsCro };
   }
 }
 

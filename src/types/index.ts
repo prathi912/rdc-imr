@@ -3,6 +3,7 @@ export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
   email: string
+  misId?: string; // Stored when adding an unregistered user by MIS ID
   cvUrl?: string // URL to the uploaded CV
   cvFileName?: string // Original filename for display
 }

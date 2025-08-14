@@ -130,6 +130,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isPostSetupDialogOpen, setIsPostSetupDialogOpen] = useState(false);
+  const [linkedProjectsCount, setLinkedProjectsCount] = useState({ imr: 0, emr: 0 });
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
@@ -155,7 +157,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'manage-incentive-claims', href: '/dashboard/manage-incentive-claims', tooltip: 'Manage Incentive Claims', icon: Award, label: 'Manage Claims' },
     { id: 'bulk-upload', href: '/dashboard/bulk-upload', tooltip: 'Bulk Upload Projects', icon: Upload, label: 'Bulk Upload Projects' },
     { id: 'bulk-upload-papers', href: '/dashboard/bulk-upload-papers', tooltip: 'Bulk Upload Papers', icon: BookUp, label: 'Bulk Upload Papers' },
-    { id: 'bulk-upload-emr', href: '/dashboard/bulk-upload-emr', tooltip: 'Bulk Upload EMR Projects', icon: Upload, label: 'Bulk Upload EMR' },
+    { id: 'bulk-upload-emr', href: '/dashboard/bulk-upload-emr', tooltip: 'Bulk Upload EMR', icon: Upload, label: 'Bulk Upload EMR' },
     { id: 'module-management', href: '/dashboard/module-management', tooltip: 'Module Management', icon: ShieldCheck, label: 'Module Management' },
     { id: 'notifications', href: '/dashboard/notifications', tooltip: 'Notifications', icon: Bell, label: 'Notifications', badge: unreadCount, condition: true },
     { id: 'settings', href: '/dashboard/settings', tooltip: 'Settings', icon: Settings, label: 'Settings', condition: true },
@@ -189,7 +191,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 appUser.allowedModules.push('all-projects');
               }
             }
-
+            
+            // Check for post-setup linking notification
+            const postSetupInfo = sessionStorage.getItem('postSetupInfo');
+            if (postSetupInfo) {
+                const { imr, emr } = JSON.parse(postSetupInfo);
+                if (imr > 0 || emr > 0) {
+                    setLinkedProjectsCount({ imr, emr });
+                    setIsPostSetupDialogOpen(true);
+                }
+                sessionStorage.removeItem('postSetupInfo');
+            }
+            
             setUser(appUser);
             localStorage.setItem('user', JSON.stringify(appUser));
           } else {
@@ -438,6 +451,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleLogout}>Log Out</AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+    <AlertDialog open={isPostSetupDialogOpen} onOpenChange={setIsPostSetupDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Projects Linked to Your Account</AlertDialogTitle>
+                <AlertDialogDescription>
+                    We found some existing projects where you were listed as an investigator. They have been automatically linked to your new account.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+                {linkedProjectsCount.imr > 0 && <p>{linkedProjectsCount.imr} IMR project(s) linked.</p>}
+                {linkedProjectsCount.emr > 0 && <p>{linkedProjectsCount.emr} EMR project(s) linked.</p>}
+            </div>
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setIsPostSetupDialogOpen(false)}>Great!</AlertDialogAction>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>
