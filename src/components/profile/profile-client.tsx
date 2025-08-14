@@ -512,6 +512,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                         <div className="space-y-4">
                             <h3 className="font-semibold text-lg">Researcher IDs</h3>
                             <div className="space-y-4">
+                                <ProfileDetail label="MIS ID" value={user.misId} icon={BookCopy} />
                                 <ProfileDetail label="ORCID iD" value={user.orcidId} icon={BookCopy} />
                                 <ProfileDetail label="Scopus ID" value={user.scopusId} icon={BookCopy} />
                                 <ProfileDetail label="Vidwan ID" value={user.vidwanId} icon={BookCopy} />
@@ -704,3 +705,5 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
         </div>
     );
 }
+
+    
