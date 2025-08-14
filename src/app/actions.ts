@@ -101,11 +101,11 @@ export async function getSystemSettings(): Promise<SystemSettings> {
       return settingsSnap.data() as SystemSettings;
     }
     // Default settings if none are found
-    return { is2faEnabled: false, allowedDomains: [], croDomains: [] };
+    return { is2faEnabled: false, allowedDomains: [], croAssignments: [] };
   } catch (error) {
     console.error("Error fetching system settings:", error);
     // Return default settings on error to ensure app functionality
-    return { is2faEnabled: false, allowedDomains: [], croDomains: [] };
+    return { is2faEnabled: false, allowedDomains: [], croAssignments: [] };
   }
 }
 
@@ -1811,11 +1811,7 @@ export async function updateProjectEvaluators(
 
 export async function findUserByMisId(
   misId: string,
-): Promise<{ 
-  success: boolean; 
-  user?: { uid: string; name: string; email: string; misId: string; }; 
-  error?: string 
-}> {
+): Promise<{ success: boolean; user?: { uid: string; name: string; email: string; misId: string; }; error?: string }> {
   try {
     if (!misId || misId.trim() === "") {
       return { success: false, error: "MIS ID is required." };
@@ -1843,11 +1839,11 @@ export async function findUserByMisId(
     return { success: false, error: error.message || "Failed to search for user." };
   }
 }
-export async function isEmailDomainAllowed(email: string): Promise<{ allowed: boolean; isCro: boolean }> {
+export async function isEmailDomainAllowed(email: string): Promise<{ allowed: boolean; isCro: boolean; croFaculty?: string; croCampus?: string; }> {
   try {
     const settings = await getSystemSettings();
     const allowedDomains = settings.allowedDomains || ["@paruluniversity.ac.in", "@goa.paruluniversity.ac.in"];
-    const croDomains = settings.croDomains || [];
+    const croAssignments = settings.croAssignments || [];
 
     // Special case for primary super admin
     if (email === "rathipranav07@gmail.com") {
@@ -1855,17 +1851,20 @@ export async function isEmailDomainAllowed(email: string): Promise<{ allowed: bo
     }
 
     const isAllowed = allowedDomains.some((domain) => email.endsWith(domain));
-    const isCro = croDomains.some((domain) => email.endsWith(domain));
+    const croAssignment = croAssignments.find(c => c.email.toLowerCase() === email.toLowerCase());
 
-    return { allowed: isAllowed, isCro };
+    if (croAssignment) {
+        return { allowed: true, isCro: true, croFaculty: croAssignment.faculty, croCampus: croAssignment.campus };
+    }
+
+    return { allowed: isAllowed, isCro: false };
   } catch (error) {
     console.error("Error checking email domain:", error);
     // Default to original domains on error
     const defaultAllowed =
       email.endsWith("@paruluniversity.ac.in") ||
       email.endsWith("@goa.paruluniversity.ac.in");
-    const defaultIsCro = false; // Default to not CRO on error
-    return { allowed: defaultAllowed, isCro: defaultIsCro };
+    return { allowed: defaultAllowed, isCro: false };
   }
 }
 

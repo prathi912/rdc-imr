@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -24,7 +25,7 @@ import {
   getSystemSettings,
   updateSystemSettings,
 } from "@/app/actions"
-import type { User, SystemSettings } from "@/types"
+import type { User, SystemSettings, CroAssignment } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   onAuthStateChanged,
@@ -39,6 +40,7 @@ import { Combobox } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -78,6 +80,13 @@ const bankDetailsSchema = z.object({
 })
 type BankDetailsFormValues = z.infer<typeof bankDetailsSchema>
 
+const croAssignmentSchema = z.object({
+    email: z.string().email("Please enter a valid email address."),
+    faculty: z.string().min(1, "Please select a faculty."),
+    campus: z.string().min(1, "Please select a campus."),
+})
+type CroAssignmentFormValues = z.infer<typeof croAssignmentSchema>
+
 const faculties = [
   "Faculty of Engineering & Technology",
   "Faculty of Diploma Studies",
@@ -105,6 +114,8 @@ const faculties = [
   "University Office",
   "Parul Aarogya Seva Mandal",
 ]
+
+const campuses = ["Rajkot", "Ahmedabad", "Vadodara", "Goa"];
 
 const institutes = [
   "Parul Institute of Technology",
@@ -186,7 +197,6 @@ export default function SettingsPage() {
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [newAllowedDomain, setNewAllowedDomain] = useState("")
-  const [newCroDomain, setNewCroDomain] = useState("")
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -224,6 +234,15 @@ export default function SettingsPage() {
       branchName: "",
       city: "",
       ifscCode: "",
+    },
+  })
+  
+  const croAssignmentForm = useForm<CroAssignmentFormValues>({
+    resolver: zodResolver(croAssignmentSchema),
+    defaultValues: {
+        email: '',
+        faculty: '',
+        campus: '',
     },
   })
 
@@ -509,47 +528,51 @@ export default function SettingsPage() {
     setIsSavingSettings(false)
   }
 
-  const addCroDomain = async () => {
-    if (!systemSettings || !newCroDomain.trim()) return
+  const addCroAssignment = async (values: CroAssignmentFormValues) => {
+    if (!systemSettings) return;
 
-    const domain = newCroDomain.trim().startsWith("@") ? newCroDomain.trim() : `@${newCroDomain.trim()}`
-    const currentDomains = systemSettings.croDomains || []
+    const newAssignment: CroAssignment = {
+        email: values.email.toLowerCase(),
+        faculty: values.faculty,
+        campus: values.campus,
+    };
 
-    if (currentDomains.includes(domain)) {
-      toast({ variant: "destructive", title: "Domain exists", description: "This domain is already in the CRO list." })
-      return
+    const currentAssignments = systemSettings.croAssignments || [];
+    if (currentAssignments.some(c => c.email === newAssignment.email)) {
+        toast({ variant: "destructive", title: "Email exists", description: "This email is already assigned." });
+        return;
     }
 
-    setIsSavingSettings(true)
-    const newSettings = { ...systemSettings, croDomains: [...currentDomains, domain] }
-    const result = await updateSystemSettings(newSettings)
+    setIsSavingSettings(true);
+    const newSettings = { ...systemSettings, croAssignments: [...currentAssignments, newAssignment] };
+    const result = await updateSystemSettings(newSettings);
 
     if (result.success) {
-      setSystemSettings(newSettings)
-      setNewCroDomain("")
-      toast({ title: "CRO domain added successfully." })
+        setSystemSettings(newSettings);
+        croAssignmentForm.reset();
+        toast({ title: "CRO pre-assignment added." });
     } else {
-      toast({ variant: "destructive", title: "Error", description: result.error })
+        toast({ variant: "destructive", title: "Error", description: result.error });
     }
-    setIsSavingSettings(false)
-  }
+    setIsSavingSettings(false);
+  };
 
-  const removeCroDomain = async (domainToRemove: string) => {
-    if (!systemSettings) return
+  const removeCroAssignment = async (emailToRemove: string) => {
+    if (!systemSettings) return;
 
-    setIsSavingSettings(true)
-    const currentDomains = systemSettings.croDomains || []
-    const newSettings = { ...systemSettings, croDomains: currentDomains.filter((d) => d !== domainToRemove) }
-    const result = await updateSystemSettings(newSettings)
+    setIsSavingSettings(true);
+    const currentAssignments = systemSettings.croAssignments || [];
+    const newSettings = { ...systemSettings, croAssignments: currentAssignments.filter(c => c.email !== emailToRemove) };
+    const result = await updateSystemSettings(newSettings);
 
     if (result.success) {
-      setSystemSettings(newSettings)
-      toast({ title: "CRO domain removed successfully." })
+        setSystemSettings(newSettings);
+        toast({ title: "CRO pre-assignment removed." });
     } else {
-      toast({ variant: "destructive", title: "Error", description: result.error })
+        toast({ variant: "destructive", title: "Error", description: result.error });
     }
-    setIsSavingSettings(false)
-  }
+    setIsSavingSettings(false);
+  };
 
   const isAcademicInfoLocked = isCro || isPrincipal
 
@@ -653,38 +676,35 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </div>
-
-              <div className="space-y-4">
-                <Label className="text-base">CRO Auto-Assignment Domains</Label>
+               <div className="space-y-4">
+                <Label className="text-base">CRO Pre-assignment</Label>
                 <p className="text-sm text-muted-foreground">
-                  Users with these email domains will automatically be assigned the CRO role upon signup.
+                  Pre-assign the CRO role and their primary faculty/campus to a specific email. This will be automatically applied upon sign-up.
                 </p>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="@newcampus.paruluniversity.ac.in"
-                    value={newCroDomain}
-                    onChange={(e) => setNewCroDomain(e.target.value)}
-                  />
-                  <Button onClick={addCroDomain} disabled={isSavingSettings || !newCroDomain.trim()}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(systemSettings.croDomains || []).map((domain) => (
-                    <Badge key={domain} variant="outline" className="flex items-center gap-1">
-                      {domain}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={() => removeCroDomain(domain)}
-                        disabled={isSavingSettings}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </Badge>
-                  ))}
-                </div>
+                <Form {...croAssignmentForm}>
+                    <form onSubmit={croAssignmentForm.handleSubmit(addCroAssignment)} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end p-4 border rounded-lg">
+                        <FormField control={croAssignmentForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>CRO Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField control={croAssignmentForm.control} name="faculty" render={({ field }) => ( <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl><SelectContent>{faculties.map(f => (<SelectItem key={f} value={f}>{f}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                        <FormField control={croAssignmentForm.control} name="campus" render={({ field }) => ( <FormItem><FormLabel>Campus</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select campus" /></SelectTrigger></FormControl><SelectContent>{campuses.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
+                        <Button type="submit" disabled={isSavingSettings}><Plus className="h-4 w-4 mr-2" /> Add CRO</Button>
+                    </form>
+                </Form>
+                
+                {(systemSettings.croAssignments || []).length > 0 && (
+                    <Table>
+                        <TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Faculty</TableHead><TableHead>Campus</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {systemSettings.croAssignments?.map((assignment) => (
+                                <TableRow key={assignment.email}>
+                                    <TableCell>{assignment.email}</TableCell>
+                                    <TableCell>{assignment.faculty}</TableCell>
+                                    <TableCell>{assignment.campus}</TableCell>
+                                    <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => removeCroAssignment(assignment.email)} disabled={isSavingSettings}><X className="h-4 w-4" /></Button></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                )}
               </div>
             </CardContent>
           </Card>

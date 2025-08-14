@@ -1,4 +1,5 @@
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -410,10 +411,16 @@ export type EmrEvaluation = {
   comments: string
 }
 
+export type CroAssignment = {
+    email: string;
+    faculty: string;
+    campus: string;
+};
+
 export type SystemSettings = {
   is2faEnabled: boolean
   allowedDomains?: string[]
-  croDomains?: string[]
+  croAssignments?: CroAssignment[]
 }
 
 export type LoginOtp = {
