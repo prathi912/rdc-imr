@@ -332,20 +332,37 @@ export default function AllProjectsPage() {
                          <Card>
                             <CardContent className="pt-6">
                                 <Table>
-                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Agency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                                     <TableBody>{filteredEmrProjects.map(p => {
                                         const pi = users.find(u => u.uid === p.userId);
                                         return (
                                         <TableRow key={p.id}>
                                             <TableCell className="font-medium">{p.callTitle || 'N/A'}</TableCell>
-                                            <TableCell>{pi?.name || p.userName}</TableCell>
+                                            <TableCell>
+                                                {pi?.misId ? (
+                                                    <Link href={`/profile/${pi.misId}`} className="hover:underline text-primary" target="_blank" rel="noopener noreferrer">
+                                                        {p.userName}
+                                                    </Link>
+                                                ) : p.userName}
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col text-xs">
+                                                    {(p.coPiDetails || []).map(copi => {
+                                                        const coPiUser = users.find(u => u.uid === copi.uid);
+                                                        return (
+                                                            <div key={copi.email}>
+                                                                {coPiUser?.misId ? (
+                                                                    <Link href={`/profile/${coPiUser.misId}`} className="hover:underline text-primary" target="_blank" rel="noopener noreferrer">
+                                                                        {copi.name}
+                                                                    </Link>
+                                                                ) : copi.name}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+                                            </TableCell>
                                             <TableCell>{p.agency || 'N/A'}</TableCell>
                                             <TableCell><Badge>{p.status}</Badge></TableCell>
-                                            <TableCell className="text-right">
-                                                {pi?.misId && (
-                                                    <Button asChild variant="outline" size="icon"><Link href={`/profile/${pi.misId}`}><Eye className="h-4 w-4" /></Link></Button>
-                                                )}
-                                            </TableCell>
                                         </TableRow>
                                     )})}</TableBody>
                                 </Table>
