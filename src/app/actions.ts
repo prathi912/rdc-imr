@@ -1608,8 +1608,6 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
     const lowercasedEmail = email.toLowerCase();
     const interestsRef = adminDb.collection("emrInterests");
     
-    // Find interests where the new user's email is in the coPiEmails array (if it exists)
-    // This is a more flexible query that doesn't rely on the structure of coPiDetails
     const q = interestsRef.where('coPiEmails', 'array-contains', lowercasedEmail);
     const snapshot = await adminGetDocs(q);
     
@@ -1624,7 +1622,6 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
       const interest = doc.data() as EmrInterest;
       let needsUpdate = false;
       
-      // Update the coPiDetails array to include the new UID
       const updatedCoPiDetails = (interest.coPiDetails || []).map(coPi => {
         if (coPi.email.toLowerCase() === lowercasedEmail && !coPi.uid) {
           needsUpdate = true;
@@ -1634,7 +1631,6 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
       });
 
       if (needsUpdate) {
-        // Add the new UID to the coPiUids array for efficient querying
         const updatedCoPiUids = [...new Set([...(interest.coPiUids || []), uid])];
         batch.update(doc.ref, {
           coPiDetails: updatedCoPiDetails,
