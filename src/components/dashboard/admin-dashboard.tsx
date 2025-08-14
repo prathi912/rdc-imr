@@ -68,7 +68,6 @@ export function AdminDashboard() {
             const projectsRef = collection(db, "projects");
             const usersRef = collection(db, "users");
             const emrInterestsRef = collection(db, "emrInterests");
-            const sanctionedEmrQuery = query(emrInterestsRef, or(where('status', '==', 'Sanctioned'), where('status', '==', 'SANCTIONED')));
             
             const isPrincipal = user.designation === 'Principal';
             const isHod = user.designation === 'HOD';
@@ -79,17 +78,8 @@ export function AdminDashboard() {
 
             if (isPrincipal && user.institute) {
                 projectsQuery = query(projectsRef, where('institute', '==', user.institute));
-                let snapshot = await getDocs(projectsQuery);
-                if (snapshot.empty) {
-                    const allProjectsSnapshot = await getDocs(query(projectsRef));
-                    allProjects = allProjectsSnapshot.docs
-                        .map(doc => ({ ...doc.data(), id: doc.id } as Project))
-                        .filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
-                     const debugInfo = createDebugInfo(user, allProjects);
-                     logDebugInfo(debugInfo, 'Admin Dashboard Fallback');
-                } else {
-                    allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-                }
+                const snapshot = await getDocs(projectsQuery);
+                allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
             } else if (isHod && user.department && user.institute) {
                 projectsQuery = query(projectsRef, where('departmentName', '==', user.department), where('institute', '==', user.institute));
                 const snapshot = await getDocs(projectsQuery);
@@ -102,6 +92,12 @@ export function AdminDashboard() {
                 projectsQuery = query(projectsRef);
                  const snapshot = await getDocs(projectsQuery);
                 allProjects = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+            }
+            
+            // Stats should also be filtered
+            let sanctionedEmrQuery = query(emrInterestsRef, or(where('status', '==', 'Sanctioned'), where('status', '==', 'SANCTIONED')));
+            if (isHod && user.department && user.institute) {
+                sanctionedEmrQuery = query(sanctionedEmrQuery, where('department', '==', user.department), where('institute', '==', user.institute));
             }
             
             const [usersSnapshot, emrSnapshot] = await Promise.all([

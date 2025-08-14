@@ -89,10 +89,10 @@ export default function AnalyticsPage() {
     const projectsCollection = collection(db, 'projects');
     let projectsQuery;
 
-    const isPrincipal = user?.designation === 'Principal';
-    const isCro = user?.role === 'CRO';
-    const isHod = user?.designation === 'HOD';
-    const isSpecialPitUser = user?.email === 'pit@paruluniversity.ac.in';
+    const isPrincipal = user.designation === 'Principal';
+    const isCro = user.role === 'CRO';
+    const isHod = user.designation === 'HOD';
+    const isSpecialPitUser = user.email === 'pit@paruluniversity.ac.in';
 
 
     if (isCro && user.faculties && user.faculties.length > 0) {
@@ -115,22 +115,8 @@ export default function AnalyticsPage() {
     const unsubscribe = onSnapshot(projectsQuery, (snapshot) => {
         let projectList: Project[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         
-        if (isPrincipal && user.institute && snapshot.empty) {
-            const allProjectsQuery = query(collection(db, 'projects'));
-            onSnapshot(allProjectsQuery, (allSnapshot) => {
-                 const allProjects = allSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-                 const filteredList = allProjects.filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
-                 
-                 const debugInfo = createDebugInfo(user, filteredList);
-                 logDebugInfo(debugInfo, 'Analytics Fallback');
-                 
-                 setProjects(filteredList);
-                 setLoading(false);
-            });
-        } else {
-            setProjects(projectList);
-            setLoading(false);
-        }
+        setProjects(projectList);
+        setLoading(false);
     }, (error) => {
         console.error("Error fetching project data:", error);
         setLoading(false);
