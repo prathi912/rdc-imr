@@ -19,6 +19,7 @@ import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
+import { getTemplateContent } from "@/lib/template-manager"
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -865,7 +866,7 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
     const usersRef = adminDb.collection("users")
     const q = adminQuery(usersRef, where("role", "in", adminRoles))
 
-    const adminUsersSnapshot = await getDocs(q)
+    const adminUsersSnapshot = await adminGetDocs(q)
     if (adminUsersSnapshot.empty) {
       console.log("No admin users found to notify.")
       return { success: true, message: "No admins to notify." }
@@ -934,7 +935,7 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
     const usersRef = adminDb.collection("users")
     const q = adminQuery(usersRef, where("role", "in", adminRoles))
 
-    const adminUsersSnapshot = await getDocs(q)
+    const adminUsersSnapshot = await adminGetDocs(q)
     if (adminUsersSnapshot.empty) {
       console.log("No admin users found to notify for completion request.")
       return { success: true, message: "No admins to notify." }
@@ -1451,13 +1452,12 @@ export async function exportClaimToExcel(
       }
     }
 
-    const templatePath = path.join(process.cwd(), "format.xlsx")
-    if (!fs.existsSync(templatePath)) {
-      return { success: false, error: 'Template file "format.xlsx" not found in the project root directory.' }
+    const templateContent = getTemplateContent('format.xlsx');
+    if (!templateContent) {
+        return { success: false, error: 'Template file "format.xlsx" not found or could not be read.' };
     }
-    const templateBuffer = fs.readFileSync(templatePath)
-    // Add sheetStubs to create cell objects for empty but styled cells.
-    const workbook = XLSX.read(templateBuffer, { type: "buffer", cellStyles: true, sheetStubs: true })
+    const workbook = XLSX.read(templateContent, { type: "binary", cellStyles: true, sheetStubs: true });
+
     const sheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[sheetName]
 
@@ -1608,10 +1608,10 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
     const lowercasedEmail = email.toLowerCase();
     const interestsRef = adminDb.collection("emrInterests");
     
-    // Find interests where the new user's email is in the coPiDetails array but their UID is not set.
-    const q = interestsRef.where('coPiDetails', 'array-contains', { email: lowercasedEmail, name: '', uid: null });
-
-    const snapshot = await getDocs(q);
+    // Find interests where the new user's email is in the coPiEmails array (if it exists)
+    // This is a more flexible query that doesn't rely on the structure of coPiDetails
+    const q = interestsRef.where('coPiEmails', 'array-contains', lowercasedEmail);
+    const snapshot = await adminGetDocs(q);
     
     if (snapshot.empty) {
       return { success: true, count: 0 };
@@ -1624,6 +1624,7 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
       const interest = doc.data() as EmrInterest;
       let needsUpdate = false;
       
+      // Update the coPiDetails array to include the new UID
       const updatedCoPiDetails = (interest.coPiDetails || []).map(coPi => {
         if (coPi.email.toLowerCase() === lowercasedEmail && !coPi.uid) {
           needsUpdate = true;
@@ -1633,6 +1634,7 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
       });
 
       if (needsUpdate) {
+        // Add the new UID to the coPiUids array for efficient querying
         const updatedCoPiUids = [...new Set([...(interest.coPiUids || []), uid])];
         batch.update(doc.ref, {
           coPiDetails: updatedCoPiDetails,
@@ -1683,7 +1685,7 @@ export async function updateProjectWithRevision(
     const usersRef = adminDb.collection("users")
     const q = adminQuery(usersRef, where("role", "in", adminRoles))
 
-    const adminUsersSnapshot = await getDocs(q)
+    const adminUsersSnapshot = await adminGetDocs(q)
     if (!adminUsersSnapshot.empty) {
       const batch = adminDb.batch()
       const notificationTitle = `Revision Submitted for "${project.title}" by ${project.pi}`
@@ -2022,7 +2024,7 @@ export async function updatePhaseStatus(
         const adminRoles = ['Super-admin', 'admin'];
         const usersRef = adminDb.collection('users');
         const q = adminQuery(usersRef, adminWhere('role', 'in', adminRoles));
-        const adminUsersSnapshot = await getDocs(q);
+        const adminUsersSnapshot = await adminGetDocs(q);
 
         if (!adminUsersSnapshot.empty) {
             const batch = adminDb.batch();
@@ -2139,7 +2141,7 @@ export async function updateUserTutorialStatus(uid: string): Promise<{ success: 
   }
 }
 
-export async function registerEmrInterest(callId: string, user: User, coPis?: { uid: string, name: string }[]): Promise<{ success: boolean; error?: string }> {
+export async function registerEmrInterest(callId: string, user: User, coPis: CoPiDetails[] = []): Promise<{ success: boolean; error?: string }> {
   try {
     if (!user || !user.uid || !user.faculty || !user.department) {
       return { success: false, error: "User profile is incomplete. Please update your faculty and department in Settings." };
@@ -2152,12 +2154,10 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
         return { success: false, error: "You have already registered your interest for this call." };
     }
     
-    // Check if this is the first registration for this call
     const allInterestsForCallQuery = interestsRef.where('callId', '==', callId);
     const allInterestsSnapshot = await allInterestsForCallQuery.get();
     const isFirstInterest = allInterestsSnapshot.empty;
 
-    // Use a transaction to get the next sequential ID
     const newInterest = await adminDb.runTransaction(async (transaction) => {
       const counterRef = adminDb.collection('counters').doc('emrInterest');
       const counterDoc = await transaction.get(counterRef);
@@ -2180,12 +2180,11 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
           department: user.department!,
           registeredAt: new Date().toISOString(),
           status: 'Registered',
+          coPiDetails: coPis,
+          coPiUids: coPis.map(p => p.uid).filter((uid): uid is string => !!uid),
+          coPiNames: coPis.map(p => p.name),
+          coPiEmails: coPis.map(p => p.email.toLowerCase()),
       };
-
-      if (coPis && coPis.length > 0) {
-        newInterestDoc.coPiUids = coPis.map(p => p.uid);
-        newInterestDoc.coPiNames = coPis.map(p => p.name);
-      }
       
       const interestRef = adminDb.collection('emrInterests').doc();
       transaction.set(interestRef, newInterestDoc);
@@ -2195,7 +2194,6 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
     const callSnap = await adminDb.collection('fundingCalls').doc(callId).get();
     const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : "an EMR call";
 
-    // If it's the first interest, notify admins
     if (isFirstInterest) {
         const adminRoles = ["admin", "Super-admin"];
         const usersRef = adminDb.collection("users");
@@ -2218,40 +2216,42 @@ export async function registerEmrInterest(callId: string, user: User, coPis?: { 
         }
     }
 
-
-     // Notify Co-PIs
     if (coPis && coPis.length > 0) {
         const usersRef = adminDb.collection("users");
-        const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", coPis.map(p => p.uid));
-        const coPiDocs = await usersQuery.get();
-        const batch = adminDb.batch();
+        const coPiUids = coPis.map(p => p.uid).filter(Boolean) as string[];
 
-        for (const userDoc of coPiDocs.docs) {
-            const coPi = userDoc.data() as User;
-            const notificationRef = adminDb.collection("notifications").doc();
-            batch.set(notificationRef, {
-                uid: coPi.uid,
-                title: `You've been added as a Co-PI for the EMR call: "${callTitle}"`,
-                createdAt: new Date().toISOString(),
-                isRead: false,
-            });
+        if (coPiUids.length > 0) {
+            const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", coPiUids);
+            const coPiDocs = await usersQuery.get();
+            const batch = adminDb.batch();
 
-            if (coPi.email) {
-                await sendEmailUtility({
-                    to: coPi.email,
-                    subject: `You've been added to an EMR Application `,
-                    html: `
-                        <div ${EMAIL_STYLES.background}>
-                            ${EMAIL_STYLES.logo}
-                            <p style="color:#ffffff;">Dear ${coPi.name},</p>
-                            <p style="color:#e0e0e0;">You have been added as a Co-PI by ${user.name} for the EMR funding opportunity titled "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
-                             ${EMAIL_STYLES.footer}
-                        </div>`,
-                    from: 'default'
+            for (const userDoc of coPiDocs.docs) {
+                const coPi = userDoc.data() as User;
+                const notificationRef = adminDb.collection("notifications").doc();
+                batch.set(notificationRef, {
+                    uid: coPi.uid,
+                    title: `You've been added as a Co-PI for the EMR call: "${callTitle}"`,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
                 });
+
+                if (coPi.email) {
+                    await sendEmailUtility({
+                        to: coPi.email,
+                        subject: `You've been added to an EMR Application `,
+                        html: `
+                            <div ${EMAIL_STYLES.background}>
+                                ${EMAIL_STYLES.logo}
+                                <p style="color:#ffffff;">Dear ${coPi.name},</p>
+                                <p style="color:#e0e0e0;">You have been added as a Co-PI by ${user.name} for the EMR funding opportunity titled "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
+                                 ${EMAIL_STYLES.footer}
+                            </div>`,
+                        from: 'default'
+                    });
+                }
             }
+            await batch.commit();
         }
-        await batch.commit();
     }
     
     await logActivity('INFO', 'EMR interest registered', { callId, userId: user.uid });
@@ -2505,7 +2505,7 @@ export async function withdrawEmrInterest(interestId: string): Promise<{ success
         return { success: true };
     } catch (error: any) {
         const interestSnap = await adminDb.collection('emrInterests').doc(interestId).get();
-        const interest = interestSnap.exists() ? interestSnap.data() as EmrInterest : null;
+        const interest = interestSnap.exists ? interestSnap.data() as EmrInterest : null;
         await logActivity('ERROR', 'Failed to withdraw EMR interest', { interestId, userId: interest?.userId, callId: interest?.callId, error: error.message, stack: error.stack });
         return { success: false, error: error.message || "Failed to withdraw interest." };
     }
@@ -2790,7 +2790,7 @@ export async function updateEmrStatus(
         
         if (status === 'Revision Needed') {
             const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
-            if (callSnap.exists()) {
+            if (callSnap.exists) {
                 const call = callSnap.data() as FundingCall;
                 if (call.meetingDetails?.date) {
                     const meetingDate = parseISO(call.meetingDetails.date);
@@ -2981,13 +2981,12 @@ export async function generateOfficeNotingForm(
       }
     }
 
-    const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
-    if (!fs.existsSync(templatePath)) {
-      return { success: false, error: 'Office Notings form template not found on the server.' };
+    const templateContent = getTemplateContent('IMR_RECOMMENDATION_TEMPLATE.docx');
+    if (!templateContent) {
+        return { success: false, error: 'Office Notings form template not found on the server.' };
     }
-    const content = fs.readFileSync(templatePath, 'binary');
+    const zip = new PizZip(templateContent);
 
-    const zip = new PizZip(content);
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
     const coPiData: { [key: string]: string } = {};
@@ -3328,7 +3327,7 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
         });
 
         const interestSnap = await interestRef.get();
-        if (interestSnap.exists()) {
+        if (interestSnap.exists) {
             const interest = interestSnap.data() as EmrInterest;
             await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
             // You can add email notification logic here if needed, similar to other functions.
@@ -3350,7 +3349,7 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
 
         const interestRef = adminDb.collection('emrInterests').doc(interestId);
         const interestSnap = await interestRef.get();
-        if (!interestSnap.exists()) {
+        if (!interestSnap.exists) {
             return { success: false, error: "Interest registration not found." };
         }
         const interest = interestSnap.data() as EmrInterest;
@@ -3395,3 +3394,5 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
 }
 
   
+
+    

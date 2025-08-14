@@ -199,7 +199,7 @@ export default function SignupPage() {
         title: "Account Created",
         description: "Let's complete your profile to continue.",
       })
-      router.push("/profile-setup")
+      router.push("/dashboard/profile-setup")
     }
   }
 
@@ -412,4 +412,4 @@ export default function SignupPage() {
   )
 }
 
-  
+    

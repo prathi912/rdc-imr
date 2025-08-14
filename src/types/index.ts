@@ -364,6 +364,7 @@ export type EmrInterest = {
   coPiDetails?: CoPiDetails[]
   coPiUids?: string[]
   coPiNames?: string[]
+  coPiEmails?: string[]
   status:
     | "Registered"
     | "PPT Submitted"
@@ -420,4 +421,4 @@ export type LoginOtp = {
   expiresAt: number // Store as timestamp
 }
 
-  
+    
