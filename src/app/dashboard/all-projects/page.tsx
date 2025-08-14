@@ -9,11 +9,11 @@ import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/config';
 import { collection, getDocs, query, where, orderBy, or } from 'firebase/firestore';
-import type { Project, User } from '@/types';
+import type { Project, User, EmrInterest, FundingCall } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Calendar as CalendarIcon } from 'lucide-react';
+import { Download, Calendar as CalendarIcon, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,13 +23,17 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { createDebugInfo, logDebugInfo, findInstituteMatches } from '@/lib/debug-utils';
+import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
 
-const EXPORT_COLUMNS = [
+const IMR_EXPORT_COLUMNS = [
   { id: 'title', label: 'Project Title' },
   { id: 'type', label: 'Category' },
   { id: 'submissionDate', label: 'Submission Date' },
@@ -45,8 +49,23 @@ const EXPORT_COLUMNS = [
   { id: 'coPiNames', label: 'Co-PI Names' },
 ];
 
+const EMR_EXPORT_COLUMNS = [
+    { id: 'callTitle', label: 'Project Title' },
+    { id: 'agency', label: 'Funding Agency' },
+    { id: 'piName', label: 'PI Name' },
+    { id: 'piEmail', label: 'PI Email' },
+    { id: 'piInstitute', label: 'PI Institute' },
+    { id: 'piDepartment', label: 'PI Department' },
+    { id: 'coPiNames', label: 'Co-PI Names' },
+    { id: 'status', label: 'Status' },
+    { id: 'sanctionDate', label: 'Sanction Date' },
+    { id: 'durationAmount', label: 'Duration & Amount' },
+];
+
+
 export default function AllProjectsPage() {
-  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [allImrProjects, setAllImrProjects] = useState<Project[]>([]);
+  const [allEmrProjects, setAllEmrProjects] = useState<EmrInterest[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -54,19 +73,18 @@ export default function AllProjectsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [facultyFilter, setFacultyFilter] = useState('all');
+  const [activeTab, setActiveTab] = useState('imr');
   const isMobile = useIsMobile();
 
-  // State for export dialog
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>(undefined);
-  const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(EXPORT_COLUMNS.map(c => c.id));
+  const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(IMR_EXPORT_COLUMNS.map(c => c.id));
   
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
-      // For CROs, default to showing all their assigned faculties.
       if (parsedUser.role === 'CRO') {
         setFacultyFilter('all');
       }
@@ -74,298 +92,205 @@ export default function AllProjectsPage() {
       setLoading(false);
     }
   }, []);
+  
+  useEffect(() => {
+      setSelectedExportColumns(activeTab === 'imr' ? IMR_EXPORT_COLUMNS.map(c => c.id) : EMR_EXPORT_COLUMNS.map(c => c.id));
+  }, [activeTab]);
 
   useEffect(() => {
     if (!user) return;
-
     setLoading(true);
 
-    const usersCol = collection(db, 'users');
-    getDocs(usersCol).then(userSnapshot => {
-        const userList = userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
-        setUsers(userList);
-    }).catch(error => {
-        console.error("Error fetching users:", error);
-    });
-
-    async function fetchProjects() {
+    const fetchAllData = async () => {
         try {
+            const usersCol = collection(db, 'users');
+            const userSnapshot = await getDocs(usersCol);
+            const userList = userSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+            setUsers(userList);
+
             const projectsCol = collection(db, 'projects');
+            const emrInterestsCol = collection(db, 'emrInterests');
             const isSuperAdmin = user?.role === 'Super-admin';
             const isAdmin = user?.role === 'admin';
             const isCro = user?.role === 'CRO';
             const isPrincipal = user?.designation === 'Principal';
             const isHod = user?.designation === 'HOD';
-            const isSpecialPitUser = user?.email === 'pit@paruluniversity.ac.in';
 
-
-            let projectList: Project[] = [];
+            let imrQuery;
+            let emrQuery;
 
             if (isSuperAdmin || isAdmin) {
-                const q = query(projectsCol, orderBy('submissionDate', 'desc'));
-                const snapshot = await getDocs(q);
-                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                imrQuery = query(projectsCol, orderBy('submissionDate', 'desc'));
+                emrQuery = query(emrInterestsCol, where('status', 'in', ['Sanctioned', 'Process Complete']));
             } else if (isCro && user.faculties && user.faculties.length > 0) {
-                // Fetch projects for all assigned faculties
-                const croFaculties = user.faculties;
-                const q = query(projectsCol, where('faculty', 'in', croFaculties), orderBy('submissionDate', 'desc'));
-                const snapshot = await getDocs(q);
-                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                imrQuery = query(projectsCol, where('faculty', 'in', user.faculties), orderBy('submissionDate', 'desc'));
+                emrQuery = query(emrInterestsCol, where('faculty', 'in', user.faculties), where('status', 'in', ['Sanctioned', 'Process Complete']));
+            } else if (isPrincipal && user.institute) {
+                imrQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
+                emrQuery = query(emrInterestsCol, where('faculty', '==', user.faculty), where('status', 'in', ['Sanctioned', 'Process Complete'])); // Assuming institute is tied to faculty
             } else if (isHod && user.department && user.institute) {
-                const q = query(
+                 imrQuery = query(
                     projectsCol, 
                     where('departmentName', '==', user.department), 
                     where('institute', '==', user.institute),
                     orderBy('submissionDate', 'desc')
                 );
-                const snapshot = await getDocs(q);
-                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-            } else if (isSpecialPitUser) {
-                 const q = query(projectsCol, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']), orderBy('submissionDate', 'desc'));
-                 const snapshot = await getDocs(q);
-                 projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-            }
-            else if (isPrincipal && user.institute) {
-                // First, try an exact match.
-                const exactQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
-                let snapshot = await getDocs(exactQuery);
-
-                if (snapshot.empty) {
-                    // Fallback to client-side filtering if exact match yields no results
-                    const allProjectsSnapshot = await getDocs(query(projectsCol, orderBy('submissionDate', 'desc')));
-                    projectList = allProjectsSnapshot.docs
-                        .map(doc => ({ ...doc.data(), id: doc.id } as Project))
-                        .filter(p => p.institute && p.institute.toLowerCase() === user!.institute!.toLowerCase());
-
-                    // Logging for debug purposes
-                    const allProjectInstitutes = allProjectsSnapshot.docs.map(d => d.data().institute);
-                    const debugInfo = createDebugInfo(user, projectList);
-                    logDebugInfo(debugInfo, 'All Projects Fallback');
-
-                } else {
-                    projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
-                }
-
+                emrQuery = query(emrInterestsCol, where('department', '==', user.department), where('status', 'in', ['Sanctioned', 'Process Complete']));
             } else {
-                const q = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
-                 const snapshot = await getDocs(q);
-                projectList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project));
+                imrQuery = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
+                emrQuery = query(emrInterestsCol, where('userId', '==', user.uid), where('status', 'in', ['Sanctioned', 'Process Complete']));
             }
-            
-            setAllProjects(projectList);
+
+            const [imrSnapshot, emrSnapshot] = await Promise.all([
+                getDocs(imrQuery),
+                getDocs(emrQuery)
+            ]);
+
+            setAllImrProjects(imrSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project)));
+            setAllEmrProjects(emrSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as EmrInterest)));
+
         } catch (error) {
             console.error("Error fetching projects: ", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data.' });
         } finally {
             setLoading(false);
         }
-    }
+    };
 
-    fetchProjects();
-}, [user, toast]);
+    fetchAllData();
+  }, [user, toast]);
   
-  const isSuperAdmin = user?.role === 'Super-admin';
-  const isAdmin = user?.role === 'admin';
-  const isCro = user?.role === 'CRO';
-  const isPrincipal = user?.designation === 'Principal';
-  const isHod = user?.designation === 'HOD';
-  const hasExportAccess = isSuperAdmin || isAdmin || isCro || isPrincipal || isHod;
+  const hasAdminView = user?.role === 'Super-admin' || user?.role === 'admin' || user?.role === 'CRO' || user?.designation === 'Principal' || user?.designation === 'HOD';
+
+  const filteredImrProjects = useMemo(() => {
+    return allImrProjects.filter(project => {
+      if (statusFilter !== 'all' && project.status !== statusFilter) return false;
+      if (user?.role === 'CRO' && facultyFilter !== 'all' && project.faculty !== facultyFilter) return false;
+      if (!searchTerm) return true;
+      const lowerCaseSearch = searchTerm.toLowerCase();
+      return project.title.toLowerCase().includes(lowerCaseSearch) || project.pi.toLowerCase().includes(lowerCaseSearch);
+    });
+  }, [allImrProjects, searchTerm, statusFilter, facultyFilter, user]);
   
+  const filteredEmrProjects = useMemo(() => {
+      return allEmrProjects.filter(project => {
+          if (!searchTerm) return true;
+          const lowerCaseSearch = searchTerm.toLowerCase();
+          const title = project.callTitle || '';
+          return title.toLowerCase().includes(lowerCaseSearch) || project.userName.toLowerCase().includes(lowerCaseSearch) || (project.agency || '').toLowerCase().includes(lowerCaseSearch);
+      })
+  }, [allEmrProjects, searchTerm]);
+
   let pageTitle = "All Projects";
   let pageDescription = "Browse and manage all projects in the system.";
-  let exportFileName = 'all_projects';
+  
+  if (user?.designation === 'Principal' && user?.institute) pageTitle = `Projects from ${user.institute}`;
+  if (user?.designation === 'HOD' && user?.department) pageTitle = `Projects from ${user.department}`;
+  if (user?.role === 'CRO' && facultyFilter !== 'all') pageTitle = `Projects from ${facultyFilter}`;
 
-  if (user?.email === 'pit@paruluniversity.ac.in') {
-      pageTitle = `Projects from Parul Institute of Technology`;
-      pageDescription = "Browse all projects from Parul Institute of Technology and its Diploma studies wing.";
-      exportFileName = `projects_PIT_Combined`;
-  }
-  else if (isPrincipal && user?.institute) {
-    pageTitle = `Projects from ${user.institute}`;
-    pageDescription = "Browse all projects submitted from your institute.";
-    exportFileName = `projects_${user.institute.replace(/[ &]/g, '_')}`;
-  } else if (isPrincipal && !user?.institute) {
-    pageTitle = "All Projects (Principal - No Institute Set)";
-    pageDescription = "Your institute information is not configured. Please update your profile to see institute-specific projects.";
-    exportFileName = 'principal_all_projects';
-  } else if (isHod && user?.department) {
-    pageTitle = `Projects from ${user.department}`;
-    pageDescription = `Browse all projects submitted from your department within ${user.institute}.`;
-    exportFileName = `projects_${user.department.replace(/[ &]/g, '_')}`;
-  } else if (isCro && user?.faculties) {
-      if (facultyFilter === 'all' || !facultyFilter) {
-          pageTitle = `Projects from All Your Faculties`;
-      } else {
-          pageTitle = `Projects from ${facultyFilter}`;
-      }
-      pageDescription = "Browse all projects submitted from your assigned faculties.";
-      exportFileName = `projects_${facultyFilter.replace(/[ &]/g, '_')}`;
-  }
-
-  const filteredProjects = useMemo(() => {
-    return allProjects
-      .filter(project => {
-        if (statusFilter !== 'all' && project.status !== statusFilter) {
-          return false;
-        }
-        if (isCro && facultyFilter !== 'all' && project.faculty !== facultyFilter) {
-            return false;
-        }
-        if (searchTerm === '') {
-          return true;
-        }
-        const lowerCaseSearch = searchTerm.toLowerCase();
-        return (
-          project.title.toLowerCase().includes(lowerCaseSearch) ||
-          project.pi.toLowerCase().includes(lowerCaseSearch)
-        );
-      });
-  }, [allProjects, searchTerm, statusFilter, facultyFilter, isCro]);
-
-  const handleColumnSelectionChange = (columnId: string, checked: boolean) => {
-    setSelectedExportColumns(prev => {
-      if (checked) {
-        return [...prev, columnId];
-      } else {
-        return prev.filter(id => id !== columnId);
-      }
-    });
-  };
+  const EXPORT_COLUMNS = activeTab === 'imr' ? IMR_EXPORT_COLUMNS : EMR_EXPORT_COLUMNS;
 
   const handleConfirmExport = () => {
-    let projectsToExport = [...filteredProjects];
-
+      if (activeTab === 'imr') {
+          exportImrProjects();
+      } else {
+          exportEmrProjects();
+      }
+      setIsExportDialogOpen(false);
+  };
+  
+  const exportImrProjects = () => {
+    let projectsToExport = [...filteredImrProjects];
     if (exportDateRange?.from) {
-      projectsToExport = projectsToExport.filter(p => {
-        const submissionDate = parseISO(p.submissionDate);
-        // If there's an end date, check the range. Otherwise just check 'after from'.
-        return isAfter(submissionDate, exportDateRange.from!) && (!exportDateRange.to || isBefore(submissionDate, exportDateRange.to!));
-      });
+      projectsToExport = projectsToExport.filter(p => isAfter(parseISO(p.submissionDate), exportDateRange.from!) && (!exportDateRange.to || isBefore(parseISO(p.submissionDate), exportDateRange.to!)));
     }
-
     if (projectsToExport.length === 0) {
-      toast({ variant: 'destructive', title: "No Data", description: "There are no projects to export with the selected filters." });
-      return;
+      toast({ variant: 'destructive', title: "No Data", description: "No IMR projects to export with selected filters." }); return;
     }
-    
     const usersMap = new Map(users.map(u => [u.uid, u]));
-    
     const dataToExport = projectsToExport.map(p => {
       const userDetails = usersMap.get(p.pi_uid);
-      const coPiNames = (p.coPiUids || [])
-        .map(uid => usersMap.get(uid)?.name)
-        .filter(Boolean)
-        .join(', ');
-
-      const projectData: { [key: string]: any } = {
-        title: p.title,
-        type: p.type,
-        submissionDate: new Date(p.submissionDate).toLocaleDateString(),
-        abstract: p.abstract,
-        pi: p.pi,
-        pi_email: p.pi_email || 'N/A',
-        pi_phoneNumber: p.pi_phoneNumber || 'N/A',
-        misId: userDetails?.misId || 'N/A',
-        designation: userDetails?.designation || 'N/A',
-        institute: p.institute,
-        departmentName: p.departmentName,
-        status: p.status,
-        coPiNames: coPiNames || 'N/A',
-      };
-
+      const coPiNames = (p.coPiDetails || []).map(c => c.name).join(', ');
       const row: { [key: string]: any } = {};
       selectedExportColumns.forEach(colId => {
-        const column = EXPORT_COLUMNS.find(c => c.id === colId);
-        if (column) {
-            row[column.label] = projectData[colId];
-        }
+        const column = IMR_EXPORT_COLUMNS.find(c => c.id === colId);
+        if (column) row[column.label] = { title: p.title, type: p.type, submissionDate: new Date(p.submissionDate).toLocaleDateString(), abstract: p.abstract, pi: p.pi, pi_email: p.pi_email, pi_phoneNumber: p.pi_phoneNumber, misId: userDetails?.misId, designation: userDetails?.designation, institute: p.institute, departmentName: p.departmentName, status: p.status, coPiNames: coPiNames || 'N/A' }[colId];
       });
       return row;
     });
-
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Projects");
-    
-    XLSX.writeFile(workbook, `${exportFileName}_${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast({ title: "Export Started", description: `Downloading ${projectsToExport.length} projects.` });
-    setIsExportDialogOpen(false);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "IMR_Projects");
+    XLSX.writeFile(workbook, `IMR_Projects_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast({ title: "Export Started", description: `Downloading ${projectsToExport.length} IMR projects.` });
+  };
+  
+  const exportEmrProjects = () => {
+      if (filteredEmrProjects.length === 0) {
+          toast({ variant: 'destructive', title: "No Data", description: "No EMR projects to export." }); return;
+      }
+      const usersMap = new Map(users.map(u => [u.uid, u]));
+      const dataToExport = filteredEmrProjects.map(p => {
+          const userDetails = usersMap.get(p.userId);
+          const row: { [key: string]: any } = {};
+          selectedExportColumns.forEach(colId => {
+               const column = EMR_EXPORT_COLUMNS.find(c => c.id === colId);
+               if(column) row[column.label] = { callTitle: p.callTitle, agency: p.agency, piName: p.userName, piEmail: p.userEmail, piInstitute: userDetails?.institute, piDepartment: userDetails?.department, coPiNames: p.coPiNames?.join(', ') || 'N/A', status: p.status, sanctionDate: p.sanctionDate ? new Date(p.sanctionDate).toLocaleDateString() : 'N/A', durationAmount: p.durationAmount }[colId];
+          });
+          return row;
+      });
+       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+       const workbook = XLSX.utils.book_new();
+       XLSX.utils.book_append_sheet(workbook, worksheet, "EMR_Projects");
+       XLSX.writeFile(workbook, `EMR_Projects_${new Date().toISOString().split('T')[0]}.xlsx`);
+       toast({ title: "Export Started", description: `Downloading ${filteredEmrProjects.length} EMR projects.` });
+  };
+
+  const handleColumnSelectionChange = (columnId: string, checked: boolean) => {
+    setSelectedExportColumns(prev => checked ? [...prev, columnId] : prev.filter(id => id !== columnId));
   };
 
 
   return (
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
-        {hasExportAccess && (
+        {hasAdminView && (
             <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
                 <DialogTrigger asChild>
-                    <Button disabled={loading || filteredProjects.length === 0}>
-                        <Download className="mr-2 h-4 w-4" />
-                        Export XLSX
+                    <Button disabled={loading || (activeTab === 'imr' && filteredImrProjects.length === 0) || (activeTab === 'emr' && filteredEmrProjects.length === 0)}>
+                        <Download className="mr-2 h-4 w-4" /> Export XLSX
                     </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle>Custom Export</DialogTitle>
+                        <DialogTitle>Custom Export for {activeTab.toUpperCase()} Projects</DialogTitle>
                         <DialogDescription>Select filters and columns for your Excel export.</DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-6 py-4">
-                        <div>
-                            <Label>Filter by Submission Date</Label>
-                             {isMobile ? (
-                                <div className="flex items-center gap-2 mt-2">
-                                  <Input type="date" value={exportDateRange?.from ? format(exportDateRange.from, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, from: e.target.value ? parseISO(e.target.value) : undefined }))} />
-                                  <span>-</span>
-                                  <Input type="date" value={exportDateRange?.to ? format(exportDateRange.to, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, to: e.target.value ? parseISO(e.target.value) : undefined }))} />
-                                </div>
-                             ) : (
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                    <Button
-                                        id="date"
-                                        variant={"outline"}
-                                        className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}
-                                    >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {exportDateRange?.from ? (
-                                        exportDateRange.to ? (
-                                            <>
-                                            {format(exportDateRange.from, "LLL dd, y")} -{" "}
-                                            {format(exportDateRange.to, "LLL dd, y")}
-                                            </>
-                                        ) : (
-                                            format(exportDateRange.from, "LLL dd, y")
-                                        )
-                                        ) : (
-                                        <span>Pick a date range</span>
-                                        )}
-                                    </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        initialFocus
-                                        mode="range"
-                                        defaultMonth={exportDateRange?.from}
-                                        selected={exportDateRange}
-                                        onSelect={setExportDateRange}
-                                    />
-                                    </PopoverContent>
-                                </Popover>
-                             )}
-                        </div>
+                        {activeTab === 'imr' && (
+                            <div>
+                                <Label>Filter by Submission Date</Label>
+                                {isMobile ? (
+                                    <div className="flex items-center gap-2 mt-2">
+                                    <Input type="date" value={exportDateRange?.from ? format(exportDateRange.from, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, from: e.target.value ? parseISO(e.target.value) : undefined }))} />
+                                    <span>-</span>
+                                    <Input type="date" value={exportDateRange?.to ? format(exportDateRange.to, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, to: e.target.value ? parseISO(e.target.value) : undefined }))} />
+                                    </div>
+                                ) : (
+                                    <Popover>
+                                        <PopoverTrigger asChild><Button id="date" variant={"outline"} className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{exportDateRange?.from ? (exportDateRange.to ? (`${format(exportDateRange.from, "LLL dd, y")} - ${format(exportDateRange.to, "LLL dd, y")}`) : format(exportDateRange.from, "LLL dd, y")) : (<span>Pick a date range</span>)}</Button></PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start"><Calendar initialFocus mode="range" defaultMonth={exportDateRange?.from} selected={exportDateRange} onSelect={setExportDateRange} /></PopoverContent>
+                                    </Popover>
+                                )}
+                            </div>
+                        )}
                         <div>
                             <Label>Select Columns to Export</Label>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-2 p-4 border rounded-md max-h-60 overflow-y-auto">
                                 {EXPORT_COLUMNS.map(column => (
                                     <div key={column.id} className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id={`col-${column.id}`} 
-                                            checked={selectedExportColumns.includes(column.id)}
-                                            onCheckedChange={(checked) => handleColumnSelectionChange(column.id, !!checked)}
-                                        />
-                                        <label htmlFor={`col-${column.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                            {column.label}
-                                        </label>
+                                        <Checkbox id={`col-${column.id}`} checked={selectedExportColumns.includes(column.id)} onCheckedChange={(checked) => handleColumnSelectionChange(column.id, !!checked)} />
+                                        <label htmlFor={`col-${column.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{column.label}</label>
                                     </div>
                                 ))}
                             </div>
@@ -381,55 +306,61 @@ export default function AllProjectsPage() {
       </PageHeader>
       
       <div className="flex flex-col sm:flex-row flex-wrap items-center py-4 gap-2 sm:gap-4">
-        <Input
-            placeholder="Filter by title or PI..."
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-xs"
-        />
+        <Input placeholder="Filter by title or PI..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-xs" />
         <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[220px]">
-                    <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    {STATUSES.map(status => (
-                        <SelectItem key={status} value={status}>{status}</SelectItem>
-                    ))}
-                </SelectContent>
+            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={activeTab === 'emr'}>
+                <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
+                <SelectContent><SelectItem value="all">All Statuses</SelectItem>{STATUSES.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
             </Select>
-            {isCro && user && user.faculties && user.faculties.length > 1 && (
+            {user?.role === 'CRO' && user.faculties && user.faculties.length > 1 && (
                  <Select value={facultyFilter} onValueChange={setFacultyFilter}>
-                    <SelectTrigger className="w-full sm:w-[280px]">
-                        <SelectValue placeholder="Filter by faculty" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Assigned Faculties</SelectItem>
-                        {user.faculties.map(faculty => (
-                            <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
-                        ))}
-                    </SelectContent>
+                    <SelectTrigger className="w-full sm:w-[280px]"><SelectValue placeholder="Filter by faculty" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All Assigned Faculties</SelectItem>{user.faculties.map(faculty => (<SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>))}</SelectContent>
                 </Select>
             )}
         </div>
       </div>
 
-      <div className="mt-4">
-        {loading ? (
-           <Card>
-            <CardContent className="pt-6">
-              <div className="space-y-4">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </CardContent>
-          </Card>
+        {hasAdminView ? (
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList><TabsTrigger value="imr">IMR Projects</TabsTrigger><TabsTrigger value="emr">EMR Projects</TabsTrigger></TabsList>
+                <TabsContent value="imr" className="mt-4">
+                    {loading ? <Skeleton className="h-64 w-full" /> : <ProjectList projects={filteredImrProjects} currentUser={user!} allUsers={users} />}
+                </TabsContent>
+                <TabsContent value="emr" className="mt-4">
+                     {loading ? <Skeleton className="h-64 w-full" /> : (
+                         <Card>
+                            <CardContent className="pt-6">
+                                <Table>
+                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Agency</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                                    <TableBody>{filteredEmrProjects.map(p => {
+                                        const pi = users.find(u => u.uid === p.userId);
+                                        return (
+                                        <TableRow key={p.id}>
+                                            <TableCell className="font-medium">{p.callTitle || 'N/A'}</TableCell>
+                                            <TableCell>{pi?.name || p.userName}</TableCell>
+                                            <TableCell>{p.agency || 'N/A'}</TableCell>
+                                            <TableCell><Badge>{p.status}</Badge></TableCell>
+                                            <TableCell className="text-right">
+                                                {pi?.misId && (
+                                                    <Button asChild variant="outline" size="icon"><Link href={`/profile/${pi.misId}`}><Eye className="h-4 w-4" /></Link></Button>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                    )})}</TableBody>
+                                </Table>
+                            </CardContent>
+                         </Card>
+                     )}
+                </TabsContent>
+            </Tabs>
         ) : (
-          <ProjectList projects={filteredProjects} currentUser={user!} allUsers={users} />
+            <div className="mt-4">
+                {loading ? <Skeleton className="h-64 w-full" /> : <ProjectList projects={filteredImrProjects} currentUser={user!} allUsers={users} />}
+            </div>
         )}
-      </div>
     </div>
   );
 }
+
+    
