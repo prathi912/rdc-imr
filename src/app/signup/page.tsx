@@ -103,7 +103,12 @@ export default function SignupPage() {
 
     if (firebaseUser.email?.endsWith('@goa.paruluniversity.ac.in')) {
         campus = 'Goa';
+    } else if (firebaseUser.email?.endsWith('@rajkot.paruluniversity.ac.in')) {
+        campus = 'Rajkot';
+    } else if (firebaseUser.email?.endsWith('@ahmedabad.paruluniversity.ac.in')) {
+        campus = 'Ahmedabad';
     }
+
 
     if (firebaseUser.email === "vicepresident_86@paruluniversity.ac.in") {
       role = "Super-admin"
@@ -113,6 +118,7 @@ export default function SignupPage() {
     } else if (staffResult.success) {
       userDataFromExcel = staffResult.data
       const userType = staffResult.data.type
+      campus = staffResult.data.campus || campus
 
       if (userType === "CRO") {
         role = "CRO"
@@ -139,7 +145,7 @@ export default function SignupPage() {
       role,
       designation,
       campus,
-      faculty: userDataFromExcel.faculty || null,
+      faculty: userDataFromExcel.faculty || domainCheck.croFaculty || null,
       institute: userDataFromExcel.institute || null,
       department: userDataFromExcel.department || null,
       phoneNumber: userDataFromExcel.phoneNumber || null,
