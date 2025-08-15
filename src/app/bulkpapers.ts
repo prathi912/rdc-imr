@@ -65,11 +65,15 @@ async function linkAuthorToPaper(existingPaper: ResearchPaper, user: User) {
 
     if (existingPaper.mainAuthorUid) {
         const mainAuthorDoc = await adminDb.collection('users').doc(existingPaper.mainAuthorUid).get();
-        const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
+        const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
+        const mainAuthorMisId = mainAuthorData?.misId;
+        const mainAuthorCampus = mainAuthorData?.campus;
+        
+        const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorMisId}` : `/profile/${mainAuthorMisId}`;
 
         const notification = {
             uid: existingPaper.mainAuthorUid,
-            projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+            projectId: mainAuthorMisId ? profileLink : `/dashboard/my-projects`,
             title: `${user.name} has requested to be added as a co-author on your paper: "${existingPaper.title}"`,
             createdAt: new Date().toISOString(),
             isRead: false,

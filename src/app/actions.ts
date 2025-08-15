@@ -331,8 +331,12 @@ export async function addResearchPaper(
     await logActivity('INFO', 'Research paper added', { paperId: paperRef.id, title, mainAuthorUid });
 
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid!).get();
-    const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
-    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
+    const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
+    const mainAuthorName = mainAuthorData?.name || 'A colleague';
+    const mainAuthorMisId = mainAuthorData?.misId;
+    const mainAuthorCampus = mainAuthorData?.campus;
+    
+    const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorMisId}` : `/profile/${mainAuthorMisId}`;
 
     const notificationBatch = adminDb.batch();
     authors.forEach((author) => {
@@ -343,7 +347,7 @@ export async function addResearchPaper(
           title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
           createdAt: new Date().toISOString(),
           isRead: false,
-          projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+          projectId: mainAuthorMisId ? profileLink : `/dashboard/my-projects`,
         });
       }
     });
@@ -392,8 +396,13 @@ export async function updateResearchPaper(
     await logActivity('INFO', 'Research paper updated', { paperId, userId, title: data.title });
 
     const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
-    const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
-    const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
+    const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
+    const mainAuthorName = mainAuthorData?.name || 'A colleague';
+    const mainAuthorMisId = mainAuthorData?.misId;
+    const mainAuthorCampus = mainAuthorData?.campus;
+
+    const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorMisId}` : `/profile/${mainAuthorMisId}`;
+
     const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
 
     const notificationBatch = adminDb.batch();
@@ -405,7 +414,7 @@ export async function updateResearchPaper(
           title: `${mainAuthorName} added you as a co-author on the paper: "${data.title}"`,
           createdAt: new Date().toISOString(),
           isRead: false,
-          projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
+          projectId: mainAuthorMisId ? profileLink : `/dashboard/my-projects`,
         });
       }
     });
