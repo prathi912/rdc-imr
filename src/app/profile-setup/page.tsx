@@ -61,7 +61,8 @@ const goaFaculties = [
     "Faculty of Pharmacy",
     "Faculty of Applied and Health Sciences",
     "Faculty of Nursing",
-    "Faculty of Physiotherapy"
+    "Faculty of Physiotherapy",
+    "University Office"
 ];
 
 const goaInstitutes = [
@@ -131,39 +132,41 @@ export default function ProfileSetupPage() {
     },
   });
 
-      const prefillData = useCallback(async (misId: string) => {
-          if (!misId) return;
-          setIsPrefilling(true);
-          try {
-              const res = await fetch(`/api/get-staff-data?misId=${misId}`);
-              const result = await res.json();
-              if (result.success) {
-                form.reset(result.data);
-                setUserType(result.data.type);
-                // Set campus if present in fetched data
-                if (result.data.campus) {
-                  form.setValue("campus", result.data.campus);
-                  // Adjust faculty and institute based on campus
-                  if (result.data.campus === "Goa") {
-                    if (!goaFaculties.includes(result.data.faculty)) {
-                      form.setValue("faculty", "");
-                    }
-                    if (!goaInstitutes.includes(result.data.institute)) {
-                      form.setValue("institute", "");
-                    }
-                  }
+  const selectedCampus = form.watch('campus');
+
+  const prefillData = useCallback(async (misId: string) => {
+      if (!misId) return;
+      setIsPrefilling(true);
+      try {
+          const res = await fetch(`/api/get-staff-data?misId=${misId}`);
+          const result = await res.json();
+          if (result.success) {
+            form.reset(result.data);
+            setUserType(result.data.type);
+            // Set campus if present in fetched data
+            if (result.data.campus) {
+              form.setValue("campus", result.data.campus);
+              // Adjust faculty and institute based on campus
+              if (result.data.campus === "Goa") {
+                if (!goaFaculties.includes(result.data.faculty)) {
+                  form.setValue("faculty", "");
                 }
-                toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
-              } else {
-                 toast({ variant: 'destructive', title: 'Not Found', description: "Could not find your details using that MIS ID. Please enter them manually." });
+                if (!goaInstitutes.includes(result.data.institute)) {
+                  form.setValue("institute", "");
+                }
               }
-          } catch (error) {
-              console.error("Failed to fetch prefill data", error);
-              toast({ variant: 'destructive', title: 'Error', description: "Could not fetch your data. Please try again or enter manually." });
-          } finally {
-              setIsPrefilling(false);
+            }
+            toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+          } else {
+             toast({ variant: 'destructive', title: 'Not Found', description: "Could not find your details using that MIS ID. Please enter them manually." });
           }
-      }, [form, toast]);
+      } catch (error) {
+          console.error("Failed to fetch prefill data", error);
+          toast({ variant: 'destructive', title: 'Error', description: "Could not fetch your data. Please try again or enter manually." });
+      } finally {
+          setIsPrefilling(false);
+      }
+  }, [form, toast]);
 
 
   useEffect(() => {
@@ -204,18 +207,24 @@ export default function ProfileSetupPage() {
 
   useEffect(() => {
     async function fetchDepartments() {
+      const endpoint = selectedCampus === 'Goa' ? '/api/get-goa-departments' : '/api/get-departments';
       try {
-        const res = await fetch('/api/get-departments');
+        const res = await fetch(endpoint);
         const result = await res.json();
         if (result.success) {
           setDepartments(result.data);
+          // If current department is not in the new list, reset it
+          const currentDepartment = form.getValues('department');
+          if (currentDepartment && !result.data.includes(currentDepartment)) {
+              form.setValue('department', '');
+          }
         }
       } catch (error) {
-        console.error("Failed to fetch departments", error);
+        console.error(`Failed to fetch departments from ${endpoint}`, error);
       }
     }
     fetchDepartments();
-  }, []);
+  }, [selectedCampus, form]);
 
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

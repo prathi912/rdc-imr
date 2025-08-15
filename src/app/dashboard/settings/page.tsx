@@ -121,7 +121,8 @@ const goaFaculties = [
     "Faculty of Pharmacy",
     "Faculty of Applied and Health Sciences",
     "Faculty of Nursing",
-    "Faculty of Physiotherapy"
+    "Faculty of Physiotherapy",
+    "University Office"
 ];
 
 const campuses = ["Rajkot", "Ahmedabad", "Vadodara", "Goa"];
@@ -306,21 +307,29 @@ export default function SettingsPage() {
     return () => unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+  
+  const selectedCampus = profileForm.watch('campus');
 
   useEffect(() => {
     async function fetchDepartments() {
+      const endpoint = selectedCampus === 'Goa' ? '/api/get-goa-departments' : '/api/get-departments';
       try {
-        const res = await fetch("/api/get-departments")
-        const result = await res.json()
+        const res = await fetch(endpoint);
+        const result = await res.json();
         if (result.success) {
-          setDepartments(result.data)
+          setDepartments(result.data);
+          // If current department is not in the new list, reset it
+          const currentDepartment = profileForm.getValues('department');
+          if (currentDepartment && !result.data.includes(currentDepartment)) {
+              profileForm.setValue('department', '');
+          }
         }
       } catch (error) {
-        console.error("Failed to fetch departments", error)
+        console.error(`Failed to fetch departments from ${endpoint}`, error);
       }
     }
-    fetchDepartments()
-  }, [])
+    fetchDepartments();
+  }, [selectedCampus, profileForm]);
 
   async function onProfileSubmit(data: ProfileFormValues) {
     if (!user) return
