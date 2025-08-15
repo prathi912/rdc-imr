@@ -140,6 +140,10 @@ export default function NotificationsPage() {
     
     if (conflictingRoles.includes(selectedRole) && mainAuthor?.role === selectedRole) {
         setRoleConflict(true);
+    } else if (selectedRole === 'First Author' && mainAuthor?.role === 'First & Corresponding Author') {
+        setRoleConflict(true);
+    } else if (selectedRole === 'Corresponding Author' && mainAuthor?.role === 'First & Corresponding Author') {
+        setRoleConflict(true);
     } else {
         setRoleConflict(false);
         setMainAuthorNewRole('');
@@ -160,10 +164,20 @@ export default function NotificationsPage() {
     return `/dashboard/project/${notification.projectId}`;
   };
 
-  const getAvailableRolesForMainAuthor = (paper?: ResearchPaper): Author['role'][] => {
-    if (!paper) return AUTHOR_ROLES;
+  const getAvailableRolesForMainAuthor = (paper?: ResearchPaper, requesterAssignedRole?: Author['role']): Author['role'][] => {
+    if (!paper || !requesterAssignedRole) return AUTHOR_ROLES;
     const myCurrentRole = paper.authors.find(a => a.uid === user?.uid)?.role;
-    return AUTHOR_ROLES.filter(r => r !== myCurrentRole);
+    
+    let availableRoles = AUTHOR_ROLES.filter(r => r !== myCurrentRole);
+
+    if (requesterAssignedRole.includes('First Author')) {
+        availableRoles = availableRoles.filter(r => !r.includes('First Author'));
+    }
+    if (requesterAssignedRole.includes('Corresponding Author')) {
+        availableRoles = availableRoles.filter(r => !r.includes('Corresponding Author'));
+    }
+
+    return availableRoles;
   }
 
   return (
@@ -269,7 +283,7 @@ export default function NotificationsPage() {
                             <Select value={mainAuthorNewRole} onValueChange={(value) => setMainAuthorNewRole(value as Author['role'])}>
                                 <SelectTrigger><SelectValue placeholder="Select your new role" /></SelectTrigger>
                                 <SelectContent>
-                                    {getAvailableRolesForMainAuthor(managingRequest?.paper).map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
+                                    {getAvailableRolesForMainAuthor(managingRequest?.paper, assignedRole as Author['role']).map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
