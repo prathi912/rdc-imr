@@ -39,47 +39,58 @@ async function findExistingPaper(title: string, url: string): Promise<ResearchPa
     return null;
 }
 
-async function linkAuthorToPaper(existingPaper: ResearchPaper, user: User) {
-    const paperRef = adminDb.collection('papers').doc(existingPaper.id);
-    
-    const isAlreadyAuthor = existingPaper.authors?.some(a => a.uid === user.uid && a.status === 'approved');
-    const isAlreadyRequested = existingPaper.coAuthorRequests?.some(a => a.uid === user.uid);
-
-    if (isAlreadyAuthor || isAlreadyRequested) {
-        console.log(`User ${user.email} is already linked or has a pending request for paper ${existingPaper.id}.`);
-        return;
-    }
-
-    const newAuthorRequest: Author = {
-        uid: user.uid,
-        email: user.email,
-        name: user.name,
-        role: 'Co-Author', 
-        isExternal: false,
-        status: 'pending',
-    };
-    
-    await paperRef.update({
-        coAuthorRequests: FieldValue.arrayUnion(newAuthorRequest),
-    });
-
-    if (existingPaper.mainAuthorUid) {
-        const mainAuthorDoc = await adminDb.collection('users').doc(existingPaper.mainAuthorUid).get();
-        const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
-        const mainAuthorCampus = mainAuthorData?.campus;
+export async function sendCoAuthorRequest(
+    existingPaper: ResearchPaper, 
+    requestingUser: User, 
+    requesterRole: Author['role']
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const paperRef = adminDb.collection('papers').doc(existingPaper.id);
         
-        const notification: Omit<Notification, 'id'> = {
-            uid: existingPaper.mainAuthorUid,
-            title: `${user.name} has requested to be added as a co-author on your paper: "${existingPaper.title}"`,
-            createdAt: new Date().toISOString(),
-            isRead: false,
-            type: 'coAuthorRequest',
-            paperId: existingPaper.id,
-            requester: newAuthorRequest,
+        const isAlreadyAuthor = existingPaper.authors?.some(a => a.uid === requestingUser.uid && a.status === 'approved');
+        const isAlreadyRequested = existingPaper.coAuthorRequests?.some(a => a.uid === requestingUser.uid);
+
+        if (isAlreadyAuthor || isAlreadyRequested) {
+            return { success: false, error: 'You are already an author or have a pending request for this paper.' };
+        }
+
+        const newAuthorRequest: Author = {
+            uid: requestingUser.uid,
+            email: requestingUser.email,
+            name: requestingUser.name,
+            role: requesterRole, 
+            isExternal: false,
+            status: 'pending',
         };
-        await adminDb.collection('notifications').add(notification);
+        
+        await paperRef.update({
+            coAuthorRequests: FieldValue.arrayUnion(newAuthorRequest),
+        });
+
+        if (existingPaper.mainAuthorUid) {
+            const mainAuthorDoc = await adminDb.collection('users').doc(existingPaper.mainAuthorUid).get();
+            const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
+            const mainAuthorCampus = mainAuthorData?.campus;
+            const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorData?.misId}` : `/profile/${mainAuthorData?.misId}`;
+            
+            const notification: Omit<Notification, 'id'> = {
+                uid: existingPaper.mainAuthorUid,
+                title: `${requestingUser.name} has requested to be added as a co-author on your paper: "${existingPaper.title}"`,
+                createdAt: new Date().toISOString(),
+                isRead: false,
+                type: 'coAuthorRequest',
+                paperId: existingPaper.id,
+                requester: newAuthorRequest,
+            };
+            await adminDb.collection('notifications').add(notification);
+        }
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error sending co-author request:', error);
+        return { success: false, error: error.message || 'Server error while sending request.' };
     }
 }
+
 
 async function createNewPaper(paperData: PaperUploadData, user: User): Promise<ResearchPaper> {
     const paperRef = adminDb.collection('papers').doc();
@@ -130,13 +141,13 @@ export async function bulkUploadPapers(
     success: boolean; 
     data: {
         newPapers: { title: string }[];
-        linkedPapers: { title: string }[];
+        linkedPapers: ResearchPaper[];
         errors: { title: string; reason: string }[];
     };
     error?: string 
 }> {
   const newPapers: { title: string }[] = [];
-  const linkedPapers: { title: string }[] = [];
+  const linkedPapers: ResearchPaper[] = [];
   const errors: { title: string; reason: string }[] = [];
 
   for (const row of papersData) {
@@ -152,8 +163,7 @@ export async function bulkUploadPapers(
       const existingPaper = await findExistingPaper(title, url);
 
       if (existingPaper) {
-        await linkAuthorToPaper(existingPaper, user);
-        linkedPapers.push({ title });
+        linkedPapers.push(existingPaper);
       } else {
         await createNewPaper(row, user);
         newPapers.push({ title });
@@ -201,7 +211,7 @@ export async function manageCoAuthorRequest(
                 return { success: false, error: 'A First Author already exists for this paper.' };
             }
              if (assignedRole === 'Corresponding Author' && currentAuthors.some(a => a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author')) {
-                return { success: false, error: 'A Corresponding Author already exists for this paper.' };
+                return { success: false, error: 'A Corresponding Author already exists.' };
             }
              if (assignedRole === 'First & Corresponding Author' && (currentAuthors.some(a => a.role === 'First Author' || a.role === 'First & Corresponding Author') || currentAuthors.some(a => a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'))) {
                 return { success: false, error: 'A First or Corresponding Author already exists.' };
