@@ -87,13 +87,10 @@ export default function NotificationsPage() {
     const { paper } = managingRequest;
     const mainAuthor = paper.authors.find(a => a.uid === user.uid);
     
-    const conflictingRoles = ['First Author', 'Corresponding Author', 'First & Corresponding Author'];
+    const isFirstAuthorConflict = (selectedRole.includes('First Author') && mainAuthor?.role?.includes('First Author'));
+    const isCorrespondingAuthorConflict = (selectedRole.includes('Corresponding Author') && mainAuthor?.role?.includes('Corresponding Author'));
     
-    if (conflictingRoles.includes(selectedRole) && mainAuthor?.role === selectedRole) {
-        setRoleConflict(true);
-    } else if (selectedRole === 'First Author' && mainAuthor?.role === 'First & Corresponding Author') {
-        setRoleConflict(true);
-    } else if (selectedRole === 'Corresponding Author' && mainAuthor?.role === 'First & Corresponding Author') {
+    if (isFirstAuthorConflict || isCorrespondingAuthorConflict) {
         setRoleConflict(true);
     } else {
         setRoleConflict(false);
@@ -109,7 +106,6 @@ export default function NotificationsPage() {
         if (paperSnap.exists()) {
             const paper = { id: paperSnap.id, ...paperSnap.data() } as ResearchPaper;
             setManagingRequest({ notification, paper });
-            // Auto-select the requested role and trigger conflict check
             const requestedRole = notification.requester.role;
             handleRoleSelection(requestedRole);
         } else {
@@ -184,7 +180,7 @@ export default function NotificationsPage() {
     return `/dashboard/project/${notification.projectId}`;
   };
 
-  const buttonText = `Confirm & Add ${assignedRole?.replace(' Author', '')}`
+  const buttonText = `Confirm & Add as ${assignedRole}`
 
   return (
     <>
