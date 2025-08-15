@@ -33,13 +33,13 @@ import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { updateIncentiveClaimStatus, exportClaimToExcel } from '@/app/actions';
+import { updateIncentiveClaimStatus } from '@/app/actions';
 import { generateBookIncentiveForm } from '@/app/incentive-actions';
 import { generateMembershipIncentiveForm } from '@/app/membership-actions';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
-type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
+type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'submissionDate' | 'status' | 'claimType'>;
 
 
 function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null }) {
@@ -47,40 +47,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
     const [isPrinting, setIsPrinting] = useState(false);
 
     if (!claim) return null;
-
-    const handlePrint = async () => {
-        if (!claim) return;
-        setIsPrinting(true);
-        try {
-            const result = await exportClaimToExcel(claim.id);
-            if (result.success && result.fileData) {
-                const byteCharacters = atob(result.fileData);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `claim_${claim.userName.replace(/\s/g, '_')}_${claim.id.substring(0,5)}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-                toast({ title: "Export Successful", description: "Claim details have been exported." });
-            } else {
-                throw new Error(result.error || "Failed to export data.");
-            }
-        } catch (error: any) {
-            console.error("Print error:", error);
-            toast({ variant: 'destructive', title: "Export Failed", description: error.message });
-        } finally {
-            setIsPrinting(false);
-        }
-    };
 
     const renderDetail = (label: string, value?: string | number | boolean | string[] | { name: string, email: string, role: string }[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
@@ -569,12 +535,7 @@ export default function ManageIncentiveClaimsPage() {
               </Button>
             </TableHead>
             <TableHead className="hidden md:table-cell">
-               <Button variant="ghost" onClick={() => requestSort('paperTitle')}>
-                  Title <ArrowUpDown className="ml-2 h-4 w-4" />
-              </Button>
-            </TableHead>
-            <TableHead className="hidden lg:table-cell">
-              <Button variant="ghost" onClick={() => requestSort('claimType')}>
+               <Button variant="ghost" onClick={() => requestSort('claimType')}>
                   Claim Type <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
@@ -595,8 +556,7 @@ export default function ManageIncentiveClaimsPage() {
           {sortedAndFilteredClaims.map((claim) => (
               <TableRow key={claim.id}>
                 <TableCell className="font-medium whitespace-nowrap">{claim.userName}</TableCell>
-                <TableCell className="hidden md:table-cell max-w-sm truncate">{claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle}</TableCell>
-                <TableCell className="hidden lg:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
+                <TableCell className="hidden md:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
                 <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
@@ -664,7 +624,7 @@ export default function ManageIncentiveClaimsPage() {
       <div className="mt-8">
         <div className="flex items-center py-4 gap-4">
             <Input
-                placeholder="Filter by claimant or title..."
+                placeholder="Filter by claimant..."
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 className="max-w-sm"
