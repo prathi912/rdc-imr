@@ -51,7 +51,6 @@ export async function GET(request: NextRequest) {
   
   let userRecord: StaffData | undefined;
   let fileName: string;
-  let isGoaUser = false;
   
   const goastaffdataFilePath = path.join(process.cwd(), 'goastaffdata.xlsx');
   const staffdataFilePath = path.join(process.cwd(), 'staffdata.xlsx');
@@ -59,21 +58,26 @@ export async function GET(request: NextRequest) {
   const goaData = readStaffData(goastaffdataFilePath);
   const vadodaraData = readStaffData(staffdataFilePath);
 
-  if (email) {
-    if (email.endsWith('@goa.paruluniversity.ac.in')) {
+  let isGoaUser = false;
+  if (email?.endsWith('@goa.paruluniversity.ac.in')) {
       isGoaUser = true;
-      userRecord = goaData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
-      fileName = 'goastaffdata.xlsx';
-    } else {
-      userRecord = vadodaraData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
-      fileName = 'staffdata.xlsx';
-    }
+  }
+  
+  if (email) {
+      if (isGoaUser) {
+          userRecord = goaData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
+          fileName = 'goastaffdata.xlsx';
+      } else {
+          userRecord = vadodaraData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
+          fileName = 'staffdata.xlsx';
+      }
   } else if (misId) {
-    userRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
-    if (userRecord) {
-        isGoaUser = true;
+    // If an email is also provided, use it to determine campus first.
+    if(isGoaUser) {
+        userRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
         fileName = 'goastaffdata.xlsx';
     } else {
+        // If not a goa user email, or no email, check vadodara file.
         userRecord = vadodaraData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
         fileName = 'staffdata.xlsx';
     }
@@ -84,6 +88,7 @@ export async function GET(request: NextRequest) {
 
   if (userRecord) {
     const instituteName = userRecord.Type === 'Institutional' ? userRecord.Name : userRecord.Institute;
+    const resolvedCampus = userRecord.Campus || (isGoaUser ? 'Goa' : 'Vadodara');
 
     return NextResponse.json({
       success: true,
@@ -101,7 +106,7 @@ export async function GET(request: NextRequest) {
         orcidId: String(userRecord.ORCID_ID || userRecord.Orcid || ''),
         vidwanId: String(userRecord.Vidwan_ID || ''),
         type: userRecord.Type || 'faculty',
-        campus: userRecord.Campus || (isGoaUser ? 'Goa' : 'Vadodara'),
+        campus: resolvedCampus,
       },
     });
   } else {

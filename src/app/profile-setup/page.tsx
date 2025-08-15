@@ -137,10 +137,10 @@ export default function ProfileSetupPage() {
   const selectedCampus = form.watch('campus');
 
   const prefillData = useCallback(async (misId: string) => {
-      if (!misId) return;
+      if (!misId || !user?.email) return;
       setIsPrefilling(true);
       try {
-          const res = await fetch(`/api/get-staff-data?misId=${misId}`);
+          const res = await fetch(`/api/get-staff-data?misId=${misId}&email=${user.email}`);
           const result = await res.json();
           if (result.success) {
             form.reset(result.data);
@@ -168,7 +168,7 @@ export default function ProfileSetupPage() {
       } finally {
           setIsPrefilling(false);
       }
-  }, [form, toast]);
+  }, [form, toast, user?.email]);
 
 
   useEffect(() => {
