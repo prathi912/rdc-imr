@@ -135,6 +135,7 @@ export default function ProfileSetupPage() {
   });
 
   const selectedCampus = form.watch('campus');
+  const isGoaCampusUser = user?.email?.endsWith('@goa.paruluniversity.ac.in');
 
   const prefillData = useCallback(async (misId: string) => {
       if (!misId || !user?.email) return;
@@ -185,6 +186,10 @@ export default function ProfileSetupPage() {
           setUser(appUser);
           setPreviewUrl(appUser.photoURL || null);
           form.setValue('name', appUser.name);
+          
+          if (appUser.email?.endsWith('@goa.paruluniversity.ac.in')) {
+            form.setValue('campus', 'Goa');
+          }
 
           // Pre-fetch user type based on email to determine if MIS ID is needed.
           const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email!}`);
@@ -415,7 +420,6 @@ export default function ProfileSetupPage() {
                       <Select
                         onValueChange={(value) => {
                           field.onChange(value);
-                          // Reset faculty if campus changes
                           if (value === "Goa") {
                             if (!goaFaculties.includes(form.getValues("faculty"))) {
                               form.setValue("faculty", "");
@@ -423,6 +427,7 @@ export default function ProfileSetupPage() {
                           }
                         }}
                         value={field.value}
+                        disabled={isGoaCampusUser}
                       >
                         <FormControl>
                           <SelectTrigger>
