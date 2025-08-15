@@ -1811,27 +1811,38 @@ export async function updateProjectEvaluators(
 
 export async function findUserByMisId(
   misId: string,
-): Promise<{ success: boolean; user?: { uid: string; name: string; email: string; misId: string; }; error?: string }> {
+): Promise<{ 
+    success: boolean; 
+    users?: { uid: string; name: string; email: string; misId: string; campus: string; }[];
+    error?: string 
+}> {
   try {
     if (!misId || misId.trim() === "") {
       return { success: false, error: "MIS ID is required." };
     }
 
-    // 1. Check registered users in Firestore
-    const usersRef = adminDb.collection("users");
-    const q = usersRef.where("misId", "==", misId).limit(1);
-    const querySnapshot = await q.get();
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
+    const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}`);
+    const result = await response.json();
 
-    if (!querySnapshot.empty) {
-      const userDoc = querySnapshot.docs[0];
-      const userData = userDoc.data() as User;
-       if (userData.role === 'admin' || userData.role === 'Super-admin') {
-         return { success: false, error: "Administrators cannot be added as Co-PIs." };
-      }
-      return { success: true, user: { uid: userDoc.id, name: userData.name, email: userData.email, misId: userData.misId! } };
+    if (result.success && result.data) {
+        // The API now returns an array
+        const users = result.data.map((staff: any) => ({
+            uid: staff.uid || '', // UID will be empty if not registered
+            name: staff.name,
+            email: staff.email,
+            misId: staff.misId,
+            campus: staff.campus
+        }));
+        
+        if (users.some((user: any) => user.role === 'admin' || user.role === 'Super-admin')) {
+          return { success: false, error: "Administrators cannot be added as Co-PIs." };
+        }
+        
+        return { success: true, users: users };
     }
 
-    return { success: false, error: "No registered user found with this MIS ID. Please ask them to sign up for the portal before adding them as a Co-PI." };
+    return { success: false, error: result.error || "No registered user found with this MIS ID. Please ask them to sign up first." };
 
   } catch (error: any) {
     console.error("Error finding user by MIS ID:", error);
@@ -1839,6 +1850,7 @@ export async function findUserByMisId(
     return { success: false, error: error.message || "Failed to search for user." };
   }
 }
+
 export async function isEmailDomainAllowed(email: string): Promise<{ allowed: boolean; isCro: boolean; croFaculty?: string; croCampus?: string; }> {
   try {
     const settings = await getSystemSettings();

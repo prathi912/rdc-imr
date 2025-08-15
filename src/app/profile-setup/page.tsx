@@ -25,6 +25,8 @@ import { Bot, Loader2, Search } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { Combobox } from '@/components/ui/combobox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const profileSetupSchema = z.object({
   name: z.string().min(2, 'A full name is required.'),
@@ -114,6 +116,8 @@ export default function ProfileSetupPage() {
   const [misIdToFetch, setMisIdToFetch] = useState('');
   const [userType, setUserType] = useState<'faculty' | 'CRO' | 'Institutional' | null>(null);
   const [departments, setDepartments] = useState<string[]>([]);
+  const [foundUsers, setFoundUsers] = useState<any[]>([]);
+  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 
   const form = useForm<ProfileSetupFormValues>({
     resolver: zodResolver(profileSetupSchema),
@@ -140,17 +144,18 @@ export default function ProfileSetupPage() {
       if (!misIdToFetch || !user?.email) return;
       setIsPrefilling(true);
       try {
-          // Pass both MIS ID and email to the API
           const res = await fetch(`/api/get-staff-data?misId=${misIdToFetch}&email=${user.email}`);
           const result = await res.json();
-          if (result.success) {
-            form.reset(result.data);
-            setUserType(result.data.type);
-            
-            // Explicitly set the MIS ID from the input field, as the Excel sheet might have formatting issues
-            form.setValue("misId", misIdToFetch);
-
-            toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+          if (result.success && result.data.length > 0) {
+              if (result.data.length > 1) {
+                  setFoundUsers(result.data);
+                  setIsSelectionOpen(true);
+              } else {
+                  form.reset(result.data[0]);
+                  setUserType(result.data[0].type);
+                  form.setValue("misId", misIdToFetch);
+                  toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+              }
           } else {
              toast({ variant: 'destructive', title: 'Not Found', description: "Could not find your details using that MIS ID. Please enter them manually." });
           }
@@ -161,6 +166,14 @@ export default function ProfileSetupPage() {
           setIsPrefilling(false);
       }
   }, [form, toast, user?.email, misIdToFetch]);
+
+  const handleUserSelection = (selectedUser: any) => {
+      form.reset(selectedUser);
+      setUserType(selectedUser.type);
+      form.setValue("misId", misIdToFetch);
+      toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
+      setIsSelectionOpen(false);
+  };
 
 
   useEffect(() => {
@@ -186,7 +199,7 @@ export default function ProfileSetupPage() {
           const staffRes = await fetch(`/api/get-staff-data?email=${appUser.email!}`);
           const staffResult = await staffRes.json();
           if (staffResult.success) {
-              setUserType(staffResult.data.type || 'faculty');
+              setUserType(staffResult.data[0]?.type || 'faculty');
           } else {
               setUserType('faculty'); // Default to faculty if not found
           }
@@ -319,6 +332,7 @@ export default function ProfileSetupPage() {
   const departmentOptions = departments.map(dept => ({ label: dept, value: dept }));
 
   return (
+    <>
     <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
       <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <div className="w-full max-w-lg">
@@ -494,7 +508,7 @@ export default function ProfileSetupPage() {
                   />
                    <FormField control={form.control} name="orcidId" render={({ field }) => (
                       <FormItem>
-                          <FormLabel>ORCID iD (Optional)</FormLabel>
+                          <FormLabel>ORCID iD</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
                           </FormControl>
@@ -535,5 +549,33 @@ export default function ProfileSetupPage() {
         </nav>
       </footer>
     </div>
+    <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Multiple Users Found</DialogTitle>
+                <DialogDescription>
+                    We found multiple records for this MIS ID. Please select your profile to continue.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <RadioGroup onValueChange={(value) => handleUserSelection(JSON.parse(value))}>
+                    {foundUsers.map((u, i) => (
+                        <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
+                            <RadioGroupItem value={JSON.stringify(u)} id={`user-${i}`} />
+                            <Label htmlFor={`user-${i}`} className="flex flex-col">
+                                <span className="font-semibold">{u.name}</span>
+                                <span className="text-muted-foreground text-xs">{u.email}</span>
+                                <span className="text-muted-foreground text-xs">{u.designation}, {u.institute} ({u.campus})</span>
+                            </Label>
+                        </div>
+                    ))}
+                </RadioGroup>
+            </div>
+            <DialogFooter>
+                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }
