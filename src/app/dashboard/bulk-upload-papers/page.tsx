@@ -10,19 +10,22 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { FileWarning, Upload, Loader2, CheckCircle, XCircle } from 'lucide-react';
-import { bulkUploadPapers } from '@/app/actions';
+import { FileWarning, Upload, Loader2, CheckCircle, XCircle, Link as LinkIcon } from 'lucide-react';
+import { bulkUploadPapers } from '@/app/bulkpapers';
+import type { User } from '@/types';
 
 type PaperUploadData = {
-  paper_title: string;
-  author_email: string;
-  author_type: 'First Author' | 'Corresponding Author' | 'Co-Author';
-  url: string;
+    PublicationTitle: string;
+    PublicationURL: string;
+    PublicationYear?: number;
+    PublicationMonthName?: string;
+    ImpactFactor?: number;
 };
 
 type UploadResult = {
-  successfulPapers: { title: string; authors: string[] }[];
-  failedAuthorLinks: { title: string; email: string; reason: string }[];
+  newPapers: { title: string }[];
+  linkedPapers: { title: string }[];
+  errors: { title: string; reason: string }[];
 };
 
 export default function BulkUploadPapersPage() {
@@ -30,7 +33,15 @@ export default function BulkUploadPapersPage() {
   const [fileName, setFileName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
+
+  useState(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+        setUser(JSON.parse(storedUser));
+    }
+  });
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -47,7 +58,7 @@ export default function BulkUploadPapersPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['paper_title', 'author_email', 'author_type', 'url'];
+        const requiredColumns = ['PublicationTitle', 'PublicationURL', 'PublicationYear'];
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
             toast({
@@ -62,10 +73,11 @@ export default function BulkUploadPapersPage() {
         }
 
         const formattedData = jsonData.map(row => ({
-          paper_title: String(row.paper_title || ''),
-          author_email: String(row.author_email || ''),
-          author_type: String(row.author_type || 'Co-Author') as PaperUploadData['author_type'],
-          url: String(row.url || ''),
+          PublicationTitle: String(row.PublicationTitle || ''),
+          PublicationURL: String(row.PublicationURL || ''),
+          PublicationYear: row.PublicationYear ? Number(row.PublicationYear) : undefined,
+          PublicationMonthName: row.PublicationMonthName ? String(row.PublicationMonthName) : undefined,
+          ImpactFactor: row.ImpactFactor ? Number(row.ImpactFactor) : undefined,
         }));
         setData(formattedData);
       } catch (error) {
@@ -77,17 +89,17 @@ export default function BulkUploadPapersPage() {
   };
 
   const handleUpload = async () => {
-    if (data.length === 0) {
-      toast({ variant: 'destructive', title: 'No Data', description: 'There is no data to upload.' });
+    if (data.length === 0 || !user) {
+      toast({ variant: 'destructive', title: 'No Data', description: 'There is no data to upload or user is not identified.' });
       return;
     }
     setIsLoading(true);
     setUploadResult(null);
     try {
-        const result = await bulkUploadPapers(data);
+        const result = await bulkUploadPapers(data, user);
         if (result.success) {
             setUploadResult(result.data);
-            toast({ title: 'Upload Processed', description: `Successfully added ${result.data.successfulPapers.length} new papers.` });
+            toast({ title: 'Upload Processed', description: `Successfully processed ${data.length} records.` });
             setData([]);
             setFileName('');
         } else {
@@ -103,12 +115,12 @@ export default function BulkUploadPapersPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title="Bulk Upload Research Papers" description="Upload an Excel file to add multiple research papers at once." />
+      <PageHeader title="Bulk Upload Research Papers" description="Upload an Excel file to add your published papers to the portal." />
       <div className="mt-8 space-y-8">
         <Card>
           <CardHeader>
             <CardTitle>Upload File</CardTitle>
-            <CardDescription>Select an Excel (.xlsx) file with paper and author data.</CardDescription>
+            <CardDescription>Select an Excel (.xlsx) file with your publication data.</CardDescription>
           </CardHeader>
           <CardContent>
             <Alert>
@@ -116,11 +128,10 @@ export default function BulkUploadPapersPage() {
               <AlertTitle>Required File Format</AlertTitle>
               <AlertDescription>
                 Your Excel file must contain these columns: 
-                <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">paper_title</code>, 
-                <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">author_email</code>, 
-                <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">author_type</code>, and
-                <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">url</code>.
-                 Each row represents one author of one paper.
+                <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationTitle</code>, 
+                <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationURL</code>, and
+                <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationYear</code>.
+                Optional columns are <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationMonthName</code> and <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">ImpactFactor</code>.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -134,7 +145,7 @@ export default function BulkUploadPapersPage() {
           </CardContent>
         </Card>
 
-        {data.length > 0 && (
+        {data.length > 0 && !uploadResult && (
           <Card>
             <CardHeader>
               <CardTitle>Preview Data ({data.length} rows)</CardTitle>
@@ -143,14 +154,13 @@ export default function BulkUploadPapersPage() {
             <CardContent>
                 <div className="max-h-96 overflow-x-auto">
                     <Table>
-                        <TableHeader><TableRow><TableHead>Paper Title</TableHead><TableHead>Author Email</TableHead><TableHead>Author Type</TableHead><TableHead>URL</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>URL</TableHead><TableHead>Year</TableHead></TableRow></TableHeader>
                         <TableBody>
                         {data.map((row, index) => (
                             <TableRow key={index}>
-                            <TableCell className="font-medium whitespace-nowrap">{row.paper_title}</TableCell>
-                            <TableCell>{row.author_email}</TableCell>
-                            <TableCell>{row.author_type}</TableCell>
-                            <TableCell className="whitespace-nowrap">{row.url}</TableCell>
+                            <TableCell className="font-medium whitespace-nowrap">{row.PublicationTitle}</TableCell>
+                            <TableCell className="whitespace-nowrap">{row.PublicationURL}</TableCell>
+                            <TableCell>{row.PublicationYear}</TableCell>
                             </TableRow>
                         ))}
                         </TableBody>
@@ -168,25 +178,32 @@ export default function BulkUploadPapersPage() {
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div>
-                        <h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" /> Successfully Added Papers ({uploadResult.successfulPapers.length})</h3>
-                        {uploadResult.successfulPapers.length > 0 ? (
+                        <h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" /> New Papers Added ({uploadResult.newPapers.length})</h3>
+                        {uploadResult.newPapers.length > 0 ? (
                             <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground max-h-48 overflow-y-auto">
-                                {uploadResult.successfulPapers.map(p => <li key={p.title}>{p.title}</li>)}
+                                {uploadResult.newPapers.map(p => <li key={p.title}>{p.title}</li>)}
                             </ul>
-                        ) : <p className="text-sm text-muted-foreground mt-2">No new papers were added.</p>}
+                        ) : <p className="text-sm text-muted-foreground mt-2">No new papers were created.</p>}
                     </div>
                      <div>
-                        <h3 className="font-semibold flex items-center gap-2"><XCircle className="h-5 w-5 text-destructive" /> Failed to Link Authors ({uploadResult.failedAuthorLinks.length})</h3>
-                        {uploadResult.failedAuthorLinks.length > 0 ? (
+                        <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-blue-500" /> Papers Linked ({uploadResult.linkedPapers.length})</h3>
+                        {uploadResult.linkedPapers.length > 0 ? (
                              <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground max-h-48 overflow-y-auto">
-                                {uploadResult.failedAuthorLinks.map((f, i) => <li key={i}>{f.title}: <span className="font-semibold text-foreground">{f.email}</span> ({f.reason})</li>)}
+                                {uploadResult.linkedPapers.map(p => <li key={p.title}>{p.title}</li>)}
                             </ul>
-                        ) : <p className="text-sm text-muted-foreground mt-2">All authors were linked successfully.</p>}
+                        ) : <p className="text-sm text-muted-foreground mt-2">No existing papers were linked to your profile.</p>}
+                    </div>
+                     <div>
+                        <h3 className="font-semibold flex items-center gap-2"><XCircle className="h-5 w-5 text-destructive" /> Errors ({uploadResult.errors.length})</h3>
+                        {uploadResult.errors.length > 0 ? (
+                             <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground max-h-48 overflow-y-auto">
+                                {uploadResult.errors.map((f, i) => <li key={i}>{f.title}: <span className="text-destructive">{f.reason}</span></li>)}
+                            </ul>
+                        ) : <p className="text-sm text-muted-foreground mt-2">No errors occurred.</p>}
                     </div>
                 </CardContent>
             </Card>
         )}
-
       </div>
     </div>
   );
