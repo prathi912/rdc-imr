@@ -4,7 +4,7 @@ import path from 'path';
 // This function reads a file and returns its content as a binary string at runtime.
 export const getTemplateContent = (fileName: string): string | null => {
     try {
-        const templatesDir = path.join(process.cwd(), 'public', 'templates');
+        const templatesDir = path.join(process.cwd(), 'src', 'templates');
         const filePath = path.join(templatesDir, fileName);
         console.log('Resolved template path at runtime:', filePath);
 
