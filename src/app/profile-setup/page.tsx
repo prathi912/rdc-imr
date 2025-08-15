@@ -14,7 +14,7 @@ import { Logo } from '@/components/logo';
 import { useToast } from '@/hooks/use-toast';
 import { auth, db } from '@/lib/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { uploadFileToServer, checkMisIdExists, fetchOrcidData } from '@/app/actions';
+import { uploadFileToServer, checkMisIdExists, fetchOrcidData, linkEmrInterestsByMisId } from '@/app/actions';
 import type { User } from '@/types';
 import { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
@@ -280,6 +280,14 @@ export default function ProfileSetupPage() {
 
     const updatedUser = { ...user, ...updateData };
     localStorage.setItem('user', JSON.stringify(updatedUser));
+    
+    // After profile is saved, link historical data
+    if (updatedUser.misId) {
+        const linkResult = await linkEmrInterestsByMisId(updatedUser.uid, updatedUser.misId);
+        if (linkResult.success && linkResult.count > 0) {
+            sessionStorage.setItem('postSetupInfo', JSON.stringify({ emr: linkResult.count, imr: 0 }));
+        }
+    }
 
     toast({ title: 'Profile Updated!', description: 'Redirecting to your dashboard.' });
     router.push('/dashboard');
@@ -388,6 +396,11 @@ export default function ProfileSetupPage() {
                       </p>
                   </div>
 
+                   <div className="space-y-2">
+                      <Label>Email</Label>
+                      <Input value={user.email} disabled />
+                  </div>
+
                   <FormField name="campus" control={form.control} render={({ field }) => (
                     <FormItem>
                       <FormLabel>Campus</FormLabel>
@@ -439,7 +452,7 @@ export default function ProfileSetupPage() {
                       </FormItem>
                     );
                   }} />
- <FormField name="institute" control={form.control} render={({ field }) => {
+                 <FormField name="institute" control={form.control} render={({ field }) => {
                     const instituteOptions = form.getValues("campus") === "Goa" ? goaInstitutes : institutes;
                     return (
                       <FormItem>
@@ -547,3 +560,4 @@ export default function ProfileSetupPage() {
     </div>
   );
 }
+
