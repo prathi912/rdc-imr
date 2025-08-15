@@ -178,6 +178,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           if (userDocSnap.exists()) {
             const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User;
             
+            // Critical check: Ensure profile is complete before allowing access to the dashboard.
+            if (!appUser.profileComplete) {
+                router.replace('/profile-setup');
+                return;
+            }
+
             if (!appUser.allowedModules || appUser.allowedModules.length === 0) {
                 appUser.allowedModules = getDefaultModulesForRole(appUser.role, appUser.designation);
             }

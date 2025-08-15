@@ -67,7 +67,7 @@ const goaFaculties = [
 ];
 
 const goaInstitutes = [
-    "Parul College of Applied and Life Sciences",
+    "Parul College of Applied and Health Sciences",
     "Parul College of Engineering",
     "Parul College of Information Technology & Computer Science",
     "Parul College of Management",
