@@ -3,7 +3,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import type { ResearchPaper, Author, User } from '@/types';
+import type { ResearchPaper, Author, User, Notification } from '@/types';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getResearchDomainSuggestion } from '@/ai/flows/research-domain-suggestion';
 import admin from 'firebase-admin';
@@ -66,17 +66,16 @@ async function linkAuthorToPaper(existingPaper: ResearchPaper, user: User) {
     if (existingPaper.mainAuthorUid) {
         const mainAuthorDoc = await adminDb.collection('users').doc(existingPaper.mainAuthorUid).get();
         const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
-        const mainAuthorMisId = mainAuthorData?.misId;
         const mainAuthorCampus = mainAuthorData?.campus;
         
-        const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorMisId}` : `/profile/${mainAuthorMisId}`;
-
-        const notification = {
+        const notification: Omit<Notification, 'id'> = {
             uid: existingPaper.mainAuthorUid,
-            projectId: mainAuthorMisId ? profileLink : `/dashboard/my-projects`,
             title: `${user.name} has requested to be added as a co-author on your paper: "${existingPaper.title}"`,
             createdAt: new Date().toISOString(),
             isRead: false,
+            type: 'coAuthorRequest',
+            paperId: existingPaper.id,
+            requester: newAuthorRequest,
         };
         await adminDb.collection('notifications').add(notification);
     }

@@ -1,23 +1,33 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from "@/components/ui/card";
-import { Bell, FileCheck2, GanttChartSquare, Loader2 } from "lucide-react";
+import { Bell, FileCheck2, GanttChartSquare, Loader2, Check, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, doc, updateDoc, orderBy, onSnapshot } from 'firebase/firestore';
-import { type Notification as NotificationType, type User } from '@/types';
+import { type Notification as NotificationType, type User, Author, ResearchPaper } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { manageCoAuthorRequest } from '@/app/bulkpapers';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const AUTHOR_ROLES: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
+  const [managingRequest, setManagingRequest] = useState<{ notification: NotificationType, paper: ResearchPaper } | null>(null);
+  const [requestToReject, setRequestToReject] = useState<NotificationType | null>(null);
+  const [assignedRole, setAssignedRole] = useState<Author['role'] | ''>('');
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -57,12 +67,56 @@ export default function NotificationsPage() {
     try {
         const notifRef = doc(db, 'notifications', notificationId);
         await updateDoc(notifRef, { isRead: true });
-        setNotifications(notifications.map(n => n.id === notificationId ? { ...n, isRead: true } : n));
     } catch (error) {
         console.error("Error marking notification as read:", error);
         toast({ variant: 'destructive', title: "Error", description: "Could not update notification." });
     }
   };
+
+  const handleOpenAcceptDialog = async (notification: NotificationType) => {
+    if (!notification.paperId) return;
+    try {
+        const paperRef = doc(db, 'papers', notification.paperId);
+        const paperSnap = await getDoc(paperRef);
+        if (paperSnap.exists()) {
+            setManagingRequest({ notification, paper: paperSnap.data() as ResearchPaper });
+        } else {
+            toast({ title: 'Error', description: 'Could not find the associated paper.', variant: 'destructive' });
+        }
+    } catch (error) {
+        toast({ title: 'Error', description: 'Failed to fetch paper details.', variant: 'destructive' });
+    }
+  };
+  
+  const handleConfirmAcceptRequest = async () => {
+    if (!managingRequest || !assignedRole) {
+        toast({title: "Please assign a role", variant: "destructive"});
+        return;
+    }
+    const { notification } = managingRequest;
+    const result = await manageCoAuthorRequest(notification.paperId!, notification.requester!, 'accept', assignedRole);
+    if (result.success) {
+        toast({title: "Co-Author Approved"});
+        await handleMarkAsRead(notification.id);
+        setManagingRequest(null);
+        setAssignedRole('');
+    } else {
+        toast({title: "Error", description: result.error, variant: "destructive"});
+    }
+  };
+
+  const handleRejectRequest = async () => {
+    if (!requestToReject) return;
+    const result = await manageCoAuthorRequest(requestToReject.paperId!, requestToReject.requester!, 'reject');
+    if (result.success) {
+        toast({title: "Request Rejected"});
+        await handleMarkAsRead(requestToReject.id);
+        setRequestToReject(null);
+    } else {
+        toast({title: "Error", description: result.error, variant: "destructive"});
+    }
+  };
+
 
   const getIcon = (title: string) => {
     if (title.includes('Recommended') || title.includes('Completed')) return FileCheck2;
@@ -73,76 +127,133 @@ export default function NotificationsPage() {
   const getNotificationLink = (notification: NotificationType) => {
     if (!notification.projectId) return null;
     if (notification.projectId.startsWith('/')) {
-      return notification.projectId; // It's a full path
+      return notification.projectId;
     }
-    // It's a project ID
     return `/dashboard/project/${notification.projectId}`;
   };
 
-  return (
-    <div className="container mx-auto max-w-4xl py-10">
-      <PageHeader title="Notifications" description="Here are your recent updates." />
-      <div className="mt-8">
-        <Card>
-          <CardContent className="pt-6">
-            {loading ? (
-              <div className="flex justify-center items-center h-40">
-                <Loader2 className="h-8 w-8 animate-spin" />
-              </div>
-            ) : notifications.length === 0 ? (
-               <div className="text-center py-12 text-muted-foreground">
-                  <Bell className="mx-auto h-12 w-12" />
-                  <p className="mt-4">You have no new notifications.</p>
-                </div>
-            ) : (
-               <div className="space-y-4">
-                {notifications.map((notification) => {
-                  const Icon = getIcon(notification.title);
-                  const link = getNotificationLink(notification);
-                  
-                  const NotificationTitle = () => (
-                    <p className="font-semibold break-words">{notification.title}</p>
-                  );
+  const getAvailableRoles = (paper?: ResearchPaper): Author['role'][] => {
+    if (!paper) return AUTHOR_ROLES;
+    const existingRoles = paper.authors.map(a => a.role);
+    let available = [...AUTHOR_ROLES];
+    if (existingRoles.includes('First Author') || existingRoles.includes('First & Corresponding Author')) {
+        available = available.filter(r => r !== 'First Author' && r !== 'First & Corresponding Author');
+    }
+    if (existingRoles.includes('Corresponding Author') || existingRoles.includes('First & Corresponding Author')) {
+        available = available.filter(r => r !== 'Corresponding Author' && r !== 'First & Corresponding Author');
+    }
+    return available;
+  };
 
-                  return (
-                    <div
-                      key={notification.id}
-                      className={`flex items-start gap-4 rounded-lg border p-4 ${
-                        !notification.isRead ? "bg-accent/50" : ""
-                      }`}
-                    >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 flex-shrink-0">
-                        <Icon className="h-5 w-5" />
-                      </div>
+  return (
+    <>
+      <div className="container mx-auto max-w-4xl py-10">
+        <PageHeader title="Notifications" description="Here are your recent updates." />
+        <div className="mt-8">
+          <Card>
+            <CardContent className="pt-6">
+              {loading ? (
+                <div className="flex justify-center items-center h-40">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+              ) : notifications.length === 0 ? (
+                 <div className="text-center py-12 text-muted-foreground">
+                    <Bell className="mx-auto h-12 w-12" />
+                    <p className="mt-4">You have no new notifications.</p>
+                  </div>
+              ) : (
+                 <div className="space-y-4">
+                  {notifications.map((notification) => {
+                    const Icon = getIcon(notification.title);
+                    const link = getNotificationLink(notification);
+                    
+                    const NotificationContent = () => (
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                            <div className="flex-1">
-                             {link ? (
-                               <Link href={link} className="hover:underline">
-                                 <NotificationTitle />
-                               </Link>
-                             ) : (
-                               <NotificationTitle />
-                             )}
+                             <p className="font-semibold break-words">{notification.title}</p>
                              <p className="text-sm text-muted-foreground mt-1">
                                  {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
                              </p>
                            </div>
-                           {!notification.isRead && (
+                           {!notification.isRead && notification.type !== 'coAuthorRequest' && (
                              <Button variant="ghost" size="sm" onClick={() => handleMarkAsRead(notification.id)} className="self-start sm:self-center flex-shrink-0">
                                  Mark as read
                              </Button>
                            )}
+                           {!notification.isRead && notification.type === 'coAuthorRequest' && (
+                                <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
+                                    <Button size="sm" onClick={() => handleOpenAcceptDialog(notification)}><Check className="h-4 w-4 mr-2"/>Accept</Button>
+                                    <Button size="sm" variant="destructive" onClick={() => setRequestToReject(notification)}><X className="h-4 w-4 mr-2"/>Reject</Button>
+                                </div>
+                           )}
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    );
+
+                    return (
+                      <div
+                        key={notification.id}
+                        className={`flex items-start gap-4 rounded-lg border p-4 ${
+                          !notification.isRead ? "bg-accent/50" : ""
+                        }`}
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 flex-shrink-0">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        {link && notification.type !== 'coAuthorRequest' ? (
+                          <Link href={link} className="flex-1 min-w-0" onClick={() => handleMarkAsRead(notification.id)}>
+                            <NotificationContent />
+                          </Link>
+                        ) : (
+                          <NotificationContent />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+
+      <Dialog open={!!managingRequest} onOpenChange={() => setManagingRequest(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign Role to Co-Author</DialogTitle>
+            <DialogDescription>Select a role for {managingRequest?.notification.requester?.name}.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Select value={assignedRole} onValueChange={(value) => setAssignedRole(value as Author['role'])}>
+              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
+              <SelectContent>
+                {getAvailableRoles(managingRequest?.paper).map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {getAvailableRoles(managingRequest?.paper).length < AUTHOR_ROLES.length && (
+              <p className="text-xs text-muted-foreground mt-2">Some roles are unavailable because they are already assigned.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={handleConfirmAcceptRequest}>Confirm & Add Co-Author</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+       <AlertDialog open={!!requestToReject} onOpenChange={() => setRequestToReject(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure you want to reject this request?</AlertDialogTitle>
+                    <AlertDialogDescription>This action cannot be undone. The user will not be added as a co-author.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRejectRequest} className="bg-destructive hover:bg-destructive/90">Confirm Reject</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    </>
   );
 }

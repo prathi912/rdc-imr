@@ -174,10 +174,13 @@ export type Project = {
 export type Notification = {
   id: string
   uid: string // The user this notification is for
-  projectId: string
+  projectId?: string // The ID of the project, or a profile link
   title: string
   createdAt: string // ISO String
   isRead: boolean
+  type?: 'coAuthorRequest' | 'default';
+  paperId?: string;
+  requester?: Author;
 }
 
 export type BookCoAuthor = {
