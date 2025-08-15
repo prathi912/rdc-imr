@@ -32,6 +32,219 @@ const EMAIL_STYLES = {
     </p>`
 };
 
+export async function checkUserOrStaff(email: string): Promise<{ success: boolean; name: string | null; uid: string | null }> {
+  try {
+    const lowercasedEmail = email.toLowerCase();
+
+    // 1. Check existing users in Firestore
+    const usersRef = adminDb.collection('users');
+    const userQuery = usersRef.where('email', '==', lowercasedEmail);
+    const userSnapshot = await userQuery.get();
+
+    if (!userSnapshot.empty) {
+      const userDoc = userSnapshot.docs[0];
+      const userData = userDoc.data();
+      return { success: true, name: userData.name, uid: userDoc.id };
+    }
+
+    // 2. Check staffdata via API route
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
+    const response = await fetch(`${baseUrl}/api/get-staff-data?email=${encodeURIComponent(lowercasedEmail)}`);
+    const staffResult = await response.json();
+    
+    if (staffResult.success && staffResult.data) {
+      return { success: true, name: staffResult.data.name, uid: null }; // No UID because they haven't signed up
+    }
+
+    // 3. Not found in either
+    return { success: true, name: null, uid: null };
+
+  } catch (error) {
+    console.error("Error checking user/staff:", error);
+    return { success: false, name: null, uid: null };
+  }
+}
+
+export async function addResearchPaper(
+  paperData: Pick<ResearchPaper, 'title' | 'url' | 'mainAuthorUid' | 'authors' | 'journalName' | 'journalWebsite' | 'qRating' | 'impactFactor'>
+): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
+  try {
+    const paperRef = adminDb.collection('papers').doc();
+    const now = new Date().toISOString();
+    
+    const { authors, title } = paperData;
+
+    // Determine the main author based on the "First Author" role
+    const firstAuthor = authors.find(a => a.role === 'First Author' || a.role === 'First & Corresponding Author');
+    const mainAuthorUid = firstAuthor?.uid || paperData.mainAuthorUid;
+
+    if (!mainAuthorUid) {
+        return { success: false, error: "A main author (either the creator or a designated First Author) is required." };
+    }
+
+    const authorUids = authors.map((a) => a.uid).filter(Boolean) as string[];
+    const authorEmails = authors.map((a) => a.email.toLowerCase());
+
+    const newPaperData: Omit<ResearchPaper, 'id'> = {
+      ...paperData,
+      mainAuthorUid, // Set the determined main author
+      authorUids,
+      authorEmails,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    // AI Domain Suggestion
+    try {
+      if (authorUids.length > 0) {
+        const allPapersQuery = await adminDb.collection('papers').where('authorUids', 'array-contains-any', authorUids).get();
+        const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
+        const allTitles = [...new Set([title, ...existingTitles])];
+
+        if (allTitles.length > 0) {
+          const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
+          newPaperData.domain = domainResult.domain;
+
+          const batch = adminDb.batch();
+          const userDocs = await adminDb.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', authorUids).get();
+            
+          userDocs.forEach(doc => {
+            batch.update(doc.ref, { researchDomain: domainResult.domain });
+          });
+          await batch.commit();
+        }
+      }
+    } catch (aiError: any) {
+      console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
+    }
+
+    await paperRef.set(newPaperData);
+
+    const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid!).get();
+    const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
+    const mainAuthorName = mainAuthorData?.name || 'A colleague';
+    const mainAuthorMisId = mainAuthorData?.misId;
+    const mainAuthorCampus = mainAuthorData?.campus;
+    
+    const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorMisId}` : `/profile/${mainAuthorMisId}`;
+
+    const notificationBatch = adminDb.batch();
+    authors.forEach((author) => {
+      if (author.uid && author.uid !== mainAuthorUid) {
+        const notificationRef = adminDb.collection('notifications').doc();
+        notificationBatch.set(notificationRef, {
+          uid: author.uid,
+          title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          projectId: mainAuthorMisId ? profileLink : `/dashboard/my-projects`,
+        });
+      }
+    });
+    await notificationBatch.commit();
+
+    return { success: true, paper: { id: paperRef.id, ...newPaperData } };
+
+  } catch (error: any) {
+    console.error("Error adding research paper:", error);
+    return { success: false, error: error.message || "Failed to add research paper." };
+  }
+}
+
+export async function updateResearchPaper(
+  paperId: string,
+  userId: string, 
+  data: Partial<ResearchPaper>
+): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
+  try {
+    const paperRef = adminDb.collection('papers').doc(paperId);
+    const paperSnap = await paperRef.get();
+
+    if (!paperSnap.exists) {
+      return { success: false, error: "Paper not found." };
+    }
+
+    const paperData = paperSnap.data() as ResearchPaper;
+    const oldAuthors = paperData.authors || [];
+
+    if (paperData.mainAuthorUid !== userId) {
+      return { success: false, error: "You do not have permission to edit this paper." };
+    }
+    
+    // Determine the new main author if a "First Author" is set
+    const firstAuthor = data.authors?.find(a => a.role === 'First Author' || a.role === 'First & Corresponding Author');
+    const mainAuthorUid = firstAuthor?.uid || paperData.mainAuthorUid;
+    
+    const authorUids = data.authors?.map((a) => a.uid).filter(Boolean) as string[] || paperData.authorUids;
+    const authorEmails = data.authors?.map((a) => a.email.toLowerCase()) || paperData.authorEmails;
+
+    const updatedData: Partial<ResearchPaper> = {
+      ...data,
+      mainAuthorUid, // Update main author
+      authorUids: authorUids,
+      authorEmails: authorEmails,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await paperRef.update(updatedData);
+
+    const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
+    const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
+    const mainAuthorName = mainAuthorData?.name || 'A colleague';
+    const mainAuthorMisId = mainAuthorData?.misId;
+    const mainAuthorCampus = mainAuthorData?.campus;
+
+    const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorMisId}` : `/profile/${mainAuthorMisId}`;
+
+    const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
+
+    const notificationBatch = adminDb.batch();
+    data.authors?.forEach(author => {
+      if (author.uid && author.uid !== userId && !oldAuthorUids.has(author.uid)) {
+        const notificationRef = adminDb.collection('notifications').doc();
+        notificationBatch.set(notificationRef, {
+          uid: author.uid,
+          title: `${mainAuthorName} added you as a co-author on the paper: "${data.title}"`,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+          projectId: mainAuthorMisId ? profileLink : `/dashboard/my-projects`,
+        });
+      }
+    });
+    await notificationBatch.commit();
+    
+    return { success: true, paper: { ...paperData, ...updatedData, id: paperId } };
+
+  } catch (error: any) {
+    console.error("Error updating research paper:", error);
+    return { success: false, error: error.message || "Failed to update paper." };
+  }
+}
+
+export async function deleteResearchPaper(paperId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const paperRef = adminDb.collection('papers').doc(paperId);
+    const paperSnap = await paperRef.get();
+
+    if (!paperSnap.exists) {
+      return { success: false, error: "Paper not found." };
+    }
+
+    const paperData = paperSnap.data() as ResearchPaper;
+
+    if (paperData.mainAuthorUid !== userId) {
+      return { success: false, error: "You do not have permission to delete this paper." };
+    }
+
+    await paperRef.delete();
+    return { success: true };
+
+  } catch (error: any) {
+    console.error("Error deleting research paper:", error);
+    return { success: false, error: error.message || "Failed to delete paper." };
+  }
+}
+
 
 async function findExistingPaper(title: string, url: string): Promise<ResearchPaper | null> {
     const papersRef = adminDb.collection('papers');
@@ -107,9 +320,6 @@ export async function sendCoAuthorRequest(
 
 
 async function createNewPaper(paperData: PaperUploadData, user: User, role: Author['role']): Promise<ResearchPaper> {
-    const paperRef = adminDb.collection('papers').doc();
-    const now = new Date().toISOString();
-
     const mainAuthor: Author = {
         uid: user.uid,
         email: user.email,
@@ -119,32 +329,22 @@ async function createNewPaper(paperData: PaperUploadData, user: User, role: Auth
         status: 'approved',
     };
 
-    const newPaper: Omit<ResearchPaper, 'id'> = {
+    const result = await addResearchPaper({
         title: paperData.PublicationTitle,
         url: paperData.PublicationURL,
         mainAuthorUid: user.uid,
         authors: [mainAuthor],
-        authorUids: [user.uid],
-        authorEmails: [user.email.toLowerCase()],
         journalName: paperData.JournalName ?? null,
         journalWebsite: paperData.JournalWebsite ?? null,
         qRating: paperData.QRating ?? null,
         impactFactor: paperData.ImpactFactor ?? null,
-        createdAt: now,
-        updatedAt: now,
-        coAuthorRequests: [],
-    };
-
-    try {
-        const domainResult = await getResearchDomainSuggestion({ paperTitles: [newPaper.title] });
-        newPaper.domain = domainResult.domain;
-        await adminDb.collection('users').doc(user.uid).update({ researchDomain: domainResult.domain });
-    } catch (aiError: any) {
-        console.warn("AI domain suggestion failed for new paper:", aiError.message);
+    });
+    
+    if (!result.success || !result.paper) {
+        throw new Error(result.error || "Failed to create new paper.");
     }
     
-    await paperRef.set(newPaper);
-    return { id: paperRef.id, ...newPaper };
+    return result.paper;
 }
 
 
@@ -229,6 +429,7 @@ export async function manageCoAuthorRequest(
 
             if (action === 'accept' && assignedRole) {
                 let currentAuthors = paperData.authors || [];
+                let newMainAuthorUid = paperData.mainAuthorUid;
 
                 if (mainAuthorNewRole && mainAuthorUid) {
                     const mainAuthorIndex = currentAuthors.findIndex(author => author.uid === mainAuthorUid);
@@ -240,6 +441,11 @@ export async function manageCoAuthorRequest(
                 const newAuthor: Author = { ...requestingAuthor, role: assignedRole, status: 'approved' };
                 const updatedAuthors = [...currentAuthors, newAuthor];
                 
+                const firstAuthor = updatedAuthors.find(a => a.role === 'First Author' || a.role === 'First & Corresponding Author');
+                if (firstAuthor && firstAuthor.uid) {
+                    newMainAuthorUid = firstAuthor.uid;
+                }
+                
                 const updatedAuthorUids = [...new Set([...(paperData.authorUids || []), newAuthor.uid])].filter(Boolean) as string[];
                 const updatedAuthorEmails = [...new Set([...(paperData.authorEmails || []), newAuthor.email.toLowerCase()])];
 
@@ -247,6 +453,7 @@ export async function manageCoAuthorRequest(
                     authors: updatedAuthors,
                     authorUids: updatedAuthorUids,
                     authorEmails: updatedAuthorEmails,
+                    mainAuthorUid: newMainAuthorUid, // Update main author if a first author is set
                 });
             }
             
