@@ -57,10 +57,6 @@ export default function GoaProfilePage() {
         const targetUserDoc = userSnapshot.docs[0]
         const fetchedUser = { uid: targetUserDoc.id, ...targetUserDoc.data() } as User
         
-        if (fetchedUser.campus !== 'Goa') {
-            throw new Error("This profile is not for a Goa campus user.")
-        }
-
         // --- Permission Check ---
         const isAdmin = ["Super-admin", "admin", "CRO"].includes(sessionUser.role)
         const isOwner = sessionUser.uid === fetchedUser.uid
