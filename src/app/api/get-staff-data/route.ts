@@ -39,7 +39,6 @@ const readStaffData = (filePath: string): StaffData[] => {
     return XLSX.utils.sheet_to_json<StaffData>(worksheet);
 }
 
-
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
@@ -48,46 +47,44 @@ export async function GET(request: NextRequest) {
   if (!email && !misId) {
     return NextResponse.json({ success: false, error: 'Email or MIS ID query parameter is required.' }, { status: 400 });
   }
-  
-  let userRecord: StaffData | undefined;
-  let fileName: string;
-  
+
   const goastaffdataFilePath = path.join(process.cwd(), 'goastaffdata.xlsx');
   const staffdataFilePath = path.join(process.cwd(), 'staffdata.xlsx');
   
   const goaData = readStaffData(goastaffdataFilePath);
   const vadodaraData = readStaffData(staffdataFilePath);
 
+  let userRecord: StaffData | undefined;
   let isGoaUser = false;
-  if (email?.endsWith('@goa.paruluniversity.ac.in')) {
-      isGoaUser = true;
-  }
-  
-  if (email) {
-      if (isGoaUser) {
-          userRecord = goaData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
-          fileName = 'goastaffdata.xlsx';
-      } else {
-          userRecord = vadodaraData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
-          fileName = 'staffdata.xlsx';
-      }
-  } else if (misId) {
-    // If an email is also provided, use it to determine campus first.
-    if(isGoaUser) {
-        userRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
-        fileName = 'goastaffdata.xlsx';
-    } else {
-        // If not a goa user email, or no email, check vadodara file.
-        userRecord = vadodaraData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
-        fileName = 'staffdata.xlsx';
-    }
-  } else {
-     return NextResponse.json({ success: false, error: 'Insufficient parameters.' }, { status: 400 });
-  }
+  let fileName = 'staffdata.xlsx'; // Default file name
 
+  if (email) {
+    const lowercasedEmail = email.toLowerCase();
+    if (lowercasedEmail.endsWith('@goa.paruluniversity.ac.in')) {
+      // If it's a Goa email, ONLY search the Goa file.
+      userRecord = goaData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
+      isGoaUser = true;
+      fileName = 'goastaffdata.xlsx';
+    } else {
+      // For any other email, ONLY search the Vadodara file.
+      userRecord = vadodaraData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
+    }
+  } else if (misId) {
+    // If searching by MIS ID, check Goa file first.
+    userRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
+    if (userRecord) {
+      isGoaUser = true;
+      fileName = 'goastaffdata.xlsx';
+    } else {
+      // If not found in Goa file, check Vadodara file.
+      userRecord = vadodaraData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
+      fileName = 'staffdata.xlsx';
+    }
+  }
 
   if (userRecord) {
     const instituteName = userRecord.Type === 'Institutional' ? userRecord.Name : userRecord.Institute;
+    // Determine campus from record, fallback to email domain, then default to Vadodara
     const resolvedCampus = userRecord.Campus || (isGoaUser ? 'Goa' : 'Vadodara');
 
     return NextResponse.json({
@@ -110,7 +107,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } else {
-    // We already assigned the filename, so we can use it in the error.
-    return NextResponse.json({ success: false, error: `User not found in ${fileName}.` }, { status: 404 });
+    return NextResponse.json({ success: false, error: `User not found in the respective staff data file.` }, { status: 404 });
   }
 }
