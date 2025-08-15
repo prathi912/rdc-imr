@@ -30,18 +30,13 @@ import {
   sendLoginOtp,
   isEmailDomainAllowed,
   linkEmrInterestsToNewUser,
+  linkEmrCoPiInterestsToNewUser,
 } from "@/app/actions"
 import { Eye, EyeOff } from "lucide-react"
 import { OtpDialog } from "@/components/otp-dialog"
 
 const loginSchema = z.object({
-  email: z
-    .string()
-    .email("Invalid email address.")
-    .refine(async (email) => {
-      const domainCheck = await isEmailDomainAllowed(email)
-      return domainCheck.allowed
-    }, "This email domain is not authorized for portal access."),
+  email: z.string().email("Invalid email address."),
   password: z.string().min(1, "Password is required."),
 })
 
@@ -54,6 +49,15 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isOtpOpen, setIsOtpOpen] = useState(false)
   const [otpUser, setOtpUser] = useState<{ email: string; firebaseUser: FirebaseUser } | null>(null)
+  
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
 
   const processSignIn = async (firebaseUser: FirebaseUser) => {
     const userDocRef = doc(db, "users", firebaseUser.uid)
@@ -134,6 +138,12 @@ export default function LoginPage() {
       if (emrResult.success && emrResult.count > 0) {
         console.log(`Successfully linked ${emrResult.count} EMR interests for user ${user.email}.`)
       }
+
+      const emrCoPiResult = await linkEmrCoPiInterestsToNewUser(user.uid, user.email)
+      if (emrCoPiResult.success && emrCoPiResult.count > 0) {
+        console.log(`Successfully linked ${emrCoPiResult.count} EMR Co-PI interests for user ${user.email}.`)
+      }
+
 
       if (!result.success) {
         console.error("Failed to link historical projects:", result.error)
