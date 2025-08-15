@@ -264,8 +264,12 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Professional Body Membership Details</h4>
                             {renderDetail("Professional Body Name", claim.professionalBodyName)}
-                            {renderDetail("Membership Fee (INR)", claim.membershipFee?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
-                            {renderLinkDetail("Proof of Membership", claim.membershipProofUrl)}
+                            {renderDetail("Membership Type", claim.membershipType)}
+                            {renderDetail("Locale", claim.membershipLocale)}
+                            {renderDetail("Membership Number", claim.membershipNumber)}
+                            {renderDetail("Amount Paid (INR)", claim.membershipAmountPaid?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Payment Date", claim.membershipPaymentDate ? new Date(claim.membershipPaymentDate).toLocaleDateString() : 'N/A')}
+                            {renderLinkDetail("Proof", claim.membershipProofUrl)}
                             {renderDetail("Self Declaration", claim.membershipSelfDeclaration)}
                         </>
                     )}

@@ -57,7 +57,7 @@ export type ResearchPaper = {
   id: string
   title: string
   url: string
-  mainAuthorUid?: string
+  mainAuthorUid: string
   authors: Author[]
   coAuthorRequests?: Author[];
   authorUids: string[] // For efficient querying by UID
@@ -308,8 +308,12 @@ export type IncentiveClaim = {
 
   // Professional Body Membership fields
   professionalBodyName?: string
-  membershipFee?: number
-  membershipProofUrl?: string
+  membershipType?: 'Lifetime' | 'Yearly' | 'Other';
+  membershipLocale?: 'National' | 'International';
+  membershipNumber?: string;
+  membershipAmountPaid?: number;
+  membershipPaymentDate?: string; // ISO string
+  membershipProofUrl?: string;
   membershipSelfDeclaration?: boolean
 
   // Seed Money for APC Fields

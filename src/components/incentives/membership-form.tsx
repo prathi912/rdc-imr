@@ -6,20 +6,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardFooter,
-} from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
@@ -27,18 +16,22 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
-const membershipSchema = z
-  .object({
+const membershipSchema = z.object({
     professionalBodyName: z.string().min(3, 'Name of the professional body is required.'),
-    membershipFee: z.coerce.number().positive('A valid membership fee is required.'),
+    membershipType: z.enum(['Lifetime', 'Yearly', 'Other'], { required_error: 'Please select a membership type.'}),
+    membershipLocale: z.enum(['National', 'International'], { required_error: 'Please select the locale.'}),
+    membershipNumber: z.string().min(1, 'Membership number is required.'),
+    membershipAmountPaid: z.coerce.number().positive('A valid amount is required.'),
+    membershipPaymentDate: z.string().min(1, 'Payment date is required.'),
     membershipProof: z.any().refine((files) => files?.length > 0, 'Proof of membership/payment is required.'),
     membershipSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
-  });
+});
 
 type MembershipFormValues = z.infer<typeof membershipSchema>;
 
@@ -63,7 +56,6 @@ export function MembershipForm() {
     resolver: zodResolver(membershipSchema),
     defaultValues: {
       professionalBodyName: '',
-      membershipFee: 0,
       membershipProof: undefined,
       membershipSelfDeclaration: false,
     },
@@ -166,9 +158,15 @@ export function MembershipForm() {
                 <h3 className="font-semibold text-sm -mb-2">MEMBERSHIP DETAILS</h3>
                 <Separator />
                 <FormField name="professionalBodyName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Professional Body</FormLabel><FormControl><Input placeholder="e.g., Institute of Electrical and Electronics Engineers" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="membershipFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Membership Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10000" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="membershipProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof of Membership/Payment (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="membershipSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby certify that this is the only application for Professional Body Membership incentive in the current calendar year.</p></div></FormItem> )} />
+                <FormField control={form.control} name="membershipType" render={({ field }) => ( <FormItem><FormLabel>Type of Membership</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Lifetime" /></FormControl><FormLabel className="font-normal">Lifetime</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Yearly" /></FormControl><FormLabel className="font-normal">Yearly</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Other" /></FormControl><FormLabel className="font-normal">Other</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="membershipLocale" render={({ field }) => ( <FormItem><FormLabel>Locale of Professional Body</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="National" /></FormControl><FormLabel className="font-normal">National</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="International" /></FormControl><FormLabel className="font-normal">International</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="membershipNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Membership Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField name="membershipAmountPaid" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount Paid (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10000" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="membershipPaymentDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Payment Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                </div>
+                <FormField name="membershipProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof (Membership Certificate, Invoice/Receipt and Payment Proof)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
+                <FormField control={form.control} name="membershipSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
