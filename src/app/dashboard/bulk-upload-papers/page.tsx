@@ -44,6 +44,8 @@ export default function BulkUploadPapersPage() {
   const { toast } = useToast();
   const [roles, setRoles] = useState<Record<string, Author['role']>>({});
   const [isSendingRequest, setIsSendingRequest] = useState<string | null>(null);
+  const [selectedRoleForUpload, setSelectedRoleForUpload] = useState<Author['role'] | ''>('');
+
 
   useState(() => {
     const storedUser = localStorage.getItem('user');
@@ -105,11 +107,15 @@ export default function BulkUploadPapersPage() {
       toast({ variant: 'destructive', title: 'No Data', description: 'There is no data to upload or user is not identified.' });
       return;
     }
+     if (!selectedRoleForUpload) {
+      toast({ variant: 'destructive', title: 'Role Required', description: 'Please select your role for the papers in this upload.' });
+      return;
+    }
     setIsLoading(true);
     setUploadResult(null);
     setRoles({});
     try {
-        const result = await bulkUploadPapers(data, user);
+        const result = await bulkUploadPapers(data, user, selectedRoleForUpload);
         if (result.success) {
             setUploadResult(result.data);
             toast({ title: 'Upload Processed', description: `Successfully processed ${data.length} records.` });
@@ -178,7 +184,19 @@ export default function BulkUploadPapersPage() {
             </Alert>
             <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
               <Input id="file-upload" type="file" accept=".xlsx" onChange={handleFileUpload} className="w-full sm:max-w-xs" />
-              <Button onClick={handleUpload} disabled={isLoading || data.length === 0}>
+               {data.length > 0 && (
+                <Select value={selectedRoleForUpload} onValueChange={(value) => setSelectedRoleForUpload(value as Author['role'])}>
+                    <SelectTrigger className="w-full sm:w-[220px]">
+                        <SelectValue placeholder="Select your role for this upload..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {AUTHOR_ROLES.map(role => (
+                            <SelectItem key={role} value={role}>{role}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+               )}
+              <Button onClick={handleUpload} disabled={isLoading || data.length === 0 || !selectedRoleForUpload}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 Upload {data.length > 0 ? `${data.length} Rows` : ''}
               </Button>

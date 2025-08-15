@@ -92,7 +92,7 @@ export async function sendCoAuthorRequest(
 }
 
 
-async function createNewPaper(paperData: PaperUploadData, user: User): Promise<ResearchPaper> {
+async function createNewPaper(paperData: PaperUploadData, user: User, role: Author['role']): Promise<ResearchPaper> {
     const paperRef = adminDb.collection('papers').doc();
     const now = new Date().toISOString();
 
@@ -100,7 +100,7 @@ async function createNewPaper(paperData: PaperUploadData, user: User): Promise<R
         uid: user.uid,
         email: user.email,
         name: user.name,
-        role: 'First Author', // Default for new submissions
+        role: role,
         isExternal: false,
         status: 'approved',
     };
@@ -136,7 +136,8 @@ async function createNewPaper(paperData: PaperUploadData, user: User): Promise<R
 
 export async function bulkUploadPapers(
   papersData: PaperUploadData[],
-  user: User
+  user: User,
+  role: Author['role']
 ): Promise<{ 
     success: boolean; 
     data: {
@@ -165,7 +166,7 @@ export async function bulkUploadPapers(
       if (existingPaper) {
         linkedPapers.push(existingPaper);
       } else {
-        await createNewPaper(row, user);
+        await createNewPaper(row, user, role);
         newPapers.push({ title });
       }
     } catch (error: any) {
