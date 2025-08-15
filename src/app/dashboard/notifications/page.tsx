@@ -79,14 +79,39 @@ export default function NotificationsPage() {
         toast({ variant: 'destructive', title: "Error", description: "Could not update notification." });
     }
   };
+  
+  const handleRoleSelection = (selectedRole: Author['role']) => {
+    setAssignedRole(selectedRole);
+    if (!managingRequest || !user) return;
+    
+    const { paper } = managingRequest;
+    const mainAuthor = paper.authors.find(a => a.uid === user.uid);
+    
+    const conflictingRoles = ['First Author', 'Corresponding Author', 'First & Corresponding Author'];
+    
+    if (conflictingRoles.includes(selectedRole) && mainAuthor?.role === selectedRole) {
+        setRoleConflict(true);
+    } else if (selectedRole === 'First Author' && mainAuthor?.role === 'First & Corresponding Author') {
+        setRoleConflict(true);
+    } else if (selectedRole === 'Corresponding Author' && mainAuthor?.role === 'First & Corresponding Author') {
+        setRoleConflict(true);
+    } else {
+        setRoleConflict(false);
+        setMainAuthorNewRole('');
+    }
+  };
 
   const handleOpenAcceptDialog = async (notification: NotificationType) => {
-    if (!notification.paperId) return;
+    if (!notification.paperId || !notification.requester) return;
     try {
         const paperRef = doc(db, 'papers', notification.paperId);
         const paperSnap = await getDoc(paperRef);
         if (paperSnap.exists()) {
-            setManagingRequest({ notification, paper: { id: paperSnap.id, ...paperSnap.data() } as ResearchPaper });
+            const paper = { id: paperSnap.id, ...paperSnap.data() } as ResearchPaper;
+            setManagingRequest({ notification, paper });
+            // Auto-select the requested role and trigger conflict check
+            const requestedRole = notification.requester.role;
+            handleRoleSelection(requestedRole);
         } else {
             toast({ title: 'Error', description: 'Could not find the associated paper.', variant: 'destructive' });
         }
@@ -128,41 +153,6 @@ export default function NotificationsPage() {
         toast({title: "Error", description: result.error, variant: "destructive"});
     }
   };
-  
-  const handleRoleSelection = (selectedRole: Author['role']) => {
-    setAssignedRole(selectedRole);
-    if (!managingRequest || !user) return;
-    
-    const { paper } = managingRequest;
-    const mainAuthor = paper.authors.find(a => a.uid === user.uid);
-    
-    const conflictingRoles = ['First Author', 'Corresponding Author', 'First & Corresponding Author'];
-    
-    if (conflictingRoles.includes(selectedRole) && mainAuthor?.role === selectedRole) {
-        setRoleConflict(true);
-    } else if (selectedRole === 'First Author' && mainAuthor?.role === 'First & Corresponding Author') {
-        setRoleConflict(true);
-    } else if (selectedRole === 'Corresponding Author' && mainAuthor?.role === 'First & Corresponding Author') {
-        setRoleConflict(true);
-    } else {
-        setRoleConflict(false);
-        setMainAuthorNewRole('');
-    }
-  };
-
-  const getIcon = (title: string) => {
-    if (title.includes('Recommended') || title.includes('Completed')) return FileCheck2;
-    if (title.includes('Review') || title.includes('Not Recommended')) return GanttChartSquare;
-    return Bell;
-  }
-  
-  const getNotificationLink = (notification: NotificationType) => {
-    if (!notification.projectId) return null;
-    if (notification.projectId.startsWith('/')) {
-      return notification.projectId;
-    }
-    return `/dashboard/project/${notification.projectId}`;
-  };
 
   const getAvailableRolesForMainAuthor = (paper?: ResearchPaper, requesterAssignedRole?: Author['role']): Author['role'][] => {
     if (!paper || !requesterAssignedRole) return AUTHOR_ROLES;
@@ -179,6 +169,22 @@ export default function NotificationsPage() {
 
     return availableRoles;
   }
+
+  const getIcon = (title: string) => {
+    if (title.includes('Recommended') || title.includes('Completed')) return FileCheck2;
+    if (title.includes('Review') || title.includes('Not Recommended')) return GanttChartSquare;
+    return Bell;
+  }
+  
+  const getNotificationLink = (notification: NotificationType) => {
+    if (!notification.projectId) return null;
+    if (notification.projectId.startsWith('/')) {
+      return notification.projectId;
+    }
+    return `/dashboard/project/${notification.projectId}`;
+  };
+
+  const buttonText = `Confirm & Add ${assignedRole?.replace(' Author', '')}`
 
   return (
     <>
@@ -293,7 +299,7 @@ export default function NotificationsPage() {
           </div>
           <DialogFooter>
             <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={handleConfirmAcceptRequest}>Confirm & Add Co-Author</Button>
+            <Button onClick={handleConfirmAcceptRequest}>{buttonText}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
