@@ -505,6 +505,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                 <ProfileDetail label="Faculty" value={user.faculty} icon={Building2} />
                                 <ProfileDetail label="Institute" value={user.institute} icon={Building2} />
                                 <ProfileDetail label="Department" value={user.department} icon={Briefcase} />
+                                <ProfileDetail label="Campus" value={user.campus} icon={Building2} />
                                 <ProfileDetail label="Email" value={user.email} icon={Mail} />
                                 <ProfileDetail label="Phone" value={user.phoneNumber} icon={Phone} />
                             </div>
@@ -705,5 +706,3 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
         </div>
     );
 }
-
-    

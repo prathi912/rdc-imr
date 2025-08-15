@@ -1079,6 +1079,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 <dd>{project.institute}</dd>
                 <dt className="font-medium text-muted-foreground">Department</dt>
                 <dd>{project.departmentName}</dd>
+                 <dt className="font-medium text-muted-foreground">Campus</dt>
+                <dd>{piUser?.campus || 'N/A'}</dd>
               </dl>
             </div>
           </div>
