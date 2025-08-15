@@ -103,9 +103,12 @@ export function MembershipForm() {
         };
 
         const membershipProofUrl = await uploadFileHelper(data.membershipProof?.[0], 'membership-proof');
+        
+        // This is the fix: create a new object without the FileList
+        const { membershipProof, ...restOfData } = data;
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
-            ...data,
+            ...restOfData,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
             claimType: 'Membership of Professional Bodies',
