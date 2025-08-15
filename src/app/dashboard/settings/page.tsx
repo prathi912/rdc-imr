@@ -45,6 +45,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
   email: z.string().email(),
+  campus: z.string().optional(),
   faculty: z.string().min(1, "Please select a faculty."),
   institute: z.string().min(1, "Please select an institute."),
   department: z.string().optional(),
@@ -213,6 +214,7 @@ export default function SettingsPage() {
     defaultValues: {
       name: "",
       email: "",
+      campus: "",
       faculty: "",
       institute: "",
       department: "",
@@ -285,6 +287,7 @@ export default function SettingsPage() {
           profileForm.reset({
             name: appUser.name || "",
             email: appUser.email || "",
+            campus: appUser.campus || "",
             faculty: appUser.faculty || "",
             institute: appUser.institute || "",
             department: appUser.department || "",
@@ -357,7 +360,7 @@ export default function SettingsPage() {
           ;(updateData as any)[key] = ""
         }
       }
-      await updateDoc(userDocRef, updateData)
+      await updateDoc(userDocRef, updateData as any)
       const updatedUser = { ...user, ...updateData }
       localStorage.setItem("user", JSON.stringify(updatedUser))
       setUser(updatedUser)
@@ -802,6 +805,16 @@ export default function SettingsPage() {
                     )}
                   />
                 </div>
+                 <FormField name="campus" control={profileForm.control} render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Campus</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={user?.email?.endsWith('@goa.paruluniversity.ac.in')}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select your campus" /></SelectTrigger></FormControl>
+                            <SelectContent>{campuses.map(campus => (<SelectItem key={campus} value={campus}>{campus}</SelectItem>))}</SelectContent>
+                        </Select>
+                        <FormMessage />
+                    </FormItem>
+                 )} />
                 <FormField
                   name="faculty"
                   control={profileForm.control}
@@ -815,7 +828,7 @@ export default function SettingsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {faculties.map((f) => (
+                          {(selectedCampus === 'Goa' ? goaFaculties : faculties).map((f) => (
                             <SelectItem key={f} value={f}>
                               {f}
                             </SelectItem>
