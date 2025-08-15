@@ -22,10 +22,10 @@ This is the base role for all teaching and research staff.
 
 ### Profile & Settings
 1.  **First-Time Login (Profile Setup):**
-    -   On your first login, you will be guided to the **Profile Setup** page. This is a critical step.
+    -   On your first login, you will be guided to the **Profile Setup** page. This is a critical and mandatory step.
     -   You can pre-fill your academic details by entering your MIS ID and clicking "Fetch My Details". Review the information for accuracy.
     -   Upload a professional profile picture.
-    -   Complete all required fields, including your Faculty, Institute, Department, and Designation.
+    -   Complete all required fields, including your Campus, Faculty, Institute, Department, and Designation.
 
 2.  **Settings Page:**
     -   Navigate to **Settings** from the sidebar at any time to update your profile.
@@ -37,7 +37,7 @@ This is the base role for all teaching and research staff.
     -   Navigate to **New Submission** from the sidebar.
     -   The submission form is divided into four steps:
         1.  **Project Details:** Enter the title, abstract, and category. You can also align your project with UN Sustainable Development Goals (SDGs).
-        2.  **Team Info:** Add Co-PIs by searching for their MIS ID. They must be registered on the portal. List any student members involved. Upload a single ZIP file containing the CVs of all team members.
+        2.  **Team Info:** Add Co-PIs by searching for their MIS ID. They must be registered on the portal. For each Co-PI added, you must upload their individual CV as a PDF (max 5MB). List any student members involved.
         3.  **File Uploads:** Upload your main Project Proposal (PDF) and, if applicable, your Ethics Approval document (PDF).
         4.  **Timeline & Outcomes:** Detail the project timeline and the expected outcomes or impact.
     -   At any step, you can click **Save as Draft**. Drafts are accessible from the **My Projects** page to be completed later.
@@ -94,7 +94,7 @@ This role is assigned to reviewers of IMR or EMR proposals.
     -   You will receive an email and in-app notification when you are assigned to an IMR evaluation committee for a scheduled meeting.
 
 2.  **Access Evaluation Queue:**
-    -   Navigate to the **IMR Evaluation Queue**. This page lists all IMR projects that are scheduled for a meeting you are a part of and are awaiting your review.
+    -   Navigate to the **Evaluation Queue**. This page lists all IMR projects that are scheduled for a meeting you are a part of and are awaiting your review.
     -   **Important:** You can only submit your evaluation on the day of the scheduled meeting.
 
 3.  **Evaluate a Project:**
@@ -111,7 +111,7 @@ This role is assigned to reviewers of IMR or EMR proposals.
     -   You will be notified when you are assigned to an EMR evaluation committee.
 
 2.  **Access EMR Queue:**
-    -   Navigate to **EMR Evaluations**. This page lists all EMR presentation applications assigned to your committee.
+    -   Navigate to **Evaluation Queue** and select the "EMR Presentations" tab. This page lists all EMR presentation applications assigned to your committee.
 
 3.  **Evaluate a Presentation:**
     -   On the day of the scheduled EMR meeting, access this page.
@@ -144,7 +144,7 @@ A faculty-level administrative role with oversight of all projects within their 
 ---
 
 ## 4. Principal
-An institute-level administrative role with oversight of all activities within their specific institute.
+An institute-level administrative role with oversight of all activities within their specific institute. Principals are requested to sign up using institutional Email Id (Ex: piet@paruluniversity.ac.in).
 
 **Key Capabilities:**
 -   View all projects submitted from their institute.
@@ -152,7 +152,8 @@ An institute-level administrative role with oversight of all activities within t
 
 **Workflow:**
 1.  **First-time Login:**
-    -   You will be prompted to complete a simplified profile setup, requiring only your **Faculty** and **Institute**. An MIS ID is not required for your role.
+    -   You will be guided through a mandatory **Profile Setup** page where you must complete your academic details.
+    -   Your designation as 'Principal' is automatically assigned based on your email.
 
 2.  **Project Oversight:**
     -   Navigate to **All Projects**. The list is automatically filtered to show every project from your institute, regardless of your personal involvement. This is your primary tool for monitoring research activity.
@@ -229,6 +230,7 @@ These roles have the highest level of access for managing the entire portal.
 2.  **Bulk Data Management:**
     -   **Bulk Upload Projects**: Import historical IMR project data from a formatted Excel file.
     -   **Bulk Upload Papers**: Import historical research paper data from a formatted Excel file to populate user profiles.
+    -   **Bulk Upload EMR Projects**: Import historical sanctioned EMR project data.
 
 3.  **System Health:**
     -   The **System Health** dashboard allows you to monitor the connectivity and status of all integrated Firebase services (Firestore, Auth, Storage) in real-time.
@@ -236,5 +238,3 @@ These roles have the highest level of access for managing the entire portal.
 4.  **Module Management (Super-admin only):**
     -   The Super-admin has exclusive access to the **Module Management** page.
     -   This powerful feature allows you to dynamically grant or revoke access to any part of the portal (e.g., "Manage Users", "Analytics") for any user, providing fine-grained permission control beyond the default roles.
-
-    
