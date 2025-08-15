@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState } from 'react';
@@ -214,13 +213,14 @@ export default function BulkUploadPapersPage() {
             <CardContent>
                 <div className="max-h-96 overflow-x-auto">
                     <Table>
-                        <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>URL</TableHead><TableHead>Year</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>URL</TableHead><TableHead>Year</TableHead><TableHead>Your Role</TableHead></TableRow></TableHeader>
                         <TableBody>
                         {data.map((row, index) => (
                             <TableRow key={index}>
                             <TableCell className="font-medium max-w-sm whitespace-normal break-words">{row.PublicationTitle}</TableCell>
                             <TableCell className="whitespace-nowrap truncate max-w-xs">{row.PublicationURL}</TableCell>
                             <TableCell>{row.PublicationYear}</TableCell>
+                            <TableCell>{selectedRoleForUpload || 'Not Selected'}</TableCell>
                             </TableRow>
                         ))}
                         </TableBody>
