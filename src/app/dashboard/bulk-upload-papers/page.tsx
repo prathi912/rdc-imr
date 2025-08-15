@@ -41,9 +41,8 @@ export default function BulkUploadPapersPage() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const { toast } = useToast();
-  const [roles, setRoles] = useState<Record<string, Author['role']>>({});
+  const [roles, setRoles] = useState<Record<number, Author['role']>>({});
   const [isSendingRequest, setIsSendingRequest] = useState<string | null>(null);
-  const [selectedRoleForUpload, setSelectedRoleForUpload] = useState<Author['role'] | ''>('');
 
 
   useState(() => {
@@ -59,6 +58,7 @@ export default function BulkUploadPapersPage() {
 
     setFileName(file.name);
     setUploadResult(null);
+    setRoles({}); // Reset roles on new file upload
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -82,7 +82,7 @@ export default function BulkUploadPapersPage() {
             return;
         }
 
-        const formattedData = jsonData.map(row => ({
+        const formattedData: PaperUploadData[] = jsonData.map(row => ({
           PublicationTitle: String(row.PublicationTitle || ''),
           PublicationURL: String(row.PublicationURL || ''),
           PublicationYear: row.PublicationYear ? Number(row.PublicationYear) : undefined,
@@ -90,7 +90,7 @@ export default function BulkUploadPapersPage() {
           ImpactFactor: row.ImpactFactor ? Number(row.ImpactFactor) : undefined,
           JournalName: row.JournalName ? String(row.JournalName) : undefined,
           JournalWebsite: row.JournalWebsite ? String(row.JournalWebsite) : undefined,
-          QRating: row.Quartile ? String(row.Quartile) : undefined, // Mapping Quartile to QRating
+          QRating: row.Quartile ? String(row.Quartile) : undefined,
         }));
         setData(formattedData);
       } catch (error) {
@@ -101,20 +101,22 @@ export default function BulkUploadPapersPage() {
     reader.readAsBinaryString(file);
   };
 
+  const allRolesSelected = data.length > 0 && data.every((_, index) => !!roles[index]);
+
   const handleUpload = async () => {
     if (data.length === 0 || !user) {
       toast({ variant: 'destructive', title: 'No Data', description: 'There is no data to upload or user is not identified.' });
       return;
     }
-     if (!selectedRoleForUpload) {
-      toast({ variant: 'destructive', title: 'Role Required', description: 'Please select your role for the papers in this upload.' });
+    if (!allRolesSelected) {
+      toast({ variant: 'destructive', title: 'Role Required', description: 'Please select your role for every paper in the list.' });
       return;
     }
     setIsLoading(true);
     setUploadResult(null);
-    setRoles({});
     try {
-        const result = await bulkUploadPapers(data, user, selectedRoleForUpload);
+        const rolesArray = data.map((_, index) => roles[index]);
+        const result = await bulkUploadPapers(data, user, rolesArray);
         if (result.success) {
             setUploadResult(result.data);
             toast({ title: 'Upload Processed', description: `Successfully processed ${data.length} records.` });
@@ -131,8 +133,7 @@ export default function BulkUploadPapersPage() {
     }
   };
   
-  const handleSendRequest = async (paper: ResearchPaper) => {
-    const role = roles[paper.id];
+  const handleSendRequest = async (paper: ResearchPaper, role: Author['role'] | undefined) => {
     if (!role || !user) {
         toast({ title: 'Please select your role for this paper', variant: 'destructive' });
         return;
@@ -183,19 +184,7 @@ export default function BulkUploadPapersPage() {
             </Alert>
             <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
               <Input id="file-upload" type="file" accept=".xlsx" onChange={handleFileUpload} className="w-full sm:max-w-xs" />
-               {data.length > 0 && (
-                <Select value={selectedRoleForUpload} onValueChange={(value) => setSelectedRoleForUpload(value as Author['role'])}>
-                    <SelectTrigger className="w-full sm:w-[220px]">
-                        <SelectValue placeholder="Select your role for this upload..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {AUTHOR_ROLES.map(role => (
-                            <SelectItem key={role} value={role}>{role}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-               )}
-              <Button onClick={handleUpload} disabled={isLoading || data.length === 0 || !selectedRoleForUpload}>
+              <Button onClick={handleUpload} disabled={isLoading || !allRolesSelected}>
                 {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                 Upload {data.length > 0 ? `${data.length} Rows` : ''}
               </Button>
@@ -208,19 +197,30 @@ export default function BulkUploadPapersPage() {
           <Card>
             <CardHeader>
               <CardTitle>Preview Data ({data.length} rows)</CardTitle>
-              <CardDescription>Review the data before uploading.</CardDescription>
+              <CardDescription>Review the data and assign your role for each paper before uploading.</CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="max-h-96 overflow-x-auto">
                     <Table>
-                        <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>URL</TableHead><TableHead>Year</TableHead><TableHead>Your Role</TableHead></TableRow></TableHeader>
+                        <TableHeader><TableRow><TableHead>Title</TableHead><TableHead>URL</TableHead><TableHead>Year</TableHead><TableHead className="w-[220px]">Your Role</TableHead></TableRow></TableHeader>
                         <TableBody>
                         {data.map((row, index) => (
                             <TableRow key={index}>
                             <TableCell className="font-medium max-w-sm whitespace-normal break-words">{row.PublicationTitle}</TableCell>
                             <TableCell className="whitespace-nowrap truncate max-w-xs">{row.PublicationURL}</TableCell>
                             <TableCell>{row.PublicationYear}</TableCell>
-                            <TableCell>{selectedRoleForUpload || 'Not Selected'}</TableCell>
+                            <TableCell>
+                               <Select value={roles[index] || ''} onValueChange={(value) => setRoles(prev => ({ ...prev, [index]: value as Author['role'] }))}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select your role..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {AUTHOR_ROLES.map(role => (
+                                            <SelectItem key={role} value={role}>{role}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </TableCell>
                             </TableRow>
                         ))}
                         </TableBody>
@@ -242,24 +242,24 @@ export default function BulkUploadPapersPage() {
                              <AlertTriangle className="h-4 w-4" />
                              <AlertTitle>Action Required: Potential Duplicates Found</AlertTitle>
                              <AlertDescription>
-                                The following papers already exist in the portal. Please select your role and send a request to be added as a co-author.
+                                The following papers already exist in the portal. Please confirm and send a request to be added as a co-author.
                                 <div className="mt-4 space-y-4">
-                                {uploadResult.linkedPapers.map(paper => (
-                                    <div key={paper.id} className="p-3 bg-background/50 dark:bg-background/20 rounded-md border border-amber-500/30">
-                                        <p className="font-semibold text-sm">{paper.title}</p>
-                                        <p className="text-xs text-muted-foreground">Main Author: {paper.authors.find(a => a.uid === paper.mainAuthorUid)?.name || 'Unknown'}</p>
-                                        <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                            <Select value={roles[paper.id] || ''} onValueChange={(value) => setRoles(prev => ({ ...prev, [paper.id]: value as Author['role'] }))}>
-                                                <SelectTrigger className="w-full sm:w-[200px] h-9"><SelectValue placeholder="Select your role..." /></SelectTrigger>
-                                                <SelectContent>{AUTHOR_ROLES.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
-                                            </Select>
-                                            <Button size="sm" className="h-9" onClick={() => handleSendRequest(paper)} disabled={isSendingRequest === paper.id}>
-                                                {isSendingRequest === paper.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
-                                                <span className="ml-2">Send Request</span>
-                                            </Button>
+                                {uploadResult.linkedPapers.map(paper => {
+                                    const linkedPaperRole = roles[data.findIndex(d => d.PublicationTitle === paper.title)];
+                                    return (
+                                        <div key={paper.id} className="p-3 bg-background/50 dark:bg-background/20 rounded-md border border-amber-500/30">
+                                            <p className="font-semibold text-sm">{paper.title}</p>
+                                            <p className="text-xs text-muted-foreground">Main Author: {paper.authors.find(a => a.uid === paper.mainAuthorUid)?.name || 'Unknown'}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">Your requested role: <span className="font-medium">{linkedPaperRole}</span></p>
+                                            <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                                <Button size="sm" className="h-9" onClick={() => handleSendRequest(paper, linkedPaperRole)} disabled={isSendingRequest === paper.id}>
+                                                    {isSendingRequest === paper.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
+                                                    <span className="ml-2">Send Request</span>
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                                 </div>
                              </AlertDescription>
                          </Alert>

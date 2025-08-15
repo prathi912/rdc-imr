@@ -137,7 +137,7 @@ async function createNewPaper(paperData: PaperUploadData, user: User, role: Auth
 export async function bulkUploadPapers(
   papersData: PaperUploadData[],
   user: User,
-  role: Author['role']
+  roles: Author['role'][]
 ): Promise<{ 
     success: boolean; 
     data: {
@@ -151,12 +151,17 @@ export async function bulkUploadPapers(
   const linkedPapers: ResearchPaper[] = [];
   const errors: { title: string; reason: string }[] = [];
 
-  for (const row of papersData) {
+  for (const [index, row] of papersData.entries()) {
     const title = row.PublicationTitle?.trim();
     const url = row.PublicationURL?.trim();
+    const role = roles[index];
 
     if (!title || !url) {
       errors.push({ title: title || 'Untitled', reason: 'Missing title or URL.' });
+      continue;
+    }
+    if (!role) {
+      errors.push({ title, reason: 'Missing role for this paper.' });
       continue;
     }
 
