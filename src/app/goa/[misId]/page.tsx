@@ -47,11 +47,11 @@ export default function GoaProfilePage() {
       setError(null)
       try {
         const usersRef = collection(db, "users")
-        const userQuery = query(usersRef, where("misId", "==", misId), limit(1))
+        const userQuery = query(usersRef, where("misId", "==", misId), where("campus", "==", "Goa"), limit(1))
         const userSnapshot = await getDocs(userQuery)
 
         if (userSnapshot.empty) {
-          throw new Error("User not found.")
+          throw new Error("Goa campus user not found.")
         }
 
         const targetUserDoc = userSnapshot.docs[0]
@@ -59,6 +59,8 @@ export default function GoaProfilePage() {
         
         // --- Permission Check ---
         const isAdmin = ["Super-admin", "admin", "CRO"].includes(sessionUser.role)
+        const isPrincipal = sessionUser.designation === 'Principal' && sessionUser.institute === fetchedUser.institute;
+        const isHod = sessionUser.designation === 'HOD' && sessionUser.department === fetchedUser.department && sessionUser.institute === fetchedUser.institute;
         const isOwner = sessionUser.uid === fetchedUser.uid
         
         let isAssignedEvaluatorOnMeetingDay = false;
@@ -69,7 +71,7 @@ export default function GoaProfilePage() {
             }
         }
         
-        if (!isAdmin && !isOwner && !isAssignedEvaluatorOnMeetingDay) {
+        if (!isAdmin && !isOwner && !isAssignedEvaluatorOnMeetingDay && !isPrincipal && !isHod) {
           throw new Error("Access Denied: You do not have permission to view this profile.")
         }
 
