@@ -27,6 +27,19 @@ interface StaffData {
   Orcid?: string | number;
 }
 
+const readStaffData = (filePath: string): StaffData[] => {
+    if (!fs.existsSync(filePath)) {
+        console.warn(`Staff data file not found at: ${filePath}.`);
+        return [];
+    }
+    const buffer = fs.readFileSync(filePath);
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json<StaffData>(worksheet);
+}
+
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
@@ -36,9 +49,28 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email or MIS ID query parameter is required.' }, { status: 400 });
   }
   
-  const isGoaUser = email?.endsWith('@goa.paruluniversity.ac.in');
-  const fileName = isGoaUser ? 'goastaffdata.xlsx' : 'staffdata.xlsx';
-  const filePath = path.join(process.cwd(), fileName);
+  let userRecord: StaffData | undefined;
+  let fileName = 'staffdata.xlsx'; // Default
+  let jsonData: StaffData[] = [];
+
+  // Logic to determine which file to read
+  const goastaffdataFilePath = path.join(process.cwd(), 'goastaffdata.xlsx');
+  const staffdataFilePath = path.join(process.cwd(), 'staffdata.xlsx');
+
+  let isGoaUser = email?.endsWith('@goa.paruluniversity.ac.in');
+
+  // If MIS ID is provided, it could be from either file. We need to check.
+  if (misId) {
+      const goaData = readStaffData(goastaffdataFilePath);
+      const goaRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
+      if (goaRecord) {
+          isGoaUser = true;
+      }
+  }
+
+  fileName = isGoaUser ? 'goastaffdata.xlsx' : 'staffdata.xlsx';
+  const filePath = isGoaUser ? goastaffdataFilePath : staffdataFilePath;
+
 
   try {
     if (!fs.existsSync(filePath)) {
@@ -46,18 +78,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ success: false, error: `Staff data source '${fileName}' not found on the server.` }, { status: 404 });
     }
 
-    const buffer = fs.readFileSync(filePath);
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json<StaffData>(worksheet);
+    jsonData = readStaffData(filePath);
     
-    let userRecord: StaffData | undefined;
-
     if (misId) {
         userRecord = jsonData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
     }
     
+    // If no record found by MIS ID, or if only email was provided, search by email.
     if (!userRecord && email) {
         userRecord = jsonData.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
     }
