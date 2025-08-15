@@ -6,6 +6,7 @@ import type { ResearchPaper, Author, User, Notification } from '@/types';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getResearchDomainSuggestion } from '@/ai/flows/research-domain-suggestion';
 import admin from 'firebase-admin';
+import { sendEmail } from '@/app/actions';
 
 type PaperUploadData = {
     PublicationTitle: string;
@@ -69,8 +70,7 @@ export async function sendCoAuthorRequest(
         if (existingPaper.mainAuthorUid) {
             const mainAuthorDoc = await adminDb.collection('users').doc(existingPaper.mainAuthorUid).get();
             const mainAuthorData = mainAuthorDoc.exists ? mainAuthorDoc.data() as User : null;
-            const mainAuthorCampus = mainAuthorData?.campus;
-            const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorData?.misId}` : `/profile/${mainAuthorData?.misId}`;
+            const profileLink = `/dashboard/notifications`;
             
             const notification: Omit<Notification, 'id'> = {
                 uid: existingPaper.mainAuthorUid,
@@ -193,28 +193,29 @@ export async function manageCoAuthorRequest(
     try {
         const paperRef = adminDb.collection('papers').doc(paperId);
         
-        return await adminDb.runTransaction(async (transaction) => {
+        const result = await adminDb.runTransaction(async (transaction) => {
             const paperSnap = await transaction.get(paperRef);
             if (!paperSnap.exists) {
                 throw new Error('Paper not found.');
             }
             const paperData = paperSnap.data() as ResearchPaper;
             const mainAuthorUid = paperData.mainAuthorUid;
+            const mainAuthor = paperData.authors.find(a => a.uid === mainAuthorUid);
+            if (!mainAuthor) {
+                throw new Error('Main author not found on paper.');
+            }
 
             const requestToRemove = (paperData.coAuthorRequests || []).find(req => req.uid === requestingAuthor.uid && req.email === requestingAuthor.email);
             if (!requestToRemove) {
                 throw new Error('This co-author request was not found. It may have been withdrawn or already processed.');
             }
 
-            if (action === 'reject') {
-                transaction.update(paperRef, { coAuthorRequests: FieldValue.arrayRemove(requestToRemove) });
-                return { success: true };
-            }
+            // Always remove the request from the array
+            transaction.update(paperRef, { coAuthorRequests: FieldValue.arrayRemove(requestToRemove) });
 
             if (action === 'accept' && assignedRole) {
                 let currentAuthors = paperData.authors || [];
 
-                // Handle potential role conflicts by updating the main author's role if a new one is provided
                 if (mainAuthorNewRole && mainAuthorUid) {
                     const mainAuthorIndex = currentAuthors.findIndex(author => author.uid === mainAuthorUid);
                     if (mainAuthorIndex !== -1) {
@@ -229,16 +230,63 @@ export async function manageCoAuthorRequest(
                 const updatedAuthorEmails = [...new Set([...(paperData.authorEmails || []), newAuthor.email.toLowerCase()])];
 
                 transaction.update(paperRef, {
-                    coAuthorRequests: FieldValue.arrayRemove(requestToRemove),
                     authors: updatedAuthors,
                     authorUids: updatedAuthorUids,
                     authorEmails: updatedAuthorEmails,
                 });
-                return { success: true };
             }
             
-            throw new Error('Invalid action or missing role for acceptance.');
+            return { paper: paperData, mainAuthor };
         });
+
+        const { paper, mainAuthor } = result;
+        const mainAuthorName = mainAuthor.name;
+
+        // --- Send Notifications Outside Transaction ---
+        if (requestingAuthor.uid) {
+            const notificationTitle = action === 'accept'
+                ? `${mainAuthorName} accepted your request to be a ${assignedRole} on "${paper.title}"`
+                : `${mainAuthorName} rejected your co-author request for "${paper.title}"`;
+            
+            const notification: Omit<Notification, 'id'> = {
+                uid: requestingAuthor.uid,
+                title: notificationTitle,
+                createdAt: new Date().toISOString(),
+                isRead: false,
+                type: 'default',
+            };
+            await adminDb.collection('notifications').add(notification);
+            
+            const emailHtml = `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+                    <p>Dear ${requestingAuthor.name},</p>
+                    <p>
+                        This is an update regarding your co-author request for the paper titled:
+                        <br>
+                        <strong>"${paper.title}"</strong>
+                    </p>
+                    <p>
+                        ${mainAuthorName} has <strong>${action === 'accept' ? 'accepted' : 'rejected'}</strong> your request.
+                    </p>
+                    ${action === 'accept' ? '<p>You have been successfully added to the list of authors.</p>' : ''}
+                    <p>
+                        You can view your publications on the PU Research Projects Portal.
+                    </p>
+                    <br/>
+                    <p>Best Regards,</p>
+                    <p><strong>The R&D Cell Team</strong></p>
+                </div>
+            `;
+            
+            await sendEmail({
+                to: requestingAuthor.email,
+                subject: `Update on your co-author request for "${paper.title}"`,
+                html: emailHtml,
+                from: 'default'
+            });
+        }
+
+        return { success: true };
 
     } catch (error: any) {
         console.error("Error managing co-author request:", error);
