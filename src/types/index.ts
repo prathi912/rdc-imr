@@ -50,6 +50,7 @@ export type Author = {
   name: string
   role: "First Author" | "Corresponding Author" | "Co-Author" | "First & Corresponding Author"
   isExternal: boolean
+  status: 'approved' | 'pending';
 }
 
 export type ResearchPaper = {
@@ -58,6 +59,7 @@ export type ResearchPaper = {
   url: string
   mainAuthorUid?: string
   authors: Author[]
+  coAuthorRequests?: Author[];
   authorUids: string[] // For efficient querying by UID
   authorEmails: string[] // For efficient querying by email before sign-up
   domain?: string

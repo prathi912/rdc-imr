@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -38,36 +39,42 @@ async function findExistingPaper(title: string, url: string): Promise<ResearchPa
     return null;
 }
 
-async function linkAuthorToPaper(paperId: string, user: User) {
-    const paperRef = adminDb.collection('papers').doc(paperId);
+async function linkAuthorToPaper(existingPaper: ResearchPaper, user: User) {
+    const paperRef = adminDb.collection('papers').doc(existingPaper.id);
     
-    // Use a transaction to safely update the author arrays
-    await adminDb.runTransaction(async (transaction) => {
-        const paperDoc = await transaction.get(paperRef);
-        if (!paperDoc.exists) {
-            throw new Error("Paper not found");
-        }
-        const paperData = paperDoc.data() as ResearchPaper;
-        
-        // Check if user is already an author
-        if (paperData.authorUids?.includes(user.uid)) {
-            return; // Already linked
-        }
+    // Check if user is already an author (approved or pending)
+    const isAlreadyAuthor = existingPaper.authors?.some(a => a.uid === user.uid);
+    const isAlreadyRequested = existingPaper.coAuthorRequests?.some(a => a.uid === user.uid);
 
-        const newAuthor: Author = {
-            uid: user.uid,
-            email: user.email,
-            name: user.name,
-            role: 'Co-Author', // Default role when linking
-            isExternal: false,
-        };
-        
-        transaction.update(paperRef, {
-            authors: FieldValue.arrayUnion(newAuthor),
-            authorUids: FieldValue.arrayUnion(user.uid),
-            authorEmails: FieldValue.arrayUnion(user.email.toLowerCase()),
-        });
+    if (isAlreadyAuthor || isAlreadyRequested) {
+        console.log(`User ${user.email} is already linked or has a pending request for paper ${existingPaper.id}.`);
+        return; // Already linked or requested
+    }
+
+    const newAuthorRequest: Author = {
+        uid: user.uid,
+        email: user.email,
+        name: user.name,
+        role: 'Co-Author', // Default role for requests
+        isExternal: false,
+        status: 'pending',
+    };
+    
+    await paperRef.update({
+        coAuthorRequests: FieldValue.arrayUnion(newAuthorRequest),
     });
+
+    // Notify the main author
+    if (existingPaper.mainAuthorUid) {
+        const notification = {
+            uid: existingPaper.mainAuthorUid,
+            projectId: `/profile/${user.misId}`, // Link to requester's profile
+            title: `${user.name} has requested to be added as a co-author on your paper: "${existingPaper.title}"`,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+        };
+        await adminDb.collection('notifications').add(notification);
+    }
 }
 
 async function createNewPaper(paperData: PaperUploadData, user: User): Promise<ResearchPaper> {
@@ -80,6 +87,7 @@ async function createNewPaper(paperData: PaperUploadData, user: User): Promise<R
         name: user.name,
         role: 'First Author', // Default for new submissions
         isExternal: false,
+        status: 'approved',
     };
 
     const newPaper: Omit<ResearchPaper, 'id'> = {
@@ -95,6 +103,7 @@ async function createNewPaper(paperData: PaperUploadData, user: User): Promise<R
         impactFactor: paperData.ImpactFactor,
         createdAt: now,
         updatedAt: now,
+        coAuthorRequests: [],
     };
 
     // AI Domain Suggestion
@@ -140,8 +149,8 @@ export async function bulkUploadPapers(
       const existingPaper = await findExistingPaper(title, url);
 
       if (existingPaper) {
-        // Paper exists, link the user to it
-        await linkAuthorToPaper(existingPaper.id, user);
+        // Paper exists, create a request to link the user to it
+        await linkAuthorToPaper(existingPaper, user);
         linkedPapers.push({ title });
       } else {
         // Paper doesn't exist, create it
