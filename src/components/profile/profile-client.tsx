@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -62,6 +61,10 @@ function AddEditPaperDialog({
     const [url, setUrl] = useState('');
     const [authors, setAuthors] = useState<Author[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [journalName, setJournalName] = useState('');
+    const [journalWebsite, setJournalWebsite] = useState('');
+    const [qRating, setQRating] = useState('');
+    const [impactFactor, setImpactFactor] = useState<number | ''>('');
     
     // State for adding co-authors
     const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
@@ -76,10 +79,18 @@ function AddEditPaperDialog({
                 setTitle(existingPaper.title);
                 setUrl(existingPaper.url);
                 setAuthors(existingPaper.authors);
+                setJournalName(existingPaper.journalName || '');
+                setJournalWebsite(existingPaper.journalWebsite || '');
+                setQRating(existingPaper.qRating || '');
+                setImpactFactor(existingPaper.impactFactor || '');
             } else {
                 setTitle('');
                 setUrl('');
                 setAuthors([{ email: user.email, name: user.name, role: 'First Author', isExternal: false, uid: user.uid, status: 'approved' }]);
+                setJournalName('');
+                setJournalWebsite('');
+                setQRating('');
+                setImpactFactor('');
             }
         }
     }, [isOpen, existingPaper, user]);
@@ -163,10 +174,20 @@ function AddEditPaperDialog({
         setIsSubmitting(true);
         try {
             let result;
+            const paperPayload = {
+                title: title.trim(),
+                url: url.trim(),
+                authors,
+                journalName: journalName.trim() || null,
+                journalWebsite: journalWebsite.trim() || null,
+                qRating: qRating.trim() || null,
+                impactFactor: Number(impactFactor) || null,
+            };
+
             if (existingPaper) {
-                result = await updateResearchPaper(existingPaper.id, user.uid, { title: title.trim(), url: url.trim(), authors });
+                result = await updateResearchPaper(existingPaper.id, user.uid, paperPayload);
             } else {
-                result = await addResearchPaper(title.trim(), url.trim(), user.uid, authors);
+                result = await addResearchPaper({ ...paperPayload, mainAuthorUid: user.uid });
             }
 
             if (result.success && result.paper) {
@@ -195,6 +216,17 @@ function AddEditPaperDialog({
                     <div><Label htmlFor="paperTitle" className="block text-sm font-medium">Paper Title</Label><Input id="paperTitle" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter paper title" className="mt-1"/></div>
                     <div><Label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</Label><Input id="paperUrl" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://doi.org/..." className="mt-1"/></div>
                     
+                    <Separator />
+                    <h3 className="text-md font-semibold pt-2">Journal Details (Optional)</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><Label htmlFor="journalName" className="block text-sm font-medium">Journal Name</Label><Input id="journalName" value={journalName} onChange={(e) => setJournalName(e.target.value)} placeholder="e.g., Nature Communications" className="mt-1"/></div>
+                        <div><Label htmlFor="journalWebsite" className="block text-sm font-medium">Journal Website</Label><Input id="journalWebsite" value={journalWebsite} onChange={(e) => setJournalWebsite(e.target.value)} placeholder="https://www.nature.com/ncomms/" className="mt-1"/></div>
+                        <div><Label htmlFor="qRating" className="block text-sm font-medium">Q Rating</Label><Input id="qRating" value={qRating} onChange={(e) => setQRating(e.target.value)} placeholder="e.g., Q1" className="mt-1"/></div>
+                        <div><Label htmlFor="impactFactor" className="block text-sm font-medium">Impact Factor</Label><Input id="impactFactor" type="number" value={impactFactor} onChange={(e) => setImpactFactor(e.target.value ? parseFloat(e.target.value) : '')} placeholder="e.g., 16.6" className="mt-1"/></div>
+                    </div>
+
+                    <Separator />
+
                     <div><Label className="block text-sm font-medium mb-1">Authors</Label>
                         <div className="space-y-2">
                             {authors.map((author) => (

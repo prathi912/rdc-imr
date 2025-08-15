@@ -283,23 +283,19 @@ export async function linkPapersToNewUser(uid: string, email: string): Promise<{
 
 
 export async function addResearchPaper(
-  title: string,
-  url: string,
-  mainAuthorUid: string,
-  authors: Author[],
+  paperData: Pick<ResearchPaper, 'title' | 'url' | 'mainAuthorUid' | 'authors' | 'journalName' | 'journalWebsite' | 'qRating' | 'impactFactor'>
 ): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
     const paperRef = adminDb.collection('papers').doc();
     const now = new Date().toISOString();
     
+    const { mainAuthorUid, authors, title } = paperData;
+
     const authorUids = authors.map((a) => a.uid).filter(Boolean) as string[];
     const authorEmails = authors.map((a) => a.email.toLowerCase());
 
-    const paperData: Omit<ResearchPaper, 'id'> = {
-      title,
-      url,
-      mainAuthorUid,
-      authors,
+    const newPaperData: Omit<ResearchPaper, 'id'> = {
+      ...paperData,
       authorUids,
       authorEmails,
       createdAt: now,
@@ -315,7 +311,7 @@ export async function addResearchPaper(
 
         if (allTitles.length > 0) {
           const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
-          paperData.domain = domainResult.domain;
+          newPaperData.domain = domainResult.domain;
 
           const batch = adminDb.batch();
           const userDocs = await adminDb.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', authorUids).get();
@@ -331,10 +327,10 @@ export async function addResearchPaper(
       await logActivity('WARNING', 'AI domain suggestion failed during paper creation', { paperTitle: title, error: aiError.message });
     }
 
-    await paperRef.set(paperData);
+    await paperRef.set(newPaperData);
     await logActivity('INFO', 'Research paper added', { paperId: paperRef.id, title, mainAuthorUid });
 
-    const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
+    const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid!).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
@@ -353,11 +349,11 @@ export async function addResearchPaper(
     });
     await notificationBatch.commit();
 
-    return { success: true, paper: { id: paperRef.id, ...paperData } };
+    return { success: true, paper: { id: paperRef.id, ...newPaperData } };
 
   } catch (error: any) {
     console.error("Error adding research paper:", error);
-    await logActivity('ERROR', 'Failed to add research paper', { title, mainAuthorUid, error: error.message, stack: error.stack });
+    await logActivity('ERROR', 'Failed to add research paper', { title: paperData.title, mainAuthorUid: paperData.mainAuthorUid, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to add research paper." };
   }
 }
@@ -382,8 +378,8 @@ export async function updateResearchPaper(
       return { success: false, error: "You do not have permission to edit this paper." };
     }
     
-    const authorUids = data.authors?.map((a) => a.uid).filter(Boolean) as string[] || [];
-    const authorEmails = data.authors?.map((a) => a.email.toLowerCase()) || [];
+    const authorUids = data.authors?.map((a) => a.uid).filter(Boolean) as string[] || paperData.authorUids;
+    const authorEmails = data.authors?.map((a) => a.email.toLowerCase()) || paperData.authorEmails;
 
     const updatedData: Partial<ResearchPaper> = {
       ...data,
@@ -1808,7 +1804,6 @@ export async function findUserByMisId(
       return { success: false, error: "MIS ID is required." };
     }
     
-    // First, search for registered users in Firestore
     const usersRef = adminDb.collection("users");
     const q = adminQuery(usersRef, adminWhere("misId", "==", misId));
     const querySnapshot = await adminGetDocs(q);
@@ -1826,19 +1821,19 @@ export async function findUserByMisId(
         }
     }
 
-    // If no registered user found, fallback to staff data files
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
     const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}`);
     const result = await response.json();
 
-    if (result.success && result.data) {
+    if (result.success && result.data && result.data.length > 0) {
+        const staffData = result.data[0]; // Assuming the first match is the desired one
         return { success: true, staff: {
-            name: result.data.name,
-            email: result.data.email,
-            misId: result.data.misId,
+            name: staffData.name,
+            email: staffData.email,
+            misId: staffData.misId,
         }};
     }
-
+    
     return { success: false, error: "No user found with this MIS ID. Please check the MIS ID or ask them to sign up first." };
 
   } catch (error: any) {
@@ -2211,7 +2206,7 @@ export async function registerEmrInterest(callId: string, user: User, coPis: CoP
       const counterDoc = await transaction.get(counterRef);
 
       let newCount = 1;
-      if (counterDoc.exists && counterDoc.data()?.current) {
+      if (counterDoc.exists() && counterDoc.data()?.current) {
         newCount = counterDoc.data()!.current + 1;
       }
       transaction.set(counterRef, { current: newCount }, { merge: true });
