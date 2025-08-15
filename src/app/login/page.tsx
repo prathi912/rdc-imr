@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useRouter } from "next/navigation"
@@ -54,14 +55,6 @@ export default function LoginPage() {
   const [isOtpOpen, setIsOtpOpen] = useState(false)
   const [otpUser, setOtpUser] = useState<{ email: string; firebaseUser: FirebaseUser } | null>(null)
 
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-  })
-
   const processSignIn = async (firebaseUser: FirebaseUser) => {
     const userDocRef = doc(db, "users", firebaseUser.uid)
     const userDocSnap = await getDoc(userDocRef)
@@ -110,7 +103,7 @@ export default function LoginPage() {
         email: firebaseUser.email!,
         role,
         designation,
-        faculty: userDataFromExcel.faculty || null,
+        faculty: userDataFromExcel.faculty || domainCheck.croFaculty || null,
         institute: userDataFromExcel.institute || null,
         department: userDataFromExcel.department || null,
         phoneNumber: userDataFromExcel.phoneNumber || null,
