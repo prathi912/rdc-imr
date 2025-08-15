@@ -42,7 +42,7 @@ async function findExistingPaper(title: string, url: string): Promise<ResearchPa
 async function linkAuthorToPaper(existingPaper: ResearchPaper, user: User) {
     const paperRef = adminDb.collection('papers').doc(existingPaper.id);
     
-    const isAlreadyAuthor = existingPaper.authors?.some(a => a.uid === user.uid);
+    const isAlreadyAuthor = existingPaper.authors?.some(a => a.uid === user.uid && a.status === 'approved');
     const isAlreadyRequested = existingPaper.coAuthorRequests?.some(a => a.uid === user.uid);
 
     if (isAlreadyAuthor || isAlreadyRequested) {
@@ -69,7 +69,7 @@ async function linkAuthorToPaper(existingPaper: ResearchPaper, user: User) {
 
         const notification = {
             uid: existingPaper.mainAuthorUid,
-            projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard`, // Link to main author's profile
+            projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
             title: `${user.name} has requested to be added as a co-author on your paper: "${existingPaper.title}"`,
             createdAt: new Date().toISOString(),
             isRead: false,
@@ -178,9 +178,16 @@ export async function manageCoAuthorRequest(
         }
         const paperData = paperSnap.data() as ResearchPaper;
 
+        // Find the specific request in the array to remove it accurately
+        const requestToRemove = (paperData.coAuthorRequests || []).find(req => req.uid === requestingAuthor.uid && req.email === requestingAuthor.email);
+
+        if (!requestToRemove) {
+            return { success: false, error: 'This co-author request was not found. It may have been withdrawn or already processed.' };
+        }
+
         if (action === 'reject') {
             await paperRef.update({
-                coAuthorRequests: FieldValue.arrayRemove(requestingAuthor),
+                coAuthorRequests: FieldValue.arrayRemove(requestToRemove),
             });
             return { success: true };
         }
@@ -199,7 +206,7 @@ export async function manageCoAuthorRequest(
 
             const newAuthor: Author = { ...requestingAuthor, role: assignedRole, status: 'approved' };
             await paperRef.update({
-                coAuthorRequests: FieldValue.arrayRemove(requestingAuthor),
+                coAuthorRequests: FieldValue.arrayRemove(requestToRemove),
                 authors: FieldValue.arrayUnion(newAuthor),
                 authorUids: FieldValue.arrayUnion(newAuthor.uid),
                 authorEmails: FieldValue.arrayUnion(newAuthor.email),

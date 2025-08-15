@@ -83,7 +83,7 @@ export default function BulkUploadPapersPage() {
           ImpactFactor: row.ImpactFactor ? Number(row.ImpactFactor) : undefined,
           JournalName: row.JournalName ? String(row.JournalName) : undefined,
           JournalWebsite: row.JournalWebsite ? String(row.JournalWebsite) : undefined,
-          QRating: row.QRating ? String(row.QRating) : undefined,
+          QRating: row.Quartile ? String(row.Quartile) : undefined, // Mapping Quartile to QRating
         }));
         setData(formattedData);
       } catch (error) {
@@ -137,7 +137,7 @@ export default function BulkUploadPapersPage() {
                 <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationTitle</code>, 
                 <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationURL</code>, and
                 <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationYear</code>.
-                Optional columns are <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationMonthName</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">ImpactFactor</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">JournalName</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">JournalWebsite</code>, and <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">QRating</code>.
+                Optional columns are <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationMonthName</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">ImpactFactor</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">JournalName</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">JournalWebsite</code>, and <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">Quartile</code>.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
