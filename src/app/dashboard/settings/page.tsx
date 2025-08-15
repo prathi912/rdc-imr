@@ -49,7 +49,7 @@ const profileSchema = z.object({
   institute: z.string().min(1, "Please select an institute."),
   department: z.string().optional(),
   designation: z.string().min(2, "Designation is required."),
-  misId: z.string().optional(),
+  misId: z.string().min(1, "MIS ID is required."),
   orcidId: z.string().optional(),
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),

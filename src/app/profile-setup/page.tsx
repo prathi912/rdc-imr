@@ -33,7 +33,7 @@ const profileSetupSchema = z.object({
   institute: z.string().min(1, 'Please select an institute.'),
   department: z.string().optional(),
   designation: z.string().min(2, 'Designation is required.'),
-  misId: z.string().optional(),
+  misId: z.string().min(1, 'MIS ID is required.'),
   orcidId: z.string().optional(),
   scopusId: z.string().optional(),
   vidwanId: z.string().optional(),
@@ -159,6 +159,7 @@ export default function ProfileSetupPage() {
                 }
               }
             }
+            form.setValue("misId", misIdToFetch);
             toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
           } else {
              toast({ variant: 'destructive', title: 'Not Found', description: "Could not find your details using that MIS ID. Please enter them manually." });
@@ -169,7 +170,7 @@ export default function ProfileSetupPage() {
       } finally {
           setIsPrefilling(false);
       }
-  }, [form, toast, user?.email]);
+  }, [form, toast, user?.email, misIdToFetch]);
 
 
   useEffect(() => {
@@ -518,11 +519,19 @@ export default function ProfileSetupPage() {
                   <Separator />
                   <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
                   
-                  {userType !== 'Institutional' && (
-                    <FormField control={form.control} name="misId" render={({ field }) => (
-                      <FormItem><FormLabel>MIS ID (Optional)</FormLabel><FormControl><Input placeholder="Your MIS ID" {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                  )}
+                  <FormField
+                    control={form.control}
+                    name="misId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>MIS ID</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Your MIS ID" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                    <FormField control={form.control} name="orcidId" render={({ field }) => (
                       <FormItem>
                           <FormLabel>ORCID iD</FormLabel>
