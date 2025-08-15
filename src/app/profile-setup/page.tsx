@@ -136,29 +136,20 @@ export default function ProfileSetupPage() {
   const selectedCampus = form.watch('campus');
   const isGoaCampusUser = user?.email?.endsWith('@goa.paruluniversity.ac.in');
 
-  const prefillData = useCallback(async (misId: string) => {
-      if (!misId || !user?.email) return;
+  const prefillData = useCallback(async () => {
+      if (!misIdToFetch || !user?.email) return;
       setIsPrefilling(true);
       try {
-          const res = await fetch(`/api/get-staff-data?misId=${misId}&email=${user.email}`);
+          // Pass both MIS ID and email to the API
+          const res = await fetch(`/api/get-staff-data?misId=${misIdToFetch}&email=${user.email}`);
           const result = await res.json();
           if (result.success) {
             form.reset(result.data);
             setUserType(result.data.type);
-            // Set campus if present in fetched data
-            if (result.data.campus) {
-              form.setValue("campus", result.data.campus);
-              // Adjust faculty and institute based on campus
-              if (result.data.campus === "Goa") {
-                if (!goaFaculties.includes(result.data.faculty)) {
-                  form.setValue("faculty", "");
-                }
-                if (!goaInstitutes.includes(result.data.institute)) {
-                  form.setValue("institute", "");
-                }
-              }
-            }
+            
+            // Explicitly set the MIS ID from the input field, as the Excel sheet might have formatting issues
             form.setValue("misId", misIdToFetch);
+
             toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
           } else {
              toast({ variant: 'destructive', title: 'Not Found', description: "Could not find your details using that MIS ID. Please enter them manually." });
@@ -351,7 +342,7 @@ export default function ProfileSetupPage() {
                         value={misIdToFetch}
                         onChange={(e) => setMisIdToFetch(e.target.value)}
                       />
-                      <Button type="button" onClick={() => prefillData(misIdToFetch)} disabled={isPrefilling || !misIdToFetch}>
+                      <Button type="button" onClick={prefillData} disabled={isPrefilling || !misIdToFetch}>
                         {isPrefilling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                          <span className="ml-2 hidden sm:inline">Fetch My Details</span>
                       </Button>

@@ -52,39 +52,43 @@ export async function GET(request: NextRequest) {
   const staffdataFilePath = path.join(process.cwd(), 'staffdata.xlsx');
   
   let userRecord: StaffData | undefined;
-  let dataSourceFile: 'goa' | 'vadodara' | null = null;
   
   if (email) {
       const lowercasedEmail = email.toLowerCase();
+      let dataSourceFile: 'goa' | 'vadodara';
+      let dataToSearch: StaffData[];
+
       if (lowercasedEmail.endsWith('@goa.paruluniversity.ac.in')) {
           dataSourceFile = 'goa';
-          const goaData = readStaffData(goastaffdataFilePath);
-          userRecord = goaData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
+          dataToSearch = readStaffData(goastaffdataFilePath);
       } else {
           dataSourceFile = 'vadodara';
-          const vadodaraData = readStaffData(staffdataFilePath);
-          userRecord = vadodaraData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
+          dataToSearch = readStaffData(staffdataFilePath);
+      }
+
+      if (misId) {
+          // If both are provided, use email to determine the file, then search by MIS ID.
+          const lowercasedMisId = String(misId).toLowerCase();
+          userRecord = dataToSearch.find(row => row['MIS ID'] && String(row['MIS ID']).toLowerCase() === lowercasedMisId);
+      } else {
+          // If only email is provided, search by email in the determined file.
+          userRecord = dataToSearch.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
       }
   } else if (misId) {
-      // If only MIS ID is provided, check Goa first, then fall back to Vadodara.
+      // Fallback for when only MIS ID is provided (less preferred).
+      // Check Goa first, then Vadodara.
       const lowercasedMisId = String(misId).toLowerCase();
       const goaData = readStaffData(goastaffdataFilePath);
       userRecord = goaData.find(row => row['MIS ID'] && String(row['MIS ID']).toLowerCase() === lowercasedMisId);
       
-      if (userRecord) {
-          dataSourceFile = 'goa';
-      } else {
+      if (!userRecord) {
           const vadodaraData = readStaffData(staffdataFilePath);
           userRecord = vadodaraData.find(row => row['MIS ID'] && String(row['MIS ID']).toLowerCase() === lowercasedMisId);
-          if (userRecord) {
-              dataSourceFile = 'vadodara';
-          }
       }
   }
 
-
   if (userRecord) {
-    const isGoaUser = dataSourceFile === 'goa';
+    const isGoaUser = userRecord.Email?.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
     const instituteName = userRecord.Type === 'Institutional' ? userRecord.Name : userRecord.Institute;
     const resolvedCampus = userRecord.Campus || (isGoaUser ? 'Goa' : 'Vadodara');
 
@@ -108,6 +112,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } else {
-    return NextResponse.json({ success: false, error: `User not found in the ${dataSourceFile || 'available'} staff data file(s).` }, { status: 404 });
+    return NextResponse.json({ success: false, error: `User not found in the staff data file(s).` }, { status: 404 });
   }
 }
