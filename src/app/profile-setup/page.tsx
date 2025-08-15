@@ -251,17 +251,17 @@ export default function ProfileSetupPage() {
   if (!user) return;
   setIsSubmitting(true);
   try {
-    if (data.misId) {
-      const misIdCheck = await checkMisIdExists(data.misId, user.uid);
+    if (data.misId && data.campus) {
+      const misIdCheck = await checkMisIdExists(data.misId, user.uid, data.campus);
       if (misIdCheck.exists) {
         form.setError("misId", {
           type: "manual",
-          message: "This MIS ID is already registered. If you need help, contact helpdesk.rdc@paruluniversity.ac.in."
+          message: "This MIS ID is already registered for this campus. If you need help, contact helpdesk.rdc@paruluniversity.ac.in."
         });
         toast({
           variant: 'destructive',
           title: 'MIS ID Already Registered',
-          description: 'This MIS ID is already associated with another account.',
+          description: 'This MIS ID is already associated with another account on the same campus.',
           duration: 8000,
         });
         setIsSubmitting(false);

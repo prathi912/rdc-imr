@@ -23,6 +23,7 @@ import {
   checkHODUniqueness,
   getSystemSettings,
   updateSystemSettings,
+  checkMisIdExists,
 } from "@/app/actions"
 import type { User, SystemSettings, CroAssignment } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -348,6 +349,17 @@ export default function SettingsPage() {
           })
           setIsSubmittingProfile(false)
           return
+        }
+      }
+      if (data.misId && data.campus) {
+        const misIdCheck = await checkMisIdExists(data.misId, user.uid, data.campus);
+        if (misIdCheck.exists) {
+            profileForm.setError("misId", {
+                type: "manual",
+                message: "This MIS ID is already registered for this campus.",
+            });
+            setIsSubmittingProfile(false);
+            return;
         }
       }
 
@@ -891,7 +903,7 @@ export default function SettingsPage() {
                     name="orcidId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>ORCID iD (Optional)</FormLabel>
+                        <FormLabel>ORCID iD</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
                           </FormControl>

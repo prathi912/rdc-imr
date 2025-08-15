@@ -965,32 +965,32 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
   }
 }
 
-export async function checkMisIdExists(misId: string, currentUid: string): Promise<{ exists: boolean }> {
+export async function checkMisIdExists(misId: string, currentUid: string, campus: string): Promise<{ exists: boolean }> {
   try {
-    if (!misId || typeof misId !== 'string' || misId.trim() === '') {
+    if (!misId || typeof misId !== 'string' || misId.trim() === '' || !campus) {
       return { exists: false };
     }
-    const usersRef = adminDb.collection("users")
-    const q = usersRef.where("misId", "==", misId).limit(1)
-    const querySnapshot = await q.get()
+    const usersRef = adminDb.collection("users");
+    const q = usersRef.where("misId", "==", misId).where("campus", "==", campus).limit(1);
+    const querySnapshot = await q.get();
 
     if (querySnapshot.empty) {
-      return { exists: false }
+      return { exists: false };
     }
 
-    const foundUserDoc = querySnapshot.docs[0]
+    const foundUserDoc = querySnapshot.docs[0];
     if (foundUserDoc.id === currentUid) {
-      // The only user with this MIS ID is the current user. This can happen if they are re-saving their profile.
-      return { exists: false }
+      // The only user with this MIS ID and campus is the current user.
+      return { exists: false };
     }
 
-    // A different user has this MIS ID.
-    return { exists: true }
+    // A different user with the same MIS ID and campus exists.
+    return { exists: true };
   } catch (error: any) {
-    console.error("Error checking MIS ID uniqueness:", error)
-    await logActivity('ERROR', 'Failed to check MIS ID existence', { misId, error: error.message, stack: error.stack });
+    console.error("Error checking MIS ID uniqueness:", error);
+    await logActivity('ERROR', 'Failed to check MIS ID existence', { misId, campus, error: error.message, stack: error.stack });
     // Rethrow to let the client know something went wrong with the check.
-    throw new Error("Failed to verify MIS ID due to a server error. Please try again.")
+    throw new Error("Failed to verify MIS ID due to a server error. Please try again.");
   }
 }
 
@@ -1825,7 +1825,7 @@ export async function findUserByMisId(
     const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}`);
     const result = await response.json();
 
-    if (result.success && result.data) {
+    if (result.success && result.data && result.data.length > 0) {
         // The API now returns an array
         const users = result.data.map((staff: any) => ({
             uid: staff.uid || '', // UID will be empty if not registered
