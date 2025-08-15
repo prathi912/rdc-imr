@@ -56,15 +56,13 @@ export async function GET(request: NextRequest) {
 
   let userRecord: StaffData | undefined;
   let isGoaUser = false;
-  let fileName = 'staffdata.xlsx'; // Default file name
 
   if (email) {
     const lowercasedEmail = email.toLowerCase();
     if (lowercasedEmail.endsWith('@goa.paruluniversity.ac.in')) {
-      // If it's a Goa email, ONLY search the Goa file.
+      // If it's a Goa email, ONLY search the Goa file. No fallback.
       userRecord = goaData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
       isGoaUser = true;
-      fileName = 'goastaffdata.xlsx';
     } else {
       // For any other email, ONLY search the Vadodara file.
       userRecord = vadodaraData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
@@ -74,11 +72,9 @@ export async function GET(request: NextRequest) {
     userRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
     if (userRecord) {
       isGoaUser = true;
-      fileName = 'goastaffdata.xlsx';
     } else {
       // If not found in Goa file, check Vadodara file.
       userRecord = vadodaraData.find(row => String(row['MIS ID'] || '').toLowerCase() === misId.toLowerCase());
-      fileName = 'staffdata.xlsx';
     }
   }
 
