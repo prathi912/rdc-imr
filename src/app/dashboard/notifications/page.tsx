@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Bell, FileCheck2, GanttChartSquare, Loader2, Check, X } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { db } from '@/lib/config';
-import { collection, query, where, getDocs, doc, updateDoc, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, orderBy, onSnapshot, getDoc } from 'firebase/firestore';
 import { type Notification as NotificationType, type User, Author, ResearchPaper } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
@@ -79,7 +78,7 @@ export default function NotificationsPage() {
         const paperRef = doc(db, 'papers', notification.paperId);
         const paperSnap = await getDoc(paperRef);
         if (paperSnap.exists()) {
-            setManagingRequest({ notification, paper: paperSnap.data() as ResearchPaper });
+            setManagingRequest({ notification, paper: { id: paperSnap.id, ...paperSnap.data() } as ResearchPaper });
         } else {
             toast({ title: 'Error', description: 'Could not find the associated paper.', variant: 'destructive' });
         }
