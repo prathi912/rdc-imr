@@ -20,6 +20,9 @@ type PaperUploadData = {
     PublicationYear?: number;
     PublicationMonthName?: string;
     ImpactFactor?: number;
+    JournalName?: string;
+    JournalWebsite?: string;
+    QRating?: string;
 };
 
 type UploadResult = {
@@ -78,6 +81,9 @@ export default function BulkUploadPapersPage() {
           PublicationYear: row.PublicationYear ? Number(row.PublicationYear) : undefined,
           PublicationMonthName: row.PublicationMonthName ? String(row.PublicationMonthName) : undefined,
           ImpactFactor: row.ImpactFactor ? Number(row.ImpactFactor) : undefined,
+          JournalName: row.JournalName ? String(row.JournalName) : undefined,
+          JournalWebsite: row.JournalWebsite ? String(row.JournalWebsite) : undefined,
+          QRating: row.QRating ? String(row.QRating) : undefined,
         }));
         setData(formattedData);
       } catch (error) {
@@ -131,7 +137,7 @@ export default function BulkUploadPapersPage() {
                 <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationTitle</code>, 
                 <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationURL</code>, and
                 <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationYear</code>.
-                Optional columns are <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationMonthName</code> and <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">ImpactFactor</code>.
+                Optional columns are <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">PublicationMonthName</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">ImpactFactor</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">JournalName</code>, <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">JournalWebsite</code>, and <code className="mx-1 rounded-sm bg-muted p-1 font-mono text-sm">QRating</code>.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -158,8 +164,8 @@ export default function BulkUploadPapersPage() {
                         <TableBody>
                         {data.map((row, index) => (
                             <TableRow key={index}>
-                            <TableCell className="font-medium whitespace-nowrap">{row.PublicationTitle}</TableCell>
-                            <TableCell className="whitespace-nowrap">{row.PublicationURL}</TableCell>
+                            <TableCell className="font-medium max-w-sm whitespace-normal break-words">{row.PublicationTitle}</TableCell>
+                            <TableCell className="whitespace-nowrap truncate max-w-xs">{row.PublicationURL}</TableCell>
                             <TableCell>{row.PublicationYear}</TableCell>
                             </TableRow>
                         ))}
@@ -181,7 +187,7 @@ export default function BulkUploadPapersPage() {
                         <h3 className="font-semibold flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-500" /> New Papers Added ({uploadResult.newPapers.length})</h3>
                         {uploadResult.newPapers.length > 0 ? (
                             <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground max-h-48 overflow-y-auto">
-                                {uploadResult.newPapers.map(p => <li key={p.title}>{p.title}</li>)}
+                                {uploadResult.newPapers.map(p => <li key={p.title} className="whitespace-normal break-words">{p.title}</li>)}
                             </ul>
                         ) : <p className="text-sm text-muted-foreground mt-2">No new papers were created.</p>}
                     </div>
@@ -189,7 +195,7 @@ export default function BulkUploadPapersPage() {
                         <h3 className="font-semibold flex items-center gap-2"><LinkIcon className="h-5 w-5 text-blue-500" /> Papers Linked ({uploadResult.linkedPapers.length})</h3>
                         {uploadResult.linkedPapers.length > 0 ? (
                              <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground max-h-48 overflow-y-auto">
-                                {uploadResult.linkedPapers.map(p => <li key={p.title}>{p.title}</li>)}
+                                {uploadResult.linkedPapers.map(p => <li key={p.title} className="whitespace-normal break-words">{p.title}</li>)}
                             </ul>
                         ) : <p className="text-sm text-muted-foreground mt-2">No existing papers were linked to your profile.</p>}
                     </div>
@@ -197,7 +203,7 @@ export default function BulkUploadPapersPage() {
                         <h3 className="font-semibold flex items-center gap-2"><XCircle className="h-5 w-5 text-destructive" /> Errors ({uploadResult.errors.length})</h3>
                         {uploadResult.errors.length > 0 ? (
                              <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground max-h-48 overflow-y-auto">
-                                {uploadResult.errors.map((f, i) => <li key={i}>{f.title}: <span className="text-destructive">{f.reason}</span></li>)}
+                                {uploadResult.errors.map((f, i) => <li key={i} className="whitespace-normal break-words">{f.title}: <span className="text-destructive">{f.reason}</span></li>)}
                             </ul>
                         ) : <p className="text-sm text-muted-foreground mt-2">No errors occurred.</p>}
                     </div>
