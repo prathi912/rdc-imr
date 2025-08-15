@@ -258,7 +258,7 @@ export default function NotificationsPage() {
       <Dialog open={!!managingRequest} onOpenChange={() => { setManagingRequest(null); setRoleConflict(false); setAssignedRole(''); setMainAuthorNewRole(''); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Accept Co-Author Request</DialogTitle>
+            <DialogTitle>Accept '{managingRequest?.notification.requester?.role}' Request</DialogTitle>
             <DialogDescription>
                 {managingRequest?.notification.requester?.name} has requested to be added as the <span className="font-bold">{managingRequest?.notification.requester?.role}</span>.
             </DialogDescription>
