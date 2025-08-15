@@ -283,51 +283,42 @@ export async function linkPapersToNewUser(uid: string, email: string): Promise<{
 
 
 export async function addResearchPaper(
+  title: string,
+  url: string,
   mainAuthorUid: string,
-  paperDetails: Partial<ResearchPaper> & { title: string, url: string, authors: Author[] }
+  authors: Author[],
 ): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
     const paperRef = adminDb.collection('papers').doc();
     const now = new Date().toISOString();
     
-    // Create an array of UIDs and emails for efficient querying
-    const authorUids = paperDetails.authors.map((a) => a.uid).filter(Boolean) as string[];
-    const authorEmails = paperDetails.authors.map((a) => a.email.toLowerCase());
+    const authorUids = authors.map((a) => a.uid).filter(Boolean) as string[];
+    const authorEmails = authors.map((a) => a.email.toLowerCase());
 
     const paperData: Omit<ResearchPaper, 'id'> = {
-      title: paperDetails.title,
-      url: paperDetails.url,
+      title,
+      url,
       mainAuthorUid,
-      authors: paperDetails.authors,
+      authors,
       authorUids,
       authorEmails,
-      journalName: paperDetails.journalName,
-      journalWebsite: paperDetails.journalWebsite,
-      qRating: paperDetails.qRating,
-      impactFactor: paperDetails.impactFactor,
       createdAt: now,
       updatedAt: now,
     };
     
-    // 1. AI Domain Suggestion
+    // AI Domain Suggestion
     try {
       if (authorUids.length > 0) {
-        const allPapersQuery = await adminDb
-          .collection('papers')
-          .where('authorUids', 'array-contains-any', authorUids)
-          .get();
+        const allPapersQuery = await adminDb.collection('papers').where('authorUids', 'array-contains-any', authorUids).get();
         const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
-        const allTitles = [...new Set([paperDetails.title, ...existingTitles])];
+        const allTitles = [...new Set([title, ...existingTitles])];
 
         if (allTitles.length > 0) {
           const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
           paperData.domain = domainResult.domain;
 
           const batch = adminDb.batch();
-          const userDocs = await adminDb
-            .collection('users')
-            .where(admin.firestore.FieldPath.documentId(), 'in', authorUids)
-            .get();
+          const userDocs = await adminDb.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', authorUids).get();
             
           userDocs.forEach(doc => {
             batch.update(doc.ref, { researchDomain: domainResult.domain });
@@ -337,25 +328,23 @@ export async function addResearchPaper(
       }
     } catch (aiError: any) {
       console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
-      await logActivity('WARNING', 'AI domain suggestion failed during paper creation', { paperTitle: paperDetails.title, error: aiError.message });
+      await logActivity('WARNING', 'AI domain suggestion failed during paper creation', { paperTitle: title, error: aiError.message });
     }
 
-    // 2. Save paper
     await paperRef.set(paperData);
-    await logActivity('INFO', 'Research paper added', { paperId: paperRef.id, title: paperDetails.title, mainAuthorUid });
+    await logActivity('INFO', 'Research paper added', { paperId: paperRef.id, title, mainAuthorUid });
 
-    // 3. Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
     const notificationBatch = adminDb.batch();
-    paperDetails.authors.forEach((author) => {
+    authors.forEach((author) => {
       if (author.uid && author.uid !== mainAuthorUid) {
         const notificationRef = adminDb.collection('notifications').doc();
         notificationBatch.set(notificationRef, {
           uid: author.uid,
-          title: `${mainAuthorName} added you as a co-author on the paper: "${paperDetails.title}"`,
+          title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
           createdAt: new Date().toISOString(),
           isRead: false,
           projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
@@ -368,15 +357,15 @@ export async function addResearchPaper(
 
   } catch (error: any) {
     console.error("Error adding research paper:", error);
-    await logActivity('ERROR', 'Failed to add research paper', { title: paperDetails.title, mainAuthorUid, error: error.message, stack: error.stack });
+    await logActivity('ERROR', 'Failed to add research paper', { title, mainAuthorUid, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to add research paper." };
   }
 }
 
 export async function updateResearchPaper(
   paperId: string,
-  userId: string, // This is the UID of the user performing the edit (main author)
-  data: Partial<ResearchPaper> & { title: string; url: string; authors: Author[] }
+  userId: string, 
+  data: Partial<ResearchPaper>
 ): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
     const paperRef = adminDb.collection('papers').doc(paperId);
@@ -393,35 +382,26 @@ export async function updateResearchPaper(
       return { success: false, error: "You do not have permission to edit this paper." };
     }
     
-    const authorUids = data.authors.map((a) => a.uid).filter(Boolean) as string[];
-    const authorEmails = data.authors.map((a) => a.email.toLowerCase());
-
+    const authorUids = data.authors?.map((a) => a.uid).filter(Boolean) as string[] || [];
+    const authorEmails = data.authors?.map((a) => a.email.toLowerCase()) || [];
 
     const updatedData: Partial<ResearchPaper> = {
-      title: data.title,
-      url: data.url,
-      authors: data.authors,
+      ...data,
       authorUids: authorUids,
       authorEmails: authorEmails,
-      journalName: data.journalName,
-      journalWebsite: data.journalWebsite,
-      qRating: data.qRating,
-      impactFactor: data.impactFactor,
       updatedAt: new Date().toISOString(),
     };
 
     await paperRef.update(updatedData);
     await logActivity('INFO', 'Research paper updated', { paperId, userId, title: data.title });
 
-    // Notify newly added co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(userId).get();
     const mainAuthorName = mainAuthorDoc.exists ? mainAuthorDoc.data()?.name : 'A colleague';
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
     const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
 
     const notificationBatch = adminDb.batch();
-    data.authors.forEach(author => {
-      // Notify if the author is new, registered (has UID), and not the main author
+    data.authors?.forEach(author => {
       if (author.uid && author.uid !== userId && !oldAuthorUids.has(author.uid)) {
         const notificationRef = adminDb.collection('notifications').doc();
         notificationBatch.set(notificationRef, {
@@ -1819,7 +1799,8 @@ export async function findUserByMisId(
   misId: string,
 ): Promise<{ 
     success: boolean; 
-    users?: { uid: string; name: string; email: string; misId: string; campus: string; }[];
+    user?: { uid: string; name: string; email: string; misId: string; } | null;
+    staff?: { name: string; email: string; misId: string; } | null;
     error?: string 
 }> {
   try {
@@ -1833,25 +1814,15 @@ export async function findUserByMisId(
     const querySnapshot = await adminGetDocs(q);
 
     if (!querySnapshot.empty) {
-        const foundUsers = querySnapshot.docs.map(doc => {
-            const data = doc.data() as User;
-            return {
-                uid: doc.id,
-                name: data.name,
-                email: data.email,
-                misId: data.misId || '',
-                campus: data.campus || 'Vadodara',
-            };
-        });
-        
-        // Exclude admins from being added as Co-PIs
-        const nonAdminUsers = foundUsers.filter(user => {
-            const fullUser = querySnapshot.docs.find(doc => doc.id === user.uid)?.data() as User;
-            return fullUser.role !== 'admin' && fullUser.role !== 'Super-admin';
-        });
-
-        if (nonAdminUsers.length > 0) {
-            return { success: true, users: nonAdminUsers };
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        if (userData.role !== 'admin' && userData.role !== 'Super-admin') {
+            return { success: true, user: {
+                uid: userDoc.id,
+                name: userData.name,
+                email: userData.email,
+                misId: userData.misId,
+            }};
         }
     }
 
@@ -1860,16 +1831,12 @@ export async function findUserByMisId(
     const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}`);
     const result = await response.json();
 
-    if (result.success && result.data && result.data.length > 0) {
-        const staffUsers = result.data.map((staff: any) => ({
-            uid: '', // No UID as they are not registered
-            name: staff.name,
-            email: staff.email,
-            misId: staff.misId,
-            campus: staff.campus
-        }));
-        
-        return { success: true, users: staffUsers };
+    if (result.success && result.data) {
+        return { success: true, staff: {
+            name: result.data.name,
+            email: result.data.email,
+            misId: result.data.misId,
+        }};
     }
 
     return { success: false, error: "No user found with this MIS ID. Please check the MIS ID or ask them to sign up first." };

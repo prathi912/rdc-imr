@@ -1,14 +1,16 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails } from '@/types';
 import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId, updateEmrInterestDetails, uploadFileToServer } from '@/app/actions';
+import { manageCoAuthorRequest } from '@/app/bulkpapers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload, CalendarDays, FileText } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload, CalendarDays, FileText, Check, UserCheck, UserX } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -40,7 +42,7 @@ function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: st
     );
 }
 
-const AUTHOR_ROLES: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author'];
+const AUTHOR_ROLES: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
 function AddEditPaperDialog({ 
     isOpen, 
@@ -77,7 +79,7 @@ function AddEditPaperDialog({
             } else {
                 setTitle('');
                 setUrl('');
-                setAuthors([{ email: user.email, name: user.name, role: 'First Author', isExternal: false, uid: user.uid }]);
+                setAuthors([{ email: user.email, name: user.name, role: 'First Author', isExternal: false, uid: user.uid, status: 'approved' }]);
             }
         }
     }, [isOpen, existingPaper, user]);
@@ -88,12 +90,9 @@ function AddEditPaperDialog({
         setFoundCoPi(null);
         try {
             const result = await findUserByMisId(coPiSearchTerm);
-            if (result.success) {
-                if (result.user) {
-                    setFoundCoPi({ ...result.user, isRegistered: true });
-                } else if (result.staff) {
-                    setFoundCoPi({ ...result.staff, uid: '', isRegistered: false });
-                }
+            if (result.success && (result.user || result.staff)) {
+                const person = result.user || result.staff;
+                setFoundCoPi({ ...person!, uid: result.user?.uid || '', isRegistered: !!result.user });
             } else {
                 toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
             }
@@ -115,7 +114,8 @@ function AddEditPaperDialog({
                 name: foundCoPi.name, 
                 email: foundCoPi.email, 
                 role: 'Co-Author', 
-                isExternal: false 
+                isExternal: !foundCoPi.isRegistered,
+                status: 'approved'
             }]);
             setFoundCoPi(null);
             setCoPiSearchTerm('');
@@ -133,7 +133,7 @@ function AddEditPaperDialog({
             toast({ title: 'Author already added', variant: 'destructive' });
             return;
         }
-        setAuthors([...authors, { name, email, role: 'Co-Author', isExternal: true }]);
+        setAuthors([...authors, { name, email, role: 'Co-Author', isExternal: true, status: 'approved' }]);
         setExternalAuthorName('');
         setExternalAuthorEmail('');
     };
@@ -401,6 +401,8 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
     const [paperToEdit, setPaperToEdit] = useState<ResearchPaper | null>(null);
     const [paperToDelete, setPaperToDelete] = useState<ResearchPaper | null>(null);
     const [interestToEdit, setInterestToEdit] = useState<EmrInterest | null>(null);
+    const [managingRequest, setManagingRequest] = useState<{paper: ResearchPaper, author: Author} | null>(null);
+    const [assignedRole, setAssignedRole] = useState<Author['role'] | ''>('');
     const { toast } = useToast();
     const [sessionUser, setSessionUser] = useState<User | null>(null);
 
@@ -455,6 +457,37 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
             setPaperToDelete(null);
         } else {
             toast({ title: "Error", description: result.error, variant: "destructive" });
+        }
+    };
+
+    const handleCoAuthorAction = async (paper: ResearchPaper, author: Author, action: 'accept' | 'reject') => {
+        if (action === 'accept') {
+            setManagingRequest({paper, author});
+        } else { // Reject
+            const result = await manageCoAuthorRequest(paper.id, author, 'reject');
+            if(result.success) {
+                toast({title: "Request Rejected"});
+                fetchPapers();
+            } else {
+                toast({title: "Error", description: result.error, variant: "destructive"});
+            }
+        }
+    };
+    
+    const handleConfirmAcceptRequest = async () => {
+        if (!managingRequest || !assignedRole) {
+            toast({title: "Please assign a role", variant: "destructive"});
+            return;
+        }
+        const { paper, author } = managingRequest;
+        const result = await manageCoAuthorRequest(paper.id, author, 'accept', assignedRole);
+        if (result.success) {
+            toast({title: "Co-Author Approved"});
+            setManagingRequest(null);
+            setAssignedRole('');
+            fetchPapers();
+        } else {
+            toast({title: "Error", description: result.error, variant: "destructive"});
         }
     };
     
@@ -613,6 +646,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                             )}
                             {researchPapers.length > 0 ? researchPapers.map(paper => {
                                 const myRole = paper.authors.find((a: Author) => a.uid === user.uid)?.role;
+                                const pendingRequests = paper.coAuthorRequests?.filter((req: Author) => req.status === 'pending');
                                 return (
                                 <Card key={paper.id}>
                                     <CardContent className="p-4 space-y-2">
@@ -650,7 +684,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                                   </TableRow>
                                               </TableHeader>
                                               <TableBody>
-                                                  {paper.authors.map((author: Author) => (
+                                                  {paper.authors.filter((a: Author) => a.status === 'approved').map((author: Author) => (
                                                       <TableRow key={author.email}>
                                                           <TableCell>{author.name} {author.isExternal && <span className="text-xs text-muted-foreground">(Ext)</span>}</TableCell>
                                                           <TableCell><Badge variant={author.role === 'First Author' ? 'default' : 'secondary'}>{author.role}</Badge></TableCell>
@@ -660,6 +694,22 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                               </TableBody>
                                           </Table>
                                         </div>
+                                        {isOwner && paper.mainAuthorUid === user.uid && pendingRequests && pendingRequests.length > 0 && (
+                                            <div className="mt-4 p-3 bg-muted/50 rounded-md">
+                                                <h4 className="text-sm font-semibold mb-2">Pending Co-Author Requests</h4>
+                                                <div className="space-y-2">
+                                                    {pendingRequests.map((req: Author) => (
+                                                        <div key={req.uid} className="flex items-center justify-between text-sm">
+                                                            <span>{req.name} ({req.email})</span>
+                                                            <div className="flex gap-2">
+                                                                <Button size="sm" variant="outline" className="h-7 text-green-600 border-green-600 hover:bg-green-100 hover:text-green-700" onClick={() => handleCoAuthorAction(paper, req, 'accept')}><Check className="h-4 w-4"/> Accept</Button>
+                                                                <Button size="sm" variant="outline" className="h-7 text-destructive border-destructive hover:bg-red-100 hover:text-destructive" onClick={() => handleCoAuthorAction(paper, req, 'reject')}><X className="h-4 w-4"/> Reject</Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </CardContent>
                                 </Card>
                             )}) : (
@@ -703,6 +753,26 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+            <Dialog open={!!managingRequest} onOpenChange={() => setManagingRequest(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Assign Role to Co-Author</DialogTitle>
+                        <DialogDescription>Select a role for {managingRequest?.author.name}.</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Select value={assignedRole} onValueChange={(value) => setAssignedRole(value as Author['role'])}>
+                            <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
+                            <SelectContent>
+                                {AUTHOR_ROLES.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <DialogFooter>
+                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                        <Button onClick={handleConfirmAcceptRequest}>Confirm & Add Co-Author</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

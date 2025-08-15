@@ -42,20 +42,19 @@ async function findExistingPaper(title: string, url: string): Promise<ResearchPa
 async function linkAuthorToPaper(existingPaper: ResearchPaper, user: User) {
     const paperRef = adminDb.collection('papers').doc(existingPaper.id);
     
-    // Check if user is already an author (approved or pending)
     const isAlreadyAuthor = existingPaper.authors?.some(a => a.uid === user.uid);
     const isAlreadyRequested = existingPaper.coAuthorRequests?.some(a => a.uid === user.uid);
 
     if (isAlreadyAuthor || isAlreadyRequested) {
         console.log(`User ${user.email} is already linked or has a pending request for paper ${existingPaper.id}.`);
-        return; // Already linked or requested
+        return;
     }
 
     const newAuthorRequest: Author = {
         uid: user.uid,
         email: user.email,
         name: user.name,
-        role: 'Co-Author', // Default role for requests
+        role: 'Co-Author', 
         isExternal: false,
         status: 'pending',
     };
@@ -64,11 +63,13 @@ async function linkAuthorToPaper(existingPaper: ResearchPaper, user: User) {
         coAuthorRequests: FieldValue.arrayUnion(newAuthorRequest),
     });
 
-    // Notify the main author
     if (existingPaper.mainAuthorUid) {
+        const mainAuthorDoc = await adminDb.collection('users').doc(existingPaper.mainAuthorUid).get();
+        const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
+
         const notification = {
             uid: existingPaper.mainAuthorUid,
-            projectId: `/profile/${user.misId}`, // Link to requester's profile
+            projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard`, // Link to main author's profile
             title: `${user.name} has requested to be added as a co-author on your paper: "${existingPaper.title}"`,
             createdAt: new Date().toISOString(),
             isRead: false,
@@ -106,7 +107,6 @@ async function createNewPaper(paperData: PaperUploadData, user: User): Promise<R
         coAuthorRequests: [],
     };
 
-    // AI Domain Suggestion
     try {
         const domainResult = await getResearchDomainSuggestion({ paperTitles: [newPaper.title] });
         newPaper.domain = domainResult.domain;
@@ -149,11 +149,9 @@ export async function bulkUploadPapers(
       const existingPaper = await findExistingPaper(title, url);
 
       if (existingPaper) {
-        // Paper exists, create a request to link the user to it
         await linkAuthorToPaper(existingPaper, user);
         linkedPapers.push({ title });
       } else {
-        // Paper doesn't exist, create it
         await createNewPaper(row, user);
         newPapers.push({ title });
       }
@@ -164,4 +162,54 @@ export async function bulkUploadPapers(
   }
 
   return { success: true, data: { newPapers, linkedPapers, errors } };
+}
+
+export async function manageCoAuthorRequest(
+    paperId: string,
+    requestingAuthor: Author,
+    action: 'accept' | 'reject',
+    assignedRole?: Author['role']
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const paperRef = adminDb.collection('papers').doc(paperId);
+        const paperSnap = await paperRef.get();
+        if (!paperSnap.exists) {
+            return { success: false, error: 'Paper not found.' };
+        }
+        const paperData = paperSnap.data() as ResearchPaper;
+
+        if (action === 'reject') {
+            await paperRef.update({
+                coAuthorRequests: FieldValue.arrayRemove(requestingAuthor),
+            });
+            return { success: true };
+        }
+
+        if (action === 'accept' && assignedRole) {
+            const currentAuthors = paperData.authors || [];
+            if (assignedRole === 'First Author' && currentAuthors.some(a => a.role === 'First Author' || a.role === 'First & Corresponding Author')) {
+                return { success: false, error: 'A First Author already exists for this paper.' };
+            }
+             if (assignedRole === 'Corresponding Author' && currentAuthors.some(a => a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author')) {
+                return { success: false, error: 'A Corresponding Author already exists for this paper.' };
+            }
+             if (assignedRole === 'First & Corresponding Author' && (currentAuthors.some(a => a.role === 'First Author' || a.role === 'First & Corresponding Author') || currentAuthors.some(a => a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'))) {
+                return { success: false, error: 'A First or Corresponding Author already exists.' };
+            }
+
+            const newAuthor: Author = { ...requestingAuthor, role: assignedRole, status: 'approved' };
+            await paperRef.update({
+                coAuthorRequests: FieldValue.arrayRemove(requestingAuthor),
+                authors: FieldValue.arrayUnion(newAuthor),
+                authorUids: FieldValue.arrayUnion(newAuthor.uid),
+                authorEmails: FieldValue.arrayUnion(newAuthor.email),
+            });
+            return { success: true };
+        }
+
+        return { success: false, error: 'Invalid action or missing role.' };
+    } catch (error: any) {
+        console.error("Error managing co-author request:", error);
+        return { success: false, error: error.message || 'Server error.' };
+    }
 }
