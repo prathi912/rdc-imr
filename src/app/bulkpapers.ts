@@ -142,13 +142,13 @@ export async function bulkUploadPapers(
     success: boolean; 
     data: {
         newPapers: { title: string }[];
-        linkedPapers: ResearchPaper[];
+        linkedPapers: { paper: ResearchPaper, role: Author['role'] }[];
         errors: { title: string; reason: string }[];
     };
     error?: string 
 }> {
   const newPapers: { title: string }[] = [];
-  const linkedPapers: ResearchPaper[] = [];
+  const linkedPapers: { paper: ResearchPaper, role: Author['role'] }[] = [];
   const errors: { title: string; reason: string }[] = [];
 
   for (const [index, row] of papersData.entries()) {
@@ -169,7 +169,7 @@ export async function bulkUploadPapers(
       const existingPaper = await findExistingPaper(title, url);
 
       if (existingPaper) {
-        linkedPapers.push(existingPaper);
+        linkedPapers.push({ paper: existingPaper, role: role });
       } else {
         await createNewPaper(row, user, role);
         newPapers.push({ title });

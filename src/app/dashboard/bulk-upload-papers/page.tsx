@@ -28,7 +28,7 @@ type PaperUploadData = {
 
 type UploadResult = {
   newPapers: { title: string }[];
-  linkedPapers: ResearchPaper[];
+  linkedPapers: { paper: ResearchPaper; role: Author['role'] }[];
   errors: { title: string; reason: string }[];
 };
 
@@ -147,7 +147,7 @@ export default function BulkUploadPapersPage() {
             if (uploadResult) {
                 setUploadResult({
                     ...uploadResult,
-                    linkedPapers: uploadResult.linkedPapers.filter(p => p.id !== paper.id)
+                    linkedPapers: uploadResult.linkedPapers.filter(p => p.paper.id !== paper.id)
                 });
             }
         } else {
@@ -244,24 +244,19 @@ export default function BulkUploadPapersPage() {
                              <AlertDescription>
                                 The following papers already exist in the portal. Please confirm and send a request to be added as a co-author.
                                 <div className="mt-4 space-y-4">
-                                {uploadResult.linkedPapers.map(paper => {
-                                    const originalDataRow = data.find(d => d.PublicationTitle === paper.title || d.PublicationURL === paper.url);
-                                    const originalIndex = originalDataRow ? data.indexOf(originalDataRow) : -1;
-                                    const linkedPaperRole = originalIndex !== -1 ? roles[originalIndex] : undefined;
-                                    return (
-                                        <div key={paper.id} className="p-3 bg-background/50 dark:bg-background/20 rounded-md border border-amber-500/30">
-                                            <p className="font-semibold text-sm">{paper.title}</p>
-                                            <p className="text-xs text-muted-foreground">Main Author: {paper.authors.find(a => a.uid === paper.mainAuthorUid)?.name || 'Unknown'}</p>
-                                            <p className="text-xs text-muted-foreground mt-1">Your requested role: <span className="font-medium">{linkedPaperRole || 'Not Selected'}</span></p>
-                                            <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                                <Button size="sm" className="h-9" onClick={() => handleSendRequest(paper, linkedPaperRole)} disabled={isSendingRequest === paper.id}>
-                                                    {isSendingRequest === paper.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
-                                                    <span className="ml-2">Send Request</span>
-                                                </Button>
-                                            </div>
+                                {uploadResult.linkedPapers.map(({ paper, role }) => (
+                                    <div key={paper.id} className="p-3 bg-background/50 dark:bg-background/20 rounded-md border border-amber-500/30">
+                                        <p className="font-semibold text-sm">{paper.title}</p>
+                                        <p className="text-xs text-muted-foreground">Main Author: {paper.authors.find(a => a.uid === paper.mainAuthorUid)?.name || 'Unknown'}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">Your requested role: <span className="font-medium">{role || 'Not Selected'}</span></p>
+                                        <div className="mt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                            <Button size="sm" className="h-9" onClick={() => handleSendRequest(paper, role)} disabled={isSendingRequest === paper.id}>
+                                                {isSendingRequest === paper.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4"/>}
+                                                <span className="ml-2">Send Request</span>
+                                            </Button>
                                         </div>
-                                    )
-                                })}
+                                    </div>
+                                ))}
                                 </div>
                              </AlertDescription>
                          </Alert>
