@@ -2214,7 +2214,7 @@ export async function registerEmrInterest(callId: string, user: User, coPis: CoP
       const counterDoc = await transaction.get(counterRef);
 
       let newCount = 1;
-      if (counterDoc.exists) {
+      if (counterDoc.exists && counterDoc.data()?.current) {
         newCount = counterDoc.data()!.current + 1;
       }
       transaction.set(counterRef, { current: newCount }, { merge: true });
