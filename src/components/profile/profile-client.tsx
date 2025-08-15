@@ -163,8 +163,8 @@ function AddEditPaperDialog({
     };
 
     const handleSubmit = async () => {
-        if (!title.trim() || !url.trim()) {
-            toast({ title: "Paper title and URL are required", variant: "destructive" });
+        if (!title.trim() || !url.trim() || !journalName.trim() || !journalWebsite.trim() || !qRating.trim() || impactFactor === '') {
+            toast({ title: "All fields are required", description: "Please fill out the paper title, URL, and all journal details.", variant: "destructive" });
             return;
         }
         if (!url.trim().startsWith('https://')) {
@@ -178,10 +178,10 @@ function AddEditPaperDialog({
                 title: title.trim(),
                 url: url.trim(),
                 authors,
-                journalName: journalName.trim() || null,
-                journalWebsite: journalWebsite.trim() || null,
-                qRating: qRating.trim() || null,
-                impactFactor: Number(impactFactor) || null,
+                journalName: journalName.trim(),
+                journalWebsite: journalWebsite.trim(),
+                qRating: qRating.trim(),
+                impactFactor: Number(impactFactor),
             };
 
             if (existingPaper) {
@@ -217,7 +217,7 @@ function AddEditPaperDialog({
                     <div><Label htmlFor="paperUrl" className="block text-sm font-medium">Published Paper URL</Label><Input id="paperUrl" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://doi.org/..." className="mt-1"/></div>
                     
                     <Separator />
-                    <h3 className="text-md font-semibold pt-2">Journal Details (Optional)</h3>
+                    <h3 className="text-md font-semibold pt-2">Journal Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div><Label htmlFor="journalName" className="block text-sm font-medium">Journal Name</Label><Input id="journalName" value={journalName} onChange={(e) => setJournalName(e.target.value)} placeholder="e.g., Nature Communications" className="mt-1"/></div>
                         <div><Label htmlFor="journalWebsite" className="block text-sm font-medium">Journal Website</Label><Input id="journalWebsite" value={journalWebsite} onChange={(e) => setJournalWebsite(e.target.value)} placeholder="https://www.nature.com/ncomms/" className="mt-1"/></div>
