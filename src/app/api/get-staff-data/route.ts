@@ -53,37 +53,33 @@ export async function GET(request: NextRequest) {
   
   let userRecord: StaffData | undefined;
   let dataSourceFile: 'goa' | 'vadodara' | null = null;
-  let searchField: 'email' | 'misId' | null = null;
-  let searchTerm: string | null = null;
-
+  
   if (email) {
-      searchField = email ? 'email' : 'misId';
-      searchTerm = (email || misId)!.toLowerCase();
-
-      if (email.toLowerCase().endsWith('@goa.paruluniversity.ac.in')) {
+      const lowercasedEmail = email.toLowerCase();
+      if (lowercasedEmail.endsWith('@goa.paruluniversity.ac.in')) {
           dataSourceFile = 'goa';
+          const goaData = readStaffData(goastaffdataFilePath);
+          userRecord = goaData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
       } else {
           dataSourceFile = 'vadodara';
+          const vadodaraData = readStaffData(staffdataFilePath);
+          userRecord = vadodaraData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
       }
   } else if (misId) {
-      // If only MIS ID is provided, we must check both files, starting with Goa.
-      searchField = 'misId';
-      searchTerm = misId.toLowerCase();
+      // If only MIS ID is provided, check Goa first, then fall back to Vadodara.
+      const lowercasedMisId = String(misId).toLowerCase();
       const goaData = readStaffData(goastaffdataFilePath);
-      userRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === searchTerm);
+      userRecord = goaData.find(row => row['MIS ID'] && String(row['MIS ID']).toLowerCase() === lowercasedMisId);
       
       if (userRecord) {
           dataSourceFile = 'goa';
       } else {
-          dataSourceFile = 'vadodara'; // Fallback to check the main file
+          const vadodaraData = readStaffData(staffdataFilePath);
+          userRecord = vadodaraData.find(row => row['MIS ID'] && String(row['MIS ID']).toLowerCase() === lowercasedMisId);
+          if (userRecord) {
+              dataSourceFile = 'vadodara';
+          }
       }
-  }
-
-
-  if (dataSourceFile && searchField && searchTerm && !userRecord) {
-      const data = dataSourceFile === 'goa' ? readStaffData(goastaffdataFilePath) : readStaffData(staffdataFilePath);
-      const searchKey = searchField === 'misId' ? 'MIS ID' : 'Email';
-      userRecord = data.find(row => row[searchKey] && String(row[searchKey]).toLowerCase() === searchTerm);
   }
 
 
@@ -112,6 +108,6 @@ export async function GET(request: NextRequest) {
       },
     });
   } else {
-    return NextResponse.json({ success: false, error: `User not found in the ${dataSourceFile} staff data file.` }, { status: 404 });
+    return NextResponse.json({ success: false, error: `User not found in the ${dataSourceFile || 'available'} staff data file(s).` }, { status: 404 });
   }
 }
