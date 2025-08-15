@@ -16,6 +16,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { manageCoAuthorRequest } from '@/app/bulkpapers';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 
 const AUTHOR_ROLES: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
@@ -26,7 +29,12 @@ export default function NotificationsPage() {
   const { toast } = useToast();
   const [managingRequest, setManagingRequest] = useState<{ notification: NotificationType, paper: ResearchPaper } | null>(null);
   const [requestToReject, setRequestToReject] = useState<NotificationType | null>(null);
+  
+  // State for the acceptance dialog
   const [assignedRole, setAssignedRole] = useState<Author['role'] | ''>('');
+  const [mainAuthorNewRole, setMainAuthorNewRole] = useState<Author['role'] | ''>('');
+  const [roleConflict, setRoleConflict] = useState(false);
+
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -89,16 +97,21 @@ export default function NotificationsPage() {
   
   const handleConfirmAcceptRequest = async () => {
     if (!managingRequest || !assignedRole) {
-        toast({title: "Please assign a role", variant: "destructive"});
+        toast({title: "Please assign a role to the requester.", variant: "destructive"});
         return;
     }
+    if (roleConflict && !mainAuthorNewRole) {
+        toast({title: "Please select a new role for yourself to resolve the conflict.", variant: "destructive"});
+        return;
+    }
+
     const { notification } = managingRequest;
-    const result = await manageCoAuthorRequest(notification.paperId!, notification.requester!, 'accept', assignedRole);
+    const result = await manageCoAuthorRequest(notification.paperId!, notification.requester!, 'accept', assignedRole, roleConflict ? mainAuthorNewRole : undefined);
+    
     if (result.success) {
         toast({title: "Co-Author Approved"});
         await handleMarkAsRead(notification.id);
         setManagingRequest(null);
-        setAssignedRole('');
     } else {
         toast({title: "Error", description: result.error, variant: "destructive"});
     }
@@ -115,7 +128,23 @@ export default function NotificationsPage() {
         toast({title: "Error", description: result.error, variant: "destructive"});
     }
   };
-
+  
+  const handleRoleSelection = (selectedRole: Author['role']) => {
+    setAssignedRole(selectedRole);
+    if (!managingRequest || !user) return;
+    
+    const { paper } = managingRequest;
+    const mainAuthor = paper.authors.find(a => a.uid === user.uid);
+    
+    const conflictingRoles = ['First Author', 'Corresponding Author', 'First & Corresponding Author'];
+    
+    if (conflictingRoles.includes(selectedRole) && mainAuthor?.role === selectedRole) {
+        setRoleConflict(true);
+    } else {
+        setRoleConflict(false);
+        setMainAuthorNewRole('');
+    }
+  };
 
   const getIcon = (title: string) => {
     if (title.includes('Recommended') || title.includes('Completed')) return FileCheck2;
@@ -131,18 +160,11 @@ export default function NotificationsPage() {
     return `/dashboard/project/${notification.projectId}`;
   };
 
-  const getAvailableRoles = (paper?: ResearchPaper): Author['role'][] => {
+  const getAvailableRolesForMainAuthor = (paper?: ResearchPaper): Author['role'][] => {
     if (!paper) return AUTHOR_ROLES;
-    const existingRoles = paper.authors.map(a => a.role);
-    let available = [...AUTHOR_ROLES];
-    if (existingRoles.includes('First Author') || existingRoles.includes('First & Corresponding Author')) {
-        available = available.filter(r => r !== 'First Author' && r !== 'First & Corresponding Author');
-    }
-    if (existingRoles.includes('Corresponding Author') || existingRoles.includes('First & Corresponding Author')) {
-        available = available.filter(r => r !== 'Corresponding Author' && r !== 'First & Corresponding Author');
-    }
-    return available;
-  };
+    const myCurrentRole = paper.authors.find(a => a.uid === user?.uid)?.role;
+    return AUTHOR_ROLES.filter(r => r !== myCurrentRole);
+  }
 
   return (
     <>
@@ -217,21 +239,42 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <Dialog open={!!managingRequest} onOpenChange={() => setManagingRequest(null)}>
+      <Dialog open={!!managingRequest} onOpenChange={() => { setManagingRequest(null); setRoleConflict(false); setAssignedRole(''); setMainAuthorNewRole(''); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Assign Role to Co-Author</DialogTitle>
-            <DialogDescription>Select a role for {managingRequest?.notification.requester?.name}.</DialogDescription>
+            <DialogTitle>Accept Co-Author Request</DialogTitle>
+            <DialogDescription>
+                {managingRequest?.notification.requester?.name} has requested to be added as the <span className="font-bold">{managingRequest?.notification.requester?.role}</span>.
+            </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <Select value={assignedRole} onValueChange={(value) => setAssignedRole(value as Author['role'])}>
-              <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
-              <SelectContent>
-                {getAvailableRoles(managingRequest?.paper).map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            {getAvailableRoles(managingRequest?.paper).length < AUTHOR_ROLES.length && (
-              <p className="text-xs text-muted-foreground mt-2">Some roles are unavailable because they are already assigned.</p>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label>Assign Role to {managingRequest?.notification.requester?.name}</Label>
+              <Select value={assignedRole} onValueChange={(value) => handleRoleSelection(value as Author['role'])}>
+                <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
+                <SelectContent>
+                  {AUTHOR_ROLES.map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {roleConflict && (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Role Conflict Detected!</AlertTitle>
+                    <AlertDescription>
+                        You are also assigned as the {assignedRole}. To resolve this, please select a new role for yourself.
+                        <div className="mt-4">
+                            <Label>Your New Role</Label>
+                            <Select value={mainAuthorNewRole} onValueChange={(value) => setMainAuthorNewRole(value as Author['role'])}>
+                                <SelectTrigger><SelectValue placeholder="Select your new role" /></SelectTrigger>
+                                <SelectContent>
+                                    {getAvailableRolesForMainAuthor(managingRequest?.paper).map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </AlertDescription>
+                </Alert>
             )}
           </div>
           <DialogFooter>

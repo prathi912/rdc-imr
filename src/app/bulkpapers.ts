@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -79,6 +80,7 @@ export async function sendCoAuthorRequest(
                 type: 'coAuthorRequest',
                 paperId: existingPaper.id,
                 requester: newAuthorRequest,
+                projectId: profileLink,
             };
             await adminDb.collection('notifications').add(notification);
         }
@@ -191,6 +193,7 @@ export async function manageCoAuthorRequest(
                 throw new Error('Paper not found.');
             }
             const paperData = paperSnap.data() as ResearchPaper;
+            const mainAuthorUid = paperData.mainAuthorUid;
 
             const requestToRemove = (paperData.coAuthorRequests || []).find(req => req.uid === requestingAuthor.uid && req.email === requestingAuthor.email);
             if (!requestToRemove) {
@@ -205,29 +208,25 @@ export async function manageCoAuthorRequest(
             if (action === 'accept' && assignedRole) {
                 let currentAuthors = paperData.authors || [];
 
-                // Handle potential role conflicts
-                if (mainAuthorNewRole && paperData.mainAuthorUid) {
-                    currentAuthors = currentAuthors.map(author => 
-                        author.uid === paperData.mainAuthorUid ? { ...author, role: mainAuthorNewRole } : author
-                    );
-                }
-                
-                // Final check to prevent duplicate roles after potential changes
-                if ((assignedRole === 'First Author' || assignedRole === 'First & Corresponding Author') && currentAuthors.some(a => a.role === 'First Author' || a.role === 'First & Corresponding Author')) {
-                    throw new Error('A First Author already exists for this paper.');
-                }
-                if ((assignedRole === 'Corresponding Author' || assignedRole === 'First & Corresponding Author') && currentAuthors.some(a => a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author')) {
-                    throw new Error('A Corresponding Author already exists.');
+                // Handle potential role conflicts by updating the main author's role if a new one is provided
+                if (mainAuthorNewRole && mainAuthorUid) {
+                    const mainAuthorIndex = currentAuthors.findIndex(author => author.uid === mainAuthorUid);
+                    if (mainAuthorIndex !== -1) {
+                        currentAuthors[mainAuthorIndex].role = mainAuthorNewRole;
+                    }
                 }
                 
                 const newAuthor: Author = { ...requestingAuthor, role: assignedRole, status: 'approved' };
                 const updatedAuthors = [...currentAuthors, newAuthor];
+                
+                const updatedAuthorUids = [...new Set([...(paperData.authorUids || []), newAuthor.uid])].filter(Boolean) as string[];
+                const updatedAuthorEmails = [...new Set([...(paperData.authorEmails || []), newAuthor.email.toLowerCase()])];
 
                 transaction.update(paperRef, {
                     coAuthorRequests: FieldValue.arrayRemove(requestToRemove),
                     authors: updatedAuthors,
-                    authorUids: FieldValue.arrayUnion(newAuthor.uid),
-                    authorEmails: FieldValue.arrayUnion(newAuthor.email),
+                    authorUids: updatedAuthorUids,
+                    authorEmails: updatedAuthorEmails,
                 });
                 return { success: true };
             }
