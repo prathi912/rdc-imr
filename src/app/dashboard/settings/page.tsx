@@ -178,6 +178,18 @@ const institutes = [
   "Parul Aarogya Seva Mandal",
 ]
 
+const goaInstitutes = [
+    "Parul College of Applied and Health Sciences",
+    "Parul College of Engineering",
+    "Parul College of Information Technology & Computer Science",
+    "Parul College of Management",
+    "Parul College of Pharmacy",
+    "Parul College of Physiotherapy",
+    "Parul College of Nursing",
+    "University Office",
+];
+
+
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"]
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -331,6 +343,14 @@ export default function SettingsPage() {
       }
     }
     fetchDepartments();
+  }, [selectedCampus, profileForm]);
+
+  useEffect(() => {
+    const currentInstitute = profileForm.getValues('institute');
+    const appropriateInstitutes = selectedCampus === 'Goa' ? goaInstitutes : institutes;
+    if (currentInstitute && !appropriateInstitutes.includes(currentInstitute)) {
+        profileForm.setValue('institute', '');
+    }
   }, [selectedCampus, profileForm]);
 
   async function onProfileSubmit(data: ProfileFormValues) {
@@ -836,7 +856,7 @@ export default function SettingsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {institutes.map((i) => (
+                          {(selectedCampus === 'Goa' ? goaInstitutes : institutes).map((i) => (
                             <SelectItem key={i} value={i}>
                               {i}
                             </SelectItem>
