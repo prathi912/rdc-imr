@@ -326,10 +326,6 @@ function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim:
                     )}
                 </div>
                 <DialogFooter className="gap-2">
-                    <Button onClick={handlePrint} disabled={isPrinting}>
-                        {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-                        Export to Excel
-                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
