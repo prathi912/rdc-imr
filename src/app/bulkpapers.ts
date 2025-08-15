@@ -19,6 +19,20 @@ type PaperUploadData = {
     QRating?: string;
 };
 
+const EMAIL_STYLES = {
+  background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
+  logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-WHITE.svg" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
+  footer: ` 
+    <p style="color:#b0bec5; margin-top: 30px;">Best Regards,</p>
+    <p style="color:#b0bec5;">Research & Development Cell Team,</p>
+    <p style="color:#b0bec5;">Parul University</p>
+    <hr style="border-top: 1px solid #4f5b62; margin-top: 20px;">
+    <p style="font-size:10px; color:#999999; text-align:center; margin-top:10px;">
+        This is a system generated automatic email. If you feel this is an error, please report at the earliest.
+    </p>`
+};
+
+
 async function findExistingPaper(title: string, url: string): Promise<ResearchPaper | null> {
     const papersRef = adminDb.collection('papers');
     const titleQuery = papersRef.where('title', '==', title);
@@ -257,31 +271,49 @@ export async function manageCoAuthorRequest(
             };
             await adminDb.collection('notifications').add(notification);
             
-            const emailHtml = `
-                <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-                    <p>Dear ${requestingAuthor.name},</p>
-                    <p>
-                        This is an update regarding your co-author request for the paper titled:
+            const acceptedHtml = `
+                <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
+                    <p style="color:#ffffff;">Dear ${requestingAuthor.name},</p>
+                    <p style="color:#e0e0e0;">
+                        This is to inform you that ${mainAuthorName} has <strong>accepted</strong> your request to be added as a
+                        <strong style="color:#ffffff;">${assignedRole}</strong> on the paper titled:
                         <br>
-                        <strong>"${paper.title}"</strong>
+                        "<strong style="color:#ffffff;">${paper.title}</strong>".
                     </p>
-                    <p>
-                        ${mainAuthorName} has <strong>${action === 'accept' ? 'accepted' : 'rejected'}</strong> your request.
+                    <p style="color:#e0e0e0;">You have been successfully added to the list of authors.</p>
+                    <p style="color:#e0e0e0;">
+                        You can view your updated publication list on the 
+                        <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/my-projects" style="color:#64b5f6; text-decoration:underline;">
+                          PU Research Projects Portal
+                        </a>.
                     </p>
-                    ${action === 'accept' ? '<p>You have been successfully added to the list of authors.</p>' : ''}
-                    <p>
-                        You can view your publications on the PU Research Projects Portal.
-                    </p>
-                    <br/>
-                    <p>Best Regards,</p>
-                    <p><strong>The R&D Cell Team</strong></p>
+                    ${EMAIL_STYLES.footer}
                 </div>
             `;
+            
+            const rejectedHtml = `
+                 <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
+                    <p style="color:#ffffff;">Dear ${requestingAuthor.name},</p>
+                    <p style="color:#e0e0e0;">
+                        This is an update regarding your co-author request for the paper titled:
+                        <br>
+                        "<strong style="color:#ffffff;">${paper.title}</strong>".
+                    </p>
+                    <p style="color:#e0e0e0;">
+                        ${mainAuthorName} has <strong>rejected</strong> your request.
+                    </p>
+                     <p style="color:#e0e0e0;">If you believe this is a mistake, please contact the main author directly.</p>
+                    ${EMAIL_STYLES.footer}
+                </div>
+            `;
+
             
             await sendEmail({
                 to: requestingAuthor.email,
                 subject: `Update on your co-author request for "${paper.title}"`,
-                html: emailHtml,
+                html: action === 'accept' ? acceptedHtml : rejectedHtml,
                 from: 'default'
             });
         }
@@ -293,3 +325,5 @@ export async function manageCoAuthorRequest(
         return { success: false, error: error.message || 'Server error.' };
     }
 }
+
+    
