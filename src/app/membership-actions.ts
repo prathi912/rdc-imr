@@ -11,14 +11,14 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
   try {
     const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
     const claimSnap = await claimRef.get();
-    if (!claimSnap.exists()) {
+    if (!claimSnap.exists) {
       return { success: false, error: 'Incentive claim not found.' };
     }
     const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
 
     const userRef = adminDb.collection('users').doc(claim.uid);
     const userSnap = await userRef.get();
-    if (!userSnap.exists()) {
+    if (!userSnap.exists) {
       return { success: false, error: 'Claimant user profile not found.' };
     }
     const user = userSnap.data() as User;
