@@ -57,40 +57,30 @@ export async function GET(request: NextRequest) {
   let searchTerm: string | null = null;
 
   if (email) {
-      searchField = 'email';
-      searchTerm = email.toLowerCase();
-      if (searchTerm.endsWith('@goa.paruluniversity.ac.in')) {
-          dataSourceFile = 'goa';
-      } else {
-          dataSourceFile = 'vadodara';
-      }
-  } else if (misId) {
-      // This block is for legacy support or other API calls, but the primary logic from profile setup will pass both email and misId.
-      searchField = 'misId';
-      searchTerm = misId.toLowerCase();
-      // If only MIS ID is passed, we have to check both files.
-      const goaData = readStaffData(goastaffdataFilePath);
-      userRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === searchTerm);
-      if (userRecord) {
-          dataSourceFile = 'goa';
-      } else {
-          dataSourceFile = 'vadodara';
-      }
-  }
-  
-  // If profile setup sends both email and misId, the email determines the file to search.
-  if (email && misId) {
-      searchField = 'misId';
-      searchTerm = misId.toLowerCase();
+      searchField = email ? 'email' : 'misId';
+      searchTerm = (email || misId)!.toLowerCase();
+
       if (email.toLowerCase().endsWith('@goa.paruluniversity.ac.in')) {
           dataSourceFile = 'goa';
       } else {
           dataSourceFile = 'vadodara';
       }
+  } else if (misId) {
+      // If only MIS ID is provided, we must check both files, starting with Goa.
+      searchField = 'misId';
+      searchTerm = misId.toLowerCase();
+      const goaData = readStaffData(goastaffdataFilePath);
+      userRecord = goaData.find(row => String(row['MIS ID'] || '').toLowerCase() === searchTerm);
+      
+      if (userRecord) {
+          dataSourceFile = 'goa';
+      } else {
+          dataSourceFile = 'vadodara'; // Fallback to check the main file
+      }
   }
 
 
-  if (dataSourceFile && searchField && searchTerm) {
+  if (dataSourceFile && searchField && searchTerm && !userRecord) {
       const data = dataSourceFile === 'goa' ? readStaffData(goastaffdataFilePath) : readStaffData(staffdataFilePath);
       const searchKey = searchField === 'misId' ? 'MIS ID' : 'Email';
       userRecord = data.find(row => row[searchKey] && String(row[searchKey]).toLowerCase() === searchTerm);

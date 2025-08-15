@@ -208,7 +208,7 @@ export default function GoaProfilePage() {
   return (
     <div className="container mx-auto max-w-7xl py-10">
       <PageHeader
-        title={`${profileUser.name}'s Profile (Goa Campus)`}
+        title={`${profileUser.name}'s Profile`}
         description="Public research profile and contributions."
         showBackButton={false}
       />

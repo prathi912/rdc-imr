@@ -21,12 +21,12 @@ import { toPng } from 'html-to-image';
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
 const GOA_FACULTIES = [
-    "Faculty of Engineering, IT & CS",
-    "Faculty of Management Studies",
-    "Faculty of Pharmacy",
-    "Faculty of Applied and Health Sciences",
-    "Faculty of Nursing",
-    "Faculty of Physiotherapy"
+    "Faculty of Engineering, IT & CS (Goa)",
+    "Faculty of Management Studies (Goa)",
+    "Faculty of Pharmacy (Goa)",
+    "Faculty of Applied and Health Sciences (Goa)",
+    "Faculty of Nursing (Goa)",
+    "Faculty of Physiotherapy (Goa)"
 ];
 
 export default function AnalyticsPage() {
@@ -264,13 +264,15 @@ export default function AnalyticsPage() {
       label = 'Department';
       options = [...new Set(filteredProjects.map(p => p.departmentName).filter(Boolean) as string[])].sort();
     } else { // Admin/Super-admin
-      options = [...new Set(projects.map(p => {
+      const facultySet = new Set<string>();
+      projects.forEach(p => {
           const faculty = p.faculty || '';
-          if (GOA_FACULTIES.includes(faculty)) {
-              return `${faculty} (Goa)`;
+          if (faculty) {
+              const campus = p.campus === 'Goa' ? ' (Goa)' : '';
+              facultySet.add(`${faculty}${campus}`);
           }
-          return faculty;
-      }).filter(Boolean))].sort();
+      });
+      options = Array.from(facultySet).sort();
     }
   
     return { grantAggregationKey: key, grantAggregationLabel: label, grantFilterOptions: options };
@@ -291,7 +293,13 @@ export default function AnalyticsPage() {
 
     if (grantGroupFilter) {
       const filterValue = grantGroupFilter.replace(' (Goa)', '');
-      projectsToProcess = projectsWithGrants.filter(p => p[grantAggregationKey] === filterValue);
+      const filterCampus = grantGroupFilter.includes('(Goa)') ? 'Goa' : undefined;
+
+      projectsToProcess = projectsWithGrants.filter(p => {
+          const keyMatch = p[grantAggregationKey] === filterValue;
+          const campusMatch = filterCampus ? p.campus === filterCampus : p.campus !== 'Goa';
+          return keyMatch && campusMatch;
+      });
     }
   
     const yearlyData = projectsToProcess.reduce((acc, project) => {
