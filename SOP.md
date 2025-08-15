@@ -37,7 +37,7 @@ This is the base role for all teaching and research staff.
     -   Navigate to **New Submission** from the sidebar.
     -   The submission form is divided into four steps:
         1.  **Project Details:** Enter the title, abstract, and category. You can also align your project with UN Sustainable Development Goals (SDGs).
-        2.  **Team Info:** Add Co-PIs by searching for their MIS ID. They must be registered on the portal. For each Co-PI added, you must upload their individual CV as a PDF (max 5MB). List any student members involved.
+        2.  **Team Info:** Upload your CV as the Principal Investigator (PI). Add Co-PIs by searching for their MIS ID. They must be registered on the portal. For each Co-PI added, you must upload their individual CV as a PDF (max 5MB). List any student members involved.
         3.  **File Uploads:** Upload your main Project Proposal (PDF) and, if applicable, your Ethics Approval document (PDF).
         4.  **Timeline & Outcomes:** Detail the project timeline and the expected outcomes or impact.
     -   At any step, you can click **Save as Draft**. Drafts are accessible from the **My Projects** page to be completed later.

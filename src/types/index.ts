@@ -125,6 +125,7 @@ export type Project = {
   pi_uid: string
   pi_email?: string
   pi_phoneNumber?: string
+  piCvUrl?: string; // URL for PI's CV
   coPiDetails?: CoPiDetails[]
   coPiUids?: string[]
   status:

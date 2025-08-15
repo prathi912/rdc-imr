@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -84,6 +85,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const [coPiList, setCoPiList] = useState<CoPiDetails[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [coPiCvFiles, setCoPiCvFiles] = useState<{ [email: string]: File }>({});
+  const [piCvFile, setPiCvFile] = useState<File | null>(null);
 
   const formSchema = useMemo(() => z.object({
     // Step 1
@@ -161,8 +163,16 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       4: ['expectedOutcomes', 'guidelinesAgreement'],
     }[currentStep] as (keyof FormData)[];
 
-    // Additional validation for Co-PI CVs in step 2
+    // Additional validation for CVs in step 2
     if (currentStep === 2) {
+      if (!project?.piCvUrl && !piCvFile) {
+        toast({
+          variant: 'destructive',
+          title: 'CV Required',
+          description: 'Please upload your CV as the Principal Investigator.'
+        });
+        return;
+      }
       const missingCvs = coPiList.filter(coPi => !coPi.cvUrl && !coPiCvFiles[coPi.email]);
       if (missingCvs.length > 0) {
         toast({
@@ -194,12 +204,8 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     setFoundCoPi(null);
     try {
         const result = await findUserByMisId(coPiSearchTerm);
-        if (result.success) {
-            if (result.user) {
+        if (result.success && result.user) {
                 setFoundCoPi({ ...result.user });
-            } else if (result.staff) {
-                setFoundCoPi({ ...result.staff });
-            }
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
         }
@@ -230,35 +236,34 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     setCoPiCvFiles(newCvFiles);
   };
 
-  const handleCoPiCvUpload = (email: string, file: File | null) => {
-    if (file) {
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          variant: 'destructive',
-          title: 'File Too Large',
-          description: 'CV file must be under 5MB.'
-        });
-        return;
+  const handleCvUpload = (file: File | null, email?: string) => {
+    if (!file) {
+      if (email) {
+        const newCvFiles = { ...coPiCvFiles };
+        delete newCvFiles[email];
+        setCoPiCvFiles(newCvFiles);
+      } else {
+        setPiCvFile(null);
       }
-      
-      // Validate file type (PDF only)
-      if (file.type !== 'application/pdf') {
-        toast({
-          variant: 'destructive',
-          title: 'Invalid File Type',
-          description: 'CV must be a PDF file.'
-        });
-        return;
-      }
-      
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ variant: 'destructive', title: 'File Too Large', description: 'CV file must be under 5MB.' });
+      return;
+    }
+    if (file.type !== 'application/pdf') {
+      toast({ variant: 'destructive', title: 'Invalid File Type', description: 'CV must be a PDF file.' });
+      return;
+    }
+
+    if (email) {
       setCoPiCvFiles(prev => ({ ...prev, [email]: file }));
     } else {
-      const newCvFiles = { ...coPiCvFiles };
-      delete newCvFiles[email];
-      setCoPiCvFiles(newCvFiles);
+      setPiCvFile(file);
     }
   };
+
 
   const handleSave = async (status: 'Draft' | 'Submitted') => {
     if (!user || !user.faculty || !user.institute || !user.department) {
@@ -278,8 +283,12 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         return;
     }
 
-    // Validate Co-PI CVs for submission
+    // Validate CVs for submission
     if (status === 'Submitted') {
+      if (!project?.piCvUrl && !piCvFile) {
+        toast({ variant: 'destructive', title: 'CV Required', description: 'Please upload your CV as the Principal Investigator.' });
+        return;
+      }
       const missingCvs = coPiList.filter(coPi => !coPi.cvUrl && !coPiCvFiles[coPi.email]);
       if (missingCvs.length > 0) {
         toast({
@@ -306,9 +315,16 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         throw new Error(result.error || `Failed to upload ${file.name}`);
       };
 
+      // Upload PI CV
+      let piCvUrl = project?.piCvUrl;
+      if (piCvFile) {
+        piCvUrl = await uploadFile(piCvFile, `pi-cv`);
+        setProgress(15);
+      }
+
       // Upload Co-PI CVs
       const updatedCoPiList = [...coPiList];
-      let uploadProgress = 10;
+      let uploadProgress = 20;
       
       for (let i = 0; i < updatedCoPiList.length; i++) {
         const coPi = updatedCoPiList[i];
@@ -358,7 +374,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       const projectData: Omit<Project, 'id'> = {
         title: data.title, abstract: data.abstract, type: data.projectType,
         faculty: user.faculty, institute: user.institute, departmentName: user.department,
-        pi: user.name, pi_uid: user.uid, pi_email: user.email, pi_phoneNumber: user.phoneNumber,
+        pi: user.name, pi_uid: user.uid, pi_email: user.email, pi_phoneNumber: user.phoneNumber, piCvUrl,
         coPiDetails: updatedCoPiList, // Store details with CV URLs
         coPiUids: coPiUids, // Store UIDs for registered users
         teamInfo, timelineAndOutcomes: data.expectedOutcomes, status: status,
@@ -476,11 +492,38 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
               </div>
             )}
             {currentStep === 2 && (
-              <div className="space-y-4 animate-in fade-in-0">
-                <FormItem>
-                  <FormLabel>Principal Investigator (PI)</FormLabel>
-                  <Input disabled value={user?.name || 'Loading...'} />
-                </FormItem>
+              <div className="space-y-6 animate-in fade-in-0">
+                <div className="p-4 bg-secondary rounded-md space-y-3">
+                    <FormLabel>Principal Investigator (PI)</FormLabel>
+                    <Input disabled value={user?.name || 'Loading...'} />
+                     <div className="space-y-2">
+                         <div className="flex items-center justify-between">
+                           <label className="text-sm font-medium">Your CV (PDF, max 5MB) <span className="text-destructive">*</span></label>
+                           {project?.piCvUrl && (
+                             <Button asChild variant="link" size="sm" className="p-0 h-auto">
+                               <a href={project.piCvUrl} target="_blank" rel="noopener noreferrer">
+                                 View Current CV
+                               </a>
+                             </Button>
+                           )}
+                         </div>
+                         <Input
+                           type="file"
+                           accept=".pdf"
+                           onChange={(e) => handleCvUpload(e.target.files?.[0] || null)}
+                           className="text-sm"
+                         />
+                         {piCvFile && (
+                           <p className="text-xs text-muted-foreground">
+                             Selected: {piCvFile.name}
+                           </p>
+                         )}
+                         {!project?.piCvUrl && !piCvFile && (
+                           <p className="text-xs text-destructive">CV upload required</p>
+                         )}
+                    </div>
+                </div>
+
                  <div className="space-y-2">
                     <FormLabel>Co-PIs</FormLabel>
                     <div className="flex items-center gap-2">
@@ -501,7 +544,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                     )}
                     <div className="space-y-4 pt-2">
                       {coPiList.map(coPi => (
-                        <div key={coPi.email} className="p-4 bg-secondary rounded-md space-y-3">
+                        <div key={coPi.email} className="p-4 bg-secondary/50 rounded-md space-y-3">
                            <div className="flex items-center justify-between">
                              <p className="text-sm font-medium">{coPi.name} {!coPi.uid && <span className="text-xs text-muted-foreground">(Not Registered)</span>}</p>
                              <Button type="button" variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.email)}>
@@ -522,7 +565,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                              <Input
                                type="file"
                                accept=".pdf"
-                               onChange={(e) => handleCoPiCvUpload(coPi.email, e.target.files?.[0] || null)}
+                               onChange={(e) => handleCvUpload(e.target.files?.[0] || null, coPi.email)}
                                className="text-sm"
                              />
                              {coPiCvFiles[coPi.email] && (
