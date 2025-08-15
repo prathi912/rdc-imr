@@ -35,6 +35,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { updateIncentiveClaimStatus, exportClaimToExcel } from '@/app/actions';
 import { generateBookIncentiveForm } from '@/app/incentive-actions';
+import { generateMembershipIncentiveForm } from '@/app/membership-actions';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
@@ -349,6 +350,7 @@ export default function ManageIncentiveClaimsPage() {
   const [claimTypeFilter, setClaimTypeFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
   const [isPrintingBookForm, setIsPrintingBookForm] = useState<string | null>(null);
+  const [isPrintingMembershipForm, setIsPrintingMembershipForm] = useState<string | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -525,6 +527,40 @@ export default function ManageIncentiveClaimsPage() {
         setIsPrintingBookForm(null);
       }
     };
+
+    const handlePrintMembershipForm = async (claim: IncentiveClaim) => {
+        if (!claim) return;
+        setIsPrintingMembershipForm(claim.id);
+        try {
+            const result = await generateMembershipIncentiveForm(claim.id);
+            if (result.success && result.fileData) {
+                const byteCharacters = atob(result.fileData);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Office_Noting_Membership_Claim_${claim.userName.replace(/\s/g, '_')}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
+            } else {
+                throw new Error(result.error || "Failed to generate form.");
+            }
+        } catch (error: any) {
+            console.error("Membership form generation error:", error);
+            toast({ variant: 'destructive', title: "Generation Failed", description: error.message });
+        } finally {
+            setIsPrintingMembershipForm(null);
+        }
+    };
   
   const renderTable = () => (
     <div className="overflow-x-auto">
@@ -576,6 +612,12 @@ export default function ManageIncentiveClaimsPage() {
                                 {isPrintingBookForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                                 Notings
                             </Button>
+                        )}
+                        {claim.claimType === 'Membership of Professional Bodies' && claim.status === 'Pending' && (
+                          <Button onClick={() => handlePrintMembershipForm(claim)} disabled={isPrintingMembershipForm === claim.id} size="sm" variant="outline">
+                            {isPrintingMembershipForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                            Notings
+                          </Button>
                         )}
                         <DropdownMenu>
                         <DropdownMenuTrigger asChild>
