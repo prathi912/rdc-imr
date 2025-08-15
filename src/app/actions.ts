@@ -1820,29 +1820,53 @@ export async function findUserByMisId(
     if (!misId || misId.trim() === "") {
       return { success: false, error: "MIS ID is required." };
     }
+    
+    // First, search for registered users in Firestore
+    const usersRef = adminDb.collection("users");
+    const q = adminQuery(usersRef, adminWhere("misId", "==", misId));
+    const querySnapshot = await adminGetDocs(q);
 
+    if (!querySnapshot.empty) {
+        const foundUsers = querySnapshot.docs.map(doc => {
+            const data = doc.data() as User;
+            return {
+                uid: doc.id,
+                name: data.name,
+                email: data.email,
+                misId: data.misId || '',
+                campus: data.campus || 'Vadodara',
+            };
+        });
+        
+        // Exclude admins from being added as Co-PIs
+        const nonAdminUsers = foundUsers.filter(user => {
+            const fullUser = querySnapshot.docs.find(doc => doc.id === user.uid)?.data() as User;
+            return fullUser.role !== 'admin' && fullUser.role !== 'Super-admin';
+        });
+
+        if (nonAdminUsers.length > 0) {
+            return { success: true, users: nonAdminUsers };
+        }
+    }
+
+    // If no registered user found, fallback to staff data files
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
     const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}`);
     const result = await response.json();
 
     if (result.success && result.data && result.data.length > 0) {
-        // The API now returns an array
-        const users = result.data.map((staff: any) => ({
-            uid: staff.uid || '', // UID will be empty if not registered
+        const staffUsers = result.data.map((staff: any) => ({
+            uid: '', // No UID as they are not registered
             name: staff.name,
             email: staff.email,
             misId: staff.misId,
             campus: staff.campus
         }));
         
-        if (users.some((user: any) => user.role === 'admin' || user.role === 'Super-admin')) {
-          return { success: false, error: "Administrators cannot be added as Co-PIs." };
-        }
-        
-        return { success: true, users: users };
+        return { success: true, users: staffUsers };
     }
 
-    return { success: false, error: result.error || "No registered user found with this MIS ID. Please ask them to sign up first." };
+    return { success: false, error: "No registered user found with this MIS ID. Please ask them to sign up first." };
 
   } catch (error: any) {
     console.error("Error finding user by MIS ID:", error);
@@ -2690,7 +2714,7 @@ export async function createFundingCall(
             const counterDoc = await transaction.get(counterRef);
 
             let newCount = 1;
-            if (counterDoc.exists) {
+            if (counterDoc.exists && counterDoc.data()?.current) {
                 newCount = counterDoc.data()!.current + 1;
             }
             transaction.set(counterRef, { current: newCount }, { merge: true });
