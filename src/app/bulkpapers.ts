@@ -1,5 +1,3 @@
-
-
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -75,7 +73,7 @@ export async function sendCoAuthorRequest(
             
             const notification: Omit<Notification, 'id'> = {
                 uid: existingPaper.mainAuthorUid,
-                title: `${requestingUser.name} has requested to be added as a co-author on your paper: "${existingPaper.title}"`,
+                title: `${requestingUser.name} has requested to be added as a ${requesterRole} on your paper: "${existingPaper.title}"`,
                 createdAt: new Date().toISOString(),
                 isRead: false,
                 type: 'coAuthorRequest',
@@ -181,53 +179,62 @@ export async function manageCoAuthorRequest(
     paperId: string,
     requestingAuthor: Author,
     action: 'accept' | 'reject',
-    assignedRole?: Author['role']
+    assignedRole?: Author['role'],
+    mainAuthorNewRole?: Author['role']
 ): Promise<{ success: boolean; error?: string }> {
     try {
         const paperRef = adminDb.collection('papers').doc(paperId);
-        const paperSnap = await paperRef.get();
-        if (!paperSnap.exists) {
-            return { success: false, error: 'Paper not found.' };
-        }
-        const paperData = paperSnap.data() as ResearchPaper;
-
-        // Find the specific request in the array to remove it accurately
-        const requestToRemove = (paperData.coAuthorRequests || []).find(req => req.uid === requestingAuthor.uid && req.email === requestingAuthor.email);
-
-        if (!requestToRemove) {
-            return { success: false, error: 'This co-author request was not found. It may have been withdrawn or already processed.' };
-        }
-
-        if (action === 'reject') {
-            await paperRef.update({
-                coAuthorRequests: FieldValue.arrayRemove(requestToRemove),
-            });
-            return { success: true };
-        }
-
-        if (action === 'accept' && assignedRole) {
-            const currentAuthors = paperData.authors || [];
-            if (assignedRole === 'First Author' && currentAuthors.some(a => a.role === 'First Author' || a.role === 'First & Corresponding Author')) {
-                return { success: false, error: 'A First Author already exists for this paper.' };
+        
+        return await adminDb.runTransaction(async (transaction) => {
+            const paperSnap = await transaction.get(paperRef);
+            if (!paperSnap.exists) {
+                throw new Error('Paper not found.');
             }
-             if (assignedRole === 'Corresponding Author' && currentAuthors.some(a => a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author')) {
-                return { success: false, error: 'A Corresponding Author already exists.' };
-            }
-             if (assignedRole === 'First & Corresponding Author' && (currentAuthors.some(a => a.role === 'First Author' || a.role === 'First & Corresponding Author') || currentAuthors.some(a => a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'))) {
-                return { success: false, error: 'A First or Corresponding Author already exists.' };
+            const paperData = paperSnap.data() as ResearchPaper;
+
+            const requestToRemove = (paperData.coAuthorRequests || []).find(req => req.uid === requestingAuthor.uid && req.email === requestingAuthor.email);
+            if (!requestToRemove) {
+                throw new Error('This co-author request was not found. It may have been withdrawn or already processed.');
             }
 
-            const newAuthor: Author = { ...requestingAuthor, role: assignedRole, status: 'approved' };
-            await paperRef.update({
-                coAuthorRequests: FieldValue.arrayRemove(requestToRemove),
-                authors: FieldValue.arrayUnion(newAuthor),
-                authorUids: FieldValue.arrayUnion(newAuthor.uid),
-                authorEmails: FieldValue.arrayUnion(newAuthor.email),
-            });
-            return { success: true };
-        }
+            if (action === 'reject') {
+                transaction.update(paperRef, { coAuthorRequests: FieldValue.arrayRemove(requestToRemove) });
+                return { success: true };
+            }
 
-        return { success: false, error: 'Invalid action or missing role.' };
+            if (action === 'accept' && assignedRole) {
+                let currentAuthors = paperData.authors || [];
+
+                // Handle potential role conflicts
+                if (mainAuthorNewRole && paperData.mainAuthorUid) {
+                    currentAuthors = currentAuthors.map(author => 
+                        author.uid === paperData.mainAuthorUid ? { ...author, role: mainAuthorNewRole } : author
+                    );
+                }
+                
+                // Final check to prevent duplicate roles after potential changes
+                if ((assignedRole === 'First Author' || assignedRole === 'First & Corresponding Author') && currentAuthors.some(a => a.role === 'First Author' || a.role === 'First & Corresponding Author')) {
+                    throw new Error('A First Author already exists for this paper.');
+                }
+                if ((assignedRole === 'Corresponding Author' || assignedRole === 'First & Corresponding Author') && currentAuthors.some(a => a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author')) {
+                    throw new Error('A Corresponding Author already exists.');
+                }
+                
+                const newAuthor: Author = { ...requestingAuthor, role: assignedRole, status: 'approved' };
+                const updatedAuthors = [...currentAuthors, newAuthor];
+
+                transaction.update(paperRef, {
+                    coAuthorRequests: FieldValue.arrayRemove(requestToRemove),
+                    authors: updatedAuthors,
+                    authorUids: FieldValue.arrayUnion(newAuthor.uid),
+                    authorEmails: FieldValue.arrayUnion(newAuthor.email),
+                });
+                return { success: true };
+            }
+            
+            throw new Error('Invalid action or missing role for acceptance.');
+        });
+
     } catch (error: any) {
         console.error("Error managing co-author request:", error);
         return { success: false, error: error.message || 'Server error.' };
