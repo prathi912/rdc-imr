@@ -20,7 +20,6 @@ import { db, auth } from "@/lib/config"
 import { doc, getDoc, updateDoc } from "firebase/firestore"
 import {
   uploadFileToServer,
-  fetchOrcidData,
   checkHODUniqueness,
   getSystemSettings,
   updateSystemSettings,
@@ -199,7 +198,6 @@ export default function SettingsPage() {
   const [profilePicFile, setProfilePicFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [isFetchingOrcid, setIsFetchingOrcid] = useState(false)
   const [departments, setDepartments] = useState<string[]>([])
   const departmentOptions = departments.map((dept) => ({ label: dept, value: dept }))
   const isPrincipal = useMemo(() => user?.designation === "Principal", [user])
@@ -469,32 +467,6 @@ export default function SettingsPage() {
       toast({ variant: "destructive", title: "Update Failed", description: "Could not update your profile picture." })
     } finally {
       setIsUploading(false)
-    }
-  }
-
-  const handleFetchOrcid = async () => {
-    const orcidId = profileForm.getValues("orcidId")
-    if (!orcidId) {
-      toast({
-        variant: "destructive",
-        title: "ORCID iD Missing",
-        description: "Please enter an ORCID iD to fetch data.",
-      })
-      return
-    }
-    setIsFetchingOrcid(true)
-    try {
-      const result = await fetchOrcidData(orcidId)
-      if (result.success && result.data) {
-        profileForm.setValue("name", result.data.name, { shouldValidate: true })
-        toast({ title: "Success", description: "Your name has been pre-filled from your ORCID profile." })
-      } else {
-        toast({ variant: "destructive", title: "Fetch Failed", description: result.error })
-      }
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." })
-    } finally {
-      setIsFetchingOrcid(false)
     }
   }
 
@@ -919,26 +891,10 @@ export default function SettingsPage() {
                     name="orcidId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>ORCID iD</FormLabel>
-                        <div className="flex items-center gap-2">
+                        <FormLabel>ORCID iD (Optional)</FormLabel>
                           <FormControl>
                             <Input placeholder="e.g., 0000-0001-2345-6789" {...field} />
                           </FormControl>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={handleFetchOrcid}
-                            disabled={isFetchingOrcid}
-                            title="Fetch data from ORCID"
-                          >
-                            {isFetchingOrcid ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Bot className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
