@@ -61,6 +61,10 @@ export type ResearchPaper = {
   authorUids: string[] // For efficient querying by UID
   authorEmails: string[] // For efficient querying by email before sign-up
   domain?: string
+  journalName?: string
+  journalWebsite?: string
+  qRating?: string
+  impactFactor?: number
   createdAt: string // ISO String
   updatedAt: string // ISO String
 }

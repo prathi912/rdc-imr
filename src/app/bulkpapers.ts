@@ -13,6 +13,9 @@ type PaperUploadData = {
     PublicationYear?: number;
     PublicationMonthName?: string;
     ImpactFactor?: number;
+    JournalName?: string;
+    JournalWebsite?: string;
+    QRating?: string;
 };
 
 async function findExistingPaper(title: string, url: string): Promise<ResearchPaper | null> {
@@ -86,6 +89,10 @@ async function createNewPaper(paperData: PaperUploadData, user: User): Promise<R
         authors: [mainAuthor],
         authorUids: [user.uid],
         authorEmails: [user.email.toLowerCase()],
+        journalName: paperData.JournalName,
+        journalWebsite: paperData.JournalWebsite,
+        qRating: paperData.QRating,
+        impactFactor: paperData.ImpactFactor,
         createdAt: now,
         updatedAt: now,
     };

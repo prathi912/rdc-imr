@@ -283,26 +283,28 @@ export async function linkPapersToNewUser(uid: string, email: string): Promise<{
 
 
 export async function addResearchPaper(
-  title: string,
-  url: string,
   mainAuthorUid: string,
-  authors: Author[]
+  paperDetails: Partial<ResearchPaper> & { title: string, url: string, authors: Author[] }
 ): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
     const paperRef = adminDb.collection('papers').doc();
     const now = new Date().toISOString();
     
     // Create an array of UIDs and emails for efficient querying
-    const authorUids = authors.map((a) => a.uid).filter(Boolean) as string[];
-    const authorEmails = authors.map((a) => a.email.toLowerCase());
+    const authorUids = paperDetails.authors.map((a) => a.uid).filter(Boolean) as string[];
+    const authorEmails = paperDetails.authors.map((a) => a.email.toLowerCase());
 
     const paperData: Omit<ResearchPaper, 'id'> = {
-      title,
-      url,
+      title: paperDetails.title,
+      url: paperDetails.url,
       mainAuthorUid,
-      authors,
+      authors: paperDetails.authors,
       authorUids,
       authorEmails,
+      journalName: paperDetails.journalName,
+      journalWebsite: paperDetails.journalWebsite,
+      qRating: paperDetails.qRating,
+      impactFactor: paperDetails.impactFactor,
       createdAt: now,
       updatedAt: now,
     };
@@ -315,7 +317,7 @@ export async function addResearchPaper(
           .where('authorUids', 'array-contains-any', authorUids)
           .get();
         const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
-        const allTitles = [...new Set([title, ...existingTitles])];
+        const allTitles = [...new Set([paperDetails.title, ...existingTitles])];
 
         if (allTitles.length > 0) {
           const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
@@ -335,12 +337,12 @@ export async function addResearchPaper(
       }
     } catch (aiError: any) {
       console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
-      await logActivity('WARNING', 'AI domain suggestion failed during paper creation', { paperTitle: title, error: aiError.message });
+      await logActivity('WARNING', 'AI domain suggestion failed during paper creation', { paperTitle: paperDetails.title, error: aiError.message });
     }
 
     // 2. Save paper
     await paperRef.set(paperData);
-    await logActivity('INFO', 'Research paper added', { paperId: paperRef.id, title, mainAuthorUid });
+    await logActivity('INFO', 'Research paper added', { paperId: paperRef.id, title: paperDetails.title, mainAuthorUid });
 
     // 3. Notify co-authors
     const mainAuthorDoc = await adminDb.collection('users').doc(mainAuthorUid).get();
@@ -348,12 +350,12 @@ export async function addResearchPaper(
     const mainAuthorMisId = mainAuthorDoc.exists ? mainAuthorDoc.data()?.misId : null;
 
     const notificationBatch = adminDb.batch();
-    authors.forEach((author) => {
+    paperDetails.authors.forEach((author) => {
       if (author.uid && author.uid !== mainAuthorUid) {
         const notificationRef = adminDb.collection('notifications').doc();
         notificationBatch.set(notificationRef, {
           uid: author.uid,
-          title: `${mainAuthorName} added you as a co-author on the paper: "${title}"`,
+          title: `${mainAuthorName} added you as a co-author on the paper: "${paperDetails.title}"`,
           createdAt: new Date().toISOString(),
           isRead: false,
           projectId: mainAuthorMisId ? `/profile/${mainAuthorMisId}` : `/dashboard/my-projects`,
@@ -366,7 +368,7 @@ export async function addResearchPaper(
 
   } catch (error: any) {
     console.error("Error adding research paper:", error);
-    await logActivity('ERROR', 'Failed to add research paper', { title, mainAuthorUid, error: error.message, stack: error.stack });
+    await logActivity('ERROR', 'Failed to add research paper', { title: paperDetails.title, mainAuthorUid, error: error.message, stack: error.stack });
     return { success: false, error: error.message || "Failed to add research paper." };
   }
 }
@@ -374,7 +376,7 @@ export async function addResearchPaper(
 export async function updateResearchPaper(
   paperId: string,
   userId: string, // This is the UID of the user performing the edit (main author)
-  data: { title: string; url: string; authors: Author[] }
+  data: Partial<ResearchPaper> & { title: string; url: string; authors: Author[] }
 ): Promise<{ success: boolean; paper?: ResearchPaper; error?: string }> {
   try {
     const paperRef = adminDb.collection('papers').doc(paperId);
@@ -401,6 +403,10 @@ export async function updateResearchPaper(
       authors: data.authors,
       authorUids: authorUids,
       authorEmails: authorEmails,
+      journalName: data.journalName,
+      journalWebsite: data.journalWebsite,
+      qRating: data.qRating,
+      impactFactor: data.impactFactor,
       updatedAt: new Date().toISOString(),
     };
 
@@ -1866,7 +1872,7 @@ export async function findUserByMisId(
         return { success: true, users: staffUsers };
     }
 
-    return { success: false, error: "No registered user found with this MIS ID. Please ask them to sign up first." };
+    return { success: false, error: "No user found with this MIS ID. Please check the MIS ID or ask them to sign up first." };
 
   } catch (error: any) {
     console.error("Error finding user by MIS ID:", error);
