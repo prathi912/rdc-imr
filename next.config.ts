@@ -30,6 +30,21 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    config.module.rules.push({
+      test: /\.docx$/,
+      use: [
+        {
+          loader: 'raw-loader',
+          options: {
+            esModule: false,
+          },
+        },
+      ],
+    });
+
+    return config;
+  },
 };
 
 export default nextConfig;

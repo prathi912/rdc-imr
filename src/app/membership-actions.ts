@@ -3,9 +3,10 @@
 
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
-import { getTemplateContent } from '@/lib/template-manager';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+// Direct import of the template file content.
+import templateContent from '@/templates/INCENTIVE_MEMBERSHIP.docx';
 
 export async function generateMembershipIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
@@ -25,12 +26,12 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
     
     const templateName = 'INCENTIVE_MEMBERSHIP.docx';
     
-    const content = getTemplateContent(templateName);
+    const content = templateContent;
     if (!content) {
         return { success: false, error: `Template file ${templateName} not found or couldn't be loaded.` };
     }
 
-    const zip = new PizZip(content);
+    const zip = new PizZip(content, { base64: true });
     const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
