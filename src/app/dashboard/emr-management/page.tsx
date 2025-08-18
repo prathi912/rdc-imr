@@ -212,12 +212,17 @@ export default function EmrManagementOverviewPage() {
             <div className="mt-8">
                 <Tabs defaultValue="calls">
                     <TabsList>
-                        <TabsTrigger value="calls">Manage Calls</TabsTrigger>
+                        <TabsTrigger value="calls">Registrations by Call</TabsTrigger>
                         <TabsTrigger value="logs">Submission Logs</TabsTrigger>
                     </TabsList>
                     <TabsContent value="calls" className="mt-4">
                         <Card>
-                            <CardContent className="pt-6">
+                             <CardHeader>
+                                <p className="text-sm text-muted-foreground">
+                                    Below is a list of all funding calls. Click the "Manage" button on a call to view registered applicants, schedule meetings, and manage evaluations for that specific opportunity.
+                                </p>
+                            </CardHeader>
+                            <CardContent>
                                 {loading ? (
                                     <div className="space-y-2">
                                         <Skeleton className="h-10 w-full" />
