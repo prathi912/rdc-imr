@@ -19,7 +19,8 @@ import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
-import { getTemplateContent } from "@/lib/template-manager"
+import officeNotingTemplate from '@/templates/IMR_RECOMMENDATION_TEMPLATE.docx';
+import excelClaimTemplate from '@/templates/format.xlsx';
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -1234,11 +1235,10 @@ export async function exportClaimToExcel(
       }
     }
 
-    const templateContent = getTemplateContent('format.xlsx');
-    if (!templateContent) {
+    if (!excelClaimTemplate) {
         return { success: false, error: 'Template file "format.xlsx" not found or could not be read.' };
     }
-    const workbook = XLSX.read(templateContent, { type: "binary", cellStyles: true, sheetStubs: true });
+    const workbook = XLSX.read(excelClaimTemplate, { type: "binary", cellStyles: true, sheetStubs: true });
 
     const sheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[sheetName]
@@ -2824,11 +2824,10 @@ export async function generateOfficeNotingForm(
       }
     }
 
-    const templateContent = getTemplateContent('IMR_RECOMMENDATION_TEMPLATE.docx');
-    if (!templateContent) {
+    if (!officeNotingTemplate) {
         return { success: false, error: 'Office Notings form template not found on the server.' };
     }
-    const zip = new PizZip(templateContent);
+    const zip = new PizZip(officeNotingTemplate, { base64: true });
 
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
