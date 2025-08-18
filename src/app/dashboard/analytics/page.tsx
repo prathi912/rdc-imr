@@ -28,6 +28,22 @@ const GOA_FACULTIES = [
     "Faculty of Physiotherapy (Goa)"
 ];
 
+// A helper component for the Pie chart legend
+const ChartLegendContent = (props: any) => {
+    const { payload } = props;
+    return (
+        <ul className="flex flex-wrap gap-x-4 gap-y-2 justify-center text-sm text-muted-foreground">
+            {payload.map((entry: any, index: number) => (
+                <li key={`item-${index}`} className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: entry.color }} />
+                    <span>{entry.value}</span>
+                </li>
+            ))}
+        </ul>
+    );
+};
+
+
 export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [emrProjects, setEmrProjects] = useState<EmrInterest[]>([]);
@@ -38,6 +54,7 @@ export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState<string>('last6months');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [submissionsByYearType, setSubmissionsByYearType] = useState<'submissions' | 'sanctions'>('submissions');
+  const [projectsByGroupType, setProjectsByGroupType] = useState<'imr' | 'emr'>('imr');
   const { toast } = useToast();
   
   const statusChartRef = useRef<HTMLDivElement>(null);
@@ -168,6 +185,13 @@ export default function AnalyticsPage() {
     }
     return projects;
   }, [projects, user, facultyFilter]);
+  
+  const filteredEmrProjects = useMemo(() => {
+    if (user?.role === 'CRO' && facultyFilter !== 'all') {
+      return emrProjects.filter(p => p.faculty === facultyFilter);
+    }
+    return emrProjects;
+  }, [emrProjects, user, facultyFilter]);
 
   useEffect(() => {
     if (filteredProjects.length > 0) {
@@ -243,18 +267,24 @@ export default function AnalyticsPage() {
   }, [user]);
 
 
-  const projectsByGroupData = useMemo(() => 
-    Object.entries(
-      filteredProjects.reduce((acc, project) => {
-        const key = project[aggregationKey as keyof Project] as string | undefined;
-        if (key) {
-          acc[key] = (acc[key] || 0) + 1;
-        }
-        return acc;
-      }, {} as Record<string, number>)
+  const projectsByGroupData = useMemo(() => {
+    const dataToAggregate = projectsByGroupType === 'imr' ? filteredProjects : filteredEmrProjects;
+    
+    const key = projectsByGroupType === 'imr' 
+        ? (aggregationKey as keyof Project)
+        : (aggregationKey === 'departmentName' ? 'department' : aggregationKey as keyof EmrInterest);
+
+    return Object.entries(
+        (dataToAggregate as any[]).reduce((acc, item) => {
+            const groupKey = item[key] as string | undefined;
+            if (groupKey) {
+                acc[groupKey] = (acc[groupKey] || 0) + 1;
+            }
+            return acc;
+        }, {} as Record<string, number>)
     ).map(([group, count]) => ({ group, projects: count }))
-    .sort((a, b) => b.projects - a.projects)
-  , [filteredProjects, aggregationKey]);
+    .sort((a, b) => b.projects - a.projects);
+  }, [filteredProjects, filteredEmrProjects, aggregationKey, projectsByGroupType]);
 
   const projectsByGroupConfig = {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },
@@ -497,13 +527,26 @@ export default function AnalyticsPage() {
       </div>
       <div className="mt-8 grid gap-6 md:grid-cols-1">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Projects by {aggregationLabel}</CardTitle>
-              <CardDescription>Total projects submitted by each {aggregationLabel.toLowerCase()}.</CardDescription>
-            </div>
-            <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group')}><Download className="h-4 w-4" /></Button>
-          </CardHeader>
+            <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <CardTitle>Projects by {aggregationLabel}</CardTitle>
+                        <CardDescription>Total projects submitted by each {aggregationLabel.toLowerCase()}.</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Select value={projectsByGroupType} onValueChange={(value) => setProjectsByGroupType(value as 'imr' | 'emr')}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="imr">IMR Submissions</SelectItem>
+                                <SelectItem value="emr">EMR Sanctions</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Button variant="outline" size="icon" onClick={() => handleExport(projectsByGroupChartRef, 'projects_by_group')}><Download className="h-4 w-4" /></Button>
+                    </div>
+                </div>
+            </CardHeader>
           <CardContent>
             <div ref={projectsByGroupChartRef} className="p-4 bg-card">
               <ChartContainer config={projectsByGroupConfig} className="h-[400px] w-full">
