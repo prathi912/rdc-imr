@@ -1,6 +1,5 @@
-import type {NextConfig} from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,
@@ -28,23 +27,17 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'pinxoxpbufq92wb4.public.blob.vercel-storage.com',
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
   webpack: (config, { isServer }) => {
     config.module.rules.push({
-      test: /\.docx$/,
-      use: [
-        {
-          loader: 'raw-loader',
-          options: {
-            esModule: false,
-          },
-        },
-      ],
-    });
-    
-    config.module.rules.push({
-      test: /\.xlsx$/,
+      test: /\.(docx|xlsx)$/,
       use: [
         {
           loader: 'raw-loader',
