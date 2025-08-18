@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState } from 'react';
@@ -474,6 +473,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                                 <p><strong>Date:</strong> {format(parseISO(interestDetails.meetingSlot.date), 'MMMM d, yyyy')}</p>
                                 <p><strong>Time:</strong> {interestDetails.meetingSlot.time}</p>
                                 <p><strong>Venue:</strong> {call.meetingDetails?.venue || 'TBD'}</p>
+                                {interestDetails.meetingSlot.pptDeadline && <p><strong>PPT Deadline:</strong> {format(parseISO(interestDetails.meetingSlot.pptDeadline), 'PPpp')}</p>}
                             </div>
                         </div>
                     ) : null}

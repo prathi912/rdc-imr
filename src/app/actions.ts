@@ -1212,82 +1212,6 @@ export async function fetchOrcidData(
   }
 }
 
-export async function exportClaimToExcel(
-  claimId: string,
-): Promise<{ success: boolean; fileData?: string; error?: string }> {
-  try {
-    const claimRef = adminDb.collection("incentiveClaims").doc(claimId)
-    const claimSnap = await claimRef.get()
-    if (!claimSnap.exists) {
-      return { success: false, error: "Claim not found." }
-    }
-    const claim = claimSnap.data() as IncentiveClaim
-
-    // Fetch user data for designation and department
-    let user: User | null = null
-    if (claim.uid) {
-      const userRef = adminDb.collection("users").doc(claim.uid)
-      const userSnap = await userRef.get()
-      if (userSnap.exists) {
-        user = userSnap.data() as User
-      }
-    }
-
-    const workbook = XLSX.read(templateContent, { type: "buffer", cellStyles: true, sheetStubs: true });
-
-    const sheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[sheetName]
-
-    const getClaimTitle = (claim: IncentiveClaim): string => {
-      return (
-        claim.paperTitle ||
-        claim.patentTitle ||
-        claim.conferencePaperTitle ||
-        claim.publicationTitle ||
-        claim.professionalBodyName ||
-        claim.apcPaperTitle ||
-        "N/A"
-      )
-    }
-
-    const claimTitle = getClaimTitle(claim)
-    const submissionDate = claim.submissionDate ? new Date(claim.submissionDate).toLocaleDateString() : "N/A"
-
-    const dataMap: { [key: string]: any } = {
-      B2: claim.userName,
-      B3: user?.designation || "N/A",
-      B4: user?.department || "N/A",
-      B5: claimTitle,
-      D11: submissionDate,
-    }
-
-    for (const cellAddress in dataMap) {
-      if (Object.prototype.hasOwnProperty.call(dataMap, cellAddress)) {
-        const value = dataMap[cellAddress]
-        if (value !== undefined && value !== null) {
-          if (worksheet[cellAddress]) {
-            // Cell exists (even if it was empty and just styled, thanks to sheetStubs).
-            // Update its value and set type to string.
-            worksheet[cellAddress].v = value
-            worksheet[cellAddress].t = "s"
-          } else {
-            // Fallback for cells that don't exist at all in the template.
-            XLSX.utils.sheet_add_aoa(worksheet, [[value]], { origin: cellAddress })
-          }
-        }
-      }
-    }
-
-    // Explicitly tell the writer to use cell styles from the workbook object
-    const outputBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "base64", cellStyles: true })
-
-    return { success: true, fileData: outputBuffer }
-  } catch (error: any) {
-    console.error("Error exporting claim to Excel:", error)
-    await logActivity('ERROR', 'Failed to export claim to Excel', { claimId, error: error.message, stack: error.stack });
-    return { success: false, error: error.message || "Failed to export data." }
-  }
-}
 export async function linkHistoricalData(
   userData: Partial<User> & { uid: string; email: string },
 ): Promise<{ success: boolean; count: number; error?: string }> {
@@ -2129,7 +2053,7 @@ export async function scheduleEmrMeeting(
     // Update meeting details on the call document itself
     batch.update(callRef, {
         status: 'Meeting Scheduled',
-        meetingDetails: { date, venue, pptDeadline, assignedEvaluators: evaluatorUids }
+        meetingDetails: { date, time, venue, pptDeadline, assignedEvaluators: evaluatorUids }
     });
 
     for (const userId of applicantUids) {

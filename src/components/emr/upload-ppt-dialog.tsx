@@ -111,7 +111,7 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
                     <DialogTitle>{isRevision ? 'Submit Revised Presentation' : 'Manage Your Presentation'}</DialogTitle>
                     <DialogDescription>{dialogDescription}</DialogDescription>
                 </DialogHeader>
-                 {isUploadDisabled && (
+                 {isUploadDisabled && !isRevision && (
                     <Alert variant="destructive">
                       <MessageSquareWarning className="h-4 w-4" />
                       <AlertTitle>Deadline Passed</AlertTitle>
@@ -129,11 +129,11 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
                           )}
                        </div>
                     )}
-                    <Input type="file" accept=".ppt, .pptx" onChange={handleFileChange} disabled={isUploadDisabled} />
+                    <Input type="file" accept=".ppt, .pptx" onChange={handleFileChange} disabled={isUploadDisabled && !isRevision} />
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleUpload} disabled={isUploading || !pptFile || isUploadDisabled}>
+                    <Button onClick={handleUpload} disabled={isUploading || !pptFile || (isUploadDisabled && !isRevision)}>
                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
                         {interest.pptUrl && !isRevision ? 'Replace' : 'Upload'}
                     </Button>
