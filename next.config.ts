@@ -1,3 +1,4 @@
+
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
@@ -29,21 +30,6 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-  },
-  webpack: (config, { isServer }) => {
-    config.module.rules.push({
-      test: /\.docx$/,
-      use: [
-        {
-          loader: 'raw-loader',
-          options: {
-            esModule: false,
-          },
-        },
-      ],
-    });
-
-    return config;
   },
 };
 

@@ -19,8 +19,8 @@ import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
-import officeNotingTemplate from '@/templates/IMR_RECOMMENDATION_TEMPLATE.docx';
-import excelClaimTemplate from '@/templates/format.xlsx';
+import { officeNotingTemplate } from '@/templates/IMR_RECOMMENDATION_TEMPLATE';
+import { excelClaimTemplate } from '@/templates/format';
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -1235,10 +1235,8 @@ export async function exportClaimToExcel(
       }
     }
 
-    if (!excelClaimTemplate) {
-        return { success: false, error: 'Template file "format.xlsx" not found or could not be read.' };
-    }
-    const workbook = XLSX.read(excelClaimTemplate, { type: "binary", cellStyles: true, sheetStubs: true });
+    const templateContent = Buffer.from(excelClaimTemplate, 'base64');
+    const workbook = XLSX.read(templateContent, { type: "buffer", cellStyles: true, sheetStubs: true });
 
     const sheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[sheetName]
@@ -2109,11 +2107,11 @@ export async function registerEmrInterest(callId: string, user: User, coPis: CoP
 
 export async function scheduleEmrMeeting(
   callId: string,
-  meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[] },
+  meetingDetails: { date: string; time: string; venue: string; pptDeadline: string; evaluatorUids: string[] },
   applicantUids: string[],
 ) {
   try {
-    const { date, time, venue, evaluatorUids } = meetingDetails;
+    const { date, time, venue, pptDeadline, evaluatorUids } = meetingDetails;
 
     if (!evaluatorUids || evaluatorUids.length === 0) {
       return { success: false, error: "An evaluation committee must be assigned." };
@@ -2134,7 +2132,7 @@ export async function scheduleEmrMeeting(
     // Update meeting details on the call document itself
     batch.update(callRef, {
         status: 'Meeting Scheduled',
-        meetingDetails: { date, venue, assignedEvaluators: evaluatorUids }
+        meetingDetails: { date, venue, pptDeadline, assignedEvaluators: evaluatorUids }
     });
 
     for (const userId of applicantUids) {
@@ -2150,7 +2148,7 @@ export async function scheduleEmrMeeting(
       const interest = interestDoc.data() as EmrInterest;
 
       batch.update(interestRef, {
-        meetingSlot: { date, time },
+        meetingSlot: { date, time, pptDeadline },
         status: 'Evaluation Pending',
       });
 
@@ -2172,7 +2170,9 @@ export async function scheduleEmrMeeting(
               <p><strong style="color: #ffffff;">Date:</strong> ${format(meetingTime, 'MMMM d, yyyy')}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
-              <p style="color: #cccccc;">Please prepare for your presentation.</p>
+              <p style="color: #e0e0e0;">
+                Please upload your presentation on the portal by <strong style="color:#ffffff;">${format(parseISO(pptDeadline), 'PPpp')}</strong>.
+              </p>
               ${EMAIL_STYLES.footer}
           </div>
       `;
@@ -2824,10 +2824,8 @@ export async function generateOfficeNotingForm(
       }
     }
 
-    if (!officeNotingTemplate) {
-        return { success: false, error: 'Office Notings form template not found on the server.' };
-    }
-    const zip = new PizZip(officeNotingTemplate, { base64: true });
+    const templateContent = Buffer.from(officeNotingTemplate, 'base64');
+    const zip = new PizZip(templateContent);
 
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 

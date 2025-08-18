@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Loader2, Upload, File, Trash2, MessageSquareWarning } from 'lucide-react';
 import { uploadEmrPpt, uploadRevisedEmrPpt, removeEmrPpt } from '@/app/actions';
-import { format, isAfter, parseISO, subDays, setHours, setMinutes, setSeconds, addDays } from 'date-fns';
+import { format, isAfter, parseISO } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface UploadPptDialogProps {
@@ -94,26 +94,15 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         }
     };
 
-    const hasMeeting = !!(call.meetingDetails?.date && interest.meetingSlot?.date);
-    let deadlineWithTime: Date | null = null;
-    let isDeadlinePast = false;
+    const deadlineWithTime = interest.meetingSlot?.pptDeadline ? parseISO(interest.meetingSlot.pptDeadline) : null;
+    let isDeadlinePast = deadlineWithTime ? isAfter(new Date(), deadlineWithTime) : false;
     let dialogDescription = 'Upload your presentation for the upcoming evaluation meeting.';
 
-    if (hasMeeting) {
-        const meetingDate = parseISO(interest.meetingSlot!.date);
-        if (isRevision) {
-            // Deadline is 3 days after meeting at 5:00 PM for revisions
-            deadlineWithTime = setSeconds(setMinutes(setHours(addDays(meetingDate, 3), 17), 0), 0);
-            dialogDescription = `The deadline to submit your revision is ${format(deadlineWithTime, 'PPpp')}.`;
-        } else {
-            // Deadline is 2 days before meeting at 5:00 PM for initial submission
-            deadlineWithTime = setSeconds(setMinutes(setHours(subDays(meetingDate, 2), 17), 0), 0);
-            dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPp')}.`;
-        }
-        isDeadlinePast = isAfter(new Date(), deadlineWithTime);
+    if (deadlineWithTime) {
+        dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPpp')}.`;
     }
     
-    const isUploadDisabled = hasMeeting && isDeadlinePast;
+    const isUploadDisabled = isDeadlinePast;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>

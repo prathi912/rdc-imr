@@ -1,5 +1,6 @@
 
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -169,6 +170,7 @@ export type Project = {
   projectDuration?: string
   phases?: { name: string; amount: number }[]
   sdgGoals?: string[]
+  campus?: string
 }
 
 export type Notification = {
@@ -359,6 +361,7 @@ export type FundingCall = {
     date: string // yyyy-MM-dd
     time?: string // HH:mm
     venue: string
+    pptDeadline?: string // ISO String for PPT deadline
     assignedEvaluators?: string[]
   }
   isAnnounced?: boolean
@@ -401,6 +404,7 @@ export type EmrInterest = {
   meetingSlot?: {
     date: string // yyyy-MM-dd
     time: string // HH:mm
+    pptDeadline: string; // ISO string
   }
   endorsementFormUrl?: string
   signedEndorsementUrl?: string

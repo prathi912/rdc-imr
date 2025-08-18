@@ -1,3 +1,4 @@
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
@@ -27,28 +28,7 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
-      {
-        protocol: 'https',
-        hostname: 'pinxoxpbufq92wb4.public.blob.vercel-storage.com',
-        port: '',
-        pathname: '/**',
-      }
     ],
-  },
-  webpack: (config, { isServer }) => {
-    config.module.rules.push({
-      test: /\.(docx|xlsx)$/,
-      use: [
-        {
-          loader: 'raw-loader',
-          options: {
-            esModule: false,
-          },
-        },
-      ],
-    });
-
-    return config;
   },
 };
 
