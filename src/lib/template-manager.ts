@@ -20,7 +20,6 @@ import Docxtemplater from 'docxtemplater';
 import { getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
 import officeNotingTemplate from '@/templates/IMR_RECOMMENDATION_TEMPLATE.docx';
 import excelClaimTemplate from '@/templates/format.xlsx';
-
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
 
