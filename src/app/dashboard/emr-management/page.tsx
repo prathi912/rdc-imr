@@ -1,4 +1,3 @@
-
 // src/app/dashboard/emr-management/page.tsx
 'use client';
 
@@ -168,6 +167,7 @@ function EmrLogsTab({ user }: { user: User | null }) {
 
 export default function EmrManagementOverviewPage() {
     const [calls, setCalls] = useState<FundingCall[]>([]);
+    const [interests, setInterests] = useState<EmrInterest[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
@@ -181,7 +181,9 @@ export default function EmrManagementOverviewPage() {
 
     useEffect(() => {
         const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
-        const unsubscribe = onSnapshot(callsQuery, 
+        const interestsQuery = query(collection(db, 'emrInterests'));
+
+        const unsubscribeCalls = onSnapshot(callsQuery, 
             (snapshot) => {
                 setCalls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)));
                 setLoading(false);
@@ -192,7 +194,20 @@ export default function EmrManagementOverviewPage() {
                 setLoading(false);
             }
         );
-        return () => unsubscribe();
+
+        const unsubscribeInterests = onSnapshot(interestsQuery,
+            (snapshot) => {
+                setInterests(snapshot.docs.map(doc => doc.data() as EmrInterest));
+            },
+            (error) => {
+                console.error("Error fetching interests:", error);
+            }
+        );
+
+        return () => {
+            unsubscribeCalls();
+            unsubscribeInterests();
+        };
     }, [toast]);
 
     const getStatusBadge = (call: FundingCall) => {
@@ -205,6 +220,13 @@ export default function EmrManagementOverviewPage() {
         }
         return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-200 dark:border-green-700">Open</Badge>;
     }
+
+    const interestCounts = useMemo(() => {
+        return interests.reduce((acc, interest) => {
+            acc[interest.callId] = (acc[interest.callId] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+    }, [interests]);
 
     return (
         <div className="container mx-auto py-10">
@@ -234,13 +256,15 @@ export default function EmrManagementOverviewPage() {
                                             <TableHeader><TableRow>
                                                 <TableHead>Call Title</TableHead>
                                                 <TableHead>Agency</TableHead>
+                                                <TableHead>Registrations</TableHead>
                                                 <TableHead>Status</TableHead>
                                                 <TableHead className="text-right">Actions</TableHead>
                                             </TableRow></TableHeader>
                                             <TableBody>{calls.map(call => (
                                                 <TableRow key={call.id}>
-                                                    <TableCell className="font-medium">{call.title}</TableCell>
+                                                    <TableCell className="font-medium whitespace-normal">{call.title}</TableCell>
                                                     <TableCell className="whitespace-nowrap">{call.agency}</TableCell>
+                                                    <TableCell>{interestCounts[call.id] || 0}</TableCell>
                                                     <TableCell>{getStatusBadge(call)}</TableCell>
                                                     <TableCell className="text-right">
                                                         <Button asChild variant="outline" size="sm">
