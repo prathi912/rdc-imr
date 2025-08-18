@@ -3,17 +3,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PageHeader } from '@/components/page-header';
-import { EmrManagementClient } from '@/components/emr/emr-management-client';
 import { db } from '@/lib/config';
-import { doc, getDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import type { FundingCall, EmrInterest, User } from '@/types';
+import { collection, query, where, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import type { FundingCall, User, EmrInterest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { PageHeader } from '@/components/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EmrManagementClient } from '@/components/emr/emr-management-client';
 
-export default function EmrCallDetailsPage() {
+export default function EmrManagementPage() {
     const params = useParams();
-    const callId = params.id as string;
+    const callId = params.callId as string;
     const router = useRouter();
     const { toast } = useToast();
 
@@ -26,34 +26,37 @@ export default function EmrCallDetailsPage() {
     const fetchData = useCallback(async () => {
         if (!callId) return;
         setLoading(true);
+
         try {
-            const callRef = doc(db, 'fundingCalls', callId);
-            const callSnap = await getDoc(callRef);
-            if (!callSnap.exists()) {
+            // Fetch all necessary data in parallel
+            const callDocRef = doc(db, 'fundingCalls', callId);
+            const interestsQuery = query(collection(db, 'emrInterests'), where('callId', '==', callId));
+            const usersQuery = query(collection(db, 'users'));
+
+            const [callDoc, interestsSnapshot, usersSnapshot] = await Promise.all([
+                getDoc(callDocRef),
+                getDocs(interestsQuery),
+                getDocs(usersQuery),
+            ]);
+
+            if (!callDoc.exists()) {
                 toast({ variant: 'destructive', title: 'Error', description: 'Funding call not found.' });
                 router.push('/dashboard/emr-management');
                 return;
             }
-            const callData = { id: callSnap.id, ...callSnap.data() } as FundingCall;
-            setCall(callData);
 
-            // Fetch interests
-            const interestsQuery = query(collection(db, 'emrInterests'), where('callId', '==', callId), orderBy('registeredAt', 'desc'));
-            const interestsSnapshot = await getDocs(interestsQuery);
+            setCall({ id: callDoc.id, ...callDoc.data() } as FundingCall);
             setInterests(interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest)));
-
-            // Fetch all users to map names, etc.
-            const usersQuery = query(collection(db, 'users'));
-            const usersSnapshot = await getDocs(usersQuery);
             setAllUsers(usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User)));
-        
+
         } catch (error) {
-            console.error("Error fetching call details:", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch call details.' });
+            console.error("Error fetching EMR management data:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch data for this call.' });
         } finally {
             setLoading(false);
         }
-    }, [callId, router, toast]);
+    }, [callId, toast, router]);
+
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -63,24 +66,22 @@ export default function EmrCallDetailsPage() {
         fetchData();
     }, [fetchData]);
 
-
     if (loading || !call || !currentUser) {
         return (
             <div className="container mx-auto py-10">
-                <PageHeader title="Loading Registrations..." description="Please wait..." backButtonHref="/dashboard/emr-management" backButtonText="Back to EMR Management"/>
+                <PageHeader title="Loading EMR Management..." description="Please wait while we fetch the details." />
                 <div className="mt-8">
                     <Skeleton className="h-96 w-full" />
                 </div>
             </div>
         );
     }
-    
 
     return (
         <div className="container mx-auto py-10">
             <PageHeader
-                title={call.title}
-                description={`Manage registrations and schedule meetings for this call. Agency: ${call.agency}`}
+                title={`Manage: ${call.title}`}
+                description={`Agency: ${call.agency}`}
                 backButtonHref="/dashboard/emr-management"
                 backButtonText="Back to All Calls"
             />
