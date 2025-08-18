@@ -3,9 +3,8 @@
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails } from '@/types';
-import { getResearchDomain, addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, findUserByMisId, updateEmrInterestDetails } from '@/app/bulkpapers';
-import { manageCoAuthorRequest } from '@/app/bulkpapers';
-import { uploadFileToServer } from '@/app/actions';
+import { getResearchDomain, uploadFileToServer, findUserByMisId, updateEmrInterestDetails } from '@/app/actions';
+import { addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, manageCoAuthorRequest } from '@/app/bulkpapers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -809,3 +808,5 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
         </div>
     );
 }
+
+    
