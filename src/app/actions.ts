@@ -19,8 +19,6 @@ import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
-import { officeNotingTemplate } from '@/templates/IMR_RECOMMENDATION_TEMPLATE';
-import { excelClaimTemplate } from '@/templates/format';
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -1235,7 +1233,6 @@ export async function exportClaimToExcel(
       }
     }
 
-    const templateContent = Buffer.from(excelClaimTemplate, 'base64');
     const workbook = XLSX.read(templateContent, { type: "buffer", cellStyles: true, sheetStubs: true });
 
     const sheetName = workbook.SheetNames[0]
@@ -2824,7 +2821,6 @@ export async function generateOfficeNotingForm(
       }
     }
 
-    const templateContent = Buffer.from(officeNotingTemplate, 'base64');
     const zip = new PizZip(templateContent);
 
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });

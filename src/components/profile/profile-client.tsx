@@ -398,7 +398,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                         </Popover>
                     </div>
                      <div>
-                        <Label>Proof of Sanction (PDF)</Label>
+                        <Label>Proof of Sanction (Below 5 MB)</Label>
                         {interest.proofUrl && <a href={interest.proofUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block mb-2">View current proof</a>}
                         <Input type="file" accept=".pdf" onChange={(e) => setProofFile(e.target.files?.[0] || null)} />
                     </div>
