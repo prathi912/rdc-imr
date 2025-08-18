@@ -8,10 +8,10 @@ import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContain
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import type { Project, User } from '@/types';
 import { db } from '@/lib/config';
-import { collection, query, where, getDocs, onSnapshot, or } from 'firebase/firestore';
-import { format, subMonths, startOfMonth, endOfMonth, parseISO, getYear } from 'date-fns';
+import { collection, query, where, getDocs, onSnapshot, or, orderBy, Timestamp } from 'firebase/firestore';
+import { format, subMonths, startOfMonth, endOfMonth, parseISO, getYear, subDays, startOfDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign, Download } from 'lucide-react';
+import { DollarSign, Download, Users } from 'lucide-react';
 import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ const GOA_FACULTIES = [
 
 export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [loginLogs, setLoginLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
@@ -45,6 +46,7 @@ export default function AnalyticsPage() {
   const submissionsYearChartRef = useRef<HTMLDivElement>(null);
   const projectsByGroupChartRef = useRef<HTMLDivElement>(null);
   const grantAmountChartRef = useRef<HTMLDivElement>(null);
+  const activeUsersChartRef = useRef<HTMLDivElement>(null);
 
   const handleExport = useCallback(async (ref: React.RefObject<HTMLDivElement>, fileName: string) => {
     if (!ref.current) {
@@ -87,7 +89,11 @@ export default function AnalyticsPage() {
     setLoading(true);
     
     const projectsCollection = collection(db, 'projects');
+    const logsCollection = collection(db, 'logs');
     let projectsQuery;
+    
+    const sevenDaysAgo = startOfDay(subDays(new Date(), 6));
+    const logsQuery = query(logsCollection, where('message', '==', 'User logged in'), where('timestamp', '>=', sevenDaysAgo.toISOString()));
 
     const isPrincipal = user.designation === 'Principal';
     const isCro = user.role === 'CRO';
@@ -112,19 +118,52 @@ export default function AnalyticsPage() {
         projectsQuery = query(projectsCollection);
     }
     
-    const unsubscribe = onSnapshot(projectsQuery, (snapshot) => {
+    const unsubscribeProjects = onSnapshot(projectsQuery, (snapshot) => {
         let projectList: Project[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-        
         setProjects(projectList);
         setLoading(false);
     }, (error) => {
         console.error("Error fetching project data:", error);
         setLoading(false);
     });
+    
+    const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
+        const logList = snapshot.docs.map(doc => doc.data());
+        setLoginLogs(logList);
+    }, (error) => {
+        console.error("Error fetching log data:", error);
+    });
 
-    return () => unsubscribe();
+    return () => {
+        unsubscribeProjects();
+        unsubscribeLogs();
+    }
 
   }, [user]);
+  
+  const dailyActiveUsersData = useMemo(() => {
+    const last7Days = Array.from({ length: 7 }, (_, i) => subDays(new Date(), i));
+    const data = last7Days.map(date => {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        const start = startOfDay(date).toISOString();
+        const end = endOfMonth(date).toISOString();
+        
+        const uniqueUsers = new Set(
+            loginLogs
+                .filter(log => log.timestamp >= start && log.timestamp < end)
+                .map(log => log.context.uid)
+        );
+        return {
+            date: format(date, 'MMM d'),
+            users: uniqueUsers.size,
+        };
+    }).reverse();
+    return data;
+  }, [loginLogs]);
+  
+  const dailyActiveUsersConfig = {
+    users: { label: 'Active Users', color: 'hsl(var(--primary))' },
+  } satisfies ChartConfig;
 
   // --- Filtered Projects based on CRO selection ---
   const filteredProjects = useMemo(() => {
@@ -378,19 +417,24 @@ export default function AnalyticsPage() {
         )}
       </PageHeader>
       <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Grant Funding</CardTitle>
-            <CardDescription>Total amount awarded to projects.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center gap-4">
-             <div className="p-3 rounded-full bg-primary/10 text-primary">
-                <DollarSign className="h-8 w-8" />
-             </div>
-             <div>
-                <p className="text-3xl font-bold">₹{totalGrantAmount.toLocaleString('en-IN')}</p>
-             </div>
-          </CardContent>
+        <Card>
+            <CardHeader>
+                <CardTitle>Daily Active Users</CardTitle>
+                <CardDescription>Unique user logins over the last 7 days.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ChartContainer config={dailyActiveUsersConfig} className="h-[250px] w-full">
+                    <BarChart data={dailyActiveUsersData} margin={{ top: 20 }}>
+                        <CartesianGrid vertical={false} />
+                        <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip content={<ChartTooltipContent />} />
+                        <Bar dataKey="users" fill="var(--color-users)" radius={4}>
+                            <LabelList position="top" offset={5} className="fill-foreground" fontSize={12} />
+                        </Bar>
+                    </BarChart>
+                </ChartContainer>
+            </CardContent>
         </Card>
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">

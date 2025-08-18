@@ -392,7 +392,15 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={sanctionDate} onSelect={setSanctionDate} initialFocus />
+                                <Calendar 
+                                    mode="single" 
+                                    captionLayout="dropdown-buttons"
+                                    fromYear={2010}
+                                    toYear={new Date().getFullYear()}
+                                    selected={sanctionDate} 
+                                    onSelect={setSanctionDate} 
+                                    initialFocus 
+                                />
                             </PopoverContent>
                         </Popover>
                     </div>
@@ -808,5 +816,3 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
         </div>
     );
 }
-
-    

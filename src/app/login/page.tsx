@@ -20,7 +20,7 @@ import {
   signOut,
   type User as FirebaseUser,
 } from "firebase/auth"
-import { doc, getDoc, setDoc } from "firebase/firestore"
+import { doc, getDoc, setDoc, collection, addDoc } from "firebase/firestore"
 import type { User } from "@/types"
 import { useState } from "react"
 import { getDefaultModulesForRole } from "@/lib/modules"
@@ -41,6 +41,19 @@ const loginSchema = z.object({
 })
 
 type LoginFormValues = z.infer<typeof loginSchema>
+
+async function logLogin(uid: string, email: string) {
+    try {
+        await addDoc(collection(db, 'logs'), {
+            timestamp: new Date().toISOString(),
+            level: 'INFO',
+            message: 'User logged in',
+            context: { uid, email }
+        });
+    } catch (error) {
+        console.error("Failed to log user login:", error);
+    }
+}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -126,6 +139,8 @@ export default function LoginPage() {
     }
 
     await setDoc(userDocRef, user, { merge: true })
+    
+    await logLogin(user.uid, user.email);
 
     try {
       const result = await linkHistoricalData(user)
