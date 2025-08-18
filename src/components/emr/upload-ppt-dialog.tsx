@@ -96,7 +96,7 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
 
     const deadlineWithTime = interest.meetingSlot?.pptDeadline ? parseISO(interest.meetingSlot.pptDeadline) : null;
     let isDeadlinePast = deadlineWithTime ? isAfter(new Date(), deadlineWithTime) : false;
-    let dialogDescription = 'Upload your presentation for the upcoming evaluation meeting.';
+    let dialogDescription = 'Upload your presentation (below 5MB) for the upcoming evaluation meeting.';
 
     if (deadlineWithTime) {
         dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPpp')}.`;
