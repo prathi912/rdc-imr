@@ -520,7 +520,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                 <ViewDescriptionDialog call={call} />
                                                 {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
                                                 {call.attachments && call.attachments.map((att, i) => (
-                                                    <Button key={i} variant="link" asChild className="p-0 h-auto text-xs"><a href={att.url} target="_blank" rel="noopener noreferrer"><Download className="h-3 w-3 mr-1"/>{att.name}</a></Button>
+                                                    <Button key={i} variant="link" asChild className="p-0 h-auto text-xs"><a href={att.url} target="_blank" rel="noopener noreferrer"><Download className="h-3 w-3 mr-1"/>Download</a></Button>
                                                 ))}
                                             </div>
                                             {isSuperAdmin && !call.isAnnounced && (
