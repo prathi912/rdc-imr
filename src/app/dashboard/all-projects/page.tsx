@@ -13,7 +13,7 @@ import type { Project, User, EmrInterest, FundingCall } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Calendar as CalendarIcon, Eye } from 'lucide-react';
+import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,12 +23,17 @@ import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import * as z from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { updateEmrFinalStatus } from '@/app/actions';
 
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
@@ -62,6 +67,95 @@ const EMR_EXPORT_COLUMNS = [
     { id: 'durationAmount', label: 'Duration & Amount' },
 ];
 
+const finalStatusSchema = z.object({
+    status: z.enum(['Sanctioned', 'Not Sanctioned'], { required_error: 'Please select a final status.' }),
+    finalProof: z.any().refine(files => files?.length > 0, "A proof document is required."),
+});
+
+function FinalStatusDialog({ interest, onActionComplete, isOpen, onOpenChange }: { interest: EmrInterest; onActionComplete: () => void; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const { toast } = useToast();
+    const form = useForm<z.infer<typeof finalStatusSchema>>({
+        resolver: zodResolver(finalStatusSchema),
+    });
+
+    const fileToDataUrl = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+            reader.readAsDataURL(file);
+        });
+    };
+
+    const handleSubmit = async (values: z.infer<typeof finalStatusSchema>) => {
+        setIsSubmitting(true);
+        try {
+            const proofFile = values.finalProof?.[0];
+            const dataUrl = await fileToDataUrl(proofFile);
+            
+            const result = await updateEmrFinalStatus(interest.id, values.status, dataUrl, proofFile.name);
+            if (result.success) {
+                toast({ title: 'Success', description: 'Final project status has been recorded.' });
+                onActionComplete();
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Upload Final Proof</DialogTitle>
+                    <DialogDescription>
+                        Update the final outcome for <strong>{interest.userName}</strong>'s application for "{interest.callTitle || 'N/A'}".
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="final-status-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
+                        <FormField
+                            name="status"
+                            control={form.control}
+                            render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                <FormLabel>Outcome</FormLabel>
+                                <FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Sanctioned" /></FormControl><FormLabel className="font-normal">Sanctioned</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Not Sanctioned" /></FormControl><FormLabel className="font-normal">Not Sanctioned</FormLabel></FormItem></RadioGroup></FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            name="finalProof"
+                            control={form.control}
+                            render={({ field: { onChange, value, ...rest }}) => (
+                                <FormItem>
+                                    <FormLabel>Proof Document (PDF)</FormLabel>
+                                    <FormControl><Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="final-status-form" disabled={isSubmitting}>
+                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : 'Submit Final Status'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 export default function AllProjectsPage() {
   const [allImrProjects, setAllImrProjects] = useState<Project[]>([]);
@@ -79,7 +173,67 @@ export default function AllProjectsPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(IMR_EXPORT_COLUMNS.map(c => c.id));
+  const [projectToUpdateProof, setProjectToUpdateProof] = useState<EmrInterest | null>(null);
   
+  const fetchAllData = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+
+    try {
+        const usersCol = collection(db, 'users');
+        const userSnapshot = await getDocs(usersCol);
+        const userList = userSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+        setUsers(userList);
+
+        const projectsCol = collection(db, 'projects');
+        const emrInterestsCol = collection(db, 'emrInterests');
+        const isSuperAdmin = user?.role === 'Super-admin';
+        const isAdmin = user?.role === 'admin';
+        const isCro = user?.role === 'CRO';
+        const isPrincipal = user?.designation === 'Principal';
+        const isHod = user?.designation === 'HOD';
+
+        let imrQuery;
+        let emrQuery;
+
+        if (isSuperAdmin || isAdmin) {
+            imrQuery = query(projectsCol, orderBy('submissionDate', 'desc'));
+            emrQuery = query(emrInterestsCol, where('status', 'in', ['Sanctioned', 'Process Complete']));
+        } else if (isCro && user.faculties && user.faculties.length > 0) {
+            imrQuery = query(projectsCol, where('faculty', 'in', user.faculties), orderBy('submissionDate', 'desc'));
+            emrQuery = query(emrInterestsCol, where('faculty', 'in', user.faculties), where('status', 'in', ['Sanctioned', 'Process Complete']));
+        } else if (isPrincipal && user.institute) {
+            imrQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
+            emrQuery = query(emrInterestsCol, where('faculty', '==', user.faculty), where('status', 'in', ['Sanctioned', 'Process Complete'])); // Assuming institute is tied to faculty
+        } else if (isHod && user.department && user.institute) {
+             imrQuery = query(
+                projectsCol, 
+                where('departmentName', '==', user.department), 
+                where('institute', '==', user.institute),
+                orderBy('submissionDate', 'desc')
+            );
+            emrQuery = query(emrInterestsCol, where('department', '==', user.department), where('status', 'in', ['Sanctioned', 'Process Complete']));
+        } else {
+            imrQuery = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
+            emrQuery = query(emrInterestsCol, where('userId', '==', user.uid), where('status', 'in', ['Sanctioned', 'Process Complete']));
+        }
+
+        const [imrSnapshot, emrSnapshot] = await Promise.all([
+            getDocs(imrQuery),
+            getDocs(emrQuery)
+        ]);
+
+        setAllImrProjects(imrSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project)));
+        setAllEmrProjects(emrSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as EmrInterest)));
+
+    } catch (error) {
+        console.error("Error fetching projects: ", error);
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data.' });
+    } finally {
+        setLoading(false);
+    }
+  }, [user, toast]);
+
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -98,69 +252,11 @@ export default function AllProjectsPage() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (!user) return;
-    setLoading(true);
-
-    const fetchAllData = async () => {
-        try {
-            const usersCol = collection(db, 'users');
-            const userSnapshot = await getDocs(usersCol);
-            const userList = userSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
-            setUsers(userList);
-
-            const projectsCol = collection(db, 'projects');
-            const emrInterestsCol = collection(db, 'emrInterests');
-            const isSuperAdmin = user?.role === 'Super-admin';
-            const isAdmin = user?.role === 'admin';
-            const isCro = user?.role === 'CRO';
-            const isPrincipal = user?.designation === 'Principal';
-            const isHod = user?.designation === 'HOD';
-
-            let imrQuery;
-            let emrQuery;
-
-            if (isSuperAdmin || isAdmin) {
-                imrQuery = query(projectsCol, orderBy('submissionDate', 'desc'));
-                emrQuery = query(emrInterestsCol, where('status', 'in', ['Sanctioned', 'Process Complete']));
-            } else if (isCro && user.faculties && user.faculties.length > 0) {
-                imrQuery = query(projectsCol, where('faculty', 'in', user.faculties), orderBy('submissionDate', 'desc'));
-                emrQuery = query(emrInterestsCol, where('faculty', 'in', user.faculties), where('status', 'in', ['Sanctioned', 'Process Complete']));
-            } else if (isPrincipal && user.institute) {
-                imrQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
-                emrQuery = query(emrInterestsCol, where('faculty', '==', user.faculty), where('status', 'in', ['Sanctioned', 'Process Complete'])); // Assuming institute is tied to faculty
-            } else if (isHod && user.department && user.institute) {
-                 imrQuery = query(
-                    projectsCol, 
-                    where('departmentName', '==', user.department), 
-                    where('institute', '==', user.institute),
-                    orderBy('submissionDate', 'desc')
-                );
-                emrQuery = query(emrInterestsCol, where('department', '==', user.department), where('status', 'in', ['Sanctioned', 'Process Complete']));
-            } else {
-                imrQuery = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
-                emrQuery = query(emrInterestsCol, where('userId', '==', user.uid), where('status', 'in', ['Sanctioned', 'Process Complete']));
-            }
-
-            const [imrSnapshot, emrSnapshot] = await Promise.all([
-                getDocs(imrQuery),
-                getDocs(emrQuery)
-            ]);
-
-            setAllImrProjects(imrSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Project)));
-            setAllEmrProjects(emrSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as EmrInterest)));
-
-        } catch (error) {
-            console.error("Error fetching projects: ", error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data.' });
-        } finally {
-            setLoading(false);
-        }
-    };
-
     fetchAllData();
-  }, [user, toast]);
+  }, [fetchAllData]);
   
   const hasAdminView = user?.role === 'Super-admin' || user?.role === 'admin' || user?.role === 'CRO' || user?.designation === 'Principal' || user?.designation === 'HOD';
+  const canUploadProof = user?.role === 'Super-admin' || user?.role === 'admin';
 
   const filteredImrProjects = useMemo(() => {
     return allImrProjects.filter(project => {
@@ -252,6 +348,7 @@ export default function AllProjectsPage() {
 
 
   return (
+    <>
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
         {hasAdminView && (
@@ -332,7 +429,7 @@ export default function AllProjectsPage() {
                          <Card>
                             <CardContent className="pt-6">
                                 <Table>
-                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                                     <TableBody>{filteredEmrProjects.map(p => {
                                         const pi = users.find(u => u.uid === p.userId);
                                         return (
@@ -363,6 +460,13 @@ export default function AllProjectsPage() {
                                             </TableCell>
                                             <TableCell>{p.agency || 'N/A'}</TableCell>
                                             <TableCell><Badge>{p.status}</Badge></TableCell>
+                                            <TableCell>
+                                                {canUploadProof && !p.finalProofUrl && (
+                                                    <Button variant="outline" size="sm" onClick={() => setProjectToUpdateProof(p)}>
+                                                        <Upload className="h-4 w-4 mr-2" /> Upload Proof
+                                                    </Button>
+                                                )}
+                                            </TableCell>
                                         </TableRow>
                                     )})}</TableBody>
                                 </Table>
@@ -377,5 +481,14 @@ export default function AllProjectsPage() {
             </div>
         )}
     </div>
+    {projectToUpdateProof && (
+        <FinalStatusDialog
+            interest={projectToUpdateProof}
+            isOpen={!!projectToUpdateProof}
+            onOpenChange={() => setProjectToUpdateProof(null)}
+            onActionComplete={fetchAllData}
+        />
+    )}
+    </>
   );
 }

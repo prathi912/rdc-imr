@@ -6,13 +6,12 @@ import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell, Legend, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import type { Project, User } from '@/types';
+import type { Project, User, EmrInterest } from '@/types';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, onSnapshot, or, orderBy, Timestamp } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, getYear, subDays, startOfDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DollarSign, Download, Users } from 'lucide-react';
-import { createDebugInfo, logDebugInfo } from '@/lib/debug-utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -31,11 +30,11 @@ const GOA_FACULTIES = [
 
 export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [emrProjects, setEmrProjects] = useState<EmrInterest[]>([]);
   const [loginLogs, setLoginLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
-  const [grantGroupFilter, setGrantGroupFilter] = useState<string>('');
   const [timeRange, setTimeRange] = useState<string>('last6months');
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [submissionsByYearType, setSubmissionsByYearType] = useState<'submissions' | 'sanctions'>('submissions');
@@ -89,8 +88,9 @@ export default function AnalyticsPage() {
     setLoading(true);
     
     const projectsCollection = collection(db, 'projects');
+    const emrCollection = collection(db, 'emrInterests');
     const logsCollection = collection(db, 'logs');
-    let projectsQuery;
+    let projectsQuery, emrQuery;
     
     const sevenDaysAgo = startOfDay(subDays(new Date(), 6));
     const logsQuery = query(logsCollection, where('message', '==', 'User logged in'), where('timestamp', '>=', sevenDaysAgo.toISOString()));
@@ -103,39 +103,37 @@ export default function AnalyticsPage() {
 
     if (isCro && user.faculties && user.faculties.length > 0) {
         projectsQuery = query(projectsCollection, where('faculty', 'in', user.faculties));
+        emrQuery = query(emrCollection, where('faculty', 'in', user.faculties), where('status', 'in', ['Sanctioned', 'Process Complete']));
     } else if (isHod && user.department && user.institute) {
-        projectsQuery = query(
-            projectsCollection, 
-            where('departmentName', '==', user.department), 
-            where('institute', '==', user.institute)
-        );
+        projectsQuery = query(projectsCollection, where('departmentName', '==', user.department), where('institute', '==', user.institute));
+        emrQuery = query(emrCollection, where('department', '==', user.department), where('status', 'in', ['Sanctioned', 'Process Complete']));
     } else if (isSpecialPitUser) {
         projectsQuery = query(projectsCollection, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']));
-    }
-    else if (isPrincipal && user.institute) {
+        emrQuery = query(emrCollection, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']), where('status', 'in', ['Sanctioned', 'Process Complete']));
+    } else if (isPrincipal && user.institute) {
         projectsQuery = query(projectsCollection, where('institute', '==', user.institute));
+        emrQuery = query(emrCollection, where('faculty', '==', user.faculty), where('status', 'in', ['Sanctioned', 'Process Complete']));
     } else {
         projectsQuery = query(projectsCollection);
+        emrQuery = query(emrCollection, where('status', 'in', ['Sanctioned', 'Process Complete']));
     }
     
     const unsubscribeProjects = onSnapshot(projectsQuery, (snapshot) => {
-        let projectList: Project[] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-        setProjects(projectList);
+        setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
         setLoading(false);
-    }, (error) => {
-        console.error("Error fetching project data:", error);
-        setLoading(false);
-    });
+    }, (error) => { console.error("Error fetching project data:", error); setLoading(false); });
+
+    const unsubscribeEmr = onSnapshot(emrQuery, (snapshot) => {
+        setEmrProjects(snapshot.docs.map(doc => doc.data() as EmrInterest));
+    }, (error) => { console.error("Error fetching EMR data:", error); });
     
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
-        const logList = snapshot.docs.map(doc => doc.data());
-        setLoginLogs(logList);
-    }, (error) => {
-        console.error("Error fetching log data:", error);
-    });
+        setLoginLogs(snapshot.docs.map(doc => doc.data()));
+    }, (error) => { console.error("Error fetching log data:", error); });
 
     return () => {
         unsubscribeProjects();
+        unsubscribeEmr();
         unsubscribeLogs();
     }
 
@@ -144,7 +142,6 @@ export default function AnalyticsPage() {
   const dailyActiveUsersData = useMemo(() => {
     const last7Days = Array.from({ length: 7 }, (_, i) => subDays(new Date(), i));
     const data = last7Days.map(date => {
-        const dateStr = format(date, 'yyyy-MM-dd');
         const start = startOfDay(date).toISOString();
         const end = endOfMonth(date).toISOString();
         
@@ -165,7 +162,6 @@ export default function AnalyticsPage() {
     users: { label: 'Active Users', color: 'hsl(var(--primary))' },
   } satisfies ChartConfig;
 
-  // --- Filtered Projects based on CRO selection ---
   const filteredProjects = useMemo(() => {
     if (user?.role === 'CRO' && facultyFilter !== 'all') {
       return projects.filter(p => p.faculty === facultyFilter);
@@ -173,8 +169,6 @@ export default function AnalyticsPage() {
     return projects;
   }, [projects, user, facultyFilter]);
 
-  // --- Data Processing ---
-  
   useEffect(() => {
     if (filteredProjects.length > 0) {
       const years = new Set(
@@ -245,7 +239,6 @@ export default function AnalyticsPage() {
     if (user?.designation === 'Principal' || user?.designation === 'HOD' || user?.email === 'pit@paruluniversity.ac.in') {
         return { aggregationKey: 'departmentName', aggregationLabel: 'Department' };
     }
-    // Default for Admin/Super-admin
     return { aggregationKey: 'faculty', aggregationLabel: 'Faculty' };
   }, [user]);
 
@@ -289,80 +282,28 @@ export default function AnalyticsPage() {
   }, [statusDistributionData]);
 
   // --- Grant Chart Data & Config ---
-  const { grantAggregationKey, grantAggregationLabel, grantFilterOptions } = useMemo(() => {
-    let key: keyof Project = 'faculty';
-    let label = 'Faculty';
-    let options: string[] = [];
-  
-    if (user?.role === 'CRO') {
-      key = 'institute';
-      label = 'Institute';
-      options = [...new Set(filteredProjects.map(p => p.institute).filter(Boolean) as string[])].sort();
-    } else if (user?.designation === 'Principal' || user?.designation === 'HOD') {
-      key = 'departmentName';
-      label = 'Department';
-      options = [...new Set(filteredProjects.map(p => p.departmentName).filter(Boolean) as string[])].sort();
-    } else { // Admin/Super-admin
-      const facultySet = new Set<string>();
-      projects.forEach(p => {
-          const faculty = p.faculty || '';
-          if (faculty) {
-              const campus = p.campus === 'Goa' ? ' (Goa)' : '';
-              facultySet.add(`${faculty}${campus}`);
-          }
-      });
-      options = Array.from(facultySet).sort();
-    }
-  
-    return { grantAggregationKey: key, grantAggregationLabel: label, grantFilterOptions: options };
-  }, [user, filteredProjects, projects]);
-  
-  useEffect(() => {
-    if (!grantGroupFilter && grantFilterOptions.length > 0) {
-      setGrantGroupFilter(grantFilterOptions[0]);
-    } else if (grantFilterOptions.length > 0 && !grantFilterOptions.includes(grantGroupFilter)) {
-      setGrantGroupFilter(grantFilterOptions[0]);
-    }
-  }, [grantFilterOptions, grantGroupFilter]);
-
   const grantAmountData = useMemo(() => {
-    const projectsWithGrants = projects.filter(p => p.grant?.totalAmount);
-    
-    let projectsToProcess = projectsWithGrants;
+    const imrTotal = projects.reduce((acc, p) => acc + (p.grant?.totalAmount || 0), 0);
+    const emrTotal = emrProjects.reduce((acc, p) => {
+        if (p.durationAmount) {
+            const match = p.durationAmount.match(/Amount: ([\d,]+)/);
+            if (match && match[1]) {
+                return acc + parseInt(match[1].replace(/,/g, ''), 10);
+            }
+        }
+        return acc;
+    }, 0);
 
-    if (grantGroupFilter) {
-      const filterValue = grantGroupFilter.replace(' (Goa)', '');
-      const filterCampus = grantGroupFilter.includes('(Goa)') ? 'Goa' : undefined;
-
-      projectsToProcess = projectsWithGrants.filter(p => {
-          const keyMatch = p[grantAggregationKey] === filterValue;
-          const campusMatch = filterCampus ? p.campus === filterCampus : p.campus !== 'Goa';
-          return keyMatch && campusMatch;
-      });
-    }
-  
-    const yearlyData = projectsToProcess.reduce((acc, project) => {
-      const year = getYear(parseISO(project.submissionDate));
-      if (!acc[year]) {
-        acc[year] = { year: String(year), amount: 0 };
-      }
-      acc[year].amount += project.grant!.totalAmount;
-      return acc;
-    }, {} as Record<string, { year: string; amount: number }>);
-  
-    return Object.values(yearlyData).sort((a, b) => parseInt(a.year) - parseInt(b.year));
-  }, [projects, grantGroupFilter, grantAggregationKey]);
+    return [
+        { name: 'IMR Grants', value: imrTotal, fill: 'var(--color-imr)' },
+        { name: 'EMR Grants', value: emrTotal, fill: 'var(--color-emr)' },
+    ].filter(d => d.value > 0);
+  }, [projects, emrProjects]);
 
   const grantAmountConfig = {
-    amount: { label: grantGroupFilter, color: 'hsl(var(--primary))' },
+    imr: { label: 'IMR Grants', color: 'hsl(var(--primary))' },
+    emr: { label: 'EMR Grants', color: 'hsl(var(--accent))' },
   } satisfies ChartConfig;
-
-
-  const totalGrantAmount = useMemo(() => {
-    return filteredProjects.reduce((acc, project) => {
-        return acc + (project.grant?.totalAmount || 0);
-    }, 0);
-  }, [filteredProjects]);
 
   const isCro = user?.role === 'CRO';
 
@@ -403,7 +344,7 @@ export default function AnalyticsPage() {
     <div className="container mx-auto py-10">
       <PageHeader title={getPageTitle()} description={getPageDescription()}>
           {isCro && user.faculties && user.faculties.length > 1 && (
-            <Select value={facultyFilter} onValueChange={(value) => { setFacultyFilter(value); setGrantGroupFilter(''); }}>
+            <Select value={facultyFilter} onValueChange={(value) => { setFacultyFilter(value); }}>
                 <SelectTrigger className="w-full sm:w-[280px]">
                     <SelectValue placeholder="Filter by faculty" />
                 </SelectTrigger>
@@ -451,7 +392,7 @@ export default function AnalyticsPage() {
               <ChartContainer config={statusDistributionConfig} className="h-[250px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
-                          <ChartTooltip content={<ChartTooltipContent nameKey="value" />} />
+                          <ChartTooltip content={<ChartTooltipContent nameKey="value" formatter={(value) => value.toLocaleString()} />} />
                           <Pie data={statusDistributionData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`} isAnimationActive={false}>
                               {statusDistributionData.map((entry, index) => (
                               <Cell key={`cell-${index}`} fill={statusDistributionConfig[entry.name]?.color || '#8884d8'} />
@@ -464,7 +405,7 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+       <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
@@ -506,71 +447,49 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Projects by Year</CardTitle>
-              <CardDescription>Total projects submitted or sanctioned each year.</CardDescription>
+              <CardTitle>Grant Funding</CardTitle>
+              <CardDescription>Total amount awarded to projects.</CardDescription>
             </div>
-             <div className="flex items-center gap-2">
-                <Select value={submissionsByYearType} onValueChange={(v) => setSubmissionsByYearType(v as 'submissions' | 'sanctions')}>
-                    <SelectTrigger className="w-full sm:w-[150px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="submissions">Total Submissions</SelectItem>
-                        <SelectItem value="sanctions">Total Sanctions</SelectItem>
-                    </SelectContent>
-                </Select>
-                <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'projects_by_year')}><Download className="h-4 w-4" /></Button>
-             </div>
-          </CardHeader>
-          <CardContent>
-            <div ref={submissionsYearChartRef} className="p-4 bg-card">
-              <ChartContainer config={submissionsByYearType === 'submissions' ? submissionsConfig : sanctionsConfig} className="h-[300px] w-full">
-              <BarChart accessibilityLayer data={submissionsByYearData} isAnimationActive={false}>
-                <CartesianGrid vertical={false} />
-                <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
-                <YAxis allowDecimals={false}/>
-                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                <Bar dataKey="count" fill="var(--color-submissions)" radius={4} />
-              </BarChart>
-            </ChartContainer>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-       <div className="mt-8 grid gap-6 md:grid-cols-1">
-        <Card>
-          <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-2">
-            <div>
-              <CardTitle>Grant Amount Awarded Over Years</CardTitle>
-              <CardDescription>Total grant amount disbursed each year for the selected {grantAggregationLabel.toLowerCase()}.</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              {grantFilterOptions.length > 0 && (
-                <Select value={grantGroupFilter} onValueChange={setGrantGroupFilter}>
-                  <SelectTrigger className="w-full sm:w-[280px]">
-                    <SelectValue placeholder={`Filter by ${grantAggregationLabel.toLowerCase()}`} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {grantFilterOptions.map(option => (
-                      <SelectItem key={option} value={option}>{option}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_amount_by_year')}><Download className="h-4 w-4" /></Button>
-            </div>
+             <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_funding_split')}><Download className="h-4 w-4" /></Button>
           </CardHeader>
           <CardContent>
             <div ref={grantAmountChartRef} className="p-4 bg-card">
-              <ChartContainer config={grantAmountConfig} className="h-[400px] w-full">
-                <BarChart data={grantAmountData} isAnimationActive={false}>
-                    <CartesianGrid vertical={false} />
-                    <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickFormatter={(value) => `₹${Number(value / 100000).toLocaleString('en-IN')}L`} />
-                    <Tooltip content={<ChartTooltipContent formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} />} />
-                    <Bar dataKey="amount" fill="var(--color-amount)" radius={4} />
-                </BarChart>
+              <ChartContainer config={grantAmountConfig} className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <ChartTooltip
+                            cursor={false}
+                            content={<ChartTooltipContent 
+                                hideLabel 
+                                formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`}
+                            />}
+                        />
+                        <Pie
+                            data={grantAmountData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={100}
+                            labelLine={false}
+                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                                const RADIAN = Math.PI / 180;
+                                const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                return ( <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central"> {`${(percent * 100).toFixed(0)}%`} </text> );
+                            }}
+                        >
+                            {grantAmountData.map((entry) => (
+                                <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                            ))}
+                        </Pie>
+                        <Legend content={<ChartLegendContent nameKey="name" />} />
+                    </PieChart>
+                </ResponsiveContainer>
               </ChartContainer>
             </div>
           </CardContent>
