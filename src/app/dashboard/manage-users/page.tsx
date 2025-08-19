@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, ArrowUpDown, ChevronDown } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ChevronDown, ShieldCheck, Loader2 } from "lucide-react";
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -28,6 +28,8 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
+  DialogClose
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -44,9 +46,11 @@ import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firesto
 import type { User, IncentiveClaim } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDefaultModulesForRole } from '@/lib/modules';
+import { getDefaultModulesForRole, ALL_MODULES } from '@/lib/modules';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const ROLES: User['role'][] = ['faculty', 'admin', 'CRO'];
 const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin';
@@ -62,6 +66,72 @@ const faculties = [
     "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
     "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
 ];
+
+function ModuleManagerDialog({ user, open, onOpenChange, onUpdate }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void, onUpdate: () => void }) {
+    const { toast } = useToast();
+    const [userModules, setUserModules] = useState<string[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        if (user) {
+            setUserModules(user.allowedModules || getDefaultModulesForRole(user.role, user.designation));
+        }
+    }, [user]);
+
+    if (!user) return null;
+
+    const handleModuleChange = (moduleId: string, checked: boolean) => {
+        setUserModules(prev => checked ? [...prev, moduleId] : prev.filter(id => id !== moduleId));
+    };
+
+    const handleSaveChanges = async () => {
+        setIsSaving(true);
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            await updateDoc(userDocRef, { allowedModules: userModules });
+            toast({ title: 'Permissions Updated', description: 'User modules have been saved successfully.' });
+            onUpdate();
+            onOpenChange(false);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'Could not update permissions.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+         <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Manage Modules for {user.name}</DialogTitle>
+                    <DialogDescription>Enable or disable access to specific portal features for this user.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        {ALL_MODULES.map((module) => (
+                            <div key={module.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`${user.uid}-${module.id}`}
+                                    checked={userModules.includes(module.id)}
+                                    onCheckedChange={(checked) => handleModuleChange(module.id, !!checked)}
+                                />
+                                <Label htmlFor={`${user.uid}-${module.id}`} className="text-sm font-normal">{module.label}</Label>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSaveChanges} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Changes
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 function ProfileDetailsDialog({ user, open, onOpenChange }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void }) {
     if (!user) return null;
@@ -139,6 +209,7 @@ export default function ManageUsersPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userToView, setUserToView] = useState<User | null>(null);
+  const [userToManageModules, setUserToManageModules] = useState<User | null>(null);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -294,7 +365,7 @@ export default function ManageUsersPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title="Manage Users" description="View and manage user roles and permissions." />
+      <PageHeader title="Manage Users & Permissions" description="View, manage user roles, and set module permissions." />
       
       <div className="flex flex-col sm:flex-row items-center py-4 gap-2 sm:gap-4">
           <Input
@@ -350,13 +421,14 @@ export default function ManageUsersPage() {
                    const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
                    const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
                    const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
+                   const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
 
                    return (
                     <TableRow key={user.uid}>
                       <TableCell className="font-medium">
                         <div>
                             {user.misId ? (
-                                <Link href={`/profile/${user.misId}`} className="hover:underline" target="_blank" rel="noopener noreferrer">
+                                <Link href={profileLink} className="hover:underline" target="_blank" rel="noopener noreferrer">
                                     {user.name}
                                 </Link>
                             ) : (
@@ -384,22 +456,27 @@ export default function ManageUsersPage() {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onSelect={() => setUserToView(user)}>View Details</DropdownMenuItem>
                             {isCurrentUserSuperAdmin && (
-                              <DropdownMenuSub>
-                                  <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
-                                  <DropdownMenuPortal>
-                                      <DropdownMenuSubContent>
-                                          {availableRoles.map(role => (
-                                            <DropdownMenuItem 
-                                                key={role} 
-                                                onClick={() => handleRoleChange(user.uid, role)}
-                                                disabled={user.role === role}
-                                            >
-                                               {role.charAt(0).toUpperCase() + role.slice(1)}
-                                            </DropdownMenuItem>
-                                          ))}
-                                      </DropdownMenuSubContent>
-                                  </DropdownMenuPortal>
-                              </DropdownMenuSub>
+                              <>
+                                <DropdownMenuItem onSelect={() => setUserToManageModules(user)}>
+                                    <ShieldCheck className="mr-2 h-4 w-4" /> Manage Modules
+                                </DropdownMenuItem>
+                                <DropdownMenuSub>
+                                    <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
+                                    <DropdownMenuPortal>
+                                        <DropdownMenuSubContent>
+                                            {availableRoles.map(role => (
+                                                <DropdownMenuItem 
+                                                    key={role} 
+                                                    onClick={() => handleRoleChange(user.uid, role)}
+                                                    disabled={user.role === role}
+                                                >
+                                                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </DropdownMenuSubContent>
+                                    </DropdownMenuPortal>
+                                </DropdownMenuSub>
+                              </>
                             )}
                             {isCurrentUserSuperAdmin && user.role === 'CRO' && (
                                 <DropdownMenuSub>
@@ -442,6 +519,7 @@ export default function ManageUsersPage() {
         </Card>
       </div>
        <ProfileDetailsDialog user={userToView} open={!!userToView} onOpenChange={() => setUserToView(null)} />
+       <ModuleManagerDialog user={userToManageModules} open={!!userToManageModules} onOpenChange={() => setUserToManageModules(null)} onUpdate={fetchUsersAndClaims} />
        {userToDelete && (
           <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
               <AlertDialogContent>
