@@ -36,7 +36,7 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
-import type { User, IncentiveClaim, BookCoAuthor } from '@/types';
+import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl, uploadFileToServer, findUserByMisId } from '@/app/actions';
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Search } from 'lucide-react';
 import {
@@ -223,9 +223,8 @@ export function ResearchPaperForm() {
   const journalName = form.watch('journalName');
   
   const isSpecialFaculty = useMemo(() => 
-    user?.faculty ? user.faculty.includes("dummy") : false,
-    [user?.faculty]
-  );
+    user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false
+  , [user?.faculty]);
 
   const availableIndexTypes = useMemo(() =>
     isSpecialFaculty 
@@ -257,50 +256,110 @@ export function ResearchPaperForm() {
 
   const handleFetchScopusData = async () => {
     const link = form.getValues('relevantLink');
-    if (!link || !user) return;
+    if (!link) {
+        toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a link to fetch data from.' });
+        return;
+    }
+
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant. Please log in again.' });
+        return;
+    }
+
     setIsFetchingScopus(true);
-    toast({ title: 'Fetching Scopus Data...' });
+    toast({ title: 'Fetching Scopus Data', description: 'Please wait...' });
+
     try {
         const result = await fetchScopusDataByUrl(link, user.name);
         if (result.success && result.data) {
-            const { title, journalName } = result.data;
+            const { title, journalName, totalAuthors } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate: true });
             
-            toast({ title: 'Success', description: 'Form fields pre-filled.' });
-            if (result.claimantIsAuthor === false) { toast({ variant: 'destructive', title: 'Author Not Found', description: `Could not verify "${user.name}" in the author list.`, duration: 8000 }); }
-        } else { toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' }); }
-    } catch (error: any) { toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' }); } finally { setIsFetchingScopus(false); }
+            toast({ title: 'Success', description: 'Form fields have been pre-filled.' });
+
+            if (result.claimantIsAuthor === false) { // check for explicit false
+                toast({
+                    variant: 'destructive',
+                    title: 'Author Not Found',
+                    description: `Could not verify "${user.name}" in the author list. Please check the publication link and your profile name.`,
+                    duration: 8000,
+                });
+            }
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFetchingScopus(false);
+    }
   };
 
   const handleFetchWosData = async () => {
     const link = form.getValues('relevantLink');
-    if (!link || !user) return;
+    if (!link) {
+      toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a link to fetch data from.' });
+      return;
+    }
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant. Please log in again.' });
+        return;
+    }
+
     setIsFetchingWos(true);
-    toast({ title: 'Fetching WoS Data...' });
+    toast({ title: 'Fetching WoS Data', description: 'Please wait...' });
+
     try {
         const result = await fetchWosDataByUrl(link, user.name);
         if (result.success && result.data) {
-            const { title, journalName } = result.data;
+            const { title, journalName, totalAuthors } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate:true });
             
-            toast({ title: 'Success', description: 'Form fields pre-filled from Web of Science.' });
-            if (result.claimantIsAuthor === false) { toast({ variant: 'destructive', title: 'Author Not Found', description: `Could not verify "${user.name}" in the author list.`, duration: 8000 }); }
-        } else { toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' }); }
-    } catch (error: any) { toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' }); } finally { setIsFetchingWos(false); }
+            toast({ title: 'Success', description: 'Form fields have been pre-filled from Web of Science.' });
+
+            if (result.claimantIsAuthor === false) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Author Not Found',
+                    description: `Could not verify "${user.name}" in the author list. Please check the publication link and your profile name.`,
+                    duration: 8000,
+                });
+            }
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFetchingWos(false);
+    }
   };
 
   const handleFindWebsite = async () => {
     const name = form.getValues('journalName');
-    if (!name) return;
+    if (!name) {
+        toast({ variant: 'destructive', title: 'No Journal Name', description: 'Please enter a journal name to find its website.' });
+        return;
+    }
+
     setIsFindingWebsite(true);
-    toast({ title: 'Finding Website...' });
+    toast({ title: 'Finding Website', description: 'AI is searching for the journal website...' });
+
     try {
         const result = await getJournalWebsite({ journalName: name });
-        if (result.success && result.url) { form.setValue('journalWebsite', result.url, { shouldValidate: true }); toast({ title: 'Success', description: 'Journal website link has been filled.' }); }
-        else { toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to find website.' }); }
-    } catch (error: any) { toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' }); } finally { setIsFindingWebsite(false); }
+        if (result.success && result.url) {
+            form.setValue('journalWebsite', result.url, { shouldValidate: true });
+            toast({ title: 'Success', description: 'Journal website link has been filled.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to find website.' });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFindingWebsite(false);
+    }
   };
   
     const handleSearchCoPi = async () => {
@@ -309,8 +368,9 @@ export function ResearchPaperForm() {
         setFoundCoPi(null);
         try {
             const result = await findUserByMisId(coPiSearchTerm);
-            if (result.success && result.user) {
-                setFoundCoPi({ ...result.user });
+            if (result.success && result.users && result.users.length > 0) {
+                const user = result.users[0];
+                setFoundCoPi({ ...user });
             } else {
                 toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
             }
