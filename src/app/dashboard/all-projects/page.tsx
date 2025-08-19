@@ -544,7 +544,7 @@ export default function AllProjectsPage() {
                          <Card>
                             <CardContent className="pt-6">
                                 <Table>
-                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                                     <TableBody>{filteredEmrProjects.map(p => {
                                         const pi = users.find(u => u.uid === p.userId);
                                         const proofLink = p.finalProofUrl || p.proofUrl;
@@ -583,7 +583,7 @@ export default function AllProjectsPage() {
                                                 </div>
                                             </TableCell>
                                             <TableCell>{p.agency || 'N/A'}</TableCell>
-                                            <TableCell><Badge>{p.status}</Badge></TableCell>
+                                            <TableCell>{p.durationAmount || 'N/A'}</TableCell>
                                             <TableCell className="flex items-center gap-2">
                                                 {canUploadProof && !proofLink && (
                                                     <Button variant="outline" size="sm" onClick={() => setProjectToUpdateProof(p)}>
