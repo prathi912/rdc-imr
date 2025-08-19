@@ -18,7 +18,6 @@ import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, set
 import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import { getDocs as adminGetDocs, collection as adminCollection, query as adminQuery, where as adminWhere } from "firebase-admin/firestore"
 
 // --- Centralized Logging Service ---
 type LogLevel = 'INFO' | 'WARNING' | 'ERROR';
@@ -46,8 +45,8 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
 export async function getEmrInterests(callId: string): Promise<EmrInterest[]> {
   try {
     const interestsRef = adminDb.collection('emrInterests');
-    const q = adminQuery(interestsRef, adminWhere('callId', '==', callId));
-    const snapshot = await adminGetDocs(q);
+    const q = interestsRef.where('callId', '==', callId);
+    const snapshot = await q.get();
     const interests: EmrInterest[] = [];
     snapshot.forEach(doc => {
       interests.push({ id: doc.id, ...(doc.data() as EmrInterest) });
@@ -645,9 +644,9 @@ export async function notifyAdminsOnProjectSubmission(projectId: string, project
   try {
     const adminRoles = ["admin", "Super-admin", "CRO"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
+    const q = usersRef.where("role", "in", adminRoles)
 
-    const adminUsersSnapshot = await adminGetDocs(q)
+    const adminUsersSnapshot = await q.get()
     if (adminUsersSnapshot.empty) {
       console.log("No admin users found to notify.")
       return { success: true, message: "No admins to notify." }
@@ -714,9 +713,9 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
   try {
     const adminRoles = ["admin", "Super-admin"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
+    const q = usersRef.where("role", "in", adminRoles)
 
-    const adminUsersSnapshot = await adminGetDocs(q)
+    const adminUsersSnapshot = await q.get()
     if (adminUsersSnapshot.empty) {
       console.log("No admin users found to notify for completion request.")
       return { success: true, message: "No admins to notify." }
@@ -752,8 +751,8 @@ export async function checkMisIdExists(misId: string, currentUid: string, campus
       return { exists: false };
     }
     const usersRef = adminDb.collection("users");
-    const q = adminQuery(usersRef, adminWhere("misId", "==", misId), adminWhere("campus", "==", campus));
-    const querySnapshot = await adminGetDocs(q);
+    const q = usersRef.where("misId", "==", misId).where("campus", "==", campus);
+    const querySnapshot = await q.get();
 
     if (querySnapshot.empty) {
       return { exists: false };
@@ -781,14 +780,12 @@ export async function checkHODUniqueness(department: string, institute: string, 
             return { exists: false }; // Cannot check if required fields are missing
         }
         const usersRef = adminDb.collection("users");
-        const q = adminQuery(
-            usersRef,
-            adminWhere("designation", "==", "HOD"),
-            adminWhere("department", "==", department),
-            adminWhere("institute", "==", institute)
-        );
+        const q = usersRef
+            .where("designation", "==", "HOD")
+            .where("department", "==", department)
+            .where("institute", "==", institute)
 
-        const querySnapshot = await adminGetDocs(q);
+        const querySnapshot = await q.get();
 
         if (querySnapshot.empty) {
             return { exists: false };
@@ -1223,13 +1220,11 @@ export async function linkHistoricalData(
     }
 
     const projectsRef = adminDb.collection("projects")
-    const q = adminQuery(
-        projectsRef,
-        adminWhere("pi_email", "==", email),
-        adminWhere("pi_uid", "in", ["", null])
-    );
+    const q = projectsRef
+        .where("pi_email", "==", email)
+        .where("pi_uid", "in", ["", null]);
 
-    const projectsSnapshot = await adminGetDocs(q)
+    const projectsSnapshot = await q.get()
 
     if (projectsSnapshot.empty) {
       return { success: true, count: 0 }
@@ -1279,9 +1274,9 @@ export async function linkEmrInterestsToNewUser(uid: string, email: string): Pro
 
     const lowercasedEmail = email.toLowerCase();
     const interestsRef = adminDb.collection("emrInterests");
-    const q = adminQuery(interestsRef, adminWhere("userEmail", "==", lowercasedEmail), adminWhere("userId", "in", ["", null]));
+    const q = interestsRef.where("userEmail", "==", lowercasedEmail).where("userId", "in", ["", null]);
 
-    const snapshot = await adminGetDocs(q);
+    const snapshot = await q.get();
 
     if (snapshot.empty) {
       return { success: true, count: 0 };
@@ -1312,8 +1307,8 @@ export async function linkEmrCoPiInterestsToNewUser(uid: string, email: string):
     const lowercasedEmail = email.toLowerCase();
     const interestsRef = adminDb.collection("emrInterests");
     
-    const q = adminQuery(interestsRef, adminWhere('coPiEmails', 'array-contains', lowercasedEmail));
-    const snapshot = await adminGetDocs(q);
+    const q = interestsRef.where('coPiEmails', 'array-contains', lowercasedEmail);
+    const snapshot = await q.get();
     
     if (snapshot.empty) {
       return { success: true, count: 0 };
@@ -1435,9 +1430,9 @@ export async function updateProjectWithRevision(
     // Notify admins
     const adminRoles = ["admin", "Super-admin", "CRO"]
     const usersRef = adminDb.collection("users")
-    const q = adminQuery(usersRef, adminWhere("role", "in", adminRoles))
+    const q = usersRef.where("role", "in", adminRoles)
 
-    const adminUsersSnapshot = await adminGetDocs(q)
+    const adminUsersSnapshot = await q.get()
     if (!adminUsersSnapshot.empty) {
       const batch = adminDb.batch()
       const notificationTitle = `Revision Submitted for "${project.title}" by ${project.pi}`
@@ -1530,9 +1525,9 @@ export async function findUserByMisId(
     const allFound = new Map<string, FoundUser>();
 
     // 1. Search existing users in Firestore
-    const usersRef = adminCollection(adminDb, "users");
-    const q = adminQuery(usersRef, adminWhere("misId", "==", misId));
-    const querySnapshot = await adminGetDocs(q);
+    const usersRef = adminDb.collection("users");
+    const q = usersRef.where("misId", "==", misId);
+    const querySnapshot = await q.get();
 
     querySnapshot.forEach(doc => {
       const userData = doc.data() as User;
@@ -1805,8 +1800,8 @@ export async function updatePhaseStatus(
     if (newStatus === 'Utilization Submitted') {
         const adminRoles = ['Super-admin', 'admin'];
         const usersRef = adminDb.collection('users');
-        const q = adminQuery(usersRef, adminWhere('role', 'in', adminRoles));
-        const adminUsersSnapshot = await adminGetDocs(q);
+        const q = usersRef.where('role', 'in', adminRoles);
+        const adminUsersSnapshot = await q.get();
 
         if (!adminUsersSnapshot.empty) {
             const batch = adminDb.batch();
@@ -1930,14 +1925,14 @@ export async function registerEmrInterest(callId: string, user: User, coPis: CoP
     }
     
     const interestsRef = adminDb.collection('emrInterests');
-    const q = adminQuery(interestsRef, adminWhere('callId', '==', callId), adminWhere('userId', '==', user.uid));
-    const docSnap = await adminGetDocs(q);
+    const q = interestsRef.where('callId', '==', callId).where('userId', '==', user.uid);
+    const docSnap = await q.get();
     if (!docSnap.empty) {
         return { success: false, error: "You have already registered your interest for this call." };
     }
     
-    const allInterestsForCallQuery = adminQuery(interestsRef, adminWhere('callId', '==', callId));
-    const allInterestsSnapshot = await adminGetDocs(allInterestsForCallQuery);
+    const allInterestsForCallQuery = interestsRef.where('callId', '==', callId);
+    const allInterestsSnapshot = await allInterestsForCallQuery.get();
     const isFirstInterest = allInterestsSnapshot.empty;
 
     const newInterest = await adminDb.runTransaction(async (transaction) => {
@@ -1979,8 +1974,8 @@ export async function registerEmrInterest(callId: string, user: User, coPis: CoP
     if (isFirstInterest) {
         const adminRoles = ["admin", "Super-admin"];
         const usersRef = adminDb.collection("users");
-        const adminQueryRef = adminQuery(usersRef, adminWhere("role", "in", adminRoles));
-        const adminUsersSnapshot = await adminGetDocs(adminQueryRef);
+        const adminQueryRef = usersRef.where("role", "in", adminRoles);
+        const adminUsersSnapshot = await adminQueryRef.get();
         
         if (!adminUsersSnapshot.empty) {
             const batch = adminDb.batch();
@@ -2079,8 +2074,8 @@ export async function scheduleEmrMeeting(
     for (const userId of applicantUids) {
       // Find the interest document for this user and call
       const interestsRef = adminDb.collection('emrInterests');
-      const q = adminQuery(interestsRef, adminWhere('callId', '==', callId), adminWhere('userId', '==', userId));
-      const interestSnapshot = await adminGetDocs(q);
+      const q = interestsRef.where('callId', '==', callId).where('userId', '==', userId);
+      const interestSnapshot = await q.get();
 
       if (interestSnapshot.empty) continue;
       
@@ -2844,13 +2839,11 @@ export async function generateOfficeNotingForm(
 export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid: string): Promise<{ success: boolean; projects?: Project[]; error?: string }> {
     try {
         const projectsRef = adminDb.collection('projects');
-        const q = adminQuery(
-            projectsRef,
-            adminWhere('pi_uid', '==', piUid),
-            adminWhere('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid)
-        );
+        const q = projectsRef
+            .where('pi_uid', '==', piUid)
+            .where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid);
 
-        const snapshot = await adminGetDocs(q);
+        const snapshot = await q.get();
         const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         
         const projectsForToday = projects.filter(p => p.meetingDetails?.date && isToday(parseISO(p.meetingDetails.date)));
