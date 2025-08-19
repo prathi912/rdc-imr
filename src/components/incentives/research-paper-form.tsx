@@ -284,7 +284,7 @@ export function ResearchPaperForm() {
     try {
         const result = await fetchScopusDataByUrl(link, user.name);
         if (result.success && result.data) {
-            const { title, journalName, totalAuthors } = result.data;
+            const { title, journalName } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate: true });
             
@@ -325,7 +325,7 @@ export function ResearchPaperForm() {
     try {
         const result = await fetchWosDataByUrl(link, user.name);
         if (result.success && result.data) {
-            const { title, journalName, totalAuthors } = result.data;
+            const { title, journalName } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate:true });
             
@@ -561,6 +561,7 @@ export function ResearchPaperForm() {
                             </div>
                         ))}
                     </div>
+                    
                     <div className="space-y-2 p-3 border rounded-md">
                         <FormLabel className="text-sm">Add PU Co-Author</FormLabel>
                         <div className="flex items-center gap-2">
