@@ -1,3 +1,4 @@
+
   'use client';
 
 import { useRouter } from 'next/navigation';
@@ -143,16 +144,17 @@ export default function ProfileSetupPage() {
       if (!misIdToFetch || !user?.email) return;
       setIsPrefilling(true);
       try {
-          const res = await fetch(`/api/get-staff-data?misId=${misIdToFetch}&email=${user.email}`);
+          const res = await fetch(`/api/get-staff-data?misId=${misIdToFetch}&userEmailForFileCheck=${user.email}`);
           const result = await res.json();
+          
           if (result.success && result.data.length > 0) {
-              if (result.data.length > 1) {
+              if (result.data.length > 1) { // This case is now less likely but kept for robustness
                   setFoundUsers(result.data);
                   setIsSelectionOpen(true);
               } else {
                   form.reset(result.data[0]);
                   setUserType(result.data[0].type);
-                  form.setValue("misId", misIdToFetch);
+                  form.setValue("misId", misIdToFetch); // Ensure the searched MIS ID is set
                   toast({ title: 'Profile Pre-filled', description: 'Your information has been pre-filled. Please review and save.' });
               }
           } else {
