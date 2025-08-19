@@ -51,6 +51,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         e_issn: claim.electronicIssn || 'N/A', 
         publish_month: claim.publicationMonth || 'N/A',
         publish_year: claim.publicationYear || 'N/A',
+        typeofpublication: claim.publicationType || 'N/A',
     };
     
     doc.setData(data);

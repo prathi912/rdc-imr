@@ -225,7 +225,7 @@ export function ResearchPaperForm() {
         if (result.success && result.data) {
             const { title, journalName, totalAuthors } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
-            form.setValue('journalName', journalName, { shouldValidate: true });
+            form.setValue('journalName', journalName, { shouldValidate:true });
             
             toast({ title: 'Success', description: 'Form fields pre-filled from Web of Science.' });
             if (result.claimantIsAuthor === false) { toast({ variant: 'destructive', title: 'Author Not Found', description: `Could not verify "${user.name}" in the author list.`, duration: 8000 }); }
