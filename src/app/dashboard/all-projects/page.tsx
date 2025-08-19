@@ -585,7 +585,7 @@ export default function AllProjectsPage() {
                                             <TableCell>{p.agency || 'N/A'}</TableCell>
                                             <TableCell><Badge>{p.status}</Badge></TableCell>
                                             <TableCell className="flex items-center gap-2">
-                                                {canUploadProof && !p.finalProofUrl && (
+                                                {canUploadProof && !proofLink && (
                                                     <Button variant="outline" size="sm" onClick={() => setProjectToUpdateProof(p)}>
                                                         <Upload className="h-4 w-4 mr-2" /> Upload Proof
                                                     </Button>
