@@ -17,7 +17,7 @@ import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2, Edit, Search 
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -143,12 +143,12 @@ function EditEmrProjectDialog({ interest, isOpen, onOpenChange, onActionComplete
                 if (!statusResult.success) {
                     throw new Error(statusResult.error);
                 }
-            } else if (values.status !== interest.status) {
+            } else if (values.status !== interest.status && interest.finalProofUrl) {
                 // If status is changed but no new file, it implies proof is already there or not needed.
                 // We should probably have a separate action just for status, but for now this is a simple path.
                 // For safety, let's just assume this means "update status".
                 // A better implementation would separate these concerns.
-                 const statusResult = await updateEmrFinalStatus(interest.id, values.status, interest.finalProofUrl || interest.proofUrl || '', 'existing_proof.pdf');
+                 const statusResult = await updateEmrFinalStatus(interest.id, values.status, interest.finalProofUrl, 'existing_proof.pdf');
                  if (!statusResult.success) throw new Error(statusResult.error);
             }
 
@@ -280,13 +280,13 @@ export default function AllProjectsPage() {
 
         if (isSuperAdmin || isAdmin) {
             imrQuery = query(projectsCol, orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('status', 'in', ['Sanctioned', 'Process Complete']));
+            emrQuery = query(emrInterestsCol, where('isBulkUploaded', '==', true));
         } else if (isCro && user.faculties && user.faculties.length > 0) {
             imrQuery = query(projectsCol, where('faculty', 'in', user.faculties), orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('faculty', 'in', user.faculties), where('status', 'in', ['Sanctioned', 'Process Complete']));
+            emrQuery = query(emrInterestsCol, where('faculty', 'in', user.faculties), where('isBulkUploaded', '==', true));
         } else if (isPrincipal && user.institute) {
             imrQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('faculty', '==', user.faculty), where('status', 'in', ['Sanctioned', 'Process Complete'])); // Assuming institute is tied to faculty
+            emrQuery = query(emrInterestsCol, where('faculty', '==', user.faculty), where('isBulkUploaded', '==', true)); // Assuming institute is tied to faculty
         } else if (isHod && user.department && user.institute) {
              imrQuery = query(
                 projectsCol, 
@@ -294,10 +294,10 @@ export default function AllProjectsPage() {
                 where('institute', '==', user.institute),
                 orderBy('submissionDate', 'desc')
             );
-            emrQuery = query(emrInterestsCol, where('department', '==', user.department), where('status', 'in', ['Sanctioned', 'Process Complete']));
+            emrQuery = query(emrInterestsCol, where('department', '==', user.department), where('isBulkUploaded', '==', true));
         } else {
             imrQuery = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('userId', '==', user.uid), where('status', 'in', ['Sanctioned', 'Process Complete']));
+            emrQuery = query(emrInterestsCol, where('userId', '==', user.uid), where('isBulkUploaded', '==', true));
         }
 
         const [imrSnapshot, emrSnapshot] = await Promise.all([
