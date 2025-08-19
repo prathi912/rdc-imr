@@ -1510,12 +1510,13 @@ export async function updateProjectEvaluators(
   }
 }
 
+type FoundUser = { uid: string; name: string; email: string; misId: string, campus: string };
+
 export async function findUserByMisId(
   misId: string,
 ): Promise<{ 
     success: boolean; 
-    user?: { uid: string; name: string; email: string; misId: string; } | null;
-    staff?: { name: string; email: string; misId: string; } | null;
+    users?: FoundUser[];
     error?: string 
 }> {
   try {
@@ -1523,37 +1524,53 @@ export async function findUserByMisId(
       return { success: false, error: "MIS ID is required." };
     }
     
+    const allFound = new Map<string, FoundUser>();
+
+    // 1. Search existing users in Firestore
     const usersRef = adminDb.collection("users");
     const q = adminQuery(usersRef, adminWhere("misId", "==", misId));
     const querySnapshot = await adminGetDocs(q);
 
-    if (!querySnapshot.empty) {
-        const userDoc = querySnapshot.docs[0];
-        const userData = userDoc.data();
-        if (userData.role !== 'admin' && userData.role !== 'Super-admin') {
-            return { success: true, user: {
-                uid: userDoc.id,
-                name: userData.name,
-                email: userData.email,
-                misId: userData.misId,
-            }};
+    querySnapshot.forEach(doc => {
+      const userData = doc.data() as User;
+      if (userData.role !== 'admin' && userData.role !== 'Super-admin') {
+        const userResult = {
+            uid: doc.id,
+            name: userData.name,
+            email: userData.email,
+            misId: userData.misId!,
+            campus: userData.campus || 'Vadodara',
+        };
+        allFound.set(userResult.email, userResult);
+      }
+    });
+
+    // 2. Search staff data files via API
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
+    const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}&fetchAll=true`);
+    const staffResult = await response.json();
+
+    if (staffResult.success && Array.isArray(staffResult.data)) {
+      staffResult.data.forEach((staff: any) => {
+        if (!allFound.has(staff.email)) {
+            allFound.set(staff.email, {
+                uid: '', // No UID for staff not yet registered
+                name: staff.name,
+                email: staff.email,
+                misId: staff.misId,
+                campus: staff.campus,
+            });
         }
+      });
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
-    const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}`);
-    const result = await response.json();
-
-    if (result.success && result.data && result.data.length > 0) {
-        const staffData = result.data[0]; // Assuming the first match is the desired one
-        return { success: true, staff: {
-            name: staffData.name,
-            email: staffData.email,
-            misId: staffData.misId,
-        }};
+    const foundUsers = Array.from(allFound.values());
+    
+    if (foundUsers.length > 0) {
+        return { success: true, users: foundUsers };
     }
     
-    return { success: false, error: "No user found with this MIS ID. Please check the MIS ID or ask them to sign up first." };
+    return { success: false, error: "No user found with this MIS ID across any campus. Please check the MIS ID or ask them to sign up first." };
 
   } catch (error: any) {
     console.error("Error finding user by MIS ID:", error);
@@ -2727,7 +2744,7 @@ export async function generateOfficeNotingForm(
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
     const projectSnap = await projectRef.get();
-    if (!projectSnap.exists) {
+    if (!projectSnap.exists()) {
       return { success: false, error: 'Project not found.' };
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;

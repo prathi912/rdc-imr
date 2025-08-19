@@ -25,6 +25,8 @@ import { Calendar } from '../ui/calendar';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import Link from 'next/link';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+
 
 function ProfileDetail({ label, value, icon: Icon }: { label: string; value?: string; icon: React.ElementType }) {
     if (!value) return null;
@@ -101,9 +103,17 @@ function AddEditPaperDialog({
         setFoundCoPi(null);
         try {
             const result = await findUserByMisId(coPiSearchTerm);
-            if (result.success && (result.user || result.staff)) {
-                const person = result.user || result.staff;
-                setFoundCoPi({ ...person!, uid: result.user?.uid || '', isRegistered: !!result.user });
+            if (result.success && result.users && result.users.length > 0) {
+                 if (result.users.length === 1) {
+                    const person = result.users[0];
+                    setFoundCoPi({ ...person!, uid: person.uid || '', isRegistered: !!person.uid });
+                 } else {
+                     // Multiple users found, handle selection (this part would need a dialog)
+                     console.log("Multiple users found:", result.users);
+                     // For now, just take the first one as a simplification
+                     const person = result.users[0];
+                     setFoundCoPi({ ...person!, uid: person.uid || '', isRegistered: !!person.uid });
+                 }
             } else {
                 toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
             }
@@ -303,28 +313,35 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
     const [proofFile, setProofFile] = useState<File | null>(null);
     const [coPis, setCoPis] = useState<CoPiDetails[]>(interest.coPiDetails || []);
     const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-    const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
+    const [foundCoPis, setFoundCoPis] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 
     const handleSearchCoPi = async () => {
         if (!coPiSearchTerm) return;
         setIsSearching(true);
         try {
             const result = await findUserByMisId(coPiSearchTerm);
-            if (result.success && (result.user || result.staff)) {
-                setFoundCoPi(result.user || { ...result.staff!, uid: undefined });
+            if (result.success && result.users && result.users.length > 0) {
+                if (result.users.length === 1) {
+                    handleAddCoPi(result.users[0]);
+                } else {
+                    setFoundCoPis(result.users);
+                    setIsSelectionOpen(true);
+                }
             } else {
                 toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
             }
         } finally { setIsSearching(false); }
     };
 
-    const handleAddCoPi = () => {
-        if (foundCoPi && !coPis.some(c => c.email === foundCoPi.email)) {
-            setCoPis([...coPis, foundCoPi]);
-            setCoPiSearchTerm('');
-            setFoundCoPi(null);
+    const handleAddCoPi = (selectedUser: any) => {
+        if (selectedUser && !coPis.some(c => c.email === selectedUser.email)) {
+            setCoPis([...coPis, selectedUser]);
         }
+        setCoPiSearchTerm('');
+        setFoundCoPis([]);
+        setIsSelectionOpen(false);
     };
 
     const handleRemoveCoPi = (email: string) => {
@@ -416,7 +433,6 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                             <Input placeholder="Search Co-PI by MIS ID" value={coPiSearchTerm} onChange={e => setCoPiSearchTerm(e.target.value)} />
                             <Button onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin"/> : "Search"}</Button>
                         </div>
-                        {foundCoPi && <div className="flex items-center justify-between p-2 border rounded-md mt-2"><p>{foundCoPi.name}</p><Button size="sm" onClick={handleAddCoPi}>Add</Button></div>}
                         <div className="space-y-2 mt-2">
                             {coPis.map(c => <div key={c.email} className="flex justify-between items-center p-2 bg-muted rounded-md text-sm"><span>{c.name}</span><Button variant="ghost" size="sm" onClick={() => handleRemoveCoPi(c.email)}>Remove</Button></div>)}
                         </div>
@@ -426,6 +442,26 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                     <Button onClick={handleSave} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save'}</Button>
                 </DialogFooter>
+                 <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Multiple Users Found</DialogTitle>
+                            <DialogDescription>Please select the correct user to add as a Co-PI.</DialogDescription>
+                        </DialogHeader>
+                        <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))} className="py-4 space-y-2">
+                            {foundCoPis.map((user, i) => (
+                                <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
+                                    <RadioGroupItem value={JSON.stringify(user)} id={`user-${i}`} />
+                                    <Label htmlFor={`user-${i}`} className="flex flex-col">
+                                        <span className="font-semibold">{user.name}</span>
+                                        <span className="text-muted-foreground text-xs">{user.email}</span>
+                                        <span className="text-muted-foreground text-xs">{user.campus}</span>
+                                    </Label>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                    </DialogContent>
+                </Dialog>
             </DialogContent>
         </Dialog>
     );
