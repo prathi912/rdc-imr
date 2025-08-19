@@ -235,8 +235,8 @@ export function ResearchPaperForm() {
   ];
 
   const isSpecialFaculty = useMemo(() => 
-    user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false
-  , [user?.faculty]);
+    user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false,
+  [user?.faculty]);
 
   const availableIndexTypes = useMemo(() =>
     isSpecialFaculty 
@@ -665,3 +665,5 @@ export function ResearchPaperForm() {
     </Card>
   );
 }
+
+  
