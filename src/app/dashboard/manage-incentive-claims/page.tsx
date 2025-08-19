@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { updateIncentiveClaimStatus } from '@/app/actions';
 import { generateBookIncentiveForm } from '@/app/incentive-actions';
 import { generateMembershipIncentiveForm } from '@/app/membership-actions';
+import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
 
 const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
@@ -313,6 +314,7 @@ export default function ManageIncentiveClaimsPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
   const [isPrintingBookForm, setIsPrintingBookForm] = useState<string | null>(null);
   const [isPrintingMembershipForm, setIsPrintingMembershipForm] = useState<string | null>(null);
+  const [isPrintingResearchPaperForm, setIsPrintingResearchPaperForm] = useState<string | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -523,6 +525,40 @@ export default function ManageIncentiveClaimsPage() {
             setIsPrintingMembershipForm(null);
         }
     };
+
+    const handlePrintResearchPaperForm = async (claim: IncentiveClaim) => {
+        if (!claim) return;
+        setIsPrintingResearchPaperForm(claim.id);
+        try {
+            const result = await generateResearchPaperIncentiveForm(claim.id);
+            if (result.success && result.fileData) {
+                const byteCharacters = atob(result.fileData);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Office_Noting_Research_Paper_Claim_${claim.userName.replace(/\s/g, '_')}.docx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
+            } else {
+                throw new Error(result.error || "Failed to generate form.");
+            }
+        } catch (error: any) {
+            console.error("Research Paper form generation error:", error);
+            toast({ variant: 'destructive', title: "Generation Failed", description: error.message });
+        } finally {
+            setIsPrintingResearchPaperForm(null);
+        }
+    };
   
   const renderTable = () => (
     <div className="overflow-x-auto">
@@ -563,7 +599,7 @@ export default function ManageIncentiveClaimsPage() {
                 </TableCell>
                 <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                        {(claim.claimType === 'Books' || claim.claimType === 'Book Chapter') && claim.status === 'Pending' && (
+                        {claim.claimType === 'Books' && claim.status === 'Pending' && (
                             <Button onClick={() => handlePrintBookForm(claim)} disabled={isPrintingBookForm === claim.id} size="sm" variant="outline">
                                 {isPrintingBookForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                                 Notings
@@ -572,6 +608,12 @@ export default function ManageIncentiveClaimsPage() {
                         {claim.claimType === 'Membership of Professional Bodies' && claim.status === 'Pending' && (
                           <Button onClick={() => handlePrintMembershipForm(claim)} disabled={isPrintingMembershipForm === claim.id} size="sm" variant="outline">
                             {isPrintingMembershipForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
+                            Notings
+                          </Button>
+                        )}
+                         {claim.claimType === 'Research Papers' && claim.status === 'Pending' && (
+                          <Button onClick={() => handlePrintResearchPaperForm(claim)} disabled={isPrintingResearchPaperForm === claim.id} size="sm" variant="outline">
+                            {isPrintingResearchPaperForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                             Notings
                           </Button>
                         )}
