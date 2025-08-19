@@ -222,6 +222,18 @@ export function ResearchPaperForm() {
   const relevantLink = form.watch('relevantLink');
   const journalName = form.watch('journalName');
   
+  const SPECIAL_POLICY_FACULTIES = [
+    "Faculty of Applied Sciences",
+    "Faculty of Medicine",
+    "Faculty of Homoeopathy",
+    "Faculty of Ayurveda",
+    "Faculty of Nursing",
+    "Faculty of Pharmacy",
+    "Faculty of Physiotherapy",
+    "Faculty of Public Health",
+    "Faculty of Engineering & Technology"
+  ];
+
   const isSpecialFaculty = useMemo(() => 
     user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false
   , [user?.faculty]);
