@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
@@ -36,9 +36,9 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
-import type { User, IncentiveClaim } from '@/types';
-import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl, uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle, Bot, ChevronDown } from 'lucide-react';
+import type { User, IncentiveClaim, BookCoAuthor } from '@/types';
+import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl, uploadFileToServer, findUserByMisId } from '@/app/actions';
+import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Search } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -47,6 +47,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Checkbox } from '../ui/checkbox';
+import { Label } from '../ui/label';
 
 const MAX_FILES = 10;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -59,7 +61,6 @@ const researchPaperSchema = z
     relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     journalClassification: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
     wosType: z.enum(['SCIE', 'SSCI', 'A&HCI']).optional(),
-    authorType: z.string({ required_error: 'Please select your author type.' }),
     journalName: z.string().min(3, "Journal name is required."),
     journalWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     paperTitle: z.string().min(5, "Paper title is required."),
@@ -75,13 +76,33 @@ const researchPaperSchema = z
       .refine((files) => files?.length <= MAX_FILES, `You can upload a maximum of ${MAX_FILES} files.`)
       .refine((files) => Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE), `Each file must be less than 5MB.`)
       .refine((files) => Array.from(files).every((file: any) => ACCEPTED_FILE_TYPES.includes(file.type)), "Only PDF files are allowed."),
+    isPuNameInPublication: z.boolean().refine(val => val === true, { message: "PU name must be present in the publication." }),
+    totalCorrespondingAuthors: z.coerce.number().min(1, 'Please specify the number of corresponding authors.'),
+    correspondingAuthorNames: z.string().min(2, 'Please specify the name(s) of corresponding authors.'),
+    bookCoAuthors: z.array(z.object({
+        name: z.string(),
+        email: z.string().email(),
+        uid: z.string().optional().nullable(),
+        role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
+        isExternal: z.boolean(),
+    })).min(1, 'At least one author from PU is required.'),
+    totalPuStudentAuthors: z.coerce.number().optional(),
+    puStudentNames: z.string().optional(),
   })
   .refine((data) => {
       if ((data.indexType === 'wos' || data.indexType === 'both')) {
         return !!data.wosType;
       }
       return true;
-  }, { message: 'For WoS or Both, you must select a WoS Type.', path: ['wosType'] });
+  }, { message: 'For WoS or Both, you must select a WoS Type.', path: ['wosType'] })
+   .refine(data => {
+      const firstAuthors = data.bookCoAuthors.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+      return firstAuthors.length <= 1;
+  }, { message: 'Only one author can be designated as the First Author.', path: ['bookCoAuthors'] })
+  .refine(data => {
+      const correspondingAuthors = data.bookCoAuthors.filter(author => author.role === 'Corresponding Author' || author.role === 'First & Corresponding Author');
+      return correspondingAuthors.length <= 1;
+  }, { message: 'Only one author can be designated as the Corresponding Author.', path: ['bookCoAuthors'] });
 
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>;
 
@@ -113,12 +134,7 @@ const sdgGoalsList = [
   "Goal 17: Partnerships for the Goals",
 ];
 
-const authorTypeOptions = [
-  'First Author',
-  'Co-Author',
-  'Corresponding Author',
-  'First & Corresponding Author',
-];
+const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 const publicationPhaseOptions = [ 'Published online first with DOI number', 'Published with vol and page number' ];
 const wosTypeOptions = [ { value: 'SCIE', label: 'SCIE' }, { value: 'SSCI', label: 'SSCI' }, { value: 'A&HCI', label: 'A&HCI' } ];
 const indexTypeOptions = [ { value: 'wos', label: 'WoS' }, { value: 'scopus', label: 'Scopus' }, { value: 'both', label: 'Both' }, { value: 'esci', label: 'ESCI' } ];
@@ -146,6 +162,9 @@ export function ResearchPaperForm() {
   const [isFindingWebsite, setIsFindingWebsite] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
+  const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
@@ -155,7 +174,6 @@ export function ResearchPaperForm() {
       relevantLink: '',
       journalClassification: undefined,
       wosType: undefined,
-      authorType: '',
       journalName: '',
       journalWebsite: '',
       paperTitle: '',
@@ -164,7 +182,14 @@ export function ResearchPaperForm() {
       printIssn: '',
       electronicIssn: '',
       sdgGoals: [],
+      bookCoAuthors: [],
+      isPuNameInPublication: false,
     },
+  });
+
+  const { fields, append, remove, update } = useFieldArray({
+    control: form.control,
+    name: "bookCoAuthors",
   });
   
   useEffect(() => {
@@ -174,8 +199,17 @@ export function ResearchPaperForm() {
       setUser(parsedUser);
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
+       if (fields.length === 0) {
+        append({ 
+            name: parsedUser.name, 
+            email: parsedUser.email,
+            uid: parsedUser.uid,
+            role: 'First Author',
+            isExternal: false,
+        });
+      }
     }
-  }, []);
+  }, [form, append, fields.length]);
 
   const indexType = form.watch('indexType');
   const relevantLink = form.watch('relevantLink');
@@ -222,7 +256,7 @@ export function ResearchPaperForm() {
     try {
         const result = await fetchScopusDataByUrl(link, user.name);
         if (result.success && result.data) {
-            const { title, journalName, totalAuthors } = result.data;
+            const { title, journalName } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate: true });
             
@@ -240,7 +274,7 @@ export function ResearchPaperForm() {
     try {
         const result = await fetchWosDataByUrl(link, user.name);
         if (result.success && result.data) {
-            const { title, journalName, totalAuthors } = result.data;
+            const { title, journalName } = result.data;
             form.setValue('paperTitle', title, { shouldValidate: true });
             form.setValue('journalName', journalName, { shouldValidate:true });
             
@@ -261,6 +295,43 @@ export function ResearchPaperForm() {
         else { toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to find website.' }); }
     } catch (error: any) { toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' }); } finally { setIsFindingWebsite(false); }
   };
+  
+    const handleSearchCoPi = async () => {
+        if (!coPiSearchTerm) return;
+        setIsSearching(true);
+        setFoundCoPi(null);
+        try {
+            const result = await findUserByMisId(coPiSearchTerm);
+            if (result.success && result.user) {
+                setFoundCoPi({ ...result.user });
+            } else {
+                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+        } finally {
+            setIsSearching(false);
+        }
+    };
+    
+    const handleAddCoPi = () => {
+        if (foundCoPi && !fields.some(field => field.email === foundCoPi.email)) {
+            if (user && foundCoPi.email === user.email) {
+                toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself again.' });
+                return;
+            }
+            append({
+                name: foundCoPi.name,
+                email: foundCoPi.email,
+                uid: foundCoPi.uid,
+                role: 'Co-Author',
+                isExternal: false,
+            });
+        }
+        setFoundCoPi(null);
+        setCoPiSearchTerm('');
+    };
+
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -299,7 +370,7 @@ export function ResearchPaperForm() {
       const publicationProofUrls = await uploadFilesAndGetUrls(data.publicationProof, 'publication-proof');
 
       const { publicationProof, ...restOfData } = data;
-
+      
       const claimData: Omit<IncentiveClaim, 'id'> = {
         ...restOfData,
         publicationProofUrls,
@@ -314,6 +385,7 @@ export function ResearchPaperForm() {
         status,
         submissionDate: new Date().toISOString(),
         bankDetails: user.bankDetails || null,
+        totalPuAuthors: data.bookCoAuthors.length, // Add total PU authors
       };
       
       await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
@@ -369,30 +441,66 @@ export function ResearchPaperForm() {
                   <FormField control={form.control} name="publicationMonth" render={({ field }) => ( <FormItem><FormLabel>Publication Month</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select month" /></SelectTrigger></FormControl><SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
                   <FormField control={form.control} name="publicationYear" render={({ field }) => ( <FormItem><FormLabel>Publication Year</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger></FormControl><SelectContent>{years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
                 </div>
-                <FormField
-                  control={form.control}
-                  name="authorType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Your Author Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="-- Please Select --" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField control={form.control} name="publicationPhase" render={({ field }) => ( <FormItem><FormLabel>Publication Phase</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                <Separator />
+
+                <div className="space-y-4">
+                    <FormLabel>Author(s) from PU</FormLabel>
+                    <div className="space-y-2">
+                        {fields.map((field, index) => (
+                            <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-3 rounded-md items-center">
+                                <FormItem className="md:col-span-2">
+                                    <FormLabel className="text-xs">Name</FormLabel>
+                                    <FormControl><Input value={field.name} readOnly /></FormControl>
+                                </FormItem>
+                                <FormField
+                                    control={form.control}
+                                    name={`bookCoAuthors.${index}.role`}
+                                    render={({ field: roleField }) => (
+                                        <FormItem>
+                                            <FormLabel className="text-xs">Role</FormLabel>
+                                            <Select onValueChange={roleField.onChange} value={roleField.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl>
+                                                <SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                {index > 0 && (
+                                    <Button type="button" variant="destructive" size="sm" className="md:col-start-4" onClick={() => remove(index)}>
+                                        <Trash2 className="h-4 w-4 mr-2" /> Remove
+                                    </Button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="space-y-2 p-3 border rounded-md">
+                        <FormLabel className="text-sm">Add PU Co-Author</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
+                            <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                        </div>
+                        {foundCoPi && (
+                            <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                                <div><p className="text-sm">{foundCoPi.name}</p></div>
+                                <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
+                            </div>
+                        )}
+                    </div>
+                    <FormMessage>{form.formState.errors.bookCoAuthors?.message || form.formState.errors.bookCoAuthors?.root?.message}</FormMessage>
+                </div>
+                <Separator/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="totalCorrespondingAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Corresponding Authors</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="correspondingAuthorNames" render={({ field }) => ( <FormItem><FormLabel>Name(s) of Corresponding Author(s)</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="totalPuStudentAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Student Authors from PU</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField control={form.control} name="puStudentNames" render={({ field }) => ( <FormItem><FormLabel>Name(s) of Student Author(s)</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />
+                </div>
                 
                 <Separator />
+                 <FormField control={form.control} name="isPuNameInPublication" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4"><div className="space-y-0.5"><FormLabel className="text-base">Is "Parul University" name present in the publication?</FormLabel></div><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormMessage /></FormItem> )} />
+
                 <FormField
                   control={form.control}
                   name="sdgGoals"
@@ -455,12 +563,12 @@ export function ResearchPaperForm() {
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
-              disabled={isSubmitting || orcidOrMisIdMissing}
+              disabled={isSubmitting || orcidOrMisIdMissing || bankDetailsMissing}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting || orcidOrMisIdMissing}>
+            <Button type="submit" disabled={isSubmitting || orcidOrMisIdMissing || bankDetailsMissing}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Submitting...' : 'Submit Claim'}
             </Button>

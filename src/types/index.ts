@@ -4,6 +4,7 @@
 
 
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -236,6 +237,12 @@ export type IncentiveClaim = {
   publicationYear?: string;
   sdgGoals?: string[];
   publicationProofUrls?: string[];
+  isPuNameInPublication?: boolean;
+  totalCorrespondingAuthors?: number;
+  correspondingAuthorNames?: string;
+  totalPuAuthors?: number;
+  totalPuStudentAuthors?: number;
+  puStudentNames?: string;
 
 
   // Patent Fields
@@ -302,7 +309,6 @@ export type IncentiveClaim = {
   publicationYear?: number
   authorRole?: "Author" | "Editor"
   totalPuStudents?: number
-  puStudentNames?: string
   publisherName?: string
   publisherCity?: string
   publisherCountry?: string
