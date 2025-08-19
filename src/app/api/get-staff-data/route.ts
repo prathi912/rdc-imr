@@ -79,21 +79,18 @@ export async function GET(request: NextRequest) {
   // --- Logic for Email-based search ---
   if (email) {
       const lowercasedEmail = email.toLowerCase();
-      let dataToSearch: StaffData[];
-      let campus: 'Vadodara' | 'Goa';
-
-      if (lowercasedEmail.endsWith('@goa.paruluniversity.ac.in')) {
-          dataToSearch = readStaffData(goastaffdataFilePath);
-          campus = 'Goa';
-      } else {
-          dataToSearch = readStaffData(staffdataFilePath);
-          campus = 'Vadodara';
+      
+      // Search both files regardless of domain
+      const goaData = readStaffData(goastaffdataFilePath);
+      const goaRecord = goaData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
+      if (goaRecord) {
+        allFoundUsers.push(formatUserRecord(goaRecord, 'Goa'));
       }
       
-      const userRecord = dataToSearch.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
-
-      if (userRecord) {
-        allFoundUsers.push(formatUserRecord(userRecord, campus));
+      const vadodaraData = readStaffData(staffdataFilePath);
+      const vadodaraRecord = vadodaraData.find(row => row.Email && row.Email.toLowerCase() === lowercasedEmail);
+      if (vadodaraRecord) {
+         allFoundUsers.push(formatUserRecord(vadodaraRecord, 'Vadodara'));
       }
   }
   // --- Logic for MIS ID-based search ---
