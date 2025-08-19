@@ -54,12 +54,16 @@ const researchPaperSchema = z
     relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     journalClassification: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
     wosType: z.enum(['SCIE', 'SSCI', 'A&HCI']).optional(),
-    impactFactor: z.coerce.number().optional(),
     authorType: z.string({ required_error: 'Please select your author type.' }),
     journalName: z.string().min(3, "Journal name is required."),
     journalWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     paperTitle: z.string().min(5, "Paper title is required."),
     publicationPhase: z.string().optional(),
+    locale: z.enum(['National', 'International'], { required_error: 'Locale is required.'}),
+    printIssn: z.string().optional(),
+    electronicIssn: z.string().optional(),
+    publicationMonth: z.string({ required_error: 'Publication month is required.' }),
+    publicationYear: z.string({ required_error: 'Publication year is required.' }),
   })
   .refine((data) => {
       if ((data.indexType === 'wos' || data.indexType === 'both')) {
@@ -75,6 +79,9 @@ const publicationPhaseOptions = [ 'Published online first with DOI number', 'Pub
 const wosTypeOptions = [ { value: 'SCIE', label: 'SCIE' }, { value: 'SSCI', label: 'SSCI' }, { value: 'A&HCI', label: 'A&HCI' } ];
 const indexTypeOptions = [ { value: 'wos', label: 'WoS' }, { value: 'scopus', label: 'Scopus' }, { value: 'both', label: 'Both' }, { value: 'esci', label: 'ESCI' } ];
 const journalClassificationOptions = [ { value: 'Q1', label: 'Q1' }, { value: 'Q2', label: 'Q2' }, { value: 'Q3', label: 'Q3' }, { value: 'Q4', label: 'Q4' } ];
+
+const months = [ "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" ];
+const years = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - i).toString());
 
 export function ResearchPaperForm() {
   const { toast } = useToast();
@@ -95,12 +102,14 @@ export function ResearchPaperForm() {
       relevantLink: '',
       journalClassification: undefined,
       wosType: undefined,
-      impactFactor: 0,
       authorType: '',
       journalName: '',
       journalWebsite: '',
       paperTitle: '',
       publicationPhase: '',
+      locale: undefined,
+      printIssn: '',
+      electronicIssn: '',
     },
   });
   
@@ -278,7 +287,15 @@ export function ResearchPaperForm() {
                 <FormField control={form.control} name="journalName" render={({ field }) => ( <FormItem><FormLabel>Name of Journal/Proceedings</FormLabel><div className="flex items-center gap-2"><FormControl><Textarea placeholder="Enter the full name of the journal or proceedings" {...field} disabled={isSubmitting} /></FormControl><Button type="button" variant="outline" size="icon" onClick={handleFindWebsite} disabled={isSubmitting || isFindingWebsite || !journalName} title="Find Journal Website with AI">{isFindingWebsite ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}<span className="sr-only">Find Website</span></Button></div><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="journalWebsite" render={({ field }) => ( <FormItem><FormLabel>Journal Website Link</FormLabel><FormControl><Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="paperTitle" render={({ field }) => ( <FormItem><FormLabel>Title of the Paper published</FormLabel><FormControl><Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting} /></FormControl><FormDescription className="text-destructive text-xs">* Note:-Please ensure that there should not be any special character (", ', !, @, #, $, &) in the Title of the Paper published.</FormDescription><FormMessage /></FormItem> )}/>
-                <FormField control={form.control} name="impactFactor" render={({ field }) => ( <FormItem><FormLabel>Impact factor</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} disabled={isSubmitting} /></FormControl><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="locale" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Locale</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="National" /></FormControl><FormLabel className="font-normal">National</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="International" /></FormControl><FormLabel className="font-normal">International</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="printIssn" render={({ field }) => ( <FormItem><FormLabel>Print ISSN</FormLabel><FormControl><Input placeholder="e.g., 1234-5678" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField control={form.control} name="electronicIssn" render={({ field }) => ( <FormItem><FormLabel>Electronic ISSN</FormLabel><FormControl><Input placeholder="e.g., 8765-4321" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="publicationMonth" render={({ field }) => ( <FormItem><FormLabel>Publication Month</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select month" /></SelectTrigger></FormControl><SelectContent>{months.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                  <FormField control={form.control} name="publicationYear" render={({ field }) => ( <FormItem><FormLabel>Publication Year</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger></FormControl><SelectContent>{years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                </div>
                 <FormField
                   control={form.control}
                   name="authorType"

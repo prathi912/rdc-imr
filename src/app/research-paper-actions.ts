@@ -37,22 +37,20 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         linebreaks: true,
     });
 
-    const submissionDate = new Date(claim.submissionDate);
-
     const data = {
         name: user.name,
         designation: `${user.designation}, ${user.department}`,
         journal_name: claim.journalName || 'N/A',
-        locale: 'International', // Assuming all are international for now, can be updated if field is added
+        locale: claim.locale || 'N/A',
         indexed: claim.indexType?.toUpperCase() || 'N/A',
         q_rating: claim.journalClassification || 'N/A',
         role: claim.authorType || 'N/A',
         total_authors: claim.totalAuthors || 'N/A',
-        print_issn: 'N/A', // Placeholder as this is not in the form
-        author_position: 'N/A', // Placeholder
-        e_issn: 'N/A', // Placeholder
-        publish_month: submissionDate.toLocaleString('default', { month: 'long' }),
-        publish_year: submissionDate.getFullYear(),
+        print_issn: claim.printIssn || 'N/A',
+        author_position: 'N/A', // This placeholder exists in the doc but not the form
+        e_issn: claim.electronicIssn || 'N/A', 
+        publish_month: claim.publicationMonth || 'N/A',
+        publish_year: claim.publicationYear || 'N/A',
     };
     
     doc.setData(data);

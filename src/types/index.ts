@@ -1,6 +1,7 @@
 
 
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -215,18 +216,23 @@ export type IncentiveClaim = {
   benefitMode: string
 
   // Research Paper Fields
-  publicationType?: string
-  indexType?: "wos" | "scopus" | "both" | "esci"
-  journalClassification?: "Q1" | "Q2" | "Q3" | "Q4"
-  wosType?: "SCIE" | "SSCI" | "A&HCI"
-  impactFactor?: number
-  journalName?: string
-  journalWebsite?: string
-  paperTitle?: string
-  publicationPhase?: string
-  relevantLink?: string
-  authorType?: string
-  totalAuthors?: string
+  publicationType?: string;
+  indexType?: "wos" | "scopus" | "both" | "esci";
+  journalClassification?: "Q1" | "Q2" | "Q3" | "Q4";
+  wosType?: "SCIE" | "SSCI" | "A&HCI";
+  journalName?: string;
+  journalWebsite?: string;
+  paperTitle?: string;
+  publicationPhase?: string;
+  relevantLink?: string;
+  authorType?: string;
+  totalAuthors?: string;
+  locale?: 'National' | 'International';
+  printIssn?: string;
+  electronicIssn?: string;
+  publicationMonth?: string;
+  publicationYear?: string;
+
 
   // Patent Fields
   patentTitle?: string
