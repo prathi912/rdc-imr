@@ -15,6 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
+import { Button } from "@/components/ui/button"
+import { FileText } from "lucide-react"
 
 function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls: FundingCall[] }) {
   if (interests.length === 0) {
@@ -38,27 +40,42 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
 
   return (
     <Card>
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Funding Call Title</TableHead>
-              <TableHead>Registered On</TableHead>
+              <TableHead>Details</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Proof</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {interests.map((interest) => (
-              <TableRow key={interest.id}>
-                <TableCell className="font-medium">{getCallTitle(interest)}</TableCell>
-                <TableCell>{format(new Date(interest.registeredAt), "PPP")}</TableCell>
-                <TableCell>
-                  <Badge variant={interest.status === "Recommended" || interest.status === 'Sanctioned' ? "default" : "secondary"}>
-                    {interest.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
+            {interests.map((interest) => {
+                const proofLink = interest.proofUrl || interest.finalProofUrl;
+                return (
+                  <TableRow key={interest.id}>
+                    <TableCell className="font-medium">{getCallTitle(interest)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{interest.durationAmount || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Badge variant={interest.status === "Recommended" || interest.status === 'Sanctioned' ? "default" : "secondary"}>
+                        {interest.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                        {proofLink ? (
+                            <Button asChild variant="outline" size="sm">
+                                <a href={proofLink} target="_blank" rel="noopener noreferrer">
+                                    <FileText className="h-4 w-4 mr-2"/> View Proof
+                                </a>
+                            </Button>
+                        ) : (
+                            <span className="text-sm text-muted-foreground">N/A</span>
+                        )}
+                    </TableCell>
+                  </TableRow>
+                )
+            })}
           </TableBody>
         </Table>
       </CardContent>
@@ -156,8 +173,7 @@ export default function MyProjectsPage() {
   const filteredEmrInterests = useMemo(() => {
     if (!searchTerm) return myEmrInterests;
     return myEmrInterests.filter(interest => {
-        const call = fundingCalls.find(c => c.id === interest.callId);
-        const title = interest.callTitle || call?.title || '';
+        const title = interest.callTitle || fundingCalls.find(c => c.id === interest.callId)?.title || '';
         return title.toLowerCase().includes(searchTerm.toLowerCase());
     });
   }, [myEmrInterests, fundingCalls, searchTerm]);
