@@ -64,7 +64,6 @@ const researchPaperSchema = z
     journalName: z.string().min(3, "Journal name is required."),
     journalWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     paperTitle: z.string().min(5, "Paper title is required."),
-    publicationPhase: z.string().optional(),
     locale: z.enum(['National', 'International'], { required_error: 'Locale is required.'}),
     printIssn: z.string().optional(),
     electronicIssn: z.string().optional(),
@@ -135,7 +134,6 @@ const sdgGoalsList = [
 ];
 
 const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
-const publicationPhaseOptions = [ 'Published online first with DOI number', 'Published with vol and page number' ];
 const wosTypeOptions = [ { value: 'SCIE', label: 'SCIE' }, { value: 'SSCI', label: 'SSCI' }, { value: 'A&HCI', label: 'A&HCI' } ];
 const indexTypeOptions = [ { value: 'wos', label: 'WoS' }, { value: 'scopus', label: 'Scopus' }, { value: 'both', label: 'Both' }, { value: 'esci', label: 'ESCI' } ];
 const journalClassificationOptions = [ { value: 'Q1', label: 'Q1' }, { value: 'Q2', label: 'Q2' }, { value: 'Q3', label: 'Q3' }, { value: 'Q4', label: 'Q4' } ];
@@ -177,7 +175,6 @@ export function ResearchPaperForm() {
       journalName: '',
       journalWebsite: '',
       paperTitle: '',
-      publicationPhase: '',
       locale: undefined,
       printIssn: '',
       electronicIssn: '',

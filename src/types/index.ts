@@ -5,6 +5,7 @@
 
 
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -226,7 +227,6 @@ export type IncentiveClaim = {
   journalName?: string;
   journalWebsite?: string;
   paperTitle?: string;
-  publicationPhase?: string;
   relevantLink?: string;
   authorType?: string;
   totalAuthors?: string;
