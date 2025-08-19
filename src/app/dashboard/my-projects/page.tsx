@@ -28,7 +28,12 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
   }
 
   const getCallTitle = (interest: EmrInterest) => {
-    return interest.callTitle || calls.find((c) => c.id === interest.callId)?.title || "Unknown Funding Call"
+    // For historical/bulk-uploaded projects, the title is stored directly in the interest record.
+    if (interest.isBulkUploaded && interest.callTitle) {
+      return interest.callTitle;
+    }
+    // For regular projects, find the title from the associated funding call.
+    return calls.find((c) => c.id === interest.callId)?.title || "Unknown Funding Call"
   }
 
   return (
@@ -48,7 +53,7 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
                 <TableCell className="font-medium">{getCallTitle(interest)}</TableCell>
                 <TableCell>{format(new Date(interest.registeredAt), "PPP")}</TableCell>
                 <TableCell>
-                  <Badge variant={interest.status === "Recommended" ? "default" : "secondary"}>
+                  <Badge variant={interest.status === "Recommended" || interest.status === 'Sanctioned' ? "default" : "secondary"}>
                     {interest.status}
                   </Badge>
                 </TableCell>
@@ -93,7 +98,7 @@ export default function MyProjectsPage() {
           or(
             where("pi_uid", "==", user.uid), 
             where("coPiUids", "array-contains", user.uid),
-            where("pi_email", "==", user.email) // Added for historical data
+            where("pi_email", "==", user.email)
           )
         );
 
@@ -147,6 +152,15 @@ export default function MyProjectsPage() {
     if (!searchTerm) return myProjects
     return myProjects.filter((p) => p.title.toLowerCase().includes(searchTerm.toLowerCase()))
   }, [myProjects, searchTerm])
+  
+  const filteredEmrInterests = useMemo(() => {
+    if (!searchTerm) return myEmrInterests;
+    return myEmrInterests.filter(interest => {
+        const call = fundingCalls.find(c => c.id === interest.callId);
+        const title = interest.callTitle || call?.title || '';
+        return title.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [myEmrInterests, fundingCalls, searchTerm]);
 
   if (loading || !user) {
     return (
@@ -199,7 +213,7 @@ export default function MyProjectsPage() {
             )}
           </TabsContent>
           <TabsContent value="emr">
-            <EmrProjectList interests={myEmrInterests} calls={fundingCalls} />
+            <EmrProjectList interests={filteredEmrInterests} calls={fundingCalls} />
           </TabsContent>
         </Tabs>
       </div>
