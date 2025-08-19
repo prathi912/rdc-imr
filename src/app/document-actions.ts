@@ -8,9 +8,29 @@ import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { Project, User, Evaluation } from '@/types';
 import { getDoc, doc, collection, query, where, getDocs as adminGetDocs } from 'firebase/firestore';
-import officeNotingTemplate from '@/templates/IMR_RECOMMENDATION_TEMPLATE.docx';
-import excelClaimTemplate from '@/templates/format.xlsx';
+import { format, parseISO } from 'date-fns';
+import * as XLSX from 'xlsx';
 
+
+async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
+  try {
+    if (!message) {
+      console.error("Log message is empty or undefined.");
+      return;
+    }
+    
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      ...context,
+    };
+    await adminDb.collection('logs').add(logEntry);
+  } catch (error) {
+    console.error("FATAL: Failed to write to logs collection.", error);
+    console.error("Original Log Entry:", { level, message, context });
+  }
+}
 
 export async function generateRecommendationForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
@@ -25,7 +45,7 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     const evaluationsSnap = await adminGetDocs(evaluationsRef);
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
     
-    const templatePath = path.join(process.cwd(), 'IMR_RECOMMENDATION_TEMPLATE.docx');
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'IMR_RECOMMENDATION_TEMPLATE.docx');
     if (!fs.existsSync(templatePath)) {
       return { success: false, error: 'Recommendation form template not found on the server.' };
     }
@@ -81,7 +101,7 @@ export async function generateOfficeNotingForm(
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
     const projectSnap = await projectRef.get();
-    if (!projectSnap.exists) {
+    if (!projectSnap.exists()) {
       return { success: false, error: 'Project not found.' };
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
@@ -98,11 +118,15 @@ export async function generateOfficeNotingForm(
         coPi1User = coPi1UserSnap.data() as User;
       }
     }
-
-    if (!officeNotingTemplate) {
-        return { success: false, error: 'Office Notings form template not found on the server.' };
+    
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'IMR_OFFICE_NOTING_TEMPLATE.docx');
+     if (!fs.existsSync(templatePath)) {
+      return { success: false, error: 'Office Notings form template not found on the server.' };
     }
-    const zip = new PizZip(officeNotingTemplate, { base64: true });
+    const content = fs.readFileSync(templatePath);
+
+
+    const zip = new PizZip(content);
 
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
@@ -176,7 +200,7 @@ export async function exportClaimToExcel(
   try {
     const claimRef = adminDb.collection("incentiveClaims").doc(claimId)
     const claimSnap = await claimRef.get()
-    if (!claimSnap.exists) {
+    if (!claimSnap.exists()) {
       return { success: false, error: "Claim not found." }
     }
     const claim = claimSnap.data() as IncentiveClaim
@@ -191,10 +215,13 @@ export async function exportClaimToExcel(
       }
     }
 
-    if (!excelClaimTemplate) {
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'format.xlsx');
+    if (!fs.existsSync(templatePath)) {
         return { success: false, error: 'Template file "format.xlsx" not found or could not be read.' };
     }
-    const workbook = XLSX.read(excelClaimTemplate, { type: "binary", cellStyles: true, sheetStubs: true });
+    
+    const excelClaimTemplate = fs.readFileSync(templatePath);
+    const workbook = XLSX.read(excelClaimTemplate, { type: "buffer", cellStyles: true, sheetStubs: true });
 
     const sheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[sheetName]
