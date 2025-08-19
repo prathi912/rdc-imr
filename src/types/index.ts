@@ -3,6 +3,7 @@
 
 
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -234,6 +235,7 @@ export type IncentiveClaim = {
   publicationMonth?: string;
   publicationYear?: string;
   sdgGoals?: string[];
+  publicationProofUrls?: string[];
 
 
   // Patent Fields

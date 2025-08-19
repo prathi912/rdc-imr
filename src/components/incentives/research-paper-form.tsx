@@ -37,7 +37,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl } from '@/app/actions';
+import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl, uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle, Bot, ChevronDown } from 'lucide-react';
 import {
   DropdownMenu,
@@ -48,11 +48,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const SPECIAL_POLICY_FACULTIES = [
-    "Faculty of Applied Sciences", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
-    "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health",
-    "Faculty of Engineering & Technology"
-];
+const MAX_FILES = 10;
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_FILE_TYPES = ["application/pdf"];
 
 const researchPaperSchema = z
   .object({
@@ -72,6 +70,11 @@ const researchPaperSchema = z
     publicationMonth: z.string({ required_error: 'Publication month is required.' }),
     publicationYear: z.string({ required_error: 'Publication year is required.' }),
     sdgGoals: z.array(z.string()).refine(value => value.length > 0, { message: "Please select at least one SDG." }),
+    publicationProof: z.any()
+      .refine((files) => files?.length > 0, 'Proof of publication is required.')
+      .refine((files) => files?.length <= MAX_FILES, `You can upload a maximum of ${MAX_FILES} files.`)
+      .refine((files) => Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE), `Each file must be less than 5MB.`)
+      .refine((files) => Array.from(files).every((file: any) => ACCEPTED_FILE_TYPES.includes(file.type)), "Only PDF files are allowed."),
   })
   .refine((data) => {
       if ((data.indexType === 'wos' || data.indexType === 'both')) {
@@ -124,6 +127,15 @@ const journalClassificationOptions = [ { value: 'Q1', label: 'Q1' }, { value: 'Q
 const months = [ "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" ];
 const years = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - i).toString());
 
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
+
 export function ResearchPaperForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -170,7 +182,7 @@ export function ResearchPaperForm() {
   const journalName = form.watch('journalName');
   
   const isSpecialFaculty = useMemo(() => 
-    user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false,
+    user?.faculty ? user.faculty.includes("dummy") : false,
     [user?.faculty]
   );
 
@@ -270,8 +282,27 @@ export function ResearchPaperForm() {
       const data = form.getValues();
       const claimId = doc(collection(db, 'incentiveClaims')).id;
 
+      const uploadFilesAndGetUrls = async (files: FileList | undefined, folderName: string): Promise<string[]> => {
+          if (!files || files.length === 0 || !user) return [];
+          const uploadPromises = Array.from(files).map(async (file) => {
+              const dataUrl = await fileToDataUrl(file);
+              const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
+              const result = await uploadFileToServer(dataUrl, path);
+              if (!result.success || !result.url) {
+                  throw new Error(result.error || `File upload failed for ${file.name}`);
+              }
+              return result.url;
+          });
+          return Promise.all(uploadPromises);
+      };
+
+      const publicationProofUrls = await uploadFilesAndGetUrls(data.publicationProof, 'publication-proof');
+
+      const { publicationProof, ...restOfData } = data;
+
       const claimData: Omit<IncentiveClaim, 'id'> = {
-        ...data,
+        ...restOfData,
+        publicationProofUrls,
         misId: user.misId || null,
         orcidId: user.orcidId || null,
         claimType: 'Research Papers',
@@ -395,6 +426,25 @@ export function ResearchPaperForm() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                        <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="publicationProof"
+                  render={({ field: { value, onChange, ...fieldProps } }) => (
+                    <FormItem>
+                      <FormLabel>Attach Proof: Publication: Copy of paper, title of the paper details with PU Name.*</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...fieldProps}
+                          type="file"
+                          multiple
+                          onChange={(e) => onChange(e.target.files)}
+                          accept="application/pdf"
+                        />
+                      </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
