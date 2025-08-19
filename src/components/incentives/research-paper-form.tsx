@@ -48,7 +48,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from '../ui/checkbox';
-import { Label } from '../ui/label';
 
 const MAX_FILES = 10;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -439,7 +438,6 @@ export function ResearchPaperForm() {
                   <FormField control={form.control} name="publicationYear" render={({ field }) => ( <FormItem><FormLabel>Publication Year</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger></FormControl><SelectContent>{years.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
                 </div>
                 <Separator />
-
                 <div className="space-y-4">
                     <FormLabel>Author(s) from PU</FormLabel>
                     <div className="space-y-2">
@@ -464,14 +462,13 @@ export function ResearchPaperForm() {
                                     )}
                                 />
                                 {index > 0 && (
-                                    <Button type="button" variant="destructive" size="sm" className="md:col-start-4" onClick={() => remove(index)}>
+                                    <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => remove(index)}>
                                         <Trash2 className="h-4 w-4 mr-2" /> Remove
                                     </Button>
                                 )}
                             </div>
                         ))}
                     </div>
-                    
                     <div className="space-y-2 p-3 border rounded-md">
                         <FormLabel className="text-sm">Add PU Co-Author</FormLabel>
                         <div className="flex items-center gap-2">
@@ -479,7 +476,7 @@ export function ResearchPaperForm() {
                             <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
                         </div>
                         {foundCoPi && (
-                            <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                            <div className="flex items-center justify-between p-2 border rounded-md mt-2">
                                 <div><p className="text-sm">{foundCoPi.name}</p></div>
                                 <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
                             </div>
