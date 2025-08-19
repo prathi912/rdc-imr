@@ -27,8 +27,8 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
     )
   }
 
-  const getCallTitle = (callId: string) => {
-    return calls.find((c) => c.id === callId)?.title || "Unknown Funding Call"
+  const getCallTitle = (interest: EmrInterest) => {
+    return interest.callTitle || calls.find((c) => c.id === interest.callId)?.title || "Unknown Funding Call"
   }
 
   return (
@@ -45,7 +45,7 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
           <TableBody>
             {interests.map((interest) => (
               <TableRow key={interest.id}>
-                <TableCell className="font-medium">{getCallTitle(interest.callId)}</TableCell>
+                <TableCell className="font-medium">{getCallTitle(interest)}</TableCell>
                 <TableCell>{format(new Date(interest.registeredAt), "PPP")}</TableCell>
                 <TableCell>
                   <Badge variant={interest.status === "Recommended" ? "default" : "secondary"}>
@@ -99,7 +99,13 @@ export default function MyProjectsPage() {
 
         // Fetch EMR Interests
         const emrInterestsRef = collection(db, "emrInterests")
-        const emrQuery = query(emrInterestsRef, where("userId", "==", user.uid), orderBy("registeredAt", "desc"))
+        const emrQuery = query(
+          emrInterestsRef,
+          or(
+            where("userId", "==", user.uid),
+            where("coPiUids", "array-contains", user.uid)
+          )
+        );
 
         // Fetch Funding Calls
         const callsRef = collection(db, "fundingCalls")
@@ -115,8 +121,12 @@ export default function MyProjectsPage() {
           .map((doc) => ({ id: doc.id, ...doc.data() } as Project))
           .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
 
+        const emrInterestList = emrSnapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() } as EmrInterest))
+          .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
+
         setMyProjects(imrProjectList)
-        setMyEmrInterests(emrSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as EmrInterest)))
+        setMyEmrInterests(emrInterestList)
         setFundingCalls(callsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as FundingCall)))
       } catch (error: any) {
         console.error("Error fetching user's projects:", error)
