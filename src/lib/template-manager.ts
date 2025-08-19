@@ -1,6 +1,6 @@
 
 'use server';
-import { officeNotingTemplate } from '@/templates/IMR_RECOMMENDATION_TEMPLATE';
+import { officeNotingTemplate } from '@/app/document-actions';
 import { excelClaimTemplate } from '@/templates/format';
 import { membershipTemplate } from '@/templates/INCENTIVE_MEMBERSHIP';
 import { bookChapterTemplate } from '@/templates/INCENTIVE_BOOK_CHAPTER';
@@ -14,7 +14,7 @@ const templates: Record<string, string> = {
     'INCENTIVE_BOOK_PUBLICATION.docx': bookPublicationTemplate,
 };
 
-export function getTemplateContent(templateName: string): Buffer | null {
+export async function getTemplateContent(templateName: string): Promise<Buffer | null> {
     const base64Content = templates[templateName];
     if (base64Content) {
         return Buffer.from(base64Content, 'base64');
