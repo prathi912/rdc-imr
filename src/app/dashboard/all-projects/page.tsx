@@ -547,9 +547,18 @@ export default function AllProjectsPage() {
                                     <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                                     <TableBody>{filteredEmrProjects.map(p => {
                                         const pi = users.find(u => u.uid === p.userId);
+                                        const proofLink = p.finalProofUrl || p.proofUrl;
                                         return (
                                         <TableRow key={p.id}>
-                                            <TableCell className="font-medium">{p.callTitle || 'N/A'}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {proofLink ? (
+                                                    <a href={proofLink} target="_blank" rel="noopener noreferrer" className="hover:underline text-primary">
+                                                        {p.callTitle || 'N/A'}
+                                                    </a>
+                                                ) : (
+                                                    p.callTitle || 'N/A'
+                                                )}
+                                            </TableCell>
                                             <TableCell>
                                                 {pi?.misId ? (
                                                     <Link href={`/profile/${pi.misId}`} className="hover:underline text-primary" target="_blank" rel="noopener noreferrer">
