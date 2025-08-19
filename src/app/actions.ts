@@ -1511,71 +1511,71 @@ export async function updateProjectEvaluators(
 type FoundUser = { uid: string; name: string; email: string; misId: string, campus: string };
 
 export async function findUserByMisId(
-  misId: string,
-): Promise<{ 
-    success: boolean; 
-    users?: FoundUser[];
-    error?: string 
-}> {
-  try {
-    if (!misId || misId.trim() === "") {
-      return { success: false, error: "MIS ID is required." };
-    }
-    
-    const allFound = new Map<string, FoundUser>();
-
-    // 1. Search existing users in Firestore
-    const usersRef = adminDb.collection("users");
-    const q = usersRef.where("misId", "==", misId);
-    const querySnapshot = await q.get();
-
-    querySnapshot.forEach(doc => {
-      const userData = doc.data() as User;
-      if (userData.role !== 'admin' && userData.role !== 'Super-admin') {
-        const userResult = {
-            uid: doc.id,
-            name: userData.name,
-            email: userData.email,
-            misId: userData.misId!,
-            campus: userData.campus || 'Vadodara',
-        };
-        allFound.set(userResult.email, userResult);
+    misId: string,
+  ): Promise<{ 
+      success: boolean; 
+      users?: FoundUser[];
+      error?: string 
+  }> {
+    try {
+      if (!misId || misId.trim() === "") {
+        return { success: false, error: "MIS ID is required." };
       }
-    });
-
-    // 2. Search staff data files via API
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
-    const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}&fetchAll=true`);
-    const staffResult = await response.json();
-
-    if (staffResult.success && Array.isArray(staffResult.data)) {
-      staffResult.data.forEach((staff: any) => {
-        if (!allFound.has(staff.email)) {
-            allFound.set(staff.email, {
-                uid: '', // No UID for staff not yet registered
-                name: staff.name,
-                email: staff.email,
-                misId: staff.misId,
-                campus: staff.campus,
-            });
+      
+      const allFound = new Map<string, FoundUser>();
+  
+      // 1. Search existing users in Firestore
+      const usersRef = adminDb.collection("users");
+      const q = usersRef.where("misId", "==", misId);
+      const querySnapshot = await q.get();
+  
+      querySnapshot.forEach(doc => {
+        const userData = doc.data() as User;
+        if (userData.role !== 'admin' && userData.role !== 'Super-admin') {
+          const userResult = {
+              uid: doc.id,
+              name: userData.name,
+              email: userData.email,
+              misId: userData.misId!,
+              campus: userData.campus || 'Vadodara',
+          };
+          allFound.set(userResult.email, userResult);
         }
       });
+  
+      // 2. Search staff data files via API
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:9002';
+      const response = await fetch(`${baseUrl}/api/get-staff-data?misId=${encodeURIComponent(misId)}&fetchAll=true`);
+      const staffResult = await response.json();
+  
+      if (staffResult.success && Array.isArray(staffResult.data)) {
+        staffResult.data.forEach((staff: any) => {
+          if (!allFound.has(staff.email)) {
+              allFound.set(staff.email, {
+                  uid: '', // No UID for staff not yet registered
+                  name: staff.name,
+                  email: staff.email,
+                  misId: staff.misId,
+                  campus: staff.campus,
+              });
+          }
+        });
+      }
+  
+      const foundUsers = Array.from(allFound.values());
+      
+      if (foundUsers.length > 0) {
+          return { success: true, users: foundUsers };
+      }
+      
+      return { success: false, error: "No user found with this MIS ID across any campus. Please check the MIS ID or ask them to sign up first." };
+  
+    } catch (error: any) {
+      console.error("Error finding user by MIS ID:", error);
+      await logActivity('ERROR', 'Failed to find user by MIS ID', { misId, error: error.message, stack: error.stack });
+      return { success: false, error: error.message || "Failed to search for user." };
     }
-
-    const foundUsers = Array.from(allFound.values());
-    
-    if (foundUsers.length > 0) {
-        return { success: true, users: foundUsers };
-    }
-    
-    return { success: false, error: "No user found with this MIS ID across any campus. Please check the MIS ID or ask them to sign up first." };
-
-  } catch (error: any) {
-    console.error("Error finding user by MIS ID:", error);
-    await logActivity('ERROR', 'Failed to find user by MIS ID', { misId, error: error.message, stack: error.stack });
-    return { success: false, error: error.message || "Failed to search for user." };
   }
-}
 
 export async function isEmailDomainAllowed(email: string): Promise<{ allowed: boolean; isCro: boolean; croFaculty?: string; croCampus?: string; }> {
   try {
@@ -2992,13 +2992,62 @@ export async function bulkUploadEmrProjects(
 export async function updateEmrInterestCoPis(interestId: string, coPis: CoPiDetails[]): Promise<{ success: boolean; error?: string }> {
     try {
         const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        const interestSnap = await interestRef.get();
+        if (!interestSnap.exists) {
+            return { success: false, error: 'Interest registration not found.' };
+        }
+        const interest = interestSnap.data() as EmrInterest;
+
+        const existingCoPiUids = new Set(interest.coPiUids || []);
+        const newCoPiUids = new Set(coPis.map(c => c.uid).filter((uid): uid is string => !!uid));
+
+        // Find newly added Co-PIs
+        const addedUids = [...newCoPiUids].filter(uid => !existingCoPiUids.has(uid));
+
+        // Update the document
         await interestRef.update({
             coPiDetails: coPis,
-            coPiUids: coPis.map(c => c.uid).filter(Boolean),
+            coPiUids: Array.from(newCoPiUids),
             coPiNames: coPis.map(c => c.name),
             coPiEmails: coPis.map(c => c.email.toLowerCase()),
         });
-        await logActivity('INFO', 'EMR interest Co-PIs updated', { interestId });
+
+        // Send notifications to newly added Co-PIs
+        if (addedUids.length > 0) {
+            const usersRef = adminDb.collection("users");
+            const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), "in", addedUids);
+            const newCoPiDocs = await usersQuery.get();
+            const batch = adminDb.batch();
+
+            for (const userDoc of newCoPiDocs.docs) {
+                const coPi = userDoc.data() as User;
+                const notificationRef = adminDb.collection("notifications").doc();
+                batch.set(notificationRef, {
+                    uid: coPi.uid,
+                    title: `You've been added as a Co-PI to the EMR project: "${interest.callTitle}"`,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
+                });
+
+                if (coPi.email) {
+                    await sendEmailUtility({
+                        to: coPi.email,
+                        subject: `You've been added to an EMR Project`,
+                        html: `
+                            <div ${EMAIL_STYLES.background}>
+                                ${EMAIL_STYLES.logo}
+                                <p style="color:#ffffff;">Dear ${coPi.name},</p>
+                                <p style="color:#e0e0e0;">You have been added as a Co-PI by ${interest.userName} for the EMR project titled "<strong style="color:#ffffff;">${interest.callTitle}</strong>".</p>
+                                ${EMAIL_STYLES.footer}
+                            </div>`,
+                        from: 'default'
+                    });
+                }
+            }
+            await batch.commit();
+        }
+
+        await logActivity('INFO', 'EMR interest Co-PIs updated', { interestId, added: addedUids.length });
         return { success: true };
     } catch (error: any) {
         console.error("Error updating EMR interest Co-PIs:", error);
@@ -3103,3 +3152,4 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
   
 
     
+
