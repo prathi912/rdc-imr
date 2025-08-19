@@ -2761,8 +2761,15 @@ export async function generateOfficeNotingForm(
         coPi1User = coPi1UserSnap.data() as User;
       }
     }
+    
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'IMR_OFFICE_NOTING_TEMPLATE.docx');
+     if (!fs.existsSync(templatePath)) {
+      return { success: false, error: 'Office Notings form template not found on the server.' };
+    }
+    const content = fs.readFileSync(templatePath);
 
-    const zip = new PizZip(templateContent);
+
+    const zip = new PizZip(content);
 
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
@@ -2985,6 +2992,25 @@ export async function bulkUploadEmrProjects(
 
   return { success: true, data: { successfulCount, failures, linkedUserCount: linkedUserIds.size } };
 }
+
+export async function updateEmrInterestCoPis(interestId: string, coPis: CoPiDetails[]): Promise<{ success: boolean; error?: string }> {
+    try {
+        const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        await interestRef.update({
+            coPiDetails: coPis,
+            coPiUids: coPis.map(c => c.uid).filter(Boolean),
+            coPiNames: coPis.map(c => c.name),
+            coPiEmails: coPis.map(c => c.email.toLowerCase()),
+        });
+        await logActivity('INFO', 'EMR interest Co-PIs updated', { interestId });
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error updating EMR interest Co-PIs:", error);
+        await logActivity('ERROR', 'Failed to update EMR Co-PIs', { interestId, error: error.message, stack: error.stack });
+        return { success: false, error: "Failed to update Co-PIs." };
+    }
+}
+
 
 export async function updateEmrInterestDetails(interestId: string, updates: Partial<EmrInterest>): Promise<{ success: boolean; error?: string }> {
     try {

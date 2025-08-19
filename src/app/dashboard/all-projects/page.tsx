@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { format, isAfter, isBefore, startOfToday, parseISO } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
@@ -9,11 +9,11 @@ import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
 import { db } from '@/lib/config';
 import { collection, getDocs, query, where, orderBy, or } from 'firebase/firestore';
-import type { Project, User, EmrInterest, FundingCall } from '@/types';
+import type { Project, User, EmrInterest, FundingCall, CoPiDetails } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2 } from 'lucide-react';
+import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2, Edit, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,7 +33,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { updateEmrFinalStatus } from '@/app/actions';
+import { updateEmrFinalStatus, findUserByMisId, updateEmrInterestCoPis } from '@/app/actions';
 
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
@@ -71,6 +71,119 @@ const finalStatusSchema = z.object({
     status: z.enum(['Sanctioned', 'Not Sanctioned'], { required_error: 'Please select a final status.' }),
     finalProof: z.any().refine(files => files?.length > 0, "A proof document is required."),
 });
+
+function EditEmrCoPisDialog({ interest, isOpen, onOpenChange, onActionComplete }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onActionComplete: () => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+    const [foundCoPis, setFoundCoPis] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [coPiList, setCoPiList] = useState<CoPiDetails[]>(interest.coPiDetails || []);
+    const [isSelectionOpen, setIsSelectionOpen] = useState(false);
+
+    const handleSearchCoPi = async () => {
+        if (!coPiSearchTerm) return;
+        setIsSearching(true);
+        try {
+            const result = await findUserByMisId(coPiSearchTerm);
+            if (result.success && result.users && result.users.length > 0) {
+                if (result.users.length === 1) {
+                    handleAddCoPi(result.users[0]);
+                } else {
+                    setFoundCoPis(result.users);
+                    setIsSelectionOpen(true);
+                }
+            } else {
+                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+            }
+        } finally { setIsSearching(false); }
+    };
+
+    const handleAddCoPi = (selectedUser: any) => {
+        if (selectedUser && !coPiList.some(c => c.email === selectedUser.email)) {
+            setCoPiList(prev => [...prev, selectedUser]);
+        }
+        setCoPiSearchTerm('');
+        setFoundCoPis([]);
+        setIsSelectionOpen(false);
+    };
+
+    const handleRemoveCoPi = (email: string) => {
+        setCoPiList(prev => prev.filter(c => c.email !== email));
+    };
+
+    const handleSave = async () => {
+        setIsSubmitting(true);
+        try {
+            const result = await updateEmrInterestCoPis(interest.id, coPiList);
+            if (result.success) {
+                toast({ title: 'Success', description: 'Co-PI list updated.' });
+                onActionComplete();
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Co-PIs for {interest.callTitle}</DialogTitle>
+                </DialogHeader>
+                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-4">
+                    <div>
+                        <Label>Search & Add Co-PI by MIS ID</Label>
+                        <div className="flex gap-2 mt-1">
+                            <Input placeholder="Enter MIS ID..." value={coPiSearchTerm} onChange={e => setCoPiSearchTerm(e.target.value)} />
+                            <Button onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}</Button>
+                        </div>
+                    </div>
+                     <div>
+                        <Label>Current Co-PIs</Label>
+                        <div className="space-y-2 mt-1">
+                            {coPiList.map(coPi => (
+                                <div key={coPi.email} className="flex justify-between items-center p-2 bg-muted rounded-md text-sm">
+                                    <span>{coPi.name}</span>
+                                    <Button variant="ghost" size="sm" onClick={() => handleRemoveCoPi(coPi.email)}>Remove</Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSave} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Button>
+                </DialogFooter>
+                 <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Multiple Users Found</DialogTitle>
+                            <DialogDescription>Please select the correct user to add.</DialogDescription>
+                        </DialogHeader>
+                        <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))} className="py-4 space-y-2">
+                            {foundCoPis.map((user, i) => (
+                                <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
+                                    <RadioGroupItem value={JSON.stringify(user)} id={`user-${i}`} />
+                                    <Label htmlFor={`user-${i}`} className="flex flex-col">
+                                        <span className="font-semibold">{user.name}</span>
+                                        <span className="text-muted-foreground text-xs">{user.email} ({user.campus})</span>
+                                    </Label>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                    </DialogContent>
+                </Dialog>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 
 function FinalStatusDialog({ interest, onActionComplete, isOpen, onOpenChange }: { interest: EmrInterest; onActionComplete: () => void; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -174,6 +287,7 @@ export default function AllProjectsPage() {
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(IMR_EXPORT_COLUMNS.map(c => c.id));
   const [projectToUpdateProof, setProjectToUpdateProof] = useState<EmrInterest | null>(null);
+  const [projectToEditCoPis, setProjectToEditCoPis] = useState<EmrInterest | null>(null);
   
   const fetchAllData = useCallback(async () => {
     if (!user) return;
@@ -257,6 +371,7 @@ export default function AllProjectsPage() {
   
   const hasAdminView = user?.role === 'Super-admin' || user?.role === 'admin' || user?.role === 'CRO' || user?.designation === 'Principal' || user?.designation === 'HOD';
   const canUploadProof = user?.role === 'Super-admin' || user?.role === 'admin';
+  const canEditCoPis = user?.role === 'Super-admin';
 
   const filteredImrProjects = useMemo(() => {
     return allImrProjects.filter(project => {
@@ -460,10 +575,15 @@ export default function AllProjectsPage() {
                                             </TableCell>
                                             <TableCell>{p.agency || 'N/A'}</TableCell>
                                             <TableCell><Badge>{p.status}</Badge></TableCell>
-                                            <TableCell>
+                                            <TableCell className="flex items-center gap-2">
                                                 {canUploadProof && !p.finalProofUrl && (
                                                     <Button variant="outline" size="sm" onClick={() => setProjectToUpdateProof(p)}>
                                                         <Upload className="h-4 w-4 mr-2" /> Upload Proof
+                                                    </Button>
+                                                )}
+                                                {canEditCoPis && p.isBulkUploaded && (
+                                                    <Button variant="outline" size="sm" onClick={() => setProjectToEditCoPis(p)}>
+                                                        <Edit className="h-4 w-4 mr-2" /> Edit
                                                     </Button>
                                                 )}
                                             </TableCell>
@@ -486,6 +606,14 @@ export default function AllProjectsPage() {
             interest={projectToUpdateProof}
             isOpen={!!projectToUpdateProof}
             onOpenChange={() => setProjectToUpdateProof(null)}
+            onActionComplete={fetchAllData}
+        />
+    )}
+    {projectToEditCoPis && (
+        <EditEmrCoPisDialog
+            interest={projectToEditCoPis}
+            isOpen={!!projectToEditCoPis}
+            onOpenChange={() => setProjectToEditCoPis(null)}
             onActionComplete={fetchAllData}
         />
     )}
