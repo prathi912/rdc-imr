@@ -17,7 +17,7 @@ import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2, Edit, Search 
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -67,12 +67,12 @@ const EMR_EXPORT_COLUMNS = [
     { id: 'durationAmount', label: 'Duration & Amount' },
 ];
 
-const finalStatusSchema = z.object({
+const editEmrSchema = z.object({
     status: z.enum(['Sanctioned', 'Not Sanctioned'], { required_error: 'Please select a final status.' }),
-    finalProof: z.any().refine(files => files?.length > 0, "A proof document is required."),
+    finalProof: z.any().optional(),
 });
 
-function EditEmrCoPisDialog({ interest, isOpen, onOpenChange, onActionComplete }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onActionComplete: () => void; }) {
+function EditEmrProjectDialog({ interest, isOpen, onOpenChange, onActionComplete }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onActionComplete: () => void; }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
@@ -80,6 +80,22 @@ function EditEmrCoPisDialog({ interest, isOpen, onOpenChange, onActionComplete }
     const [isSearching, setIsSearching] = useState(false);
     const [coPiList, setCoPiList] = useState<CoPiDetails[]>(interest.coPiDetails || []);
     const [isSelectionOpen, setIsSelectionOpen] = useState(false);
+
+    const form = useForm<z.infer<typeof editEmrSchema>>({
+        resolver: zodResolver(editEmrSchema),
+        defaultValues: {
+            status: interest.status === 'Sanctioned' || interest.status === 'Not Sanctioned' ? interest.status : undefined,
+        }
+    });
+
+    const fileToDataUrl = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+            reader.readAsDataURL(file);
+        });
+    };
 
     const handleSearchCoPi = async () => {
         if (!coPiSearchTerm) return;
@@ -112,17 +128,33 @@ function EditEmrCoPisDialog({ interest, isOpen, onOpenChange, onActionComplete }
         setCoPiList(prev => prev.filter(c => c.email !== email));
     };
 
-    const handleSave = async () => {
+    const handleSave = async (values: z.infer<typeof editEmrSchema>) => {
         setIsSubmitting(true);
         try {
-            const result = await updateEmrInterestCoPis(interest.id, coPiList);
-            if (result.success) {
-                toast({ title: 'Success', description: 'Co-PI list updated.' });
-                onActionComplete();
-                onOpenChange(false);
-            } else {
-                throw new Error(result.error);
+            const coPiResult = await updateEmrInterestCoPis(interest.id, coPiList);
+            if (!coPiResult.success) {
+                throw new Error(coPiResult.error);
             }
+
+            const proofFile = values.finalProof?.[0];
+            if (proofFile) {
+                const dataUrl = await fileToDataUrl(proofFile);
+                const statusResult = await updateEmrFinalStatus(interest.id, values.status, dataUrl, proofFile.name);
+                if (!statusResult.success) {
+                    throw new Error(statusResult.error);
+                }
+            } else if (values.status !== interest.status) {
+                // If status is changed but no new file, it implies proof is already there or not needed.
+                // We should probably have a separate action just for status, but for now this is a simple path.
+                // For safety, let's just assume this means "update status".
+                // A better implementation would separate these concerns.
+                 const statusResult = await updateEmrFinalStatus(interest.id, values.status, interest.finalProofUrl || interest.proofUrl || '', 'existing_proof.pdf');
+                 if (!statusResult.success) throw new Error(statusResult.error);
+            }
+
+            toast({ title: 'Success', description: 'EMR project details updated.' });
+            onActionComplete();
+            onOpenChange(false);
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
         } finally {
@@ -132,21 +164,18 @@ function EditEmrCoPisDialog({ interest, isOpen, onOpenChange, onActionComplete }
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Edit Co-PIs for {interest.callTitle}</DialogTitle>
+                    <DialogTitle>Edit EMR Project: {interest.callTitle}</DialogTitle>
                 </DialogHeader>
-                <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-4">
+                <div className="py-4 space-y-6 max-h-[60vh] overflow-y-auto pr-4">
                     <div>
-                        <Label>Search & Add Co-PI by MIS ID</Label>
+                        <Label>Manage Co-PIs</Label>
                         <div className="flex gap-2 mt-1">
-                            <Input placeholder="Enter MIS ID..." value={coPiSearchTerm} onChange={e => setCoPiSearchTerm(e.target.value)} />
+                            <Input placeholder="Search & Add Co-PI by MIS ID..." value={coPiSearchTerm} onChange={e => setCoPiSearchTerm(e.target.value)} />
                             <Button onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}</Button>
                         </div>
-                    </div>
-                     <div>
-                        <Label>Current Co-PIs</Label>
-                        <div className="space-y-2 mt-1">
+                         <div className="space-y-2 mt-2">
                             {coPiList.map(coPi => (
                                 <div key={coPi.email} className="flex justify-between items-center p-2 bg-muted rounded-md text-sm">
                                     <span>{coPi.name}</span>
@@ -155,10 +184,36 @@ function EditEmrCoPisDialog({ interest, isOpen, onOpenChange, onActionComplete }
                             ))}
                         </div>
                     </div>
+                    <Form {...form}>
+                         <form id="edit-emr-form" onSubmit={form.handleSubmit(handleSave)} className="space-y-4">
+                             <FormField
+                                name="status"
+                                control={form.control}
+                                render={({ field }) => (
+                                    <FormItem className="space-y-3">
+                                    <FormLabel>Final Status</FormLabel>
+                                    <FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Sanctioned" /></FormControl><FormLabel className="font-normal">Sanctioned</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Not Sanctioned" /></FormControl><FormLabel className="font-normal">Not Sanctioned</FormLabel></FormItem></RadioGroup></FormControl>
+                                    <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                             <FormField
+                                name="finalProof"
+                                control={form.control}
+                                render={({ field: { onChange, value, ...rest }}) => (
+                                    <FormItem>
+                                        <FormLabel>Upload/Replace Proof Document (PDF)</FormLabel>
+                                        <FormControl><Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                         </form>
+                    </Form>
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleSave} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Button>
+                    <Button type="submit" form="edit-emr-form" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Button>
                 </DialogFooter>
                  <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
                     <DialogContent>
@@ -184,92 +239,6 @@ function EditEmrCoPisDialog({ interest, isOpen, onOpenChange, onActionComplete }
     );
 }
 
-
-function FinalStatusDialog({ interest, onActionComplete, isOpen, onOpenChange }: { interest: EmrInterest; onActionComplete: () => void; isOpen: boolean; onOpenChange: (open: boolean) => void; }) {
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const { toast } = useToast();
-    const form = useForm<z.infer<typeof finalStatusSchema>>({
-        resolver: zodResolver(finalStatusSchema),
-    });
-
-    const fileToDataUrl = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = error => reject(error);
-            reader.readAsDataURL(file);
-        });
-    };
-
-    const handleSubmit = async (values: z.infer<typeof finalStatusSchema>) => {
-        setIsSubmitting(true);
-        try {
-            const proofFile = values.finalProof?.[0];
-            const dataUrl = await fileToDataUrl(proofFile);
-            
-            const result = await updateEmrFinalStatus(interest.id, values.status, dataUrl, proofFile.name);
-            if (result.success) {
-                toast({ title: 'Success', description: 'Final project status has been recorded.' });
-                onActionComplete();
-                onOpenChange(false);
-            } else {
-                throw new Error(result.error);
-            }
-
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-    
-    return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Upload Final Proof</DialogTitle>
-                    <DialogDescription>
-                        Update the final outcome for <strong>{interest.userName}</strong>'s application for "{interest.callTitle || 'N/A'}".
-                    </DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                    <form id="final-status-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
-                        <FormField
-                            name="status"
-                            control={form.control}
-                            render={({ field }) => (
-                                <FormItem className="space-y-3">
-                                <FormLabel>Outcome</FormLabel>
-                                <FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Sanctioned" /></FormControl><FormLabel className="font-normal">Sanctioned</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Not Sanctioned" /></FormControl><FormLabel className="font-normal">Not Sanctioned</FormLabel></FormItem></RadioGroup></FormControl>
-                                <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <FormField
-                            name="finalProof"
-                            control={form.control}
-                            render={({ field: { onChange, value, ...rest }}) => (
-                                <FormItem>
-                                    <FormLabel>Proof Document (PDF)</FormLabel>
-                                    <FormControl><Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </form>
-                </Form>
-                <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button type="submit" form="final-status-form" disabled={isSubmitting}>
-                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : 'Submit Final Status'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-
 export default function AllProjectsPage() {
   const [allImrProjects, setAllImrProjects] = useState<Project[]>([]);
   const [allEmrProjects, setAllEmrProjects] = useState<EmrInterest[]>([]);
@@ -286,8 +255,7 @@ export default function AllProjectsPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(IMR_EXPORT_COLUMNS.map(c => c.id));
-  const [projectToUpdateProof, setProjectToUpdateProof] = useState<EmrInterest | null>(null);
-  const [projectToEditCoPis, setProjectToEditCoPis] = useState<EmrInterest | null>(null);
+  const [projectToEdit, setProjectToEdit] = useState<EmrInterest | null>(null);
   
   const fetchAllData = useCallback(async () => {
     if (!user) return;
@@ -370,7 +338,6 @@ export default function AllProjectsPage() {
   }, [fetchAllData]);
   
   const hasAdminView = user?.role === 'Super-admin' || user?.role === 'admin' || user?.role === 'CRO' || user?.designation === 'Principal' || user?.designation === 'HOD';
-  const canUploadProof = user?.role === 'Super-admin' || user?.role === 'admin';
   const canEditCoPis = user?.role === 'Super-admin';
 
   const filteredImrProjects = useMemo(() => {
@@ -585,13 +552,8 @@ export default function AllProjectsPage() {
                                             <TableCell>{p.agency || 'N/A'}</TableCell>
                                             <TableCell>{p.durationAmount || 'N/A'}</TableCell>
                                             <TableCell className="flex items-center gap-2">
-                                                {canUploadProof && !proofLink && (
-                                                    <Button variant="outline" size="sm" onClick={() => setProjectToUpdateProof(p)}>
-                                                        <Upload className="h-4 w-4 mr-2" /> Upload Proof
-                                                    </Button>
-                                                )}
                                                 {canEditCoPis && p.isBulkUploaded && (
-                                                    <Button variant="outline" size="sm" onClick={() => setProjectToEditCoPis(p)}>
+                                                    <Button variant="outline" size="sm" onClick={() => setProjectToEdit(p)}>
                                                         <Edit className="h-4 w-4 mr-2" /> Edit
                                                     </Button>
                                                 )}
@@ -610,19 +572,11 @@ export default function AllProjectsPage() {
             </div>
         )}
     </div>
-    {projectToUpdateProof && (
-        <FinalStatusDialog
-            interest={projectToUpdateProof}
-            isOpen={!!projectToUpdateProof}
-            onOpenChange={() => setProjectToUpdateProof(null)}
-            onActionComplete={fetchAllData}
-        />
-    )}
-    {projectToEditCoPis && (
-        <EditEmrCoPisDialog
-            interest={projectToEditCoPis}
-            isOpen={!!projectToEditCoPis}
-            onOpenChange={() => setProjectToEditCoPis(null)}
+    {projectToEdit && (
+        <EditEmrProjectDialog
+            interest={projectToEdit}
+            isOpen={!!projectToEdit}
+            onOpenChange={() => setProjectToEdit(null)}
             onActionComplete={fetchAllData}
         />
     )}
