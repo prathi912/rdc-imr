@@ -16,7 +16,6 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -39,7 +38,15 @@ import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl } from '@/app/actions';
-import { Loader2, AlertCircle, Bot } from 'lucide-react';
+import { Loader2, AlertCircle, Bot, ChevronDown } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const SPECIAL_POLICY_FACULTIES = [
     "Faculty of Applied Sciences", "Faculty of Medicine", "Faculty of Homoeopathy", "Faculty of Ayurved",
@@ -49,7 +56,7 @@ const SPECIAL_POLICY_FACULTIES = [
 
 const researchPaperSchema = z
   .object({
-    publicationType: z.string().optional(),
+    publicationType: z.string({ required_error: 'Please select a publication type.' }),
     indexType: z.enum(['wos', 'scopus', 'both', 'esci']).optional(),
     relevantLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     journalClassification: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
@@ -64,6 +71,7 @@ const researchPaperSchema = z
     electronicIssn: z.string().optional(),
     publicationMonth: z.string({ required_error: 'Publication month is required.' }),
     publicationYear: z.string({ required_error: 'Publication year is required.' }),
+    sdgGoals: z.array(z.string()).refine(value => value.length > 0, { message: "Please select at least one SDG." }),
   })
   .refine((data) => {
       if ((data.indexType === 'wos' || data.indexType === 'both')) {
@@ -73,6 +81,34 @@ const researchPaperSchema = z
   }, { message: 'For WoS or Both, you must select a WoS Type.', path: ['wosType'] });
 
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>;
+
+const publicationTypes = [
+    'Research Articles/Short Communications',
+    'Case Reports/Short Surveys',
+    'Review Articles',
+    'Letter to the Editor/Editorial',
+    'Scopus Indexed Conference Proceedings',
+];
+
+const sdgGoalsList = [
+  "Goal 1: No Poverty",
+  "Goal 2: Zero Hunger",
+  "Goal 3: Good Health and Well-being",
+  "Goal 4: Quality Education",
+  "Goal 5: Gender Equality",
+  "Goal 6: Clean Water and Sanitation",
+  "Goal 7: Affordable and Clean Energy",
+  "Goal 8: Decent Work and Economic Growth",
+  "Goal 9: Industry, Innovation and Infrastructure",
+  "Goal 10: Reduced Inequality",
+  "Goal 11: Sustainable Cities and Communities",
+  "Goal 12: Responsible Consumption and Production",
+  "Goal 13: Climate Action",
+  "Goal 14: Life Below Water",
+  "Goal 15: Life on Land",
+  "Goal 16: Peace and Justice Strong Institutions",
+  "Goal 17: Partnerships for the Goals",
+];
 
 const authorTypeOptions = [ 'First Author', 'Co-Author' ];
 const publicationPhaseOptions = [ 'Published online first with DOI number', 'Published with vol and page number' ];
@@ -97,7 +133,7 @@ export function ResearchPaperForm() {
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
     defaultValues: {
-      publicationType: 'Referred paper in journal listed by WOS/Scopus',
+      publicationType: undefined,
       indexType: undefined,
       relevantLink: '',
       journalClassification: undefined,
@@ -110,6 +146,7 @@ export function ResearchPaperForm() {
       locale: undefined,
       printIssn: '',
       electronicIssn: '',
+      sdgGoals: [],
     },
   });
   
@@ -278,7 +315,7 @@ export function ResearchPaperForm() {
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">RESEARCH PAPER DETAILS</h3>
                 <Separator />
-                <FormField control={form.control} name="publicationType" render={({ field }) => ( <FormItem><FormLabel>Please Select</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Select publication type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Referred paper in journal listed by WOS/Scopus">Referred paper in journal listed by WOS/Scopus</SelectItem></SelectContent></Select><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="publicationType" render={({ field }) => ( <FormItem><FormLabel>Type of Publication</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="Select publication type" /></SelectTrigger></FormControl><SelectContent>{publicationTypes.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="indexType" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Select Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>{availableIndexTypes.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="relevantLink" render={({ field }) => ( <FormItem><FormLabel>Relevant Link (e.g., DOI, Scopus URL)</FormLabel><div className="flex items-center gap-2"><FormControl><Input placeholder="https://www.scopus.com/record/display.uri?eid=..." {...field} disabled={isSubmitting} /></FormControl><Button type="button" variant="outline" size="sm" onClick={handleFetchScopusData} disabled={isSubmitting || isFetchingScopus || !relevantLink || (indexType !== 'scopus' && indexType !== 'both')} title="Fetch data from Scopus">{isFetchingScopus ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}Scopus</Button><Button type="button" variant="outline" size="sm" onClick={handleFetchWosData} disabled={isSubmitting || isFetchingWos || !relevantLink || (indexType !== 'wos' && indexType !== 'both')} title="Fetch data from Web of Science">{isFetchingWos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}WoS</Button></div><FormMessage /></FormItem> )}/>
                 <FormField control={form.control} name="journalClassification" render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Journal Classification</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>{availableClassifications.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
@@ -318,6 +355,44 @@ export function ResearchPaperForm() {
                 />
                 
                 <FormField control={form.control} name="publicationPhase" render={({ field }) => ( <FormItem><FormLabel>Publication Phase</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{publicationPhaseOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
+                
+                <Separator />
+                <FormField
+                  control={form.control}
+                  name="sdgGoals"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>UN Sustainable Development Goals (SDGs)</FormLabel>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between font-normal">
+                              {field.value?.length > 0 ? `${field.value.length} selected` : "Select relevant goals"}
+                              <ChevronDown className="h-4 w-4 opacity-50" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-60 overflow-y-auto">
+                              <DropdownMenuLabel>Select all that apply</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {sdgGoalsList.map((goal) => (
+                                <DropdownMenuCheckboxItem
+                                  key={goal}
+                                  checked={field.value?.includes(goal)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...(field.value || []), goal])
+                                      : field.onChange(field.value?.filter((value) => value !== goal));
+                                  }}
+                                  onSelect={(e) => e.preventDefault()}
+                                >
+                                  {goal}
+                                </DropdownMenuCheckboxItem>
+                              ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
