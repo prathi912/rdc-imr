@@ -3,7 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 
-export async function getTemplateContent(templateName: string): Promise<Buffer | null> {
+export function getTemplateContent(templateName: string): Buffer | null {
     const templatePath = path.join(process.cwd(), 'src', 'templates', templateName);
     if (fs.existsSync(templatePath)) {
         return fs.readFileSync(templatePath);

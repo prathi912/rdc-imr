@@ -69,4 +69,3 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
 }
-
