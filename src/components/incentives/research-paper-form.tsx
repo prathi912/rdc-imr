@@ -25,6 +25,7 @@ import {
   findUserByMisId,
 } from "@/app/actions"
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
+import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2 } from "lucide-react"
 import {
   DropdownMenu,
@@ -305,7 +306,7 @@ export function ResearchPaperForm() {
     }
   }, [availableIndexTypes, form])
 
-  const handleFetchData = async () => {
+  const handleFetchScopusData = async () => {
     const link = form.getValues('scopusLink');
     if (!link) {
       toast({ variant: 'destructive', title: 'No Scopus Link', description: 'Please enter a Scopus article link to fetch data.' });
@@ -343,6 +344,38 @@ export function ResearchPaperForm() {
             toast({ title: 'Success', description: 'Form fields have been pre-filled from Scopus.' });
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data from Scopus.' });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFetching(false);
+    }
+  };
+
+  const handleFetchWosData = async () => {
+    const link = form.getValues('relevantLink');
+    if (!link) {
+      toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a WoS article link to fetch data.' });
+      return;
+    }
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant. Please log in again.' });
+        return;
+    }
+
+    setIsFetching(true);
+    toast({ title: 'Fetching WoS Data', description: 'Please wait...' });
+
+    try {
+        const result = await fetchWosDataByUrl(link, user.name);
+        if (result.success && result.data) {
+            form.setValue('paperTitle', result.data.paperTitle, { shouldValidate: true });
+            form.setValue('journalName', result.data.journalName, { shouldValidate:true });
+            form.setValue('publicationYear', result.data.publicationYear, { shouldValidate: true });
+            form.setValue('relevantLink', result.data.relevantLink, { shouldValidate: true });
+            toast({ title: 'Success', description: 'Form fields have been pre-filled from Web of Science.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
         }
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
@@ -553,7 +586,7 @@ export function ResearchPaperForm() {
                               <Button
                                   type="button"
                                   variant="outline"
-                                  onClick={handleFetchData}
+                                  onClick={handleFetchScopusData}
                                   disabled={isSubmitting || isFetching || !form.getValues('scopusLink')}
                                   title="Fetch data from Scopus"
                               >
@@ -566,6 +599,35 @@ export function ResearchPaperForm() {
                       )}
                     />
                 )}
+                
+                 {(indexType === 'wos' || indexType === 'both') && (
+                    <FormField
+                      control={form.control}
+                      name="relevantLink"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>WoS Article Link (DOI)</FormLabel>
+                          <div className="flex items-center gap-2">
+                            <FormControl>
+                              <Input placeholder="https://doi.org/..." {...field} disabled={isSubmitting} />
+                            </FormControl>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleFetchWosData}
+                                disabled={isSubmitting || isFetching || !form.getValues('relevantLink')}
+                                title="Fetch data from Web of Science"
+                            >
+                                {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                Fetch Data
+                            </Button>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                )}
+
 
                 <FormField
                   control={form.control}
