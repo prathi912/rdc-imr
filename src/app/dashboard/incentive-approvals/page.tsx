@@ -16,6 +16,7 @@ import { Eye } from 'lucide-react';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { ApprovalDialog } from './approval-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
 
 export default function IncentiveApprovalsPage() {
     const [user, setUser] = useState<User | null>(null);
@@ -132,20 +133,33 @@ export default function IncentiveApprovalsPage() {
                 <TableHead className="text-right">Actions</TableHead>
             </TableRow></TableHeader>
             <TableBody>
-                {claimsList.map(claim => (
-                    <TableRow key={claim.id}>
-                        <TableCell>{claim.userName}</TableCell>
-                        <TableCell><Badge variant="outline">{claim.claimType}</Badge></TableCell>
-                        <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
-                        <TableCell><Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge></TableCell>
-                        <TableCell className="text-right space-x-2">
-                            <Button variant="outline" onClick={() => handleViewDetails(claim)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                            </Button>
-                        </TableCell>
-                    </TableRow>
-                ))}
+                {claimsList.map(claim => {
+                    const claimant = allUsers.find(u => u.uid === claim.uid);
+                    const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
+                    const hasProfileLink = claimant && claimant.misId;
+                    return (
+                        <TableRow key={claim.id}>
+                            <TableCell>
+                                {hasProfileLink ? (
+                                    <Link href={profileLink} target="_blank" className="text-primary hover:underline">
+                                        {claim.userName}
+                                    </Link>
+                                ) : (
+                                    claim.userName
+                                )}
+                            </TableCell>
+                            <TableCell><Badge variant="outline">{claim.claimType}</Badge></TableCell>
+                            <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
+                            <TableCell><Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge></TableCell>
+                            <TableCell className="text-right space-x-2">
+                                <Button variant="outline" onClick={() => handleViewDetails(claim)}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Details
+                                </Button>
+                            </TableCell>
+                        </TableRow>
+                    )
+                })}
             </TableBody>
         </Table>
     );

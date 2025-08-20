@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { User, IncentiveClaim, Author } from '@/types';
 import { Loader2, Printer } from 'lucide-react';
+import Link from 'next/link';
 
 // NOTE: This component is a placeholder for a future feature to export to Excel.
 // The `exportClaimToExcel` action is not yet implemented.
@@ -17,7 +18,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
 
     if (!claim) return null;
 
-    const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[]) => {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[] | React.ReactNode) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         
         let displayValue: React.ReactNode = String(value);
@@ -67,7 +68,11 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const isViewerAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
+    const isClaimantViewing = currentUser?.uid === claimant?.uid;
+    const isFullyApproved = claim.status === 'Submitted to Accounts';
 
+    const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
+    const hasProfileLink = claimant && claimant.misId;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -77,7 +82,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     <DialogDescription>Full submission details for claimant: {claim.userName}.</DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[70vh] overflow-y-auto pr-4 space-y-2 text-sm">
-                    {renderDetail("Claimant Name", claim.userName)}
+                    {renderDetail("Claimant Name", hasProfileLink ? <Link href={profileLink} target="_blank" className="text-primary hover:underline">{claim.userName}</Link> : claim.userName)}
                     {renderDetail("Email", claim.userEmail)}
                     {renderDetail("Designation", claimant?.designation)}
                     {renderDetail("Department", claimant?.department)}
@@ -270,7 +275,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
-                    {(isViewerAdmin || claim.status === 'Submitted to Accounts') && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                    {(isViewerAdmin || isFullyApproved) && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     
                     {claim.approvals && claim.approvals.length > 0 && (
                         <div className="space-y-2 pt-2">
