@@ -8,6 +8,7 @@ export const ALL_MODULES = [
   { id: 'my-projects', label: 'My Projects' },
   { id: 'emr-calendar', label: 'EMR Calendar' },
   { id: 'incentive-claim', label: 'Incentive Claims' },
+  { id: 'incentive-approvals', label: 'Incentive Approvals'},
   { id: 'evaluator-dashboard', label: 'Evaluation Queue' },
   { id: 'my-evaluations', label: 'My IMR Evaluations' },
   { id: 'schedule-meeting', label: 'Schedule Meeting' },
@@ -30,9 +31,9 @@ const coreModules = ['dashboard', 'notifications', 'settings', 'emr-calendar'];
 const facultyCoreModules = ['new-submission', 'my-projects'];
 const hierarchyCoreModules = ['analytics'];
 
-const facultyDefaults = [...coreModules, ...facultyCoreModules, 'bulk-upload-papers'];
+const facultyDefaults = [...coreModules, ...facultyCoreModules, 'bulk-upload-papers', 'incentive-claim'];
 const croDefaults = [...coreModules, ...facultyCoreModules, 'all-projects'];
-const adminDefaults = [...croDefaults, 'schedule-meeting', 'analytics', 'manage-users'];
+const adminDefaults = [...croDefaults, 'schedule-meeting', 'analytics', 'manage-users', 'manage-incentive-claims'];
 const superAdminDefaults = [...adminDefaults, 'module-management', 'bulk-upload-emr'];
 
 // Default modules for special designations who are otherwise 'faculty' role

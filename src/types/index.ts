@@ -8,6 +8,7 @@
 
 
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -201,12 +202,22 @@ export type BookCoAuthor = {
   isExternal: boolean
 }
 
+export type ApprovalStage = {
+  approverUid: string;
+  approverName: string;
+  status: 'Approved' | 'Rejected';
+  timestamp: string; // ISO string
+  comments: string;
+  approvedAmount: number;
+  stage: number; // 1, 2, or 3
+};
+
 export type IncentiveClaim = {
   id: string
   uid: string
   userName: string
   userEmail: string
-  status: "Pending" | "Accepted" | "Rejected" | "Draft"
+  status: "Pending" | "Accepted" | "Rejected" | "Draft" | "Pending Stage 1 Approval" | "Pending Stage 2 Approval" | "Pending Stage 3 Approval" | "Submitted to Accounts";
   submissionDate: string // ISO String
   faculty: string
   bankDetails?: UserBankDetails
@@ -214,6 +225,8 @@ export type IncentiveClaim = {
   misId?: string
   orcidId?: string
   calculatedIncentive?: number
+  finalApprovedAmount?: number;
+  approvals?: ApprovalStage[];
 
   // Main selector
   claimType: string
@@ -454,10 +467,16 @@ export type CroAssignment = {
     campus: string;
 };
 
+export type ApproverSetting = {
+    email: string;
+    stage: 1 | 2 | 3;
+};
+
 export type SystemSettings = {
   is2faEnabled: boolean
   allowedDomains?: string[]
   croAssignments?: CroAssignment[]
+  incentiveApprovers?: ApproverSetting[];
 }
 
 export type LoginOtp = {
