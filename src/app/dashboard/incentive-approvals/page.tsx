@@ -36,7 +36,7 @@ export default function IncentiveApprovalsPage() {
             const claimsCollection = collection(db, 'incentiveClaims');
             const usersQuery = query(collection(db, 'users'));
             
-            // Fetch Pending Claims
+            // Fetch Pending Claims for the current stage
             const statusToFetch = stage === 0 ? 'Pending' : `Pending Stage ${stage + 1} Approval`;
             const pendingClaimsQuery = query(
                 claimsCollection, 
@@ -44,21 +44,23 @@ export default function IncentiveApprovalsPage() {
                 orderBy('submissionDate', 'desc')
             );
 
-            // Fetch History Claims
-            const historyClaimsQuery = query(
-                claimsCollection,
-                where(`approvals.${stage}.approverUid`, '==', currentUser.uid),
-                orderBy('submissionDate', 'desc')
-            );
+            // Fetch all claims to filter history client-side
+            const allClaimsQuery = query(claimsCollection, orderBy('submissionDate', 'desc'));
             
-            const [pendingSnapshot, historySnapshot, usersSnapshot] = await Promise.all([
+            const [pendingSnapshot, allClaimsSnapshot, usersSnapshot] = await Promise.all([
                 getDocs(pendingClaimsQuery),
-                getDocs(historyClaimsQuery),
-                getDocs(usersQuery)
+                getDocs(allClaimsQuery),
+                getDocs(usersSnapshot)
             ]);
 
             setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
-            setHistoryClaims(historySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
+            
+            const allClaims = allClaimsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
+            const userHistory = allClaims.filter(claim => 
+                claim.approvals?.some(approval => approval?.approverUid === currentUser.uid && approval.stage === stage + 1)
+            );
+            setHistoryClaims(userHistory);
+
             setAllUsers(usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User)));
 
         } catch (error) {
