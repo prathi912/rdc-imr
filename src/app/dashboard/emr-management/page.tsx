@@ -15,10 +15,13 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format, isAfter, parseISO } from 'date-fns';
-import { Eye, Download, Edit } from 'lucide-react';
+import { Eye, Download, Edit, Send, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { AddEditCallDialog } from '@/components/emr/emr-calendar';
+import { announceEmrCall } from '@/app/actions';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
 
 function EmrLogsTab({ user }: { user: User | null }) {
     const [logs, setLogs] = useState<EmrInterest[]>([]);
@@ -174,6 +177,8 @@ export default function EmrManagementOverviewPage() {
     const [user, setUser] = useState<User | null>(null);
     const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
+    const [isAnnounceDialogOpen, setIsAnnounceDialogOpen] = useState(false);
+    const [isAnnouncing, setIsAnnouncing] = useState(false);
 
     const fetchData = useCallback(() => {
         setLoading(true);
@@ -226,6 +231,25 @@ export default function EmrManagementOverviewPage() {
         }
         return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-200 dark:border-green-700">Open</Badge>;
     }
+    
+    const handleAnnounceCall = async () => {
+      if (!selectedCall) return;
+      setIsAnnouncing(true);
+      try {
+        const result = await announceEmrCall(selectedCall.id);
+        if (result.success) {
+          toast({ title: "Success", description: "Announcement email has been sent to all staff." });
+          fetchData(); // Refresh data to show updated announcement status
+        } else {
+          toast({ variant: "destructive", title: "Failed to Announce", description: result.error });
+        }
+      } catch (error: any) {
+        toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
+      } finally {
+        setIsAnnouncing(false);
+        setIsAnnounceDialogOpen(false);
+      }
+    };
 
     const interestCounts = useMemo(() => {
         return interests.reduce((acc, interest) => {
@@ -267,6 +291,7 @@ export default function EmrManagementOverviewPage() {
                                                     <TableHead>Agency</TableHead>
                                                     <TableHead>Registrations</TableHead>
                                                     <TableHead>Status</TableHead>
+                                                    <TableHead>Announced</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow></TableHeader>
                                                 <TableBody>{calls.map(call => (
@@ -275,14 +300,28 @@ export default function EmrManagementOverviewPage() {
                                                         <TableCell className="whitespace-nowrap">{call.agency}</TableCell>
                                                         <TableCell>{interestCounts[call.id] || 0}</TableCell>
                                                         <TableCell>{getStatusBadge(call)}</TableCell>
+                                                        <TableCell>
+                                                            {call.isAnnounced ? (
+                                                                <div className="flex items-center gap-1 text-green-600"><CheckCircle className="h-4 w-4" /> Yes</div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1 text-muted-foreground"><XCircle className="h-4 w-4" /> No</div>
+                                                            )}
+                                                        </TableCell>
                                                         <TableCell className="text-right flex items-center justify-end gap-2">
                                                             <Button asChild variant="outline" size="sm">
                                                                 <Link href={`/dashboard/emr-management/${call.id}`}><Eye className="mr-2 h-4 w-4" /> Manage</Link>
                                                             </Button>
                                                             {isSuperAdmin && (
+                                                                <>
                                                                 <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>
                                                                     <Edit className="mr-2 h-4 w-4" /> Edit
                                                                 </Button>
+                                                                 {!call.isAnnounced && (
+                                                                    <Button variant="secondary" size="sm" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
+                                                                        <Send className="mr-2 h-4 w-4" /> Announce
+                                                                    </Button>
+                                                                )}
+                                                                </>
                                                             )}
                                                         </TableCell>
                                                     </TableRow>
@@ -302,6 +341,7 @@ export default function EmrManagementOverviewPage() {
                 </div>
             </div>
             {isSuperAdmin && user && (
+                <>
                 <AddEditCallDialog
                     isOpen={isAddEditDialogOpen}
                     onOpenChange={setIsAddEditDialogOpen}
@@ -309,6 +349,26 @@ export default function EmrManagementOverviewPage() {
                     user={user}
                     onActionComplete={fetchData}
                 />
+                 {selectedCall && (
+                     <AlertDialog open={isAnnounceDialogOpen} onOpenChange={setIsAnnounceDialogOpen}>
+                       <AlertDialogContent>
+                         <AlertDialogHeader>
+                           <AlertDialogTitle>Announce Funding Call?</AlertDialogTitle>
+                           <AlertDialogDescription>
+                             This will send an email notification to all staff members about the call for "{selectedCall.title}". This action cannot be undone. Are you sure?
+                           </AlertDialogDescription>
+                         </AlertDialogHeader>
+                         <AlertDialogFooter>
+                           <AlertDialogCancel>Cancel</AlertDialogCancel>
+                           <AlertDialogAction onClick={handleAnnounceCall} disabled={isAnnouncing}>
+                             {isAnnouncing && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                             Confirm & Announce
+                           </AlertDialogAction>
+                         </AlertDialogFooter>
+                       </AlertDialogContent>
+                     </AlertDialog>
+                 )}
+                </>
             )}
         </>
     );
