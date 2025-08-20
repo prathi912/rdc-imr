@@ -48,8 +48,8 @@ const createApprovalSchema = (stageIndex: number) => z.object({
     if (data.action === 'reject') {
         return !!data.comments && data.comments.length > 0;
     }
-    if (stageIndex < 2 && data.action === 'approve') { // Stage 1 (index 0) and Stage 2 (index 1)
-        return !!data.comments && data.comments.length > 0;
+    if (stageIndex < 2 && data.action === 'approve') {
+        return !!data.comments && data.comments.trim() !== '';
     }
     return true;
 }, {
@@ -59,6 +59,47 @@ const createApprovalSchema = (stageIndex: number) => z.object({
 
 
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
+
+function ResearchPaperClaimDetails({ claim, claimant }: { claim: IncentiveClaim, claimant: User | null }) {
+  const renderDetail = (label: string, value?: string | number | null | boolean | string[]) => {
+    if (value === undefined || value === null || value === '') return null;
+    let displayValue = String(value);
+    if (typeof value === 'boolean') {
+        displayValue = value ? 'Yes' : 'No';
+    }
+    if (Array.isArray(value)) {
+        displayValue = value.join(', ');
+    }
+    return (
+      <div className="grid grid-cols-2 text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span>{displayValue}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+        <h4 className="font-semibold">Research Paper Details to Verify</h4>
+        <div className="space-y-1">
+            {renderDetail('Name of the Applicant', claimant?.name)}
+            {renderDetail('Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
+            {renderDetail('Type of publication', claim.publicationType)}
+            {renderDetail('Name of Journal', claim.journalName)}
+            {renderDetail('Whether National/International', claim.locale)}
+            {renderDetail('Indexed In', claim.indexType?.toUpperCase())}
+            {renderDetail('Q Rating of the Journal', claim.journalClassification)}
+            {renderDetail('First/Corresponding Author', claim.authorType)}
+            {renderDetail('No. of Authors from PU', claim.totalPuAuthors)}
+            {renderDetail('ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
+            {renderDetail('PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
+            {renderDetail('Whether “PU” name exists', claim.isPuNameInPublication)}
+            {renderDetail('Published Month', `${claim.publicationMonth}, ${claim.publicationYear}`)}
+            {renderDetail('Author Position', 'N/A')}
+        </div>
+    </div>
+  );
+}
 
 function MembershipClaimDetails({ claim, claimant }: { claim: IncentiveClaim, claimant: User | null }) {
   const renderDetail = (label: string, value?: string | number | null) => {
@@ -76,10 +117,10 @@ function MembershipClaimDetails({ claim, claimant }: { claim: IncentiveClaim, cl
         <h4 className="font-semibold">Membership Details to Verify</h4>
         <div className="space-y-1">
             {renderDetail('Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
-            {renderDetail('Faculty', claimant?.faculty)}
+            {renderDetail('Department/Faculty', claimant?.faculty)}
             {renderDetail('Type of Membership', claim.membershipType)}
             {renderDetail('Professional Body', claim.professionalBodyName)}
-            {renderDetail('Locale', claim.membershipLocale)}
+            {renderDetail('Locale of Professional Body', claim.membershipLocale)}
             {renderDetail('Membership Number', claim.membershipNumber)}
             {renderDetail('Amount Paid', `₹${claim.membershipAmountPaid?.toLocaleString('en-IN')}`)}
             {renderDetail('Payment Date', claim.membershipPaymentDate ? new Date(claim.membershipPaymentDate).toLocaleDateString() : 'N/A')}
@@ -93,9 +134,13 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
+    const isResearchPaperClaim = claim.claimType === 'Research Papers';
     
     const approvalSchema = createApprovalSchema(stageIndex);
-    const formSchemaWithMembership = approvalSchema.refine(data => !(isMembershipClaim && data.action === 'approve') || data.fieldsVerified === true, {
+    const formSchemaWithVerification = approvalSchema.refine(data => {
+        const needsVerification = isMembershipClaim || isResearchPaperClaim;
+        return !(needsVerification && data.action === 'approve') || data.fieldsVerified === true;
+    }, {
         message: 'You must confirm that you have checked all fields.',
         path: ['fieldsVerified'],
     });
@@ -113,7 +158,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     };
 
     const form = useForm<ApprovalFormData>({
-        resolver: zodResolver(formSchemaWithMembership),
+        resolver: zodResolver(formSchemaWithVerification),
         defaultValues: {
             amount: getDefaultAmount(),
             fieldsVerified: false,
@@ -194,6 +239,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                     )}
 
                     {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
+                    {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} />}
+
 
                     <Form {...form}>
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -237,7 +284,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     </FormItem>
                                 )}
                             />
-                             {isMembershipClaim && action === 'approve' && (
+                             {(isMembershipClaim || isResearchPaperClaim) && action === 'approve' && (
                                 <FormField
                                     control={form.control}
                                     name="fieldsVerified"
