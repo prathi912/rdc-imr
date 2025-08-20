@@ -2,11 +2,11 @@
 "use client"
 
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@zod/resolvers/zod"
 import * as z from "zod"
 import type { Project, User, GrantPhase, Transaction } from "@/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -54,6 +54,9 @@ const addPhaseSchema = z.object({
   amount: z.coerce.number().positive("Amount must be a positive number."),
 })
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_FILE_TYPES = ["application/pdf"];
+
 const transactionSchema = z
   .object({
     dateOfTransaction: z.string().min(1, "Transaction date is required."),
@@ -62,7 +65,10 @@ const transactionSchema = z
     isGstRegistered: z.boolean().default(false),
     gstNumber: z.string().optional(),
     description: z.string().min(10, "Description is required."),
-    invoice: z.any().refine((files) => files?.length > 0, "An invoice file is required."),
+    invoice: z.any()
+      .refine((files) => files?.length > 0, "An invoice file is required.")
+      .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, `File size must be less than 5MB.`)
+      .refine((files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type), "Only .pdf files are accepted."),
   })
   .refine(
     (data) => {
@@ -405,7 +411,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                             <TableHead>Amount</TableHead>
                             <TableHead>GST</TableHead>
                             <TableHead>Description</TableHead>
-                            <TableHead>Invoice</TableHead>
+                            <TableHead>Invoice </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -585,15 +591,16 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   control={transactionForm.control}
                   render={({ field: { onChange, value, ...field } }) => (
                     <FormItem>
-                      <FormLabel>Invoice</FormLabel>
+                      <FormLabel>Invoice (PDF)</FormLabel>
                       <FormControl>
                         <Input
                           type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
+                          accept=".pdf"
                           onChange={(e) => onChange(e.target.files)}
                           {...field}
                         />
                       </FormControl>
+                      <FormDescription>Below 5 MB</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
