@@ -39,7 +39,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarIcon, Edit, Plus, Users, ChevronLeft, ChevronRight, Link as LinkIcon, Loader2, Upload, NotebookText, Send, Trash2, Download } from 'lucide-react';
 import type { FundingCall, User, EmrInterest, EmrEvaluation } from '@/types';
-import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, setHours, setMinutes, setSeconds } from 'date-fns';
+import { format, differenceInDays, differenceInHours, differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isAfter, setHours, setMinutes, setSeconds, isBefore } from 'date-fns';
 import { uploadFileToServer, createFundingCall, announceEmrCall } from '@/app/actions';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -74,7 +74,7 @@ const callSchema = z.object({
   path: ['interestDeadline'],
 });
 
-function AddEditCallDialog({
+export function AddEditCallDialog({
   isOpen,
   onOpenChange,
   existingCall,
@@ -183,9 +183,9 @@ function AddEditCallDialog({
                 <FormItem className="flex flex-col">
                   <FormLabel>Interest Registration Deadline</FormLabel>
                   {isMobile ? (
-                    <Input type="date" value={field.value ? format(field.value, 'yyyy-MM-dd') : ''} onChange={(e) => field.onChange(e.target.value ? parseISO(e.target.value) : undefined)} />
+                    <Input type="datetime-local" value={field.value ? format(field.value, "yyyy-MM-dd'T'HH:mm") : ''} onChange={(e) => field.onChange(e.target.value ? parseISO(e.target.value) : undefined)} />
                   ) : (
-                    <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
+                    <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP HH:mm")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /><div className="p-2 border-t"><Input type="time" value={field.value ? format(field.value, 'HH:mm') : ''} onChange={e => {const time = e.target.value; field.onChange(currentDate => setHours(setMinutes(currentDate || new Date(), parseInt(time.split(':')[1])), parseInt(time.split(':')[0])))}}/></div></PopoverContent></Popover>
                   )}
                   <FormMessage />
                 </FormItem> 
@@ -509,9 +509,6 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                                                         </Link>
                                                     </Button>
                                                 )}
-                                                {isSuperAdmin && (
-                                                    <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4 mr-1"/>Edit</Button>
-                                                )}
                                             </div>
                                          </div>
 
@@ -540,7 +537,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                         </div>
                     </div>
                 </CardContent>
-                {isSuperAdmin && (
+                {isSuperAdmin && user && (
                     <>
                         <AddEditCallDialog
                             isOpen={isAddEditDialogOpen}

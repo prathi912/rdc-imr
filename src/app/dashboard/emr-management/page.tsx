@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import * as XLSX from 'xlsx';
 import { db } from '@/lib/config';
-import { collection, query, orderBy, onSnapshot, where, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import type { FundingCall, EmrInterest, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/page-header';
@@ -15,9 +15,10 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format, isAfter, parseISO } from 'date-fns';
-import { Eye, Download } from 'lucide-react';
+import { Eye, Download, Edit } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
+import { AddEditCallDialog } from '@/components/emr/emr-calendar';
 
 function EmrLogsTab({ user }: { user: User | null }) {
     const [logs, setLogs] = useState<EmrInterest[]>([]);
@@ -171,15 +172,11 @@ export default function EmrManagementOverviewPage() {
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
     const [user, setUser] = useState<User | null>(null);
+    const [selectedCall, setSelectedCall] = useState<FundingCall | null>(null);
+    const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
 
-    useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-        }
-    }, []);
-
-    useEffect(() => {
+    const fetchData = useCallback(() => {
+        setLoading(true);
         const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
         const interestsQuery = query(collection(db, 'emrInterests'));
 
@@ -210,6 +207,15 @@ export default function EmrManagementOverviewPage() {
         };
     }, [toast]);
 
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
+        }
+        const unsubscribe = fetchData();
+        return () => unsubscribe();
+    }, [fetchData]);
+
     const getStatusBadge = (call: FundingCall) => {
         const now = new Date();
         if (call.status === 'Meeting Scheduled') {
@@ -228,64 +234,82 @@ export default function EmrManagementOverviewPage() {
         }, {} as Record<string, number>);
     }, [interests]);
 
+    const isSuperAdmin = user?.role === 'Super-admin';
+
     return (
-        <div className="container mx-auto py-10">
-            <PageHeader title="Extramural Research (EMR)" description="Manage funding calls and view submission logs." />
-            <div className="mt-8">
-                <Tabs defaultValue="calls">
-                    <TabsList>
-                        <TabsTrigger value="calls">Registrations by Call</TabsTrigger>
-                        <TabsTrigger value="logs">Submission Logs</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="calls" className="mt-4">
-                        <Card>
-                             <CardHeader>
-                                <p className="text-sm text-muted-foreground">
-                                    Below is a list of all funding calls. Click the "Manage" button on a call to view registered applicants, schedule meetings, and manage evaluations for that specific opportunity.
-                                </p>
-                            </CardHeader>
-                            <CardContent>
-                                {loading ? (
-                                    <div className="space-y-2">
-                                        <Skeleton className="h-10 w-full" />
-                                        <Skeleton className="h-10 w-full" />
-                                    </div>
-                                ) : calls.length > 0 ? (
-                                    <div className="overflow-x-auto">
-                                        <Table>
-                                            <TableHeader><TableRow>
-                                                <TableHead>Call Title</TableHead>
-                                                <TableHead>Agency</TableHead>
-                                                <TableHead>Registrations</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
-                                            </TableRow></TableHeader>
-                                            <TableBody>{calls.map(call => (
-                                                <TableRow key={call.id}>
-                                                    <TableCell className="font-medium whitespace-normal">{call.title}</TableCell>
-                                                    <TableCell className="whitespace-nowrap">{call.agency}</TableCell>
-                                                    <TableCell>{interestCounts[call.id] || 0}</TableCell>
-                                                    <TableCell>{getStatusBadge(call)}</TableCell>
-                                                    <TableCell className="text-right">
-                                                        <Button asChild variant="outline" size="sm">
-                                                            <Link href={`/dashboard/emr-management/${call.id}`}><Eye className="mr-2 h-4 w-4" /> Manage</Link>
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}</TableBody>
-                                        </Table>
-                                    </div>
-                                ) : (
-                                    <div className="text-center text-muted-foreground py-8">No funding calls have been created.</div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                    <TabsContent value="logs" className="mt-4">
-                        <EmrLogsTab user={user} />
-                    </TabsContent>
-                </Tabs>
+        <>
+            <div className="container mx-auto py-10">
+                <PageHeader title="Extramural Research (EMR)" description="Manage funding calls and view submission logs." />
+                <div className="mt-8">
+                    <Tabs defaultValue="calls">
+                        <TabsList>
+                            <TabsTrigger value="calls">Registrations by Call</TabsTrigger>
+                            <TabsTrigger value="logs">Submission Logs</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="calls" className="mt-4">
+                            <Card>
+                                 <CardHeader>
+                                    <p className="text-sm text-muted-foreground">
+                                        Below is a list of all funding calls. Click the "Manage" button on a call to view registered applicants, schedule meetings, and manage evaluations for that specific opportunity.
+                                    </p>
+                                </CardHeader>
+                                <CardContent>
+                                    {loading ? (
+                                        <div className="space-y-2">
+                                            <Skeleton className="h-10 w-full" />
+                                            <Skeleton className="h-10 w-full" />
+                                        </div>
+                                    ) : calls.length > 0 ? (
+                                        <div className="overflow-x-auto">
+                                            <Table>
+                                                <TableHeader><TableRow>
+                                                    <TableHead>Call Title</TableHead>
+                                                    <TableHead>Agency</TableHead>
+                                                    <TableHead>Registrations</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                    <TableHead className="text-right">Actions</TableHead>
+                                                </TableRow></TableHeader>
+                                                <TableBody>{calls.map(call => (
+                                                    <TableRow key={call.id}>
+                                                        <TableCell className="font-medium whitespace-normal">{call.title}</TableCell>
+                                                        <TableCell className="whitespace-nowrap">{call.agency}</TableCell>
+                                                        <TableCell>{interestCounts[call.id] || 0}</TableCell>
+                                                        <TableCell>{getStatusBadge(call)}</TableCell>
+                                                        <TableCell className="text-right flex items-center justify-end gap-2">
+                                                            <Button asChild variant="outline" size="sm">
+                                                                <Link href={`/dashboard/emr-management/${call.id}`}><Eye className="mr-2 h-4 w-4" /> Manage</Link>
+                                                            </Button>
+                                                            {isSuperAdmin && (
+                                                                <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>
+                                                                    <Edit className="mr-2 h-4 w-4" /> Edit
+                                                                </Button>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}</TableBody>
+                                            </Table>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-muted-foreground py-8">No funding calls have been created.</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        <TabsContent value="logs" className="mt-4">
+                            <EmrLogsTab user={user} />
+                        </TabsContent>
+                    </Tabs>
+                </div>
             </div>
-        </div>
+            {isSuperAdmin && user && (
+                <AddEditCallDialog
+                    isOpen={isAddEditDialogOpen}
+                    onOpenChange={setIsAddEditDialogOpen}
+                    existingCall={selectedCall}
+                    user={user}
+                    onActionComplete={fetchData}
+                />
+            )}
+        </>
     );
 }
