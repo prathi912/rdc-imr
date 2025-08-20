@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, Check, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import Link from 'next/link';
 
 interface ApprovalDialogProps {
   claim: IncentiveClaim;
@@ -39,7 +40,7 @@ const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
 const createApprovalSchema = (stageIndex: number) => z.object({
   action: z.enum(['approve', 'reject'], { required_error: 'Please select an action.' }),
-  amount: z.coerce.number().positive("Amount cannot be negative.").optional(),
+  amount: z.coerce.number().positive("Amount cannot be in negative.").optional(),
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
 }).refine(data => data.action !== 'approve' || (data.amount !== undefined && data.amount > 0), {
@@ -75,7 +76,6 @@ const researchPaperFields = [
     { id: 'publicationProof', label: 'PROOF OF PUBLICATION ATTACHED' },
     { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
     { id: 'publicationDate', label: 'Published Month & Year' },
-    { id: 'authorPosition', label: 'Author Position' }
 ];
 
 
@@ -139,7 +139,6 @@ function ResearchPaperClaimDetails({ claim, claimant, form, isChecklistEnabled }
                     {renderDetail('publicationProof', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
                     {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
                     {renderDetail('publicationDate', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
-                    {renderDetail('authorPosition', 'Author Position', 'N/A')}
                 </div>
                  {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
             </form>
@@ -252,13 +251,23 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         if (stageIndex < 2 && action === 'approve') return 'Your Comments (Required)';
         return 'Your Comments (Optional)';
     };
+    
+    const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
+    const hasProfileLink = claimant && claimant.misId;
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Stage {stageIndex + 1} Approval</DialogTitle>
-                    <DialogDescription>Review and take action on the claim for {claim.userName}.</DialogDescription>
+                    <DialogDescription>
+                        Review and take action on the claim for {' '}
+                        {hasProfileLink ? (
+                            <Link href={profileLink} target="_blank" className="text-primary hover:underline">{claim.userName}</Link>
+                        ) : (
+                            claim.userName
+                        )}.
+                    </DialogDescription>
                 </DialogHeader>
                 
                 <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-4">
