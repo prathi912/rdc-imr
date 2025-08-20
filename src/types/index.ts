@@ -236,6 +236,7 @@ export type IncentiveClaim = {
   relevantLink?: string;
   scopusLink?: string;
   authorType?: string;
+  authorPosition?: '1st' | '2nd' | '3rd' | '4th' | '5th' | '6th';
   totalAuthors?: string;
   locale?: 'National' | 'International';
   printIssn?: string;
@@ -475,5 +476,3 @@ export type LoginOtp = {
   otp: string
   expiresAt: number // Store as timestamp
 }
-
-    

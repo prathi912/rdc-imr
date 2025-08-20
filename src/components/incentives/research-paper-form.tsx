@@ -75,6 +75,7 @@ const researchPaperSchema = z
       .refine((val) => val === true, { message: "PU name must be present in the publication." }),
     totalCorrespondingAuthors: z.coerce.number().min(1, "Please specify the number of corresponding authors."),
     correspondingAuthorNames: z.string().min(2, "Please specify the name(s) of corresponding authors."),
+    authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
     bookCoAuthors: z
       .array(
         z.object({
@@ -160,6 +161,8 @@ const sdgGoalsList = [
 ]
 
 const coAuthorRoles = ["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"]
+const authorPositions = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+
 const wosTypeOptions = [
   { value: "SCIE", label: "SCIE" },
   { value: "SSCI", label: "SSCI" },
@@ -954,6 +957,30 @@ export function ResearchPaperForm() {
                   </FormMessage>
                 </div>
                 <Separator />
+                <FormField
+                    control={form.control}
+                    name="authorPosition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Author Position</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select your position" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {authorPositions.map((pos) => (
+                              <SelectItem key={pos} value={pos}>
+                                {pos}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
