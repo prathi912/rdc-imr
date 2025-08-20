@@ -261,8 +261,6 @@ export function ResearchPaperForm() {
   }, [form, append, fields.length])
 
   const indexType = form.watch("indexType")
-  const relevantLink = form.watch("relevantLink")
-  const journalName = form.watch("journalName")
 
   const SPECIAL_POLICY_FACULTIES = [
     "Faculty of Applied Sciences",
@@ -489,31 +487,7 @@ export function ResearchPaperForm() {
               <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">RESEARCH PAPER DETAILS</h3>
                 <Separator />
-                 <FormField
-                    control={form.control}
-                    name="scopusLink"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Scopus Article Link</FormLabel>
-                        <div className="flex items-center gap-2">
-                            <FormControl>
-                                <Input placeholder="https://www.scopus.com/record/..." {...field} disabled={isSubmitting} />
-                            </FormControl>
-                             <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleFetchData}
-                                disabled={isSubmitting || isFetching || !form.getValues('scopusLink')}
-                                title="Fetch data from Scopus"
-                            >
-                                {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                                Fetch Data
-                            </Button>
-                        </div>
-                         <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                
                 <FormField
                   control={form.control}
                   name="publicationType"
@@ -565,6 +539,35 @@ export function ResearchPaperForm() {
                     </FormItem>
                   )}
                 />
+
+                {(indexType === 'scopus' || indexType === 'both') && (
+                  <FormField
+                      control={form.control}
+                      name="scopusLink"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Scopus Article Link</FormLabel>
+                          <div className="flex items-center gap-2">
+                              <FormControl>
+                                  <Input placeholder="https://www.scopus.com/record/..." {...field} disabled={isSubmitting} />
+                              </FormControl>
+                              <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleFetchData}
+                                  disabled={isSubmitting || isFetching || !form.getValues('scopusLink')}
+                                  title="Fetch data from Scopus"
+                              >
+                                  {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                  Fetch Data
+                              </Button>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                )}
+
                 <FormField
                   control={form.control}
                   name="journalClassification"
