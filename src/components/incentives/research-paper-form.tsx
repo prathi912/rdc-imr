@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -20,12 +21,11 @@ import { db } from "@/lib/config"
 import { collection, doc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim } from "@/types"
 import {
-  fetchScopusDataByUrl,
   getJournalWebsite,
-  fetchWosDataByUrl,
   uploadFileToServer,
   findUserByMisId,
 } from "@/app/actions"
+import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2 } from "lucide-react"
 import {
   DropdownMenu,
@@ -208,9 +208,7 @@ export function ResearchPaperForm() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isFetchingScopus, setIsFetchingScopus] = useState(false)
-  const [isFetchingWos, setIsFetchingWos] = useState(false)
-  const [isFindingWebsite, setIsFindingWebsite] = useState(false)
+  const [isFetching, setIsFetching] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false)
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false)
   const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
@@ -310,134 +308,51 @@ export function ResearchPaperForm() {
     }
   }, [availableIndexTypes, form])
 
-  const handleFetchScopusData = async () => {
-    const link = form.getValues("relevantLink")
+  const handleFetchData = async () => {
+    const link = form.getValues('scopusLink');
     if (!link) {
-      toast({
-        variant: "destructive",
-        title: "No Link Provided",
-        description: "Please enter a link to fetch data from.",
-      })
-      return
-    }
-
-    if (!user) {
-      toast({
-        variant: "destructive",
-        title: "Not Logged In",
-        description: "Could not identify the claimant. Please log in again.",
-      })
-      return
-    }
-
-    setIsFetchingScopus(true)
-    toast({ title: "Fetching Scopus Data", description: "Please wait..." })
-
-    try {
-      const result = await fetchScopusDataByUrl(link, user.name)
-      if (result.success && result.data) {
-        const { title, journalName } = result.data
-        form.setValue("paperTitle", title, { shouldValidate: true })
-        form.setValue("journalName", journalName, { shouldValidate: true })
-
-        toast({ title: "Success", description: "Form fields have been pre-filled." })
-
-        if (result.claimantIsAuthor === false) {
-          // check for explicit false
-          toast({
-            variant: "destructive",
-            title: "Author Not Found",
-            description: `Could not verify "${user.name}" in the author list. Please check the publication link and your profile name.`,
-            duration: 8000,
-          })
-        }
-      } else {
-        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to fetch data." })
-      }
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." })
-    } finally {
-      setIsFetchingScopus(false)
-    }
-  }
-
-  const handleFetchWosData = async () => {
-    const link = form.getValues("relevantLink")
-    if (!link) {
-      toast({
-        variant: "destructive",
-        title: "No Link Provided",
-        description: "Please enter a link to fetch data from.",
-      })
-      return
+      toast({ variant: 'destructive', title: 'No Scopus Link', description: 'Please enter a Scopus article link to fetch data.' });
+      return;
     }
     if (!user) {
-      toast({
-        variant: "destructive",
-        title: "Not Logged In",
-        description: "Could not identify the claimant. Please log in again.",
-      })
-      return
+      toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant.' });
+      return;
     }
 
-    setIsFetchingWos(true)
-    toast({ title: "Fetching WoS Data", description: "Please wait..." })
-
+    setIsFetching(true);
+    toast({ title: 'Fetching Scopus Data', description: 'Please wait, this may take a moment...' });
+    
     try {
-      const result = await fetchWosDataByUrl(link, user.name)
-      if (result.success && result.data) {
-        const { title, journalName } = result.data
-        form.setValue("paperTitle", title, { shouldValidate: true })
-        form.setValue("journalName", journalName, { shouldValidate: true })
-
-        toast({ title: "Success", description: "Form fields have been pre-filled from Web of Science." })
-
-        if (result.claimantIsAuthor === false) {
-          toast({
-            variant: "destructive",
-            title: "Author Not Found",
-            description: `Could not verify "${user.name}" in the author list. Please check the publication link and your profile name.`,
-            duration: 8000,
-          })
+        const result = await fetchAdvancedScopusData(link, user.name);
+        if (result.success && result.data) {
+            form.setValue('paperTitle', result.data.paperTitle, { shouldValidate: true });
+            form.setValue('journalName', result.data.journalName, { shouldValidate: true });
+            if (result.data.journalClassification) {
+                form.setValue('journalClassification', result.data.journalClassification, { shouldValidate: true });
+            }
+            form.setValue('publicationMonth', result.data.publicationMonth, { shouldValidate: true });
+            form.setValue('publicationYear', result.data.publicationYear, { shouldValidate: true });
+            form.setValue('relevantLink', result.data.relevantLink, { shouldValidate: true });
+            form.setValue('isPuNameInPublication', result.data.isPuNameInPublication, { shouldValidate: true });
+            if (result.data.journalWebsite) {
+                form.setValue('journalWebsite', result.data.journalWebsite, { shouldValidate: true });
+            }
+            if (result.data.printIssn) {
+                form.setValue('printIssn', result.data.printIssn, { shouldValidate: true });
+            }
+            if (result.data.electronicIssn) {
+                form.setValue('electronicIssn', result.data.electronicIssn, { shouldValidate: true });
+            }
+            toast({ title: 'Success', description: 'Form fields have been pre-filled from Scopus.' });
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data from Scopus.' });
         }
-      } else {
-        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to fetch data." })
-      }
     } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." })
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
     } finally {
-      setIsFetchingWos(false)
+        setIsFetching(false);
     }
-  }
-
-  const handleFindWebsite = async () => {
-    const name = form.getValues("journalName")
-    if (!name) {
-      toast({
-        variant: "destructive",
-        title: "No Journal Name",
-        description: "Please enter a journal name to find its website.",
-      })
-      return
-    }
-
-    setIsFindingWebsite(true)
-    toast({ title: "Finding Website", description: "AI is searching for the journal website..." })
-
-    try {
-      const result = await getJournalWebsite({ journalName: name })
-      if (result.success && result.url) {
-        form.setValue("journalWebsite", result.url, { shouldValidate: true })
-        toast({ title: "Success", description: "Journal website link has been filled." })
-      } else {
-        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to find website." })
-      }
-    } catch (error: any) {
-      toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." })
-    } finally {
-      setIsFindingWebsite(false)
-    }
-  }
+  };
 
   const handleSearchCoPi = async () => {
     if (!coPiSearchTerm) return
@@ -574,6 +489,31 @@ export function ResearchPaperForm() {
               <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">RESEARCH PAPER DETAILS</h3>
                 <Separator />
+                 <FormField
+                    control={form.control}
+                    name="scopusLink"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Scopus Article Link</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <FormControl>
+                                <Input placeholder="https://www.scopus.com/record/..." {...field} disabled={isSubmitting} />
+                            </FormControl>
+                             <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleFetchData}
+                                disabled={isSubmitting || isFetching || !form.getValues('scopusLink')}
+                                title="Fetch data from Scopus"
+                            >
+                                {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                                Fetch Data
+                            </Button>
+                        </div>
+                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 <FormField
                   control={form.control}
                   name="publicationType"
@@ -625,72 +565,6 @@ export function ResearchPaperForm() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="relevantLink"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>DOI Link</FormLabel>
-                      <div className="flex items-center gap-2">
-                        <FormControl>
-                          <Input placeholder="https://doi.org/..." {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleFetchScopusData}
-                          disabled={
-                            isSubmitting ||
-                            isFetchingScopus ||
-                            !relevantLink ||
-                            (indexType !== "scopus" && indexType !== "both")
-                          }
-                          title="Fetch data from Scopus"
-                        >
-                          {isFetchingScopus ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Bot className="h-4 w-4" />
-                          )}
-                          Scopus
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={handleFetchWosData}
-                          disabled={
-                            isSubmitting ||
-                            isFetchingWos ||
-                            !relevantLink ||
-                            (indexType !== "wos" && indexType !== "both")
-                          }
-                          title="Fetch data from Web of Science"
-                        >
-                          {isFetchingWos ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                          WoS
-                        </Button>
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                {(indexType === "scopus" || indexType === "both") && (
-                  <FormField
-                    control={form.control}
-                    name="scopusLink"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Scopus Link</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://www.scopus.com/record/..." {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
                 <FormField
                   control={form.control}
                   name="journalClassification"
@@ -763,30 +637,13 @@ export function ResearchPaperForm() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Name of Journal/Proceedings</FormLabel>
-                      <div className="flex items-center gap-2">
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter the full name of the journal or proceedings"
-                            {...field}
-                            disabled={isSubmitting}
-                          />
-                        </FormControl>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={handleFindWebsite}
-                          disabled={isSubmitting || isFindingWebsite || !journalName}
-                          title="Find Journal Website with AI"
-                        >
-                          {isFindingWebsite ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Bot className="h-4 w-4" />
-                          )}
-                          <span className="sr-only">Find Website</span>
-                        </Button>
-                      </div>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Enter the full name of the journal or proceedings"
+                          {...field}
+                          disabled={isSubmitting}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -812,6 +669,19 @@ export function ResearchPaperForm() {
                       <FormLabel>Title of the Paper published</FormLabel>
                       <FormControl>
                         <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="relevantLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>DOI Link</FormLabel>
+                      <FormControl>
+                        <Input placeholder="https://doi.org/..." {...field} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
