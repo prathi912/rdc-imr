@@ -123,23 +123,27 @@ function ResearchPaperClaimDetails({ claim, claimant, form, isChecklistEnabled }
             <h4 className="font-semibold">Research Paper Details to Verify</h4>
             {isChecklistEnabled && <h4 className="font-semibold text-xs pr-4">Verification</h4>}
         </div>
-        <div className="space-y-1">
-            {renderDetail('name', 'Name of the Applicant', claimant?.name)}
-            {renderDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
-            {renderDetail('publicationType', 'Type of publication', claim.publicationType)}
-            {renderDetail('journalName', 'Name of Journal', claim.journalName)}
-            {renderDetail('locale', 'Whether National/International', claim.locale)}
-            {renderDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
-            {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
-            {renderDetail('authorType', 'First/Corresponding Author', claim.authorType)}
-            {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
-            {renderDetail('issn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
-            {renderDetail('publicationProof', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
-            {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
-            {renderDetail('publicationDate', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
-            {renderDetail('authorPosition', 'Author Position', 'N/A')}
-        </div>
-         {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
+        <Form {...form}>
+            <form>
+                <div className="space-y-1">
+                    {renderDetail('name', 'Name of the Applicant', claimant?.name)}
+                    {renderDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
+                    {renderDetail('publicationType', 'Type of publication', claim.publicationType)}
+                    {renderDetail('journalName', 'Name of Journal', claim.journalName)}
+                    {renderDetail('locale', 'Whether National/International', claim.locale)}
+                    {renderDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
+                    {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
+                    {renderDetail('authorType', 'First/Corresponding Author', claim.authorType)}
+                    {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
+                    {renderDetail('issn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
+                    {renderDetail('publicationProof', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
+                    {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
+                    {renderDetail('publicationDate', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
+                    {renderDetail('authorPosition', 'Author Position', 'N/A')}
+                </div>
+                 {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
+            </form>
+        </Form>
     </div>
   );
 }
