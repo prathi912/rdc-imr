@@ -86,7 +86,7 @@ const researchPaperSchema = z
           isExternal: z.boolean(),
         }),
       )
-      .min(1, "At least one author from PU is required."),
+      .min(1, "At least one author is required."),
     totalPuStudentAuthors: z.coerce.number().optional(),
     puStudentNames: z.string().optional(),
   })
@@ -1087,7 +1087,7 @@ export function ResearchPaperForm() {
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <FormMessage />
+                       <FormMessage />
                     </FormItem>
                   )}
                 />
