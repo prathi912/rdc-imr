@@ -11,7 +11,7 @@ import { Loader2, Printer } from 'lucide-react';
 // NOTE: This component is a placeholder for a future feature to export to Excel.
 // The `exportClaimToExcel` action is not yet implemented.
 
-export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, claimant }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null, claimant: User | null }) {
+export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, claimant, onTakeAction }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null, claimant: User | null, onTakeAction?: () => void }) {
     const { toast } = useToast();
     const [isPrinting, setIsPrinting] = useState(false);
 
@@ -298,6 +298,9 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     )}
                 </div>
                 <DialogFooter className="gap-2">
+                    {onTakeAction && (
+                        <Button onClick={onTakeAction}>Take Action</Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>

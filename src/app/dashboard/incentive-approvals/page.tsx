@@ -19,6 +19,7 @@ import { ApprovalDialog } from './approval-dialog';
 export default function IncentiveApprovalsPage() {
     const [user, setUser] = useState<User | null>(null);
     const [claims, setClaims] = useState<IncentiveClaim[]>([]);
+    const [allUsers, setAllUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
     const [approvalStage, setApprovalStage] = useState<number | null>(null);
@@ -26,24 +27,33 @@ export default function IncentiveApprovalsPage() {
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isApprovalOpen, setIsApprovalOpen] = useState(false);
 
-    const fetchClaims = useCallback(async (currentUser: User, stage: number) => {
+    const fetchClaimsAndUsers = useCallback(async (currentUser: User, stage: number) => {
         setLoading(true);
         try {
             const claimsCollection = collection(db, 'incentiveClaims');
             const statusToFetch = stage === 0 ? 'Pending' : `Pending Stage ${stage + 1} Approval`;
             
-            const q = query(
+            const claimsQuery = query(
                 claimsCollection, 
                 where('status', '==', statusToFetch), 
                 orderBy('submissionDate', 'desc')
             );
+
+            const usersQuery = query(collection(db, 'users'));
             
-            const snapshot = await getDocs(q);
-            const claimsList = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
+            const [claimsSnapshot, usersSnapshot] = await Promise.all([
+                getDocs(claimsQuery),
+                getDocs(usersQuery)
+            ]);
+
+            const claimsList = claimsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
             setClaims(claimsList);
+            const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User));
+            setAllUsers(usersList);
+
         } catch (error) {
-            console.error('Error fetching claims for approval:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch claims.' });
+            console.error('Error fetching data:', error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch claims or user data.' });
         } finally {
             setLoading(false);
         }
@@ -61,14 +71,14 @@ export default function IncentiveApprovalsPage() {
             setApprovalStage(stage);
 
             if (stage !== null) {
-                fetchClaims(parsedUser, stage);
+                fetchClaimsAndUsers(parsedUser, stage);
             } else {
                 setLoading(false);
             }
         } else {
             setLoading(false);
         }
-    }, [fetchClaims]);
+    }, [fetchClaimsAndUsers]);
 
     const handleViewDetails = (claim: IncentiveClaim) => {
         setSelectedClaim(claim);
@@ -82,7 +92,7 @@ export default function IncentiveApprovalsPage() {
 
     const handleActionComplete = () => {
         if (user && approvalStage !== null) {
-            fetchClaims(user, approvalStage);
+            fetchClaimsAndUsers(user, approvalStage);
         }
     };
     
@@ -127,8 +137,10 @@ export default function IncentiveApprovalsPage() {
                                                 <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
                                                 <TableCell><Badge variant="secondary">{claim.status}</Badge></TableCell>
                                                 <TableCell className="text-right space-x-2">
-                                                    <Button variant="ghost" size="icon" onClick={() => handleViewDetails(claim)}><Eye className="h-4 w-4" /></Button>
-                                                    <Button onClick={() => handleOpenApproval(claim)}>Approve/Reject</Button>
+                                                    <Button variant="outline" onClick={() => handleViewDetails(claim)}>
+                                                        <Eye className="h-4 w-4 mr-2" />
+                                                        View &amp; Approve
+                                                    </Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -145,7 +157,17 @@ export default function IncentiveApprovalsPage() {
             </div>
             {selectedClaim && user && (
                 <>
-                    <ClaimDetailsDialog claim={selectedClaim} open={isDetailsOpen} onOpenChange={setIsDetailsOpen} currentUser={user} />
+                    <ClaimDetailsDialog 
+                        claim={selectedClaim} 
+                        open={isDetailsOpen} 
+                        onOpenChange={setIsDetailsOpen} 
+                        currentUser={user}
+                        claimant={allUsers.find(u => u.uid === selectedClaim.uid) || null}
+                        onTakeAction={() => {
+                            setIsDetailsOpen(false);
+                            handleOpenApproval(selectedClaim);
+                        }}
+                    />
                     <ApprovalDialog 
                         claim={selectedClaim} 
                         approver={user}
