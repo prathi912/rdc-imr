@@ -60,6 +60,26 @@ function UserClaimsList({ claims, claimType }: { claims: IncentiveClaim[], claim
         return `/dashboard/incentive-claim/${slug}?claimId=${claim.id}`;
     }
 
+    const getSimplifiedStatus = (claim: IncentiveClaim) => {
+        if (claim.status === 'Submitted to Accounts') {
+            return (
+                <div className="flex flex-col items-end">
+                    <Badge variant="default">Approved</Badge>
+                    <span className="text-xs text-muted-foreground mt-1">
+                        Final Amount: ₹{claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A'}
+                    </span>
+                </div>
+            );
+        }
+
+        const highestApprovalStage = claim.approvals?.filter(a => a?.status === 'Approved').length || 0;
+        if (highestApprovalStage > 0 && claim.status.startsWith('Pending Stage')) {
+             return <Badge variant="secondary">Stage {highestApprovalStage} Approved</Badge>;
+        }
+        
+        return <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>;
+    };
+
     return (
         <div className="space-y-4">
             {claims.map(claim => (
@@ -80,7 +100,7 @@ function UserClaimsList({ claims, claimType }: { claims: IncentiveClaim[], claim
                                 </Link>
                             </Button>
                         ) : (
-                            <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                           getSimplifiedStatus(claim)
                         )}
                     </CardContent>
                 </Card>
@@ -337,9 +357,8 @@ export default function IncentiveClaimPage() {
   }, []);
 
   const draftClaims = userClaims.filter(c => c.status === 'Draft');
-  const pendingClaims = userClaims.filter(c => c.status === 'Pending');
-  const acceptedClaims = userClaims.filter(c => c.status === 'Accepted');
-  const rejectedClaims = userClaims.filter(c => c.status === 'Rejected');
+  const otherClaims = userClaims.filter(c => c.status !== 'Draft');
+
 
   return (
     <div className="container mx-auto max-w-5xl py-10">
@@ -350,13 +369,11 @@ export default function IncentiveClaimPage() {
       />
       <div className="mt-8">
         <Tabs defaultValue="apply" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="apply">Apply</TabsTrigger>
+            <TabsTrigger value="my-claims">My Claims ({otherClaims.length})</TabsTrigger>
             <TabsTrigger value="co-author">Co-Author Claims ({coAuthorClaims.length})</TabsTrigger>
             <TabsTrigger value="draft">Drafts ({draftClaims.length})</TabsTrigger>
-            <TabsTrigger value="pending">Pending ({pendingClaims.length})</TabsTrigger>
-            <TabsTrigger value="accepted">Accepted ({acceptedClaims.length})</TabsTrigger>
-            <TabsTrigger value="rejected">Rejected ({rejectedClaims.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="apply" className="mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -380,20 +397,14 @@ export default function IncentiveClaimPage() {
               ))}
             </div>
           </TabsContent>
+           <TabsContent value="my-claims">
+             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={otherClaims} claimType="other" />}
+          </TabsContent>
            <TabsContent value="co-author">
             {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} onClaimApplied={() => fetchAllData(user!.uid)} />}
           </TabsContent>
           <TabsContent value="draft">
              {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" />}
-          </TabsContent>
-          <TabsContent value="pending">
-             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={pendingClaims} claimType="other" />}
-          </TabsContent>
-          <TabsContent value="accepted">
-            {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={acceptedClaims} claimType="other" />}
-          </TabsContent>
-          <TabsContent value="rejected">
-            {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={rejectedClaims} claimType="other" />}
           </TabsContent>
         </Tabs>
       </div>

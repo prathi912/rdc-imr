@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -53,9 +54,11 @@ export async function processIncentiveClaimAction(
     if (!settings.incentiveApprovers || settings.incentiveApprovers.length <= stageIndex) {
         return { success: false, error: 'Approval workflow is not configured correctly.' };
     }
-    if (approver.email?.toLowerCase() !== settings.incentiveApprovers[stageIndex].email.toLowerCase()) {
+    const currentStageApprover = settings.incentiveApprovers.find(a => a.stage === stageIndex + 1);
+    if (!currentStageApprover || approver.email?.toLowerCase() !== currentStageApprover.email.toLowerCase()) {
         return { success: false, error: 'You are not authorized to perform this action for this stage.' };
     }
+
 
     const newApproval: ApprovalStage = {
       approverUid: approver.uid,
@@ -68,7 +71,12 @@ export async function processIncentiveClaimAction(
     };
     
     const approvals = claim.approvals || [];
+    // Ensure the array is long enough, fill with null if needed
+    while (approvals.length <= stageIndex) {
+        approvals.push(null as any); 
+    }
     approvals[stageIndex] = newApproval;
+
 
     let newStatus: IncentiveClaim['status'];
     if (action === 'reject') {
@@ -87,34 +95,7 @@ export async function processIncentiveClaimAction(
       finalApprovedAmount: data.amount // Keep updating the final amount at each approval stage
     });
     
-    // Notify the claimant
-    if (claim.userEmail) {
-        const claimTitle = claim.paperTitle || claim.patentTitle || claim.publicationTitle || 'Your Claim';
-        const subject = `Update on Your Incentive Claim: ${claimTitle}`;
-        const html = `
-            <div ${EMAIL_STYLES.background}>
-                ${EMAIL_STYLES.logo}
-                <p style="color:#ffffff;">Dear ${claim.userName},</p>
-                <p style="color:#e0e0e0;">
-                  The status of your incentive claim for "<strong style="color:#ffffff;">${claimTitle}</strong>" has been updated to 
-                  <strong style="color:#ffca28;">${newStatus}</strong>.
-                </p>
-                <div style="margin-top:20px; padding:15px; border:1px solid #4f5b62; border-radius:6px; background-color:#2c3e50;">
-                    <h4 style="color:#ffffff; margin-top:0;">Remarks from ${approver.name} (Stage ${stageIndex + 1}):</h4>
-                    <p style="color:#e0e0e0;">${data.comments || 'No comments provided.'}</p>
-                    ${action === 'approve' ? `<p style="color:#e0e0e0;"><strong>Approved Amount:</strong> ₹${data.amount?.toLocaleString('en-IN')}</p>` : ''}
-                </div>
-                <p style="color:#e0e0e0;">
-                  You can view the full details on the 
-                  <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim" style="color:#64b5f6; text-decoration:underline;">
-                    PU Research Projects Portal
-                  </a>.
-                </p>
-                ${EMAIL_STYLES.footer}
-            </div>
-        `;
-        await sendEmail({ to: claim.userEmail, subject, html, from: 'default' });
-    }
+    // Notifications and emails to applicants are removed as per new requirement.
     
     await logActivity('INFO', `Incentive claim ${action}d`, { claimId, stage: stageIndex + 1, approver: approver.name });
     return { success: true };
