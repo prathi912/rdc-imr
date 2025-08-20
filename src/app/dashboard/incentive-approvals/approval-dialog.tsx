@@ -46,14 +46,14 @@ const createApprovalSchema = (stageIndex: number) => z.object({
   path: ['amount'],
 }).refine(data => {
     if (data.action === 'reject') {
-        return !!data.comments && data.comments.length > 10;
+        return !!data.comments && data.comments.length > 0;
     }
     if (stageIndex < 2 && data.action === 'approve') { // Stage 1 (index 0) and Stage 2 (index 1)
-        return !!data.comments && data.comments.length > 10;
+        return !!data.comments && data.comments.length > 0;
     }
     return true;
 }, {
-  message: 'Comments are required for this action (min 10 characters).',
+  message: 'Comments are required for this action.',
   path: ['comments'],
 });
 
