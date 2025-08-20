@@ -20,7 +20,7 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
     const userRef = adminDb.collection('users').doc(claim.uid);
     const userSnap = await userRef.get();
     if (!userSnap.exists) {
-      return { success: false, error: 'Claimant user profile not found.' };
+        return { success: false, error: 'Claimant user profile not found.' };
     }
     const user = userSnap.data() as User;
     
@@ -37,6 +37,9 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
         linebreaks: true,
     });
 
+    const approval1 = claim.approvals?.find(a => a.stage === 1);
+    const approval2 = claim.approvals?.find(a => a.stage === 2);
+
     const data = {
         name: user.name,
         designation: user.designation || 'N/A',
@@ -49,6 +52,8 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
         membership_number: claim.membershipNumber || 'N/A',
         amount_paid: claim.membershipAmountPaid?.toLocaleString('en-IN') || 'N/A',
         payment_date: claim.membershipPaymentDate ? new Date(claim.membershipPaymentDate).toLocaleDateString('en-GB') : 'N/A',
+        approver_1: approval1?.status === 'Approved' ? '✓' : '',
+        approver_2: approval2?.status === 'Approved' ? '✓' : '',
     };
     
     doc.setData(data);
