@@ -37,9 +37,9 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         linebreaks: true,
     });
 
-    const approval1 = claim.approvals?.find(a => a.stage === 1);
-    const approval2 = claim.approvals?.find(a => a.stage === 2);
-    const approval3 = claim.approvals?.find(a => a.stage === 3);
+    const approval1 = claim.approvals?.find(a => a?.stage === 1);
+    const approval2 = claim.approvals?.find(a => a?.stage === 2);
+    const approval3 = claim.approvals?.find(a => a?.stage === 3);
     
     const getVerificationMark = (approval: typeof approval1, fieldId: string) => {
         if (!approval || approval.status !== 'Approved') return '';
@@ -58,14 +58,16 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         indexed: claim.indexType?.toUpperCase() || 'N/A',
         q_rating: claim.journalClassification || 'N/A',
         role: claim.authorType || 'N/A',
-        total_authors: claim.bookCoAuthors?.length || 'N/A',
+        author_position: claim.authorPosition || 'N/A',
+        total_authors: claim.totalPuAuthors || 'N/A',
         print_issn: claim.printIssn || 'N/A',
-        author_po: 'N/A', // This placeholder exists in the doc but not the form
         e_issn: claim.electronicIssn || 'N/A', 
         publish_month: claim.publicationMonth || 'N/A',
         publish_year: claim.publicationYear || 'N/A',
-        approver_1: approval1?.status === 'Approved' ? '✓' : '',
-        approver_2: approval2?.status === 'Approved' ? '✓' : '',
+        
+        approver_1: approval1?.status === 'Approved' ? '✓' : '✗',
+        approver_2: approval2?.status === 'Approved' ? '✓' : '✗',
+        
         approver1_comments: approval1?.comments || '',
         approver1_amount: approval1?.approvedAmount?.toLocaleString('en-IN') || '',
         approver2_comments: approval2?.comments || '',
