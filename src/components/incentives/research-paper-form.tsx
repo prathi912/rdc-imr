@@ -218,21 +218,27 @@ export function ResearchPaperForm() {
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
     defaultValues: {
-      publicationType: undefined,
+      publicationType: '',
       indexType: undefined,
-      relevantLink: "",
-      scopusLink: "",
+      relevantLink: '',
+      scopusLink: '',
       journalClassification: undefined,
       wosType: undefined,
-      journalName: "",
-      journalWebsite: "",
-      paperTitle: "",
-      locale: "International",
-      printIssn: "",
-      electronicIssn: "",
+      journalName: '',
+      journalWebsite: '',
+      paperTitle: '',
+      locale: 'International',
+      printIssn: '',
+      electronicIssn: '',
+      publicationMonth: '',
+      publicationYear: '',
       sdgGoals: [],
       bookCoAuthors: [],
       isPuNameInPublication: false,
+      totalCorrespondingAuthors: 1,
+      correspondingAuthorNames: '',
+      totalPuStudentAuthors: 0,
+      puStudentNames: '',
     },
   })
 
@@ -1023,7 +1029,7 @@ export function ResearchPaperForm() {
                       <FormLabel>UN Sustainable Development Goals (SDGs)</FormLabel>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="w-full justify-between font-normal bg-transparent">
+                          <Button variant="outline" className="w-full justify-between font-normal">
                             {field.value?.length > 0 ? `${field.value.length} selected` : "Select relevant goals"}
                             <ChevronDown className="h-4 w-4 opacity-50" />
                           </Button>
