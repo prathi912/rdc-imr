@@ -2958,16 +2958,6 @@ export async function bulkUploadEmrProjects(
           };
       });
 
-      let sanctionDate;
-      if (row.sanction_date) {
-        if (row.sanction_date instanceof Date) { sanctionDate = row.sanction_date.toISOString(); } 
-        else if (typeof row.sanction_date === "number") { sanctionDate = excelDateToJSDate(row.sanction_date).toISOString(); } 
-        else if (typeof row.sanction_date === "string") {
-          const parsedDate = new Date(row.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'));
-          sanctionDate = !isNaN(parsedDate.getTime()) ? parsedDate.toISOString() : undefined;
-        }
-      }
-
       const interestDoc: Omit<EmrInterest, 'id'> = {
         callId: 'BULK_UPLOADED',
         callTitle: projectTitle,
@@ -2985,8 +2975,18 @@ export async function bulkUploadEmrProjects(
         durationAmount: `Amount: ${row['Total Amount']?.toLocaleString('en-IN')} | Duration: ${row['Duration of Project']}`,
         isBulkUploaded: true,
         isOpenToPi: false,
-        sanctionDate: sanctionDate,
       };
+
+      if (row.sanction_date) {
+        if (row.sanction_date instanceof Date) { interestDoc.sanctionDate = row.sanction_date.toISOString(); } 
+        else if (typeof row.sanction_date === "number") { interestDoc.sanctionDate = excelDateToJSDate(row.sanction_date).toISOString(); } 
+        else if (typeof row.sanction_date === "string") {
+          const parsedDate = new Date(row.sanction_date.replace(/(\d{2})-(\d{2})-(\d{4})/, '$3-$2-$1'));
+          if (!isNaN(parsedDate.getTime())) {
+              interestDoc.sanctionDate = parsedDate.toISOString();
+          }
+        }
+      }
 
       await adminDb.collection('emrInterests').add(interestDoc);
       successfulCount++;
@@ -3170,6 +3170,7 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
   
 
     
+
 
 
 
