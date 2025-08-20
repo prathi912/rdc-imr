@@ -47,8 +47,8 @@ export default function ForgotPasswordPage() {
 
   const onSubmit = async (data: ForgotPasswordFormValues) => {
     try {
-      // Use the new API route to check if the user's domain is allowed first.
-      const checkRes = await fetch('/api/check-user-exists', {
+      // Use the dedicated API route to check if the user's domain is allowed.
+      const checkRes = await fetch('/api/is-domain-allowed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: data.email }),
@@ -58,8 +58,8 @@ export default function ForgotPasswordPage() {
       
       // We send the email regardless of existence to prevent email enumeration,
       // but we block disallowed domains.
-      if (!checkRes.ok && checkData.error) {
-        toast({ variant: 'destructive', title: 'Access Denied', description: checkData.error });
+      if (!checkRes.ok || !checkData.allowed) {
+        toast({ variant: 'destructive', title: 'Access Denied', description: checkData.error || 'This email domain is not permitted.' });
         return;
       }
 
