@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, ArrowUpDown, ChevronDown, ShieldCheck, Loader2 } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ChevronDown, ShieldCheck, Loader2, Library, Users2 } from "lucide-react";
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -51,6 +51,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { bulkGrantModuleAccess } from '@/app/actions';
 
 const ROLES: User['role'][] = ['faculty', 'admin', 'CRO'];
 const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin';
@@ -214,6 +215,8 @@ export default function ManageUsersPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'name', direction: 'ascending' });
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [isBulkActionSubmitting, setIsBulkActionSubmitting] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -343,6 +346,19 @@ export default function ManageUsersPage() {
     }
   }, [fetchUsersAndClaims, toast]);
   
+  const handleBulkGrant = async (moduleId: string) => {
+    setIsBulkActionSubmitting(true);
+    const result = await bulkGrantModuleAccess(selectedUsers, moduleId);
+    if (result.success) {
+      toast({ title: 'Success', description: `Granted access to '${moduleId}' for ${selectedUsers.length} users.` });
+      setSelectedUsers([]);
+      fetchUsersAndClaims();
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
+    }
+    setIsBulkActionSubmitting(false);
+  };
+  
   if (loading) {
     return (
       <div className="container mx-auto py-10">
@@ -362,6 +378,9 @@ export default function ManageUsersPage() {
 
   const isCurrentUserSuperAdmin = currentUser?.role === 'Super-admin';
   const availableRoles = isCurrentUserSuperAdmin ? [...ROLES, SUPER_ADMIN_ROLE] : ROLES;
+  
+  const isAllSelected = sortedAndFilteredUsers.length > 0 && selectedUsers.length === sortedAndFilteredUsers.length;
+  const isSomeSelected = selectedUsers.length > 0 && selectedUsers.length < sortedAndFilteredUsers.length;
 
   return (
     <div className="container mx-auto py-10">
@@ -393,6 +412,19 @@ export default function ManageUsersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                   <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={isAllSelected}
+                      indeterminate={isSomeSelected}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedUsers(sortedAndFilteredUsers.map(u => u.uid));
+                        } else {
+                          setSelectedUsers([]);
+                        }
+                      }}
+                    />
+                  </TableHead>
                   <TableHead>
                      <Button variant="ghost" onClick={() => requestSort('name')}>
                         Name <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -428,7 +460,19 @@ export default function ManageUsersPage() {
                    const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
 
                    return (
-                    <TableRow key={user.uid}>
+                    <TableRow key={user.uid} data-state={selectedUsers.includes(user.uid) && "selected"}>
+                       <TableCell>
+                        <Checkbox
+                          checked={selectedUsers.includes(user.uid)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedUsers([...selectedUsers, user.uid]);
+                            } else {
+                              setSelectedUsers(selectedUsers.filter(id => id !== user.uid));
+                            }
+                          }}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         <div>
                             {user.misId ? (
@@ -520,6 +564,28 @@ export default function ManageUsersPage() {
               </TableBody>
             </Table>
           </CardContent>
+           {selectedUsers.length > 0 && isCurrentUserSuperAdmin && (
+              <CardFooter className="p-4 border-t sticky bottom-0 bg-background/95">
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">{selectedUsers.length} user(s) selected</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" disabled={isBulkActionSubmitting}>
+                        <Library className="mr-2 h-4 w-4" /> Grant Module Access
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {ALL_MODULES.map(module => (
+                        <DropdownMenuItem key={module.id} onSelect={() => handleBulkGrant(module.id)}>
+                          {module.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                   {isBulkActionSubmitting && <Loader2 className="h-5 w-5 animate-spin" />}
+                </div>
+              </CardFooter>
+          )}
         </Card>
       </div>
        <ProfileDetailsDialog user={userToView} open={!!userToView} onOpenChange={() => setUserToView(null)} />

@@ -43,6 +43,31 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
   }
 }
 
+export async function bulkGrantModuleAccess(userIds: string[], moduleId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!userIds || userIds.length === 0 || !moduleId) {
+      return { success: false, error: 'User IDs and a module ID are required.' };
+    }
+    const batch = adminDb.batch();
+    const usersRef = adminDb.collection('users');
+
+    userIds.forEach(uid => {
+      const userRef = usersRef.doc(uid);
+      batch.update(userRef, {
+        allowedModules: FieldValue.arrayUnion(moduleId)
+      });
+    });
+
+    await batch.commit();
+    await logActivity('INFO', 'Bulk module access granted', { userIds, moduleId });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in bulkGrantModuleAccess:", error);
+    await logActivity('ERROR', 'Failed to grant bulk module access', { userIds, moduleId, error: error.message, stack: error.stack });
+    return { success: false, error: error.message || 'Failed to update user permissions.' };
+  }
+}
+
 export async function getEmrInterests(callId: string): Promise<EmrInterest[]> {
   try {
     const interestsRef = adminDb.collection('emrInterests');
@@ -3170,6 +3195,7 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
   
 
     
+
 
 
 
