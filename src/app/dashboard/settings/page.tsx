@@ -25,7 +25,7 @@ import {
   updateSystemSettings,
   checkMisIdExists,
 } from "@/app/actions"
-import type { User, SystemSettings, CroAssignment } from "@/types"
+import type { User, SystemSettings, CroAssignment, ApproverSetting } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   onAuthStateChanged,
@@ -183,10 +183,10 @@ const goaInstitutes = [
     "Parul College of Engineering",
     "Parul College of Information Technology & Computer Science",
     "Parul College of Management",
+    "Parul College of Nursing",
     "Parul College of Pharmacy",
     "Parul College of Physiotherapy",
-    "Parul College of Nursing",
-    "University Office",
+    "University Office"
 ];
 
 
@@ -502,21 +502,22 @@ export default function SettingsPage() {
     }
   }
 
-  const handle2faToggle = async (enabled: boolean) => {
-    if (!systemSettings) return
-    setIsSavingSettings(true)
-    const newSettings = { ...systemSettings, is2faEnabled: enabled }
-    setSystemSettings(newSettings) // Optimistic update
-    const result = await updateSystemSettings(newSettings)
+  const handleSystemSettingsSave = async (newSettings: SystemSettings) => {
+    setIsSavingSettings(true);
+    const result = await updateSystemSettings(newSettings);
     if (result.success) {
-      toast({ title: "System settings updated." })
+      setSystemSettings(newSettings);
+      toast({ title: 'System settings updated.' });
     } else {
-      toast({ variant: "destructive", title: "Error", description: result.error })
-      // Revert optimistic update
-      setSystemSettings({ ...systemSettings, is2faEnabled: !enabled })
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
-    setIsSavingSettings(false)
-  }
+    setIsSavingSettings(false);
+  };
+
+  const handle2faToggle = async (enabled: boolean) => {
+    if (!systemSettings) return;
+    await handleSystemSettingsSave({ ...systemSettings, is2faEnabled: enabled });
+  };
 
   const addAllowedDomain = async () => {
     if (!systemSettings || !newAllowedDomain.trim()) return
@@ -533,35 +534,14 @@ export default function SettingsPage() {
       return
     }
 
-    setIsSavingSettings(true)
-    const newSettings = { ...systemSettings, allowedDomains: [...currentDomains, domain] }
-    const result = await updateSystemSettings(newSettings)
-
-    if (result.success) {
-      setSystemSettings(newSettings)
-      setNewAllowedDomain("")
-      toast({ title: "Domain added successfully." })
-    } else {
-      toast({ variant: "destructive", title: "Error", description: result.error })
-    }
-    setIsSavingSettings(false)
+    await handleSystemSettingsSave({ ...systemSettings, allowedDomains: [...currentDomains, domain] });
+    setNewAllowedDomain("");
   }
 
   const removeAllowedDomain = async (domainToRemove: string) => {
     if (!systemSettings) return
-
-    setIsSavingSettings(true)
     const currentDomains = systemSettings.allowedDomains || []
-    const newSettings = { ...systemSettings, allowedDomains: currentDomains.filter((d) => d !== domainToRemove) }
-    const result = await updateSystemSettings(newSettings)
-
-    if (result.success) {
-      setSystemSettings(newSettings)
-      toast({ title: "Domain removed successfully." })
-    } else {
-      toast({ variant: "destructive", title: "Error", description: result.error })
-    }
-    setIsSavingSettings(false)
+    await handleSystemSettingsSave({ ...systemSettings, allowedDomains: currentDomains.filter((d) => d !== domainToRemove) });
   }
 
   const addCroAssignment = async (values: CroAssignmentFormValues) => {
@@ -579,36 +559,28 @@ export default function SettingsPage() {
         return;
     }
 
-    setIsSavingSettings(true);
-    const newSettings = { ...systemSettings, croAssignments: [...currentAssignments, newAssignment] };
-    const result = await updateSystemSettings(newSettings);
-
-    if (result.success) {
-        setSystemSettings(newSettings);
-        croAssignmentForm.reset();
-        toast({ title: "CRO pre-assignment added." });
-    } else {
-        toast({ variant: "destructive", title: "Error", description: result.error });
-    }
-    setIsSavingSettings(false);
+    await handleSystemSettingsSave({ ...systemSettings, croAssignments: [...currentAssignments, newAssignment] });
+    croAssignmentForm.reset();
   };
 
   const removeCroAssignment = async (emailToRemove: string) => {
     if (!systemSettings) return;
-
-    setIsSavingSettings(true);
     const currentAssignments = systemSettings.croAssignments || [];
-    const newSettings = { ...systemSettings, croAssignments: currentAssignments.filter(c => c.email !== emailToRemove) };
-    const result = await updateSystemSettings(newSettings);
-
-    if (result.success) {
-        setSystemSettings(newSettings);
-        toast({ title: "CRO pre-assignment removed." });
-    } else {
-        toast({ variant: "destructive", title: "Error", description: result.error });
-    }
-    setIsSavingSettings(false);
+    await handleSystemSettingsSave({ ...systemSettings, croAssignments: currentAssignments.filter(c => c.email !== emailToRemove) });
   };
+
+  const handleApproverChange = (stage: 1 | 2 | 3, email: string) => {
+    if (!systemSettings) return;
+    const approvers = systemSettings.incentiveApprovers || [];
+    const otherApprovers = approvers.filter(a => a.stage !== stage);
+    const newApprovers: ApproverSetting[] = [...otherApprovers];
+    if (email) {
+      newApprovers.push({ stage, email });
+    }
+    newApprovers.sort((a, b) => a.stage - b.stage);
+    handleSystemSettingsSave({ ...systemSettings, incentiveApprovers: newApprovers });
+  };
+
 
   const isAcademicInfoLocked = isCro || isPrincipal
 
@@ -741,6 +713,26 @@ export default function SettingsPage() {
                         </TableBody>
                     </Table>
                 )}
+              </div>
+              <div className="space-y-4">
+                <Label className="text-base">Incentive Approval Workflow</Label>
+                <p className="text-sm text-muted-foreground">
+                  Define the email addresses for the three stages of incentive claim approval.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[1, 2, 3].map(stage => (
+                        <FormItem key={stage}>
+                            <FormLabel>Stage {stage} Approver Email</FormLabel>
+                            <Input 
+                                type="email"
+                                placeholder={`approver.stage${stage}@paruluniversity.ac.in`}
+                                defaultValue={systemSettings.incentiveApprovers?.find(a => a.stage === stage)?.email || ''}
+                                onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3, e.target.value)}
+                                disabled={isSavingSettings}
+                            />
+                        </FormItem>
+                    ))}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -1172,3 +1164,4 @@ export default function SettingsPage() {
     </div>
   )
 }
+
