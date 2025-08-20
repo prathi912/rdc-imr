@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState } from 'react';
@@ -22,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 interface ApprovalDialogProps {
   claim: IncentiveClaim;
@@ -53,7 +55,7 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
     const form = useForm<ApprovalFormData>({
         resolver: zodResolver(approvalSchema),
         defaultValues: {
-            amount: claim.calculatedIncentive || 0,
+            amount: claim.finalApprovedAmount || claim.calculatedIncentive || 0,
         }
     });
 
@@ -77,58 +79,82 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
             setIsSubmitting(false);
         }
     };
+
+    const previousApprovals = (claim.approvals || []).filter(a => a.stage < stageIndex + 1);
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Stage {stageIndex + 1} Approval</DialogTitle>
                     <DialogDescription>Review and take action on the claim for {claim.userName}.</DialogDescription>
                 </DialogHeader>
-                <Form {...form}>
-                    <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
-                        <FormField
-                            name="action"
-                            control={form.control}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Action</FormLabel>
-                                    <FormControl>
-                                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4">
-                                            <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="approve" /></FormControl><FormLabel className="font-normal">Approve</FormLabel></FormItem>
-                                            <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="reject" /></FormControl><FormLabel className="font-normal">Reject</FormLabel></FormItem>
-                                        </RadioGroup>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        {action === 'approve' && (
-                             <FormField
-                                name="amount"
+                
+                <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-4">
+                    {previousApprovals.length > 0 && (
+                        <div className="space-y-4">
+                            <h4 className="font-semibold text-sm">Previous Approval History</h4>
+                            {previousApprovals.map((approval, index) => (
+                                <div key={index} className="p-4 border rounded-lg bg-muted/50 space-y-2 text-sm">
+                                    <div className="flex justify-between items-center">
+                                        <p className="font-semibold">Stage {approval.stage}: {approval.approverName}</p>
+                                        <p className={`font-semibold ${approval.status === 'Approved' ? 'text-green-600' : 'text-red-600'}`}>{approval.status}</p>
+                                    </div>
+                                    <p><strong className="text-muted-foreground">Comments:</strong> {approval.comments || 'N/A'}</p>
+                                    {approval.status === 'Approved' && (
+                                        <p><strong className="text-muted-foreground">Approved Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
+                                    )}
+                                </div>
+                            ))}
+                            <Separator />
+                        </div>
+                    )}
+
+                    <Form {...form}>
+                        <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                            <FormField
+                                name="action"
                                 control={form.control}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Approved Amount (INR)</FormLabel>
-                                        <FormControl><Input type="number" {...field} /></FormControl>
+                                        <FormLabel>Your Action</FormLabel>
+                                        <FormControl>
+                                            <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4">
+                                                <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="approve" /></FormControl><FormLabel className="font-normal">Approve</FormLabel></FormItem>
+                                                <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="reject" /></FormControl><FormLabel className="font-normal">Reject</FormLabel></FormItem>
+                                            </RadioGroup>
+                                        </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
-                        )}
-                         <FormField
-                            name="comments"
-                            control={form.control}
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Comments {action === 'reject' && '(Required)'}</FormLabel>
-                                    <FormControl><Textarea {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
+                            {action === 'approve' && (
+                                <FormField
+                                    name="amount"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Approved Amount (INR)</FormLabel>
+                                            <FormControl><Input type="number" {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
                             )}
-                        />
-                    </form>
-                </Form>
+                            <FormField
+                                name="comments"
+                                control={form.control}
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Your Comments {action === 'reject' && '(Required)'}</FormLabel>
+                                        <FormControl><Textarea {...field} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </form>
+                    </Form>
+                </div>
                  <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button type="submit" form="approval-form" disabled={isSubmitting}>
