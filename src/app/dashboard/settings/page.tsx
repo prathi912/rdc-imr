@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { db, auth } from "@/lib/config"
-import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore"
 import {
   uploadFileToServer,
   checkHODUniqueness,
@@ -571,18 +571,52 @@ export default function SettingsPage() {
     await handleSystemSettingsSave({ ...systemSettings, croAssignments: currentAssignments.filter(c => c.email !== emailToRemove) });
   };
 
-  const handleApproverChange = (stage: 1 | 2 | 3, email: string) => {
+  const handleApproverChange = async (stage: 1 | 2 | 3, email: string) => {
     if (!systemSettings) return;
     const approvers = systemSettings.incentiveApprovers || [];
     const otherApprovers = approvers.filter(a => a.stage !== stage);
     const newApprovers: ApproverSetting[] = [...otherApprovers];
+    
+    // Find the previous approver for this stage to remove their access
+    const previousApproverEmail = approvers.find(a => a.stage === stage)?.email;
+
     if (email) {
       newApprovers.push({ stage, email });
     }
     newApprovers.sort((a, b) => a.stage - b.stage);
-    handleSystemSettingsSave({ ...systemSettings, incentiveApprovers: newApprovers });
-  };
 
+    await handleSystemSettingsSave({ ...systemSettings, incentiveApprovers: newApprovers });
+    
+    // After saving, update user permissions
+    const usersRef = collection(db, 'users');
+
+    // Remove permissions from old approver
+    if (previousApproverEmail) {
+        const oldApproverQuery = query(usersRef, where("email", "==", previousApproverEmail));
+        const oldApproverSnapshot = await getDocs(oldApproverQuery);
+        if (!oldApproverSnapshot.empty) {
+            const userDoc = oldApproverSnapshot.docs[0];
+            const userData = userDoc.data() as User;
+            const updatedModules = (userData.allowedModules || []).filter(m => !m.startsWith('incentive-approver-') && m !== 'incentive-approvals');
+            await updateDoc(userDoc.ref, { allowedModules: updatedModules });
+        }
+    }
+
+    // Add permissions to new approver
+    if (email) {
+        const newApproverQuery = query(usersRef, where("email", "==", email));
+        const newApproverSnapshot = await getDocs(newApproverQuery);
+        if (!newApproverSnapshot.empty) {
+            const userDoc = newApproverSnapshot.docs[0];
+            const userData = userDoc.data() as User;
+            const approverModule = `incentive-approver-${stage}`;
+            let updatedModules = userData.allowedModules || [];
+            if (!updatedModules.includes(approverModule)) updatedModules.push(approverModule);
+            if (!updatedModules.includes('incentive-approvals')) updatedModules.push('incentive-approvals');
+            await updateDoc(userDoc.ref, { allowedModules: updatedModules });
+        }
+    }
+  };
 
   const isAcademicInfoLocked = isCro || isPrincipal
 

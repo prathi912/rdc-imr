@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -12,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Eye } from 'lucide-react';
-import { ClaimDetailsDialog } from '../manage-incentive-claims/page';
+import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { ApprovalDialog } from './approval-dialog';
 
 export default function IncentiveApprovalsPage() {
