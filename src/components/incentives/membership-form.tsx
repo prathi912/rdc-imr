@@ -58,6 +58,7 @@ export function MembershipForm() {
       professionalBodyName: '',
       membershipProof: undefined,
       membershipSelfDeclaration: false,
+      membershipLocale: 'International',
     },
   });
 

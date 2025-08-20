@@ -19,9 +19,8 @@ import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
 import { collection, doc, setDoc } from "firebase/firestore"
-import type { User, IncentiveClaim } from "@/types"
+import type { User, IncentiveClaim, Author } from "@/types"
 import {
-  getJournalWebsite,
   uploadFileToServer,
   findUserByMisId,
 } from "@/app/actions"
@@ -227,7 +226,7 @@ export function ResearchPaperForm() {
       journalName: "",
       journalWebsite: "",
       paperTitle: "",
-      locale: undefined,
+      locale: "International",
       printIssn: "",
       electronicIssn: "",
       sdgGoals: [],
