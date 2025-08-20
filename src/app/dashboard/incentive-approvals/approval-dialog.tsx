@@ -62,27 +62,28 @@ const createApprovalSchema = (stageIndex: number) => z.object({
 
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
 
-const researchPaperFields = [
+const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
     { id: 'name', label: 'Name of the Applicant' },
     { id: 'designation', label: 'Designation and Dept.' },
     { id: 'publicationType', label: 'Type of publication' },
     { id: 'journalName', label: 'Name of Journal' },
     { id: 'locale', label: 'Whether National/International' },
     { id: 'indexType', label: 'Indexed In' },
+    { id: 'wosType', label: 'WoS Type' },
     { id: 'journalClassification', label: 'Q Rating of the Journal' },
     { id: 'authorType', label: 'Role of the Author' },
     { id: 'totalPuAuthors', label: 'No. of Authors from PU' },
-    { id: 'issn', label: 'ISSN' },
-    { id: 'publicationProof', label: 'PROOF OF PUBLICATION ATTACHED' },
+    { id: 'printIssn', label: 'ISSN' }, // Simplified for display
+    { id: 'publicationProofUrls', label: 'PROOF OF PUBLICATION ATTACHED' },
     { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
-    { id: 'publicationDate', label: 'Published Month & Year' },
+    { id: 'publicationMonth', label: 'Published Month & Year' }, // Simplified for display
     { id: 'authorPosition', label: 'Author Position' },
 ];
 
 
 function ResearchPaperClaimDetails({ claim, claimant, form, isChecklistEnabled }: { claim: IncentiveClaim, claimant: User | null, form: any, isChecklistEnabled: boolean }) {
   const renderDetail = (fieldId: string, label: string, value?: string | number | null | boolean | string[]) => {
-    if (value === undefined || value === null || value === '') return null;
+    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
     let displayValue = String(value);
     if (typeof value === 'boolean') {
         displayValue = value ? 'Yes' : 'No';
@@ -124,27 +125,24 @@ function ResearchPaperClaimDetails({ claim, claimant, form, isChecklistEnabled }
             <h4 className="font-semibold">Research Paper Details to Verify</h4>
             {isChecklistEnabled && <h4 className="font-semibold text-xs pr-4">Verification</h4>}
         </div>
-        <Form {...form}>
-            <form>
-                <div className="space-y-1">
-                    {renderDetail('name', 'Name of the Applicant', claimant?.name)}
-                    {renderDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
-                    {renderDetail('publicationType', 'Type of publication', claim.publicationType)}
-                    {renderDetail('journalName', 'Name of Journal', claim.journalName)}
-                    {renderDetail('locale', 'Whether National/International', claim.locale)}
-                    {renderDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
-                    {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
-                    {renderDetail('authorType', 'Role of the Author', claim.authorType)}
-                    {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
-                    {renderDetail('issn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
-                    {renderDetail('publicationProof', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
-                    {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
-                    {renderDetail('publicationDate', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
-                    {renderDetail('authorPosition', 'Author Position', claim.authorPosition)}
-                </div>
-                 {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
-            </form>
-        </Form>
+        <div className="space-y-1">
+            {renderDetail('name', 'Name of the Applicant', claimant?.name)}
+            {renderDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
+            {renderDetail('publicationType', 'Type of publication', claim.publicationType)}
+            {renderDetail('journalName', 'Name of Journal', claim.journalName)}
+            {renderDetail('locale', 'Whether National/International', claim.locale)}
+            {renderDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
+            {renderDetail('wosType', 'WoS Type', claim.wosType)}
+            {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
+            {renderDetail('authorType', 'Role of the Author', claim.authorType)}
+            {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
+            {renderDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
+            {renderDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
+            {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
+            {renderDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
+            {renderDetail('authorPosition', 'Author Position', claim.authorPosition)}
+        </div>
+        {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
     </div>
   );
 }
@@ -185,12 +183,32 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isChecklistEnabled = (isResearchPaperClaim && stageIndex < 2);
     
+    // Dynamically determine which fields need verification based on the claim's data
+    const getFieldsToVerify = () => {
+        if (!isResearchPaperClaim) return [];
+
+        const claimWithUserData = {
+            ...claim,
+            name: claimant?.name,
+            designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`
+        };
+
+        return allPossibleResearchPaperFields
+            .filter(field => {
+                const value = (claimWithUserData as any)[field.id];
+                return value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0);
+            })
+            .map(field => field.id);
+    };
+    const fieldsToVerify = getFieldsToVerify();
+    
     const approvalSchema = createApprovalSchema(stageIndex);
     const formSchemaWithVerification = approvalSchema.refine(data => {
         if (!isChecklistEnabled || data.action !== 'approve') return true;
-        return researchPaperFields.every(field => data.verifiedFields?.[field.id] !== undefined);
+        // Check if every required field has a boolean value (true or false)
+        return fieldsToVerify.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
     }, {
-        message: 'You must verify all fields (mark as correct or incorrect).',
+        message: 'You must verify all visible fields (mark as correct or incorrect).',
         path: ['verifiedFields'],
     });
 
@@ -294,11 +312,11 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                         </div>
                     )}
 
-                    {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
-                    {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} />}
-
-
                     <Form {...form}>
+                        {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
+                        {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} />}
+
+
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                             <FormField
                                 name="action"
