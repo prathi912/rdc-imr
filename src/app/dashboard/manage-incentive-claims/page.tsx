@@ -75,7 +75,7 @@ export default function ManageIncentiveClaimsPage() {
     try {
       const usersCollection = collection(db, 'users');
       const userSnapshot = await getDocs(usersCollection);
-      const userList = userSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as User));
+      const userList = userSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User));
       setUsers(userList);
 
       const claimsCollection = collection(db, 'incentiveClaims');
@@ -95,7 +95,7 @@ export default function ManageIncentiveClaimsPage() {
       setAllClaims(claimList);
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast({ variant: 'destructive', title: "Error", description: "Could not fetch incentive claims or user data." });
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch incentive claims or user data." });
     } finally {
       setLoading(false);
     }
@@ -444,7 +444,13 @@ export default function ManageIncentiveClaimsPage() {
             </Card>
         </Tabs>
       </div>
-      <ClaimDetailsDialog claim={selectedClaim} open={!!selectedClaim} onOpenChange={() => setSelectedClaim(null)} currentUser={currentUser} />
+      <ClaimDetailsDialog 
+        claim={selectedClaim} 
+        open={!!selectedClaim} 
+        onOpenChange={() => setSelectedClaim(null)} 
+        currentUser={currentUser}
+        claimant={users.find(u => u.uid === selectedClaim?.uid) || null}
+      />
     </div>
   );
 }

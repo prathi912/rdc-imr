@@ -5,20 +5,21 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import type { User, IncentiveClaim } from '@/types';
+import type { User, IncentiveClaim, Author } from '@/types';
 import { Loader2, Printer } from 'lucide-react';
 
 // NOTE: This component is a placeholder for a future feature to export to Excel.
 // The `exportClaimToExcel` action is not yet implemented.
 
-export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null }) {
+export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, claimant }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null, claimant: User | null }) {
     const { toast } = useToast();
     const [isPrinting, setIsPrinting] = useState(false);
 
     if (!claim) return null;
 
-    const renderDetail = (label: string, value?: string | number | boolean | string[] | { name: string, email: string, role: string }[]) => {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
+        
         let displayValue: React.ReactNode = String(value);
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
@@ -27,7 +28,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: {
              if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
                 displayValue = (
                     <ul className="list-disc pl-5">
-                        {(value as { name: string, email: string, role: string }[]).map((author, idx) => (
+                        {(value as Author[]).map((author, idx) => (
                             <li key={idx}><strong>{author.name}</strong> ({author.role}) - {author.email}</li>
                         ))}
                     </ul>
@@ -44,15 +45,20 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: {
         );
     };
     
-    const renderLinkDetail = (label: string, value?: string) => {
-      if (!value) return null;
+    const renderLinkDetail = (label: string, value?: string | string[]) => {
+      if (!value || value.length === 0) return null;
+      const urls = Array.isArray(value) ? value : [value];
       return (
         <div className="grid grid-cols-3 gap-2 py-1">
           <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
           <dd className="col-span-2">
-            <a href={value} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
-              View Document
-            </a>
+            <div className="flex flex-col gap-1">
+                {urls.map((url, index) => (
+                    <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                        View Document {urls.length > 1 ? index + 1 : ''}
+                    </a>
+                ))}
+            </div>
           </dd>
         </div>
       );
@@ -70,7 +76,12 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: {
                 </DialogHeader>
                 <div className="max-h-[70vh] overflow-y-auto pr-4 space-y-2 text-sm">
                     {renderDetail("Claimant Name", claim.userName)}
-                    {renderDetail("Claimant Email", claim.userEmail)}
+                    {renderDetail("Email", claim.userEmail)}
+                    {renderDetail("Designation", claimant?.designation)}
+                    {renderDetail("Department", claimant?.department)}
+                    {renderDetail("Institute", claimant?.institute)}
+                    {renderDetail("Faculty", claimant?.faculty)}
+                    {renderDetail("Campus", claimant?.campus)}
                     {renderDetail("MIS ID", claim.misId)}
                     {renderDetail("ORCID ID", claim.orcidId)}
                     {renderDetail("Claim Type", claim.claimType)}
@@ -82,17 +93,30 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: {
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle)}
-                            {renderLinkDetail("Relevant Link", claim.relevantLink)}
+                            {renderLinkDetail("DOI Link", claim.relevantLink)}
+                            {renderLinkDetail("Scopus Link", claim.scopusLink)}
                             {renderDetail("Journal Name", claim.journalName)}
                             {renderLinkDetail("Journal Website", claim.journalWebsite)}
                             {renderDetail("Publication Type", claim.publicationType)}
                             {renderDetail("Index Type", claim.indexType?.toUpperCase())}
                             {renderDetail("Journal Classification", claim.journalClassification)}
                             {renderDetail("WoS Type", claim.wosType)}
-                            {renderDetail("Impact Factor", claim.impactFactor)}
-                            {renderDetail("Publication Phase", claim.publicationPhase)}
+                            {renderDetail("Locale", claim.locale)}
+                            {renderDetail("Print ISSN", claim.printIssn)}
+                            {renderDetail("Electronic ISSN", claim.electronicIssn)}
+                            {renderDetail("Publication Month", claim.publicationMonth)}
+                            {renderDetail("Publication Year", claim.publicationYear)}
+                            {renderDetail("SDGs", claim.sdgGoals)}
+                            {renderLinkDetail("Publication Proofs", claim.publicationProofUrls)}
+                            {renderDetail("PU Name in Publication", claim.isPuNameInPublication)}
+                            {renderDetail("Total Corresponding Authors", claim.totalCorrespondingAuthors)}
+                            {renderDetail("Corresponding Author(s)", claim.correspondingAuthorNames)}
+                            {renderDetail("Authors from PU", claim.bookCoAuthors)}
+                            {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
+                            {renderDetail("PU Student Names", claim.puStudentNames)}
                         </>
                     )}
+
 
                     {claim.claimType === 'Patents' && (
                          <>
@@ -241,11 +265,24 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser }: {
                     )}
 
                     <hr className="my-2" />
-                    <h4 className="font-semibold text-base mt-2">Author & Benefit Details</h4>
-                    {renderDetail("Author Type", claim.authorType)}
+                    <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>
                     {renderDetail("Benefit Mode", claim.benefitMode)}
-                    {renderDetail("Total Authors", claim.totalAuthors)}
-                     {claim.claimType === 'Books' && renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                    {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                    {renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                    
+                    {claim.approvals && claim.approvals.length > 0 && (
+                        <div className="space-y-2 pt-2">
+                           <h4 className="font-semibold text-base">Approval History</h4>
+                           {claim.approvals.map(approval => (
+                               <div key={approval.stage} className="p-3 border rounded-md bg-muted/50">
+                                   <p><strong>Stage {approval.stage}:</strong> {approval.status} by {approval.approverName}</p>
+                                   <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleString()}</p>
+                                   <p className="mt-1"><strong>Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
+                                   <p className="mt-1"><strong>Comments:</strong> {approval.comments}</p>
+                               </div>
+                           ))}
+                        </div>
+                    )}
                     
                     {canViewBankDetails && claim.bankDetails && (
                         <>
