@@ -39,7 +39,7 @@ const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
 const createApprovalSchema = (stageIndex: number) => z.object({
   action: z.enum(['approve', 'reject'], { required_error: 'Please select an action.' }),
-  amount: z.coerce.number().optional(),
+  amount: z.coerce.number().positive("Amount cannot be negative.").optional(),
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
 }).refine(data => data.action !== 'approve' || (data.amount !== undefined && data.amount > 0), {
