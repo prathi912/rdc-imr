@@ -15,10 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Eye } from 'lucide-react';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { ApprovalDialog } from './approval-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function IncentiveApprovalsPage() {
     const [user, setUser] = useState<User | null>(null);
-    const [claims, setClaims] = useState<IncentiveClaim[]>([]);
+    const [pendingClaims, setPendingClaims] = useState<IncentiveClaim[]>([]);
+    const [historyClaims, setHistoryClaims] = useState<IncentiveClaim[]>([]);
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const { toast } = useToast();
@@ -31,25 +33,32 @@ export default function IncentiveApprovalsPage() {
         setLoading(true);
         try {
             const claimsCollection = collection(db, 'incentiveClaims');
-            const statusToFetch = stage === 0 ? 'Pending' : `Pending Stage ${stage + 1} Approval`;
+            const usersQuery = query(collection(db, 'users'));
             
-            const claimsQuery = query(
+            // Fetch Pending Claims
+            const statusToFetch = stage === 0 ? 'Pending' : `Pending Stage ${stage + 1} Approval`;
+            const pendingClaimsQuery = query(
                 claimsCollection, 
                 where('status', '==', statusToFetch), 
                 orderBy('submissionDate', 'desc')
             );
 
-            const usersQuery = query(collection(db, 'users'));
+            // Fetch History Claims
+            const historyClaimsQuery = query(
+                claimsCollection,
+                where(`approvals.${stage}.approverUid`, '==', currentUser.uid),
+                orderBy('submissionDate', 'desc')
+            );
             
-            const [claimsSnapshot, usersSnapshot] = await Promise.all([
-                getDocs(claimsQuery),
+            const [pendingSnapshot, historySnapshot, usersSnapshot] = await Promise.all([
+                getDocs(pendingClaimsQuery),
+                getDocs(historyClaimsQuery),
                 getDocs(usersQuery)
             ]);
 
-            const claimsList = claimsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
-            setClaims(claimsList);
-            const usersList = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User));
-            setAllUsers(usersList);
+            setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
+            setHistoryClaims(historySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
+            setAllUsers(usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User)));
 
         } catch (error) {
             console.error('Error fetching data:', error);
@@ -113,46 +122,71 @@ export default function IncentiveApprovalsPage() {
         )
     }
 
+    const renderTable = (claimsList: IncentiveClaim[], isHistory = false) => (
+        <Table>
+            <TableHeader><TableRow>
+                <TableHead>Claimant</TableHead>
+                <TableHead>Claim Type</TableHead>
+                <TableHead>Submitted On</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+            </TableRow></TableHeader>
+            <TableBody>
+                {claimsList.map(claim => (
+                    <TableRow key={claim.id}>
+                        <TableCell>{claim.userName}</TableCell>
+                        <TableCell><Badge variant="outline">{claim.claimType}</Badge></TableCell>
+                        <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
+                        <TableCell><Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge></TableCell>
+                        <TableCell className="text-right space-x-2">
+                            <Button variant="outline" onClick={() => handleViewDetails(claim)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                            </Button>
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+
     return (
         <>
             <div className="container mx-auto py-10">
                 <PageHeader title={`Incentive Approvals (Stage ${approvalStage + 1})`} description="Claims awaiting your review and approval." />
                 <div className="mt-8">
-                    <Card>
-                        <CardContent className="pt-6">
-                            {claims.length > 0 ? (
-                                <Table>
-                                    <TableHeader><TableRow>
-                                        <TableHead>Claimant</TableHead>
-                                        <TableHead>Claim Type</TableHead>
-                                        <TableHead>Submitted On</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow></TableHeader>
-                                    <TableBody>
-                                        {claims.map(claim => (
-                                            <TableRow key={claim.id}>
-                                                <TableCell>{claim.userName}</TableCell>
-                                                <TableCell><Badge variant="outline">{claim.claimType}</Badge></TableCell>
-                                                <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
-                                                <TableCell><Badge variant="secondary">{claim.status}</Badge></TableCell>
-                                                <TableCell className="text-right space-x-2">
-                                                    <Button variant="outline" onClick={() => handleViewDetails(claim)}>
-                                                        <Eye className="h-4 w-4 mr-2" />
-                                                        View &amp; Approve
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            ) : (
-                                <div className="text-center py-12 text-muted-foreground">
-                                    <p>There are no claims awaiting your approval at this stage.</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                     <Tabs defaultValue="pending">
+                        <TabsList>
+                            <TabsTrigger value="pending">Pending ({pendingClaims.length})</TabsTrigger>
+                            <TabsTrigger value="history">History ({historyClaims.length})</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="pending" className="mt-4">
+                            <Card>
+                                <CardContent className="pt-6">
+                                    {pendingClaims.length > 0 ? (
+                                        renderTable(pendingClaims)
+                                    ) : (
+                                        <div className="text-center py-12 text-muted-foreground">
+                                            <p>There are no claims awaiting your approval at this stage.</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                        <TabsContent value="history" className="mt-4">
+                            <Card>
+                                <CardContent className="pt-6">
+                                    {historyClaims.length > 0 ? (
+                                        renderTable(historyClaims, true)
+                                    ) : (
+                                        <div className="text-center py-12 text-muted-foreground">
+                                            <p>You have not processed any claims yet.</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    </Tabs>
                 </div>
             </div>
             {selectedClaim && user && (
@@ -164,8 +198,12 @@ export default function IncentiveApprovalsPage() {
                         currentUser={user}
                         claimant={allUsers.find(u => u.uid === selectedClaim.uid) || null}
                         onTakeAction={() => {
-                            setIsDetailsOpen(false);
-                            handleOpenApproval(selectedClaim);
+                            if (selectedClaim.status === `Pending Stage ${approvalStage + 1} Approval` || selectedClaim.status === 'Pending') {
+                                setIsDetailsOpen(false);
+                                handleOpenApproval(selectedClaim);
+                            } else {
+                                toast({ variant: 'default', title: 'Action Not Available', description: 'This claim is not at your current approval stage.' });
+                            }
                         }}
                     />
                     <ApprovalDialog 
