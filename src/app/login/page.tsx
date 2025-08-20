@@ -137,6 +137,18 @@ export default function LoginPage() {
     if (!user.allowedModules || user.allowedModules.length === 0) {
       user.allowedModules = getDefaultModulesForRole(user.role, user.designation)
     }
+    
+    // Check for special incentive approver role from system settings
+    const systemSettings = await getSystemSettings();
+    const approverSetting = systemSettings.incentiveApprovers?.find(a => a.email.toLowerCase() === user.email.toLowerCase());
+    
+    if (approverSetting) {
+        const approverModule = `incentive-approver-${approverSetting.stage}`;
+        if (!user.allowedModules?.includes(approverModule)) {
+            user.allowedModules = [...(user.allowedModules || []), approverModule, 'incentive-approvals'];
+        }
+    }
+
 
     await setDoc(userDocRef, user, { merge: true })
     

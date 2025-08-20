@@ -145,6 +145,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'my-projects', href: '/dashboard/my-projects', tooltip: 'My Projects', icon: Book, label: 'My Projects' },
     { id: 'emr-calendar', href: '/dashboard/emr-calendar', tooltip: 'EMR Calendar', icon: Calendar, label: 'EMR Calendar' },
     { id: 'incentive-claim', href: '/dashboard/incentive-claim', tooltip: 'Incentive Claims', icon: Award, label: 'Incentive Claims' },
+    { id: 'incentive-approvals', href: '/dashboard/incentive-approvals', tooltip: 'Incentive Approvals', icon: NotebookPen, label: 'Incentive Approvals' },
     { id: 'evaluator-dashboard', href: '/dashboard/evaluator-dashboard', tooltip: 'Evaluation Queue', icon: ClipboardCheck, label: 'Evaluation Queue' },
     { id: 'my-evaluations', href: '/dashboard/my-evaluations', tooltip: 'My Evaluations', icon: History, label: 'My IMR Evaluations' },
     { id: 'schedule-meeting', href: '/dashboard/schedule-meeting', tooltip: 'Schedule Meeting', icon: CalendarClock, label: 'Schedule Meeting' },
@@ -241,7 +242,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (user) {
-        const filtered = allNavItems.filter(item => item.condition || user.allowedModules?.includes(item.id));
+        const filtered = allNavItems.filter(item => {
+            if (item.condition) return true;
+            if (item.id === 'incentive-approvals') {
+                return user.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+            }
+            return user.allowedModules?.includes(item.id);
+        });
         const sorted = user.sidebarOrder 
             ? filtered.sort((a, b) => user.sidebarOrder!.indexOf(a.id) - user.sidebarOrder!.indexOf(b.id))
             : filtered;
