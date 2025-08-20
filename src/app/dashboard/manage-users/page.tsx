@@ -420,7 +420,11 @@ export default function ManageUsersPage() {
                 {sortedAndFilteredUsers.map((user) => {
                    const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
                    const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
-                   const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
+                   
+                   const isActionsDisabled = 
+                        (isCurrentUserLoggedIn && currentUser?.role !== 'Super-admin') || 
+                        (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
+
                    const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
 
                    return (
