@@ -2,7 +2,7 @@
 "use client"
 
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@zod/resolvers/zod"
+import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import type { Project, User, GrantPhase, Transaction } from "@/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
