@@ -269,6 +269,8 @@ export default function SettingsPage() {
     },
   })
 
+  const dummyForm = useForm(); // For the incentive approvers section
+
   const selectedCampusForCro = croAssignmentForm.watch('campus');
   const facultyOptionsForCro = selectedCampusForCro === 'Goa' ? goaFaculties : faculties;
 
@@ -715,24 +717,26 @@ export default function SettingsPage() {
                 )}
               </div>
               <div className="space-y-4">
-                <Label className="text-base">Incentive Approval Workflow</Label>
-                <p className="text-sm text-muted-foreground">
-                  Define the email addresses for the three stages of incentive claim approval.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {[1, 2, 3].map(stage => (
-                        <FormItem key={stage}>
-                            <FormLabel>Stage {stage} Approver Email</FormLabel>
-                            <Input 
-                                type="email"
-                                placeholder={`approver.stage${stage}@paruluniversity.ac.in`}
-                                defaultValue={systemSettings.incentiveApprovers?.find(a => a.stage === stage)?.email || ''}
-                                onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3, e.target.value)}
-                                disabled={isSavingSettings}
-                            />
-                        </FormItem>
-                    ))}
-                </div>
+                <Form {...dummyForm}>
+                  <Label className="text-base">Incentive Approval Workflow</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Define the email addresses for the three stages of incentive claim approval.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {[1, 2, 3].map(stage => (
+                          <FormItem key={stage}>
+                              <FormLabel>Stage {stage} Approver Email</FormLabel>
+                              <Input 
+                                  type="email"
+                                  placeholder={`approver.stage${stage}@paruluniversity.ac.in`}
+                                  defaultValue={systemSettings.incentiveApprovers?.find(a => a.stage === stage)?.email || ''}
+                                  onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3, e.target.value)}
+                                  disabled={isSavingSettings}
+                              />
+                          </FormItem>
+                      ))}
+                  </div>
+                </Form>
               </div>
             </CardContent>
           </Card>
@@ -1164,4 +1168,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
