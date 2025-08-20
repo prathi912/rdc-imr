@@ -99,13 +99,39 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
         path: ['fieldsVerified'],
     });
 
+    const getDefaultAmount = () => {
+        // For Stage 3, default to the amount from Stage 2
+        if (stageIndex === 2 && claim.approvals && claim.approvals.length > 1) {
+            const stage2Approval = claim.approvals.find(a => a.stage === 2);
+            if (stage2Approval && stage2Approval.status === 'Approved') {
+                return stage2Approval.approvedAmount;
+            }
+        }
+        // Fallback for other stages or if Stage 2 data is not available
+        return claim.finalApprovedAmount || claim.calculatedIncentive || 0;
+    };
+
     const form = useForm<ApprovalFormData>({
         resolver: zodResolver(formSchemaWithMembership),
         defaultValues: {
-            amount: claim.finalApprovedAmount || claim.calculatedIncentive || 0,
+            amount: getDefaultAmount(),
             fieldsVerified: false,
         }
     });
+
+    // When the dialog opens, reset the form with the potentially new default amount.
+    useEffect(() => {
+        if (isOpen) {
+            form.reset({
+                amount: getDefaultAmount(),
+                fieldsVerified: false,
+                action: undefined,
+                comments: '',
+            });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isOpen, claim, stageIndex]);
+
 
     const action = form.watch('action');
 
