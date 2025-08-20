@@ -14,7 +14,8 @@ import { sendEmail as sendEmailUtility } from "@/lib/email"
 import * as XLSX from "xlsx"
 import fs from "fs"
 import path from "path"
-import { format, addMinutes, parse, parseISO, addDays, setHours, setMinutes, setSeconds, isToday, isAfter } from "date-fns"
+import { addDays, setHours, setMinutes, setSeconds, isToday } from "date-fns"
+import { formatInTimeZone } from 'date-fns-tz';
 import * as z from 'zod';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
@@ -472,10 +473,13 @@ export async function scheduleMeeting(
 ) {
   try {
     const batch = adminDb.batch()
-    // The date is now 'yyyy-MM-dd', parse it safely.
-    // Using replace is a safe way to ensure it's parsed as local time, avoiding timezone-off-by-one errors.
-    const dateForFormatting = new Date(meetingDetails.date.replace(/-/g, "/"))
-    const formattedDate = format(dateForFormatting, "MMMM d, yyyy")
+    const timeZone = 'Asia/Kolkata';
+    // Combine date and time into a single string for robust parsing
+    const meetingDateTimeString = `${meetingDetails.date}T${meetingDetails.time}:00`;
+
+    const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy");
+    const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)");
+
 
     for (const projectData of projectsToSchedule) {
       const projectRef = adminDb.collection("projects").doc(projectData.id)
@@ -511,7 +515,7 @@ export async function scheduleMeeting(
                 "<strong style="color: #ffffff;">${projectData.title}</strong>".
               </p>
               <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
-              <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
+              <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
               <p style="color: #cccccc;">
                 Please prepare for your presentation. You can view more details on the 
@@ -560,7 +564,7 @@ export async function scheduleMeeting(
                         You have been assigned to the IMR evaluation committee for a meeting with the following details. You are requested to be present.
                     </p>
                     <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
-                    <p><strong style="color: #ffffff;">Time:</strong> ${meetingDetails.time}</p>
+                    <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
                     <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
                     <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
                     <ul style="list-style-type: none; padding-left: 0;">
@@ -2048,6 +2052,7 @@ export async function scheduleEmrMeeting(
 ) {
   try {
     const { date, time, venue, pptDeadline, evaluatorUids } = meetingDetails;
+    const timeZone = 'Asia/Kolkata';
 
     if (!evaluatorUids || evaluatorUids.length === 0) {
       return { success: false, error: "An evaluation committee must be assigned." };
@@ -2063,13 +2068,8 @@ export async function scheduleEmrMeeting(
     const batch = adminDb.batch();
     const emailPromises = [];
 
-    const meetingTime = parse(time, 'HH:mm', parseISO(date));
-
-    // Update meeting details on the call document itself
-    batch.update(callRef, {
-        status: 'Meeting Scheduled',
-        meetingDetails: { date, time, venue, pptDeadline, assignedEvaluators: evaluatorUids }
-    });
+    const meetingDateTimeString = `${date}T${time}:00`;
+    const pptDeadlineString = pptDeadline;
 
     for (const userId of applicantUids) {
       // Find the interest document for this user and call
@@ -2103,11 +2103,11 @@ export async function scheduleEmrMeeting(
               <p style="color: #e0e0e0;">
                   A presentation slot has been scheduled for you for the EMR funding opportunity, "<strong style="color: #ffffff;">${call.title}</strong>".
               </p>
-              <p><strong style="color: #ffffff;">Date:</strong> ${format(meetingTime, 'MMMM d, yyyy')}</p>
-              <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
+              <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, 'MMMM d, yyyy')}</p>
+              <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, 'h:mm a (z)')}</p>
               <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
               <p style="color: #e0e0e0;">
-                Please upload your presentation on the portal by <strong style="color:#ffffff;">${format(parseISO(pptDeadline), 'PPpp')}</strong>.
+                Please upload your presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(pptDeadlineString, timeZone, 'PPpp (z)')}</strong>.
               </p>
               ${EMAIL_STYLES.footer}
           </div>
@@ -2150,8 +2150,8 @@ export async function scheduleEmrMeeting(
                     ${EMAIL_STYLES.logo}
                     <p style="color: #ffffff;">Dear Evaluator,</p>
                     <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
-                    <p><strong style="color: #ffffff;">Date:</strong> ${format(parseISO(date), 'MMMM d, yyyy')}</p>
-                     <p><strong style="color: #ffffff;">Time:</strong> ${format(meetingTime, 'h:mm a')}</p>
+                    <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, 'MMMM d, yyyy')}</p>
+                    <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, 'h:mm a (z)')}</p>
                     <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Projects Portal.</p>
                     ${EMAIL_STYLES.footer}
@@ -2472,6 +2472,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
         return { success: false, error: 'Funding call not found.' };
     }
     const call = callSnap.data() as FundingCall;
+    const timeZone = 'Asia/Kolkata';
 
     const emailAttachments = (call.attachments || []).map(att => ({ filename: att.name, path: att.url }));
 
@@ -2482,8 +2483,8 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
         <p style="color:#e0e0e0;">A new funding call from <strong style="color:#ffffff;">${call.agency}</strong> has been posted on the PU Research Projects Portal.</p>
         <div style="padding: 15px; border: 1px solid #4f5b62; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
           <div style="color:#e0e0e0;" class="prose prose-sm">${call.description || 'No description provided.'}</div>
-          <p style="color:#e0e0e0;"><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>
-          <p style="color:#e0e0e0;"><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), 'PP')}</p>
+          <p style="color:#e0e0e0;"><strong>Register Interest By:</strong> ${formatInTimeZone(call.interestDeadline, timeZone, 'PPpp (z)')}</p>
+          <p style="color:#e0e0e0;"><strong>Agency Deadline:</strong> ${formatInTimeZone(call.applyDeadline, timeZone, 'PP (z)')}</p>
         </div>
     `;
 
@@ -2589,9 +2590,9 @@ export async function updateEmrStatus(
             if (callSnap.exists) {
                 const call = callSnap.data() as FundingCall;
                 if (call.meetingDetails?.date) {
-                    const meetingDate = parseISO(call.meetingDetails.date);
-                    const deadline = setSeconds(setMinutes(setHours(addDays(meetingDate, 3), 17), 0), 0); // 3 days after meeting at 5:00 PM
-                    emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Please submit your revised presentation on the portal by <strong style="color:#ffffff;">${format(deadline, 'PPpp')}</strong>.</p>`;
+                    const meetingDateTimeString = `${call.meetingDetails.date}T${call.meetingDetails.time}:00`;
+                    const deadline = setSeconds(setMinutes(setHours(addDays(new Date(meetingDateTimeString), 3), 17), 0), 0); // 3 days after meeting at 5:00 PM
+                    emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Please submit your revised presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(deadline, 'Asia/Kolkata', 'PPpp (z)')}</strong>.</p>`;
                 }
             }
         }
@@ -2818,7 +2819,7 @@ export async function generateOfficeNotingForm(
       project_duration: formData.projectDuration,
       ...phaseData,
       total_amount: totalAmount.toLocaleString('en-IN'),
-      presentation_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
+      presentation_date: project.meetingDetails?.date ? formatInTimeZone(`${project.meetingDetails.date}T00:00:00`, 'Asia/Kolkata', 'dd/MM/yyyy') : 'N/A',
       presentation_time: project.meetingDetails?.time || 'N/A',
     };
 
@@ -2863,7 +2864,7 @@ export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, piUid:
         const snapshot = await q.get();
         const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         
-        const projectsForToday = projects.filter(p => p.meetingDetails?.date && isToday(parseISO(p.meetingDetails.date)));
+        const projectsForToday = projects.filter(p => p.meetingDetails?.date && isToday(new Date(p.meetingDetails.date.replace(/-/g, '/'))));
 
         return { success: true, projects: projectsForToday };
     } catch (error: any) {
@@ -3169,5 +3170,6 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
   
 
     
+
 
 

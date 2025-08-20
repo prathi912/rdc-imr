@@ -4,7 +4,8 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/config';
 import { sendEmail } from '@/lib/email';
 import type { Project } from '@/types';
-import { format, addDays } from 'date-fns';
+import { addDays } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export async function GET(request: NextRequest) {
   // Secure the endpoint
@@ -16,8 +17,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const timeZone = 'Asia/Kolkata';
     const tomorrow = addDays(new Date(), 1);
-    const tomorrowDateString = format(tomorrow, 'yyyy-MM-dd');
+    const tomorrowDateString = formatInTimeZone(tomorrow, timeZone, 'yyyy-MM-dd');
 
     const projectsRef = collection(db, 'projects');
     const q = query(
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
     const reminderPromises = querySnapshot.docs.map(doc => {
       const project = { id: doc.id, ...doc.data() } as Project;
       if (project.pi_email && project.meetingDetails) {
-        const projectDate = new Date(project.meetingDetails.date.replace(/-/g, '/'));
+        const meetingDateTimeString = `${project.meetingDetails.date}T${project.meetingDetails.time}:00`;
         return sendEmail({
           to: project.pi_email,
           subject: `REMINDER: IMR Meeting Tomorrow for Project "${project.title}"`,
@@ -52,8 +54,8 @@ export async function GET(request: NextRequest) {
                   </p>
 
                   <p><strong style="color:#ffffff;">Project:</strong> ${project.title}</p>
-                  <p><strong style="color:#ffffff;">Date:</strong> ${format(projectDate, 'MMMM d, yyyy')}</p>
-                  <p><strong style="color:#ffffff;">Time:</strong> ${project.meetingDetails.time}</p>
+                  <p><strong style="color:#ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, 'MMMM d, yyyy')}</p>
+                  <p><strong style="color:#ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, 'h:mm a (z)')}</p>
                   <p><strong style="color:#ffffff;">Venue:</strong> ${project.meetingDetails.venue}</p>
 
                   <p style="color:#cccccc;">Please be prepared for your presentation. <span style="color:#00e676;">Good luck!</span></p>
@@ -63,6 +65,7 @@ export async function GET(request: NextRequest) {
                   <p style="color:#aaaaaa;">Parul University</p>
                 </div>
               `,
+          from: 'default'
         });
       }
       return Promise.resolve();
