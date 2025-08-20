@@ -64,7 +64,9 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
       );
     }
 
+    const isViewerAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
+    const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
 
 
     return (
@@ -268,17 +270,26 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
-                    {renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                    {(isViewerAdmin || claim.status === 'Submitted to Accounts') && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     
                     {claim.approvals && claim.approvals.length > 0 && (
                         <div className="space-y-2 pt-2">
                            <h4 className="font-semibold text-base">Approval History</h4>
-                           {claim.approvals.map(approval => (
+                           {claim.approvals.filter(a => a !== null).map(approval => (
                                <div key={approval.stage} className="p-3 border rounded-md bg-muted/50">
-                                   <p><strong>Stage {approval.stage}:</strong> {approval.status} by {approval.approverName}</p>
-                                   <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleString()}</p>
-                                   <p className="mt-1"><strong>Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
-                                   <p className="mt-1"><strong>Comments:</strong> {approval.comments}</p>
+                                   {isViewerAdmin ? (
+                                    <>
+                                       <p><strong>Stage {approval.stage}:</strong> {approval.status} by {approval.approverName}</p>
+                                       <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleString()}</p>
+                                       <p className="mt-1"><strong>Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
+                                       <p className="mt-1"><strong>Comments:</strong> {approval.comments}</p>
+                                    </>
+                                   ) : (
+                                    <>
+                                      <p><strong>Stage {approval.stage}:</strong> {approval.status}</p>
+                                      <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleDateString()}</p>
+                                    </>
+                                   )}
                                </div>
                            ))}
                         </div>
@@ -298,7 +309,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     )}
                 </div>
                 <DialogFooter className="gap-2">
-                    {onTakeAction && (
+                    {canTakeAction && (
                         <Button onClick={onTakeAction}>Take Action</Button>
                     )}
                 </DialogFooter>
