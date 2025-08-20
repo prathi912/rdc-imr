@@ -40,7 +40,14 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
     const approval1 = claim.approvals?.find(a => a.stage === 1);
     const approval2 = claim.approvals?.find(a => a.stage === 2);
     const approval3 = claim.approvals?.find(a => a.stage === 3);
-
+    
+    const getVerificationMark = (approval: typeof approval1, fieldId: string) => {
+        if (!approval || approval.status !== 'Approved') return '';
+        const verified = approval.verifiedFields?.[fieldId];
+        if (verified === true) return '✓';
+        if (verified === false) return '✗';
+        return '';
+    };
 
     const data = {
         name: user.name,
@@ -65,6 +72,38 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
         approver3_comments: approval3?.comments || '',
         approver3_amount: approval3?.approvedAmount?.toLocaleString('en-IN') || '',
+
+        // Verification marks for approver 1
+        a1_name: getVerificationMark(approval1, 'name'),
+        a1_designation: getVerificationMark(approval1, 'designation'),
+        a1_publicationType: getVerificationMark(approval1, 'publicationType'),
+        a1_journalName: getVerificationMark(approval1, 'journalName'),
+        a1_locale: getVerificationMark(approval1, 'locale'),
+        a1_indexType: getVerificationMark(approval1, 'indexType'),
+        a1_journalClassification: getVerificationMark(approval1, 'journalClassification'),
+        a1_authorType: getVerificationMark(approval1, 'authorType'),
+        a1_totalPuAuthors: getVerificationMark(approval1, 'totalPuAuthors'),
+        a1_issn: getVerificationMark(approval1, 'issn'),
+        a1_publicationProof: getVerificationMark(approval1, 'publicationProof'),
+        a1_isPuNameInPublication: getVerificationMark(approval1, 'isPuNameInPublication'),
+        a1_publicationDate: getVerificationMark(approval1, 'publicationDate'),
+        a1_authorPosition: getVerificationMark(approval1, 'authorPosition'),
+
+        // Verification marks for approver 2
+        a2_name: getVerificationMark(approval2, 'name'),
+        a2_designation: getVerificationMark(approval2, 'designation'),
+        a2_publicationType: getVerificationMark(approval2, 'publicationType'),
+        a2_journalName: getVerificationMark(approval2, 'journalName'),
+        a2_locale: getVerificationMark(approval2, 'locale'),
+        a2_indexType: getVerificationMark(approval2, 'indexType'),
+        a2_journalClassification: getVerificationMark(approval2, 'journalClassification'),
+        a2_authorType: getVerificationMark(approval2, 'authorType'),
+        a2_totalPuAuthors: getVerificationMark(approval2, 'totalPuAuthors'),
+        a2_issn: getVerificationMark(approval2, 'issn'),
+        a2_publicationProof: getVerificationMark(approval2, 'publicationProof'),
+        a2_isPuNameInPublication: getVerificationMark(approval2, 'isPuNameInPublication'),
+        a2_publicationDate: getVerificationMark(approval2, 'publicationDate'),
+        a2_authorPosition: getVerificationMark(approval2, 'authorPosition'),
     };
     
     doc.setData(data);

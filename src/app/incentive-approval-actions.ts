@@ -39,7 +39,7 @@ export async function processIncentiveClaimAction(
   action: 'approve' | 'reject',
   approver: User,
   stageIndex: number, // 0, 1, or 2
-  data: { amount?: number; comments?: string }
+  data: { amount?: number; comments?: string, verifiedFields?: { [key: string]: boolean } }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
@@ -68,6 +68,7 @@ export async function processIncentiveClaimAction(
       comments: data.comments || '',
       timestamp: new Date().toISOString(),
       stage: stageIndex + 1,
+      verifiedFields: data.verifiedFields || {},
     };
     
     const approvals = claim.approvals || [];

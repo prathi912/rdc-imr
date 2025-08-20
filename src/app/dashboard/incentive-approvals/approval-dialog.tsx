@@ -21,10 +21,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Check, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
 
 interface ApprovalDialogProps {
   claim: IncentiveClaim;
@@ -36,11 +35,13 @@ interface ApprovalDialogProps {
   onActionComplete: () => void;
 }
 
+const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
+
 const createApprovalSchema = (stageIndex: number) => z.object({
   action: z.enum(['approve', 'reject'], { required_error: 'Please select an action.' }),
   amount: z.coerce.number().optional(),
   comments: z.string().optional(),
-  fieldsVerified: z.boolean().optional(),
+  verifiedFields: verifiedFieldsSchema,
 }).refine(data => data.action !== 'approve' || (data.amount !== undefined && data.amount > 0), {
   message: 'Approved amount must be a positive number.',
   path: ['amount'],
@@ -60,8 +61,26 @@ const createApprovalSchema = (stageIndex: number) => z.object({
 
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
 
-function ResearchPaperClaimDetails({ claim, claimant }: { claim: IncentiveClaim, claimant: User | null }) {
-  const renderDetail = (label: string, value?: string | number | null | boolean | string[]) => {
+const researchPaperFields = [
+    { id: 'name', label: 'Name of the Applicant' },
+    { id: 'designation', label: 'Designation and Dept.' },
+    { id: 'publicationType', label: 'Type of publication' },
+    { id: 'journalName', label: 'Name of Journal' },
+    { id: 'locale', label: 'Whether National/International' },
+    { id: 'indexType', label: 'Indexed In' },
+    { id: 'journalClassification', label: 'Q Rating of the Journal' },
+    { id: 'authorType', label: 'First/Corresponding Author' },
+    { id: 'totalPuAuthors', label: 'No. of Authors from PU' },
+    { id: 'issn', label: 'ISSN' },
+    { id: 'publicationProof', label: 'PROOF OF PUBLICATION ATTACHED' },
+    { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
+    { id: 'publicationDate', label: 'Published Month & Year' },
+    { id: 'authorPosition', label: 'Author Position' }
+];
+
+
+function ResearchPaperClaimDetails({ claim, claimant, form, isChecklistEnabled }: { claim: IncentiveClaim, claimant: User | null, form: any, isChecklistEnabled: boolean }) {
+  const renderDetail = (fieldId: string, label: string, value?: string | number | null | boolean | string[]) => {
     if (value === undefined || value === null || value === '') return null;
     let displayValue = String(value);
     if (typeof value === 'boolean') {
@@ -71,32 +90,56 @@ function ResearchPaperClaimDetails({ claim, claimant }: { claim: IncentiveClaim,
         displayValue = value.join(', ');
     }
     return (
-      <div className="grid grid-cols-2 text-sm">
-        <span className="text-muted-foreground">{label}</span>
-        <span>{displayValue}</span>
+      <div className="grid grid-cols-12 gap-2 text-sm items-center py-1">
+        <span className="text-muted-foreground col-span-5">{label}</span>
+        <span className="col-span-5">{displayValue}</span>
+         {isChecklistEnabled && (
+            <FormField
+                control={form.control}
+                name={`verifiedFields.${fieldId}`}
+                render={({ field }) => (
+                    <FormItem className="col-span-2 flex justify-end gap-2">
+                        <FormControl>
+                            <div className="flex items-center gap-2">
+                                <Button type="button" size="icon" variant={field.value === true ? 'secondary' : 'ghost'} className="h-7 w-7" onClick={() => field.onChange(field.value === true ? undefined : true)}>
+                                    <Check className="h-4 w-4" />
+                                </Button>
+                                <Button type="button" size="icon" variant={field.value === false ? 'destructive' : 'ghost'} className="h-7 w-7" onClick={() => field.onChange(field.value === false ? undefined : false)}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </FormControl>
+                    </FormItem>
+                )}
+            />
+        )}
       </div>
     );
   };
 
   return (
     <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-        <h4 className="font-semibold">Research Paper Details to Verify</h4>
-        <div className="space-y-1">
-            {renderDetail('Name of the Applicant', claimant?.name)}
-            {renderDetail('Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
-            {renderDetail('Type of publication', claim.publicationType)}
-            {renderDetail('Name of Journal', claim.journalName)}
-            {renderDetail('Whether National/International', claim.locale)}
-            {renderDetail('Indexed In', claim.indexType?.toUpperCase())}
-            {renderDetail('Q Rating of the Journal', claim.journalClassification)}
-            {renderDetail('First/Corresponding Author', claim.authorType)}
-            {renderDetail('No. of Authors from PU', claim.totalPuAuthors)}
-            {renderDetail('ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
-            {renderDetail('PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
-            {renderDetail('Whether “PU” name exists', claim.isPuNameInPublication)}
-            {renderDetail('Published Month', `${claim.publicationMonth}, ${claim.publicationYear}`)}
-            {renderDetail('Author Position', 'N/A')}
+        <div className="flex items-center justify-between">
+            <h4 className="font-semibold">Research Paper Details to Verify</h4>
+            {isChecklistEnabled && <h4 className="font-semibold text-xs pr-4">Verification</h4>}
         </div>
+        <div className="space-y-1">
+            {renderDetail('name', 'Name of the Applicant', claimant?.name)}
+            {renderDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
+            {renderDetail('publicationType', 'Type of publication', claim.publicationType)}
+            {renderDetail('journalName', 'Name of Journal', claim.journalName)}
+            {renderDetail('locale', 'Whether National/International', claim.locale)}
+            {renderDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
+            {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
+            {renderDetail('authorType', 'First/Corresponding Author', claim.authorType)}
+            {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
+            {renderDetail('issn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
+            {renderDetail('publicationProof', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
+            {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
+            {renderDetail('publicationDate', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
+            {renderDetail('authorPosition', 'Author Position', 'N/A')}
+        </div>
+         {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
     </div>
   );
 }
@@ -135,25 +178,24 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
+    const isChecklistEnabled = (isResearchPaperClaim && stageIndex < 2);
     
     const approvalSchema = createApprovalSchema(stageIndex);
     const formSchemaWithVerification = approvalSchema.refine(data => {
-        const needsVerification = isMembershipClaim || isResearchPaperClaim;
-        return !(needsVerification && data.action === 'approve') || data.fieldsVerified === true;
+        if (!isChecklistEnabled || data.action !== 'approve') return true;
+        return researchPaperFields.every(field => data.verifiedFields?.[field.id] !== undefined);
     }, {
-        message: 'You must confirm that you have checked all fields.',
-        path: ['fieldsVerified'],
+        message: 'You must verify all fields (mark as correct or incorrect).',
+        path: ['verifiedFields'],
     });
 
     const getDefaultAmount = () => {
-        // For Stage 3, default to the amount from Stage 2
         if (stageIndex === 2 && claim.approvals && claim.approvals.length > 1) {
             const stage2Approval = claim.approvals.find(a => a.stage === 2);
             if (stage2Approval && stage2Approval.status === 'Approved') {
                 return stage2Approval.approvedAmount;
             }
         }
-        // Fallback for other stages or if Stage 2 data is not available
         return claim.finalApprovedAmount || claim.calculatedIncentive || 0;
     };
 
@@ -161,16 +203,15 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         resolver: zodResolver(formSchemaWithVerification),
         defaultValues: {
             amount: getDefaultAmount(),
-            fieldsVerified: false,
+            verifiedFields: {},
         }
     });
 
-    // When the dialog opens, reset the form with the potentially new default amount.
     useEffect(() => {
         if (isOpen) {
             form.reset({
                 amount: getDefaultAmount(),
-                fieldsVerified: false,
+                verifiedFields: {},
                 action: undefined,
                 comments: '',
             });
@@ -239,7 +280,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                     )}
 
                     {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
-                    {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} />}
+                    {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} />}
 
 
                     <Form {...form}>
@@ -284,28 +325,6 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     </FormItem>
                                 )}
                             />
-                             {(isMembershipClaim || isResearchPaperClaim) && action === 'approve' && (
-                                <FormField
-                                    control={form.control}
-                                    name="fieldsVerified"
-                                    render={({ field }) => (
-                                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                                            <FormControl>
-                                                <Checkbox
-                                                    checked={field.value}
-                                                    onCheckedChange={field.onChange}
-                                                />
-                                            </FormControl>
-                                            <div className="space-y-1 leading-none">
-                                                <FormLabel>
-                                                    I confirm that I have checked all the fields of the applicant.
-                                                </FormLabel>
-                                                <FormMessage />
-                                            </div>
-                                        </FormItem>
-                                    )}
-                                />
-                             )}
                         </form>
                     </Form>
                 </div>

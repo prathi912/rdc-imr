@@ -1,14 +1,4 @@
 
-
-
-
-
-
-
-
-
-
-
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -210,6 +200,7 @@ export type ApprovalStage = {
   comments: string;
   approvedAmount: number;
   stage: number; // 1, 2, or 3
+  verifiedFields?: { [key: string]: boolean };
 };
 
 export type IncentiveClaim = {
