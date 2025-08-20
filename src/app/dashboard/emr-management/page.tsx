@@ -297,7 +297,7 @@ export default function EmrManagementOverviewPage() {
                                                 <TableBody>{calls.map(call => (
                                                     <TableRow key={call.id}>
                                                         <TableCell className="font-medium whitespace-normal">{call.title}</TableCell>
-                                                        <TableCell className="whitespace-nowrap">{call.agency}</TableCell>
+                                                        <TableCell className="whitespace-normal">{call.agency}</TableCell>
                                                         <TableCell>{interestCounts[call.id] || 0}</TableCell>
                                                         <TableCell>{getStatusBadge(call)}</TableCell>
                                                         <TableCell>
