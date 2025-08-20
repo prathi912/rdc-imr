@@ -482,6 +482,13 @@ export function ResearchPaperForm() {
         totalPuAuthors: data.bookCoAuthors.length, // Add total PU authors
       }
 
+      // Sanitize data: remove undefined fields
+      Object.keys(claimData).forEach(key => {
+        if ((claimData as any)[key] === undefined) {
+          delete (claimData as any)[key];
+        }
+      });
+
       await setDoc(doc(db, "incentiveClaims", claimId), claimData)
 
       if (status === "Draft") {
