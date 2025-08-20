@@ -171,6 +171,7 @@ export default function IncentiveApprovalsPage() {
                     <ApprovalDialog 
                         claim={selectedClaim} 
                         approver={user}
+                        claimant={allUsers.find(u => u.uid === selectedClaim.uid) || null}
                         stageIndex={approvalStage}
                         isOpen={isApprovalOpen} 
                         onOpenChange={setIsApprovalOpen} 

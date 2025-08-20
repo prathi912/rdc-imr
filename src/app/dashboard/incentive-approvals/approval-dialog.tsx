@@ -29,6 +29,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 interface ApprovalDialogProps {
   claim: IncentiveClaim;
   approver: User;
+  claimant: User | null; // Pass the full claimant user object
   stageIndex: number;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -59,7 +60,7 @@ const createApprovalSchema = (stageIndex: number) => z.object({
 
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
 
-function MembershipClaimDetails({ claim }: { claim: IncentiveClaim }) {
+function MembershipClaimDetails({ claim, claimant }: { claim: IncentiveClaim, claimant: User | null }) {
   const renderDetail = (label: string, value?: string | number | null) => {
     if (!value && value !== 0) return null;
     return (
@@ -74,8 +75,8 @@ function MembershipClaimDetails({ claim }: { claim: IncentiveClaim }) {
     <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
         <h4 className="font-semibold">Membership Details to Verify</h4>
         <div className="space-y-1">
-            {renderDetail('Designation and Dept.', `${claim.userDesignation || 'N/A'}, ${claim.userDepartment || 'N/A'}`)}
-            {renderDetail('Faculty', claim.faculty)}
+            {renderDetail('Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
+            {renderDetail('Faculty', claimant?.faculty)}
             {renderDetail('Type of Membership', claim.membershipType)}
             {renderDetail('Professional Body', claim.professionalBodyName)}
             {renderDetail('Locale', claim.membershipLocale)}
@@ -87,7 +88,7 @@ function MembershipClaimDetails({ claim }: { claim: IncentiveClaim }) {
   );
 }
 
-export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChange, onActionComplete }: ApprovalDialogProps) {
+export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, onOpenChange, onActionComplete }: ApprovalDialogProps) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     
@@ -154,7 +155,7 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
         }
     };
 
-    const previousApprovals = (claim.approvals || []).filter(a => a.stage < stageIndex + 1);
+    const previousApprovals = (claim.approvals || []).filter(a => a?.stage < stageIndex + 1);
     
     const getCommentLabel = () => {
         if (action === 'reject') return 'Your Comments (Required)';
@@ -175,6 +176,7 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
                         <div className="space-y-4">
                             <h4 className="font-semibold text-sm">Previous Approval History</h4>
                             {previousApprovals.map((approval, index) => (
+                                approval && (
                                 <div key={index} className="p-4 border rounded-lg bg-muted/50 space-y-2 text-sm">
                                     <div className="flex justify-between items-center">
                                         <p className="font-semibold">Stage {approval.stage}: {approval.approverName}</p>
@@ -185,12 +187,13 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
                                         <p><strong className="text-muted-foreground">Approved Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
                                     )}
                                 </div>
+                                )
                             ))}
                             <Separator />
                         </div>
                     )}
 
-                    {isMembershipClaim && <MembershipClaimDetails claim={claim} />}
+                    {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
 
                     <Form {...form}>
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
