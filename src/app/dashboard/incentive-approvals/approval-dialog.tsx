@@ -70,7 +70,7 @@ const researchPaperFields = [
     { id: 'locale', label: 'Whether National/International' },
     { id: 'indexType', label: 'Indexed In' },
     { id: 'journalClassification', label: 'Q Rating of the Journal' },
-    { id: 'authorType', label: 'First/Corresponding Author' },
+    { id: 'authorType', label: 'Role of the Author' },
     { id: 'totalPuAuthors', label: 'No. of Authors from PU' },
     { id: 'issn', label: 'ISSN' },
     { id: 'publicationProof', label: 'PROOF OF PUBLICATION ATTACHED' },
@@ -134,7 +134,7 @@ function ResearchPaperClaimDetails({ claim, claimant, form, isChecklistEnabled }
                     {renderDetail('locale', 'Whether National/International', claim.locale)}
                     {renderDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
                     {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
-                    {renderDetail('authorType', 'First/Corresponding Author', claim.authorType)}
+                    {renderDetail('authorType', 'Role of the Author', claim.authorType)}
                     {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
                     {renderDetail('issn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
                     {renderDetail('publicationProof', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}

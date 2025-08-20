@@ -100,6 +100,9 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle)}
+                            {renderDetail("Role of the Author", claim.authorType)}
+                            {renderDetail("No. of Authors from PU", claim.totalPuAuthors)}
+                            {renderDetail("Author Position", claim.authorPosition)}
                             {renderLinkDetail("DOI Link", claim.relevantLink)}
                             {renderLinkDetail("Scopus Link", claim.scopusLink)}
                             {renderDetail("Journal Name", claim.journalName)}
@@ -113,7 +116,6 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderDetail("Electronic ISSN", claim.electronicIssn)}
                             {renderDetail("Publication Month", claim.publicationMonth)}
                             {renderDetail("Publication Year", claim.publicationYear)}
-                            {renderDetail("Author Position", claim.authorPosition)}
                             {renderDetail("SDGs", claim.sdgGoals)}
                             {renderLinkDetail("Publication Proofs", claim.publicationProofUrls)}
                             {renderDetail("PU Name in Publication", claim.isPuNameInPublication)}
