@@ -39,41 +39,36 @@ export async function fetchAdvancedScopusData(
   }
 
   let eid: string | null = null;
-  // Try to match eid=... format first
-  const eidMatch = url.match(/eid=([^&]+)/)
+  let doi: string | null = null;
+  let searchApiUrl = '';
+
+  const eidMatch = url.match(/eid=([^&]+)/);
   if (eidMatch && eidMatch[1]) {
-    eid = eidMatch[1]
+    eid = eidMatch[1];
+    searchApiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}?view=FULL`;
   } else {
-    // Fallback to match numeric ID in path for other URL formats
-    const pathMatch = url.match(/publications\/(\d+)/);
-    if (pathMatch && pathMatch[1]) {
-        // Scopus API requires the EID to be in a specific format, often prefixed.
-        // The numeric ID from the path is not a direct EID.
-        // We need to construct what might be a valid EID or use a different API approach.
-        // For now, we will assume this numeric ID might work if prefixed,
-        // but this part is heuristic and might need adjustment if Scopus changes formats.
-        // A common prefix is '2-s2.0-'. However, we don't have the full EID.
-        // Let's try to search by DOI if possible, or adjust the error message.
-        // The most robust way is to guide user to provide a proper article link.
-        // For now, let's adjust the error to be more helpful.
-        return { success: false, error: "The provided Scopus URL format is not supported for direct data fetching. Please use the full article link (containing 'eid=...')." };
+    // Fallback to DOI if EID is not found
+    const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+    if (doiMatch && doiMatch[1]) {
+        doi = doiMatch[1];
+        searchApiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}?view=FULL`;
     }
   }
 
-
-  if (!eid) {
-    return { success: false, error: "Could not find a valid Scopus EID in the provided link. Please use the full article link." }
+  if (!searchApiUrl) {
+    return { success: false, error: "Could not find a valid Scopus EID or DOI in the provided link. Please use the full article link." }
   }
 
-  const abstractApiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}?view=FULL`
   const serialApiUrl = `https://api.elsevier.com/content/serial/title`;
 
   try {
-    const abstractResponse = await fetch(abstractApiUrl, {
+    const abstractResponse = await fetch(searchApiUrl, {
       headers: { "X-ELS-APIKey": apiKey, Accept: "application/json" },
     });
     if (!abstractResponse.ok) {
-        throw new Error(`Scopus Abstract API Error: ${abstractResponse.statusText}`);
+        const errorData = await abstractResponse.json();
+        const errorMessage = errorData?.['service-error']?.status?.statusText || "Failed to fetch data from Scopus.";
+        throw new Error(`Scopus Abstract API Error: ${errorMessage}`);
     }
     const abstractData = await abstractResponse.json();
     const coredata = abstractData?.["abstracts-retrieval-response"]?.coredata;
@@ -140,4 +135,3 @@ export async function fetchAdvancedScopusData(
     return { success: false, error: error.message || "An unexpected error occurred while fetching Scopus data." }
   }
 }
-
