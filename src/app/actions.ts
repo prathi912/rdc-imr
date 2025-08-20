@@ -2475,7 +2475,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
 
     const emailAttachments = (call.attachments || []).map(att => ({ filename: att.name, path: att.url }));
 
-    const emailHtml = `
+    let emailHtml = `
       <div ${EMAIL_STYLES.background}>
         ${EMAIL_STYLES.logo}
         <h2 style="color: #ffffff; text-align: center;">New Funding Opportunity: ${call.title}</h2>
@@ -2485,11 +2485,28 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
           <p style="color:#e0e0e0;"><strong>Register Interest By:</strong> ${format(parseISO(call.interestDeadline), 'PPp')}</p>
           <p style="color:#e0e0e0;"><strong>Agency Deadline:</strong> ${format(parseISO(call.applyDeadline), 'PP')}</p>
         </div>
-        <p style="color:#e0e0e0; margin-top: 20px;">Please find the relevant documents attached to this email.</p>
-        <p style="margin-top: 20px; text-align: center;">
-          <a href="${call.detailsUrl || process.env.NEXT_PUBLIC_BASE_URL + '/dashboard/emr-calendar'}" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+    `;
+
+    if (emailAttachments.length > 0) {
+      emailHtml += `<p style="color:#e0e0e0; margin-top: 20px;">Please find the relevant documents attached to this email.</p>`;
+    }
+    
+    emailHtml += `
+        <p style="margin-top: 20px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">
+          <a href="https://rndprojects.paruluniversity.ac.in/login" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
             View Full Details on the Portal
           </a>
+    `;
+
+    if (call.detailsUrl) {
+      emailHtml += `
+          <a href="${call.detailsUrl}" style="background-color: transparent; border: 1px solid #64B5F6; color: #64B5F6; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+            Learn More on Funding Agency Website
+          </a>
+      `;
+    }
+
+    emailHtml += `
         </p>
          ${EMAIL_STYLES.footer}
       </div>
@@ -3152,4 +3169,5 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
   
 
     
+
 
