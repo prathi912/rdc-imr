@@ -113,6 +113,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderDetail("Electronic ISSN", claim.electronicIssn)}
                             {renderDetail("Publication Month", claim.publicationMonth)}
                             {renderDetail("Publication Year", claim.publicationYear)}
+                            {renderDetail("Author Position", claim.authorPosition)}
                             {renderDetail("SDGs", claim.sdgGoals)}
                             {renderLinkDetail("Publication Proofs", claim.publicationProofUrls)}
                             {renderDetail("PU Name in Publication", claim.isPuNameInPublication)}

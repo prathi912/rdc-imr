@@ -76,6 +76,7 @@ const researchPaperFields = [
     { id: 'publicationProof', label: 'PROOF OF PUBLICATION ATTACHED' },
     { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
     { id: 'publicationDate', label: 'Published Month & Year' },
+    { id: 'authorPosition', label: 'Author Position' },
 ];
 
 
@@ -139,6 +140,7 @@ function ResearchPaperClaimDetails({ claim, claimant, form, isChecklistEnabled }
                     {renderDetail('publicationProof', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
                     {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
                     {renderDetail('publicationDate', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
+                    {renderDetail('authorPosition', 'Author Position', claim.authorPosition)}
                 </div>
                  {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
             </form>
