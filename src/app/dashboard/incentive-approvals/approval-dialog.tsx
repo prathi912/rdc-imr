@@ -35,7 +35,7 @@ interface ApprovalDialogProps {
   onActionComplete: () => void;
 }
 
-const approvalSchema = z.object({
+const createApprovalSchema = (stageIndex: number) => z.object({
   action: z.enum(['approve', 'reject'], { required_error: 'Please select an action.' }),
   amount: z.coerce.number().optional(),
   comments: z.string().optional(),
@@ -43,12 +43,21 @@ const approvalSchema = z.object({
 }).refine(data => data.action !== 'approve' || (data.amount !== undefined && data.amount > 0), {
   message: 'Approved amount must be a positive number.',
   path: ['amount'],
-}).refine(data => data.action !== 'reject' || (!!data.comments && data.comments.length > 10), {
-  message: 'Comments are required for rejection (min 10 characters).',
+}).refine(data => {
+    if (data.action === 'reject') {
+        return !!data.comments && data.comments.length > 10;
+    }
+    if (stageIndex < 2 && data.action === 'approve') { // Stage 1 (index 0) and Stage 2 (index 1)
+        return !!data.comments && data.comments.length > 10;
+    }
+    return true;
+}, {
+  message: 'Comments are required for this action (min 10 characters).',
   path: ['comments'],
 });
 
-type ApprovalFormData = z.infer<typeof approvalSchema>;
+
+type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
 
 function MembershipClaimDetails({ claim }: { claim: IncentiveClaim }) {
   const renderDetail = (label: string, value?: string | number | null) => {
@@ -83,14 +92,15 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
-
-    const formSchema = approvalSchema.refine(data => !(isMembershipClaim && data.action === 'approve') || data.fieldsVerified === true, {
+    
+    const approvalSchema = createApprovalSchema(stageIndex);
+    const formSchemaWithMembership = approvalSchema.refine(data => !(isMembershipClaim && data.action === 'approve') || data.fieldsVerified === true, {
         message: 'You must confirm that you have checked all fields.',
         path: ['fieldsVerified'],
     });
 
     const form = useForm<ApprovalFormData>({
-        resolver: zodResolver(formSchema),
+        resolver: zodResolver(formSchemaWithMembership),
         defaultValues: {
             amount: claim.finalApprovedAmount || claim.calculatedIncentive || 0,
             fieldsVerified: false,
@@ -120,6 +130,12 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
 
     const previousApprovals = (claim.approvals || []).filter(a => a.stage < stageIndex + 1);
     
+    const getCommentLabel = () => {
+        if (action === 'reject') return 'Your Comments (Required)';
+        if (stageIndex < 2 && action === 'approve') return 'Your Comments (Required)';
+        return 'Your Comments (Optional)';
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl">
@@ -186,7 +202,7 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
                                 control={form.control}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Your Comments {action === 'reject' && '(Required)'}</FormLabel>
+                                        <FormLabel>{getCommentLabel()}</FormLabel>
                                         <FormControl><Textarea {...field} /></FormControl>
                                         <FormMessage />
                                     </FormItem>
