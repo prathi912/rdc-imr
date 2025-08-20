@@ -332,23 +332,23 @@ export default function ManageIncentiveClaimsPage() {
                 <TableCell className="hidden md:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
                 <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  <Badge variant={claim.status === 'Accepted' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                  <Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                        {claim.claimType === 'Books' && claim.status === 'Pending' && (
+                        {claim.claimType === 'Books' && claim.status === 'Submitted to Accounts' && (
                             <Button onClick={() => handlePrintBookForm(claim)} disabled={isPrintingBookForm === claim.id} size="sm" variant="outline">
                                 {isPrintingBookForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                                 Notings
                             </Button>
                         )}
-                        {claim.claimType === 'Membership of Professional Bodies' && claim.status === 'Pending' && (
+                        {claim.claimType === 'Membership of Professional Bodies' && claim.status === 'Submitted to Accounts' && (
                           <Button onClick={() => handlePrintMembershipForm(claim)} disabled={isPrintingMembershipForm === claim.id} size="sm" variant="outline">
                             {isPrintingMembershipForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                             Notings
                           </Button>
                         )}
-                         {claim.claimType === 'Research Papers' && claim.status === 'Pending' && (
+                         {claim.claimType === 'Research Papers' && claim.status === 'Submitted to Accounts' && (
                           <Button onClick={() => handlePrintResearchPaperForm(claim)} disabled={isPrintingResearchPaperForm === claim.id} size="sm" variant="outline">
                             {isPrintingResearchPaperForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
                             Notings
