@@ -12,7 +12,7 @@ import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit } from 'lucide-react';
+import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -30,9 +30,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 
 
-function UserClaimsList({ claims, claimType }: { claims: IncentiveClaim[], claimType: 'draft' | 'other' }) {
+function UserClaimsList({ 
+    claims, 
+    claimType,
+    onViewDetails,
+}: { 
+    claims: IncentiveClaim[], 
+    claimType: 'draft' | 'other',
+    onViewDetails: (claim: IncentiveClaim) => void 
+}) {
     if (claims.length === 0) {
         return (
             <Card>
@@ -84,7 +93,7 @@ function UserClaimsList({ claims, claimType }: { claims: IncentiveClaim[], claim
         <div className="space-y-4">
             {claims.map(claim => (
                  <Card key={claim.id}>
-                    <CardContent className="p-4 flex justify-between items-start gap-4">
+                    <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                          <div className="flex-1 space-y-1">
                             <Badge variant="outline">{claim.claimType}</Badge>
                             <p className="font-semibold">{getClaimTitle(claim)}</p>
@@ -92,16 +101,24 @@ function UserClaimsList({ claims, claimType }: { claims: IncentiveClaim[], claim
                             {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
                             <p className="text-sm text-muted-foreground pt-1">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
                         </div>
-                        {claimType === 'draft' ? (
-                            <Button asChild variant="outline" size="sm">
-                                <Link href={getClaimEditHref(claim)}>
-                                    <Edit className="mr-2 h-4 w-4"/>
-                                    Continue
-                                </Link>
-                            </Button>
-                        ) : (
-                           getSimplifiedStatus(claim)
-                        )}
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                            {claimType === 'draft' ? (
+                                <Button asChild variant="outline" size="sm">
+                                    <Link href={getClaimEditHref(claim)}>
+                                        <Edit className="mr-2 h-4 w-4"/>
+                                        Continue
+                                    </Link>
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button variant="outline" size="sm" onClick={() => onViewDetails(claim)}>
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        View Details
+                                    </Button>
+                                    {getSimplifiedStatus(claim)}
+                                </>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
             ))}
@@ -305,6 +322,8 @@ export default function IncentiveClaimPage() {
   const [userClaims, setUserClaims] = useState<IncentiveClaim[]>([]);
   const [coAuthorClaims, setCoAuthorClaims] = useState<IncentiveClaim[]>([]);
   const { toast } = useToast();
+  const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const fetchUserClaims = async (uid: string) => {
       setLoading(true);
@@ -356,11 +375,17 @@ export default function IncentiveClaimPage() {
     }
   }, []);
 
+  const handleViewDetails = (claim: IncentiveClaim) => {
+    setSelectedClaim(claim);
+    setIsDetailsOpen(true);
+  };
+
   const draftClaims = userClaims.filter(c => c.status === 'Draft');
   const otherClaims = userClaims.filter(c => c.status !== 'Draft');
 
 
   return (
+    <>
     <div className="container mx-auto max-w-5xl py-10">
       <PageHeader
         title="Incentive Claim Portal"
@@ -398,16 +423,24 @@ export default function IncentiveClaimPage() {
             </div>
           </TabsContent>
            <TabsContent value="my-claims">
-             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={otherClaims} claimType="other" />}
+             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={otherClaims} claimType="other" onViewDetails={handleViewDetails} />}
           </TabsContent>
            <TabsContent value="co-author">
             {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} onClaimApplied={() => fetchAllData(user!.uid)} />}
           </TabsContent>
           <TabsContent value="draft">
-             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" />}
+             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" onViewDetails={handleViewDetails}/>}
           </TabsContent>
         </Tabs>
       </div>
     </div>
+    <ClaimDetailsDialog 
+        claim={selectedClaim}
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        currentUser={user}
+        claimant={user} // On this page, the claimant is always the current user
+    />
+    </>
   );
 }
