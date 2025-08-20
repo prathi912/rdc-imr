@@ -39,6 +39,7 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
 
     const approval1 = claim.approvals?.find(a => a.stage === 1);
     const approval2 = claim.approvals?.find(a => a.stage === 2);
+    const approval3 = claim.approvals?.find(a => a.stage === 3);
 
     const data = {
         name: user.name,
@@ -54,6 +55,12 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
         payment_date: claim.membershipPaymentDate ? new Date(claim.membershipPaymentDate).toLocaleDateString('en-GB') : 'N/A',
         approver_1: approval1?.status === 'Approved' ? '✓' : '',
         approver_2: approval2?.status === 'Approved' ? '✓' : '',
+        approver1_comments: approval1?.comments || '',
+        approver1_amount: approval1?.approvedAmount?.toLocaleString('en-IN') || '',
+        approver2_comments: approval2?.comments || '',
+        approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
+        approver3_comments: approval3?.comments || '',
+        approver3_amount: approval3?.approvedAmount?.toLocaleString('en-IN') || '',
     };
     
     doc.setData(data);
