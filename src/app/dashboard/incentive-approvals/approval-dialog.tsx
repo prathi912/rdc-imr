@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -24,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface ApprovalDialogProps {
   claim: IncentiveClaim;
@@ -38,6 +39,7 @@ const approvalSchema = z.object({
   action: z.enum(['approve', 'reject'], { required_error: 'Please select an action.' }),
   amount: z.coerce.number().optional(),
   comments: z.string().optional(),
+  fieldsVerified: z.boolean().optional(),
 }).refine(data => data.action !== 'approve' || (data.amount !== undefined && data.amount > 0), {
   message: 'Approved amount must be a positive number.',
   path: ['amount'],
@@ -48,14 +50,50 @@ const approvalSchema = z.object({
 
 type ApprovalFormData = z.infer<typeof approvalSchema>;
 
+function MembershipClaimDetails({ claim }: { claim: IncentiveClaim }) {
+  const renderDetail = (label: string, value?: string | number | null) => {
+    if (!value && value !== 0) return null;
+    return (
+      <div className="grid grid-cols-2 text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span>{value}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+        <h4 className="font-semibold">Membership Details to Verify</h4>
+        <div className="space-y-1">
+            {renderDetail('Designation and Dept.', `${claim.userDesignation || 'N/A'}, ${claim.userDepartment || 'N/A'}`)}
+            {renderDetail('Faculty', claim.faculty)}
+            {renderDetail('Type of Membership', claim.membershipType)}
+            {renderDetail('Professional Body', claim.professionalBodyName)}
+            {renderDetail('Locale', claim.membershipLocale)}
+            {renderDetail('Membership Number', claim.membershipNumber)}
+            {renderDetail('Amount Paid', `₹${claim.membershipAmountPaid?.toLocaleString('en-IN')}`)}
+            {renderDetail('Payment Date', claim.membershipPaymentDate ? new Date(claim.membershipPaymentDate).toLocaleDateString() : 'N/A')}
+        </div>
+    </div>
+  );
+}
+
 export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChange, onActionComplete }: ApprovalDialogProps) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     
+    const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
+
+    const formSchema = approvalSchema.refine(data => !(isMembershipClaim && data.action === 'approve') || data.fieldsVerified === true, {
+        message: 'You must confirm that you have checked all fields.',
+        path: ['fieldsVerified'],
+    });
+
     const form = useForm<ApprovalFormData>({
-        resolver: zodResolver(approvalSchema),
+        resolver: zodResolver(formSchema),
         defaultValues: {
             amount: claim.finalApprovedAmount || claim.calculatedIncentive || 0,
+            fieldsVerified: false,
         }
     });
 
@@ -110,6 +148,8 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
                         </div>
                     )}
 
+                    {isMembershipClaim && <MembershipClaimDetails claim={claim} />}
+
                     <Form {...form}>
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                             <FormField
@@ -152,6 +192,28 @@ export function ApprovalDialog({ claim, approver, stageIndex, isOpen, onOpenChan
                                     </FormItem>
                                 )}
                             />
+                             {isMembershipClaim && action === 'approve' && (
+                                <FormField
+                                    control={form.control}
+                                    name="fieldsVerified"
+                                    render={({ field }) => (
+                                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                                            <FormControl>
+                                                <Checkbox
+                                                    checked={field.value}
+                                                    onCheckedChange={field.onChange}
+                                                />
+                                            </FormControl>
+                                            <div className="space-y-1 leading-none">
+                                                <FormLabel>
+                                                    I confirm that I have checked all the fields of the applicant.
+                                                </FormLabel>
+                                                <FormMessage />
+                                            </div>
+                                        </FormItem>
+                                    )}
+                                />
+                             )}
                         </form>
                     </Form>
                 </div>
