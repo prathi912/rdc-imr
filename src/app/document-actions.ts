@@ -40,7 +40,9 @@ function getInstituteAcronym(name?: string): string {
         'Parul Institute of Ayurved and Research': 'PIAR (Ayu.)',
         'Parul Institute of Architecture & Research': 'PIAR (Arc.)',
         'Parul Institute of Ayurved': 'PIA (Ayu.)',
-        'Parul Institute of Arts': 'PIA (Art.)'
+        'Parul Institute of Arts': 'PIA (Art.)',
+        'Parul Institute of Pharmacy': 'PIP (Pharma)',
+        'Parul Institute of Physiotherapy': 'PIP (Physio)',
     };
 
     if (acronymMap[name]) {
@@ -175,7 +177,6 @@ export async function generateIncentivePaymentSheet(
           const templateVarMatch = cell.v.match(/\{(.*?)\}/);
           if (templateVarMatch && templateVarMatch[1]) {
              const key = templateVarMatch[1];
-             // Replace with data if it exists, otherwise replace with empty string
              cell.v = flatData[key] !== undefined ? flatData[key] : '';
           }
         }
