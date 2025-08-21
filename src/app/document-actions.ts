@@ -33,6 +33,17 @@ async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string,
   }
 }
 
+function getInstituteAcronym(name?: string): string {
+    if (!name) return '';
+    const ignoreWords = ['of', 'and', '&', 'the', 'in'];
+    return name
+        .split(' ')
+        .filter(word => !ignoreWords.includes(word.toLowerCase()))
+        .map(word => word.charAt(0))
+        .join('')
+        .toUpperCase();
+}
+
 export async function generateRecommendationForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
@@ -128,7 +139,7 @@ export async function generateIncentivePaymentSheet(
         [`ifsc_${index + 1}`]: user?.bankDetails?.ifscCode || '',
         [`branch_${index + 1}`]: user?.bankDetails?.branchName || '',
         [`amount_${index + 1}`]: amount,
-        [`college_${index + 1}`]: user?.institute || '',
+        [`college_${index + 1}`]: getInstituteAcronym(user?.institute),
         [`mis_${index + 1}`]: user?.misId || '',
         [`remarks_${index + 1}`]: remarks[claim.id] || '',
       };
@@ -353,5 +364,3 @@ export async function exportClaimToExcel(
     return { success: false, error: error.message || "Failed to export data." }
   }
 }
-
-    
