@@ -54,7 +54,7 @@ export default function IncentiveApprovalsPage() {
             const [pendingSnapshot, allClaimsSnapshot, usersSnapshot] = await Promise.all([
                 getDocs(pendingClaimsQuery),
                 getDocs(allClaimsQuery),
-                getDocs(usersSnapshot)
+                getDocs(usersQuery)
             ]);
 
             setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
@@ -187,6 +187,11 @@ export default function IncentiveApprovalsPage() {
                                     <Eye className="h-4 w-4 mr-2" />
                                     View Details
                                 </Button>
+                                {!isHistory && (
+                                    <Button onClick={() => handleOpenApproval(claim)}>
+                                        Take Action
+                                    </Button>
+                                )}
                             </TableCell>
                         </TableRow>
                     )
