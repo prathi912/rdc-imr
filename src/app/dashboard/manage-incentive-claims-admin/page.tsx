@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2, FileSpreadsheet } from "lucide-react";
+import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2, FileSpreadsheet, CheckCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,12 +34,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { updateIncentiveClaimStatus, generateIncentivePaymentSheet } from '@/app/actions';
+import { markPaymentsCompleted } from '@/app/manage-claims-actions';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
-const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
 type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
@@ -47,7 +47,7 @@ type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'subm
 export default function ManageIncentiveClaimsPage() {
   const [allClaims, setAllClaims] = useState<IncentiveClaim[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('pending');
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
   const { toast } = useToast();
@@ -60,6 +60,7 @@ export default function ManageIncentiveClaimsPage() {
   
   const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
   const [isGenerateSheetOpen, setIsGenerateSheetOpen] = useState(false);
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -113,16 +114,22 @@ export default function ManageIncentiveClaimsPage() {
     fetchClaimsAndUsers();
   }, [fetchClaimsAndUsers]);
   
+  const getClaimTitle = (claim: IncentiveClaim): string => {
+    return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
+  };
+
   const sortedAndFilteredClaims = useMemo(() => {
     let filtered = [...allClaims];
+    
+    const tabStatusMap = {
+      'pending': ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval'],
+      'pending-bank': ['Accepted', 'Submitted to Accounts'],
+      'approved': ['Payment Completed'],
+      'rejected': ['Rejected'],
+    };
 
-    if (activeTab !== 'all') {
-      const status = activeTab.charAt(0).toUpperCase() + activeTab.slice(1) as IncentiveClaim['status'];
-      if(activeTab === 'accepted') {
-          filtered = filtered.filter(claim => claim.status === 'Accepted' || claim.status === 'Submitted to Accounts');
-      } else {
-        filtered = filtered.filter(claim => claim.status === status);
-      }
+    if (activeTab in tabStatusMap) {
+        filtered = filtered.filter(claim => tabStatusMap[activeTab as keyof typeof tabStatusMap].includes(claim.status));
     }
 
     if (claimTypeFilter !== 'all') {
@@ -133,18 +140,13 @@ export default function ManageIncentiveClaimsPage() {
       const lowerCaseSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(claim =>
         claim.userName.toLowerCase().includes(lowerCaseSearch) ||
-        (claim.paperTitle && claim.paperTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.patentTitle && claim.patentTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.conferencePaperTitle && claim.conferencePaperTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.publicationTitle && claim.publicationTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.professionalBodyName && claim.professionalBodyName.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.apcPaperTitle && claim.apcPaperTitle.toLowerCase().includes(lowerCaseSearch))
+        getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch)
       );
     }
 
     filtered.sort((a, b) => {
-        const aValue = a[sortConfig.key] || '';
-        const bValue = b[sortConfig.key] || '';
+        const aValue = a[sortConfig.key as keyof IncentiveClaim] || '';
+        const bValue = b[sortConfig.key as keyof IncentiveClaim] || '';
         if (aValue < bValue) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
         }
@@ -156,6 +158,10 @@ export default function ManageIncentiveClaimsPage() {
 
     return filtered;
   }, [allClaims, activeTab, searchTerm, sortConfig, claimTypeFilter]);
+  
+  useEffect(() => {
+    setSelectedClaims([]);
+  }, [activeTab, searchTerm, claimTypeFilter, sortConfig]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -164,17 +170,20 @@ export default function ManageIncentiveClaimsPage() {
     }
     setSortConfig({ key, direction });
   };
-
-
-  const handleStatusChange = useCallback(async (id: string, newStatus: IncentiveClaim['status']) => {
-    const result = await updateIncentiveClaimStatus(id, newStatus);
+  
+  const handleMarkPaymentCompleted = async () => {
+    setIsUpdatingPayment(true);
+    const result = await markPaymentsCompleted(selectedClaims);
     if (result.success) {
-      toast({ title: 'Status Updated', description: "The claim's status has been changed and the user has been notified." });
-      fetchClaimsAndUsers(); 
+      toast({ title: 'Success', description: `${selectedClaims.length} claim(s) marked as payment completed.` });
+      setSelectedClaims([]);
+      fetchClaimsAndUsers();
     } else {
-       toast({ variant: 'destructive', title: "Error", description: result.error || "Could not update status." });
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
-  }, [fetchClaimsAndUsers, toast]);
+    setIsUpdatingPayment(false);
+  };
+
 
   const handleExport = () => {
     if (sortedAndFilteredClaims.length === 0) {
@@ -242,6 +251,7 @@ export default function ManageIncentiveClaimsPage() {
                   Claimant <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
+            <TableHead>Title</TableHead>
             <TableHead className="hidden md:table-cell">
                <Button variant="ghost" onClick={() => requestSort('claimType')}>
                   Claim Type <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -252,16 +262,15 @@ export default function ManageIncentiveClaimsPage() {
                   Date <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
-            <TableHead>
-               <Button variant="ghost" onClick={() => requestSort('status')}>
-                  Status <ArrowUpDown className="ml-2 h-4 w-4" />
-              </Button>
-            </TableHead>
+            <TableHead>Status</TableHead>
+            {activeTab === 'rejected' && <TableHead>Rejected At Stage</TableHead>}
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedAndFilteredClaims.map((claim) => (
+          {sortedAndFilteredClaims.map((claim) => {
+            const lastRejectedApproval = claim.approvals?.slice().reverse().find(a => a?.status === 'Rejected');
+            return (
               <TableRow key={claim.id} data-state={selectedClaims.includes(claim.id) && "selected"}>
                 <TableCell>
                     <Checkbox
@@ -280,36 +289,19 @@ export default function ManageIncentiveClaimsPage() {
                     />
                 </TableCell>
                 <TableCell className="font-medium whitespace-nowrap">{claim.userName}</TableCell>
+                <TableCell className="max-w-xs truncate">{getClaimTitle(claim)}</TableCell>
                 <TableCell className="hidden md:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
                 <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  <Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                  <Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' || claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                 </TableCell>
+                {activeTab === 'rejected' && <TableCell>{lastRejectedApproval ? `Stage ${lastRejectedApproval.stage}` : 'N/A'}</TableCell>}
                 <TableCell className="text-right">
-                    <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button aria-haspopup="true" size="icon" variant="ghost">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Toggle menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onSelect={() => setSelectedClaim(claim)}>View Details</DropdownMenuItem>
-                      <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                        {STATUSES.map(status => (
-                          <DropdownMenuItem 
-                              key={status} 
-                              onClick={() => handleStatusChange(claim.id, status)}
-                              disabled={claim.status === status}
-                          >
-                              {status}
-                          </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    <Button variant="outline" size="sm" onClick={() => setSelectedClaim(claim)}>View Details</Button>
                 </TableCell>
               </TableRow>
-            ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -328,44 +320,45 @@ export default function ManageIncentiveClaimsPage() {
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
          <div className="flex items-center gap-2">
-            {eligibleForPaymentSheet.length > 0 && (
-                <Button onClick={() => setIsGenerateSheetOpen(true)}>
-                    <FileSpreadsheet className="mr-2 h-4 w-4" />
-                    Generate Payment Sheet ({eligibleForPaymentSheet.length})
-                </Button>
-            )}
-             <Button onClick={handleExport} disabled={loading}>
-                <Download className="mr-2 h-4 w-4" />
-                Export XLSX
-             </Button>
+            <Button onClick={handleExport} disabled={loading}>
+                <Download className="mr-2 h-4 w-4" /> Export XLSX
+            </Button>
         </div>
       </PageHeader>
       <div className="mt-8">
-        <div className="flex items-center py-4 gap-4">
-            <Input
-                placeholder="Filter by claimant or title..."
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                className="max-w-sm"
-            />
-            <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
-                <SelectTrigger className="w-[240px]">
-                    <SelectValue placeholder="Filter by claim type" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Claim Types</SelectItem>
-                    {CLAIM_TYPES.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+        <div className="flex items-center justify-between py-4 gap-4">
+            <div className="flex items-center gap-2">
+              <Input
+                  placeholder="Filter by claimant or title..."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="max-w-sm"
+              />
+              <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
+                  <SelectTrigger className="w-[240px]">
+                      <SelectValue placeholder="Filter by claim type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Claim Types</SelectItem>
+                      {CLAIM_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+            </div>
+            {activeTab === 'pending-bank' && selectedClaims.length > 0 && (
+                <Button onClick={handleMarkPaymentCompleted} disabled={isUpdatingPayment}>
+                    {isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCheck className="mr-2 h-4 w-4" />}
+                    Mark as Payment Completed ({selectedClaims.length})
+                </Button>
+            )}
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="all">All ({allClaims.filter(c => claimTypeFilter === 'all' || c.claimType === claimTypeFilter).length})</TabsTrigger>
-                <TabsTrigger value="pending">Pending ({allClaims.filter(c => c.status === 'Pending' && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
-                <TabsTrigger value="accepted">Accepted ({allClaims.filter(c => (c.status === 'Accepted' || c.status === 'Submitted to Accounts') && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
-                <TabsTrigger value="rejected">Rejected ({allClaims.filter(c => c.status === 'Rejected' && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
+                <TabsTrigger value="pending">Pending</TabsTrigger>
+                <TabsTrigger value="pending-bank">Pending for Bank</TabsTrigger>
+                <TabsTrigger value="approved">Approved</TabsTrigger>
+                <TabsTrigger value="rejected">Rejected</TabsTrigger>
             </TabsList>
             <Card className="mt-4">
               <CardContent className="pt-6">
@@ -377,7 +370,7 @@ export default function ManageIncentiveClaimsPage() {
                     renderTable()
                  ) : (
                     <div className="text-center py-10 text-muted-foreground">
-                        <p>No claims found for this category or search term.</p>
+                        <p>No claims found for this category.</p>
                     </div>
                  )}
               </CardContent>
@@ -407,7 +400,6 @@ function GeneratePaymentSheetDialog({ isOpen, onOpenChange, claims, allUsers }: 
     const [remarks, setRemarks] = useState<Record<string, string>>({});
     const [referenceNumber, setReferenceNumber] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
-    const usersMap = new Map(allUsers.map(u => [u.uid, u]));
 
     const handleGenerate = async () => {
         if (!referenceNumber.trim()) {
