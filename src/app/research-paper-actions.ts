@@ -117,6 +117,9 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       doc.render();
     } catch (error: any) {
       console.error('Docxtemplater render error:', error);
+      if (error.properties && error.properties.errors) {
+          console.error('Template errors:', JSON.stringify(error.properties.errors));
+      }
       return { success: false, error: 'Failed to render the document template.' };
     }
 
