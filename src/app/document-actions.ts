@@ -123,18 +123,17 @@ export async function generateIncentivePaymentSheet(
       const amount = claim.finalApprovedAmount || 0;
       totalAmount += amount;
       return {
-        [`beneficiary_${index + 1}`]: user?.bankDetails?.beneficiaryName || user?.name,
-        [`account_${index + 1}`]: user?.bankDetails?.accountNumber || 'N/A',
-        [`ifsc_${index + 1}`]: user?.bankDetails?.ifscCode || 'N/A',
-        [`branch_${index + 1}`]: user?.bankDetails?.branchName || 'N/A',
+        [`beneficiary_${index + 1}`]: user?.bankDetails?.beneficiaryName || user?.name || '',
+        [`account_${index + 1}`]: user?.bankDetails?.accountNumber || '',
+        [`ifsc_${index + 1}`]: user?.bankDetails?.ifscCode || '',
+        [`branch_${index + 1}`]: user?.bankDetails?.branchName || '',
         [`amount_${index + 1}`]: amount,
-        [`college_${index + 1}`]: user?.institute || 'N/A',
-        [`mis_${index + 1}`]: user?.misId || 'N/A',
-        [`remarks_${index + 1}`]: remarks[claim.id] || 'N/A',
+        [`college_${index + 1}`]: user?.institute || '',
+        [`mis_${index + 1}`]: user?.misId || '',
+        [`remarks_${index + 1}`]: remarks[claim.id] || '',
       };
     });
 
-    // Flatten the array of objects into a single object for docxtemplater-style replacement
     const flatData = paymentData.reduce((acc, item) => ({ ...acc, ...item }), {});
 
     flatData.date = format(new Date(), 'dd/MM/yyyy');
@@ -142,8 +141,6 @@ export async function generateIncentivePaymentSheet(
     flatData.total_amount = totalAmount;
     flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
 
-    // This is a simplified replacement for cell placeholders like {placeholder}.
-    // A more robust solution might use a library that specifically handles Excel templates.
     const range = XLSX.utils.decode_range(worksheet['!ref']!);
     for (let R = range.s.r; R <= range.e.r; ++R) {
       for (let C = range.s.c; C <= range.e.c; ++C) {
@@ -151,9 +148,11 @@ export async function generateIncentivePaymentSheet(
         const cell_ref = XLSX.utils.encode_cell(cell_address);
         let cell = worksheet[cell_ref];
         if (cell && cell.v && typeof cell.v === 'string') {
-          const templateVar = cell.v.match(/\{(.*?)\}/);
-          if (templateVar && flatData[templateVar[1]]) {
-            cell.v = flatData[templateVar[1]];
+          const templateVarMatch = cell.v.match(/\{(.*?)\}/);
+          if (templateVarMatch && templateVarMatch[1]) {
+             const key = templateVarMatch[1];
+             // Replace with data if it exists, otherwise replace with empty string
+             cell.v = flatData[key] !== undefined ? flatData[key] : '';
           }
         }
       }
