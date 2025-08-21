@@ -33,7 +33,7 @@ import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { updateIncentiveClaimStatus, generateIncentivePaymentSheet } from '@/app/actions';
+import { generateIncentivePaymentSheet } from '@/app/document-actions';
 import { markPaymentsCompleted } from '@/app/manage-claims-actions';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -321,7 +321,8 @@ export default function ManageIncentiveClaimsPage() {
       <PageHeader title={pageTitle} description={pageDescription}>
          <div className="flex items-center gap-2">
             <Button onClick={handleExport} disabled={loading}>
-                <Download className="mr-2 h-4 w-4" /> Export XLSX
+                <Download className="mr-2 h-4 w-4" />
+                Export XLSX
             </Button>
         </div>
       </PageHeader>
@@ -347,10 +348,15 @@ export default function ManageIncentiveClaimsPage() {
               </Select>
             </div>
             {activeTab === 'pending-bank' && selectedClaims.length > 0 && (
-                <Button onClick={handleMarkPaymentCompleted} disabled={isUpdatingPayment}>
-                    {isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCheck className="mr-2 h-4 w-4" />}
-                    Mark as Payment Completed ({selectedClaims.length})
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button onClick={() => setIsGenerateSheetOpen(true)} disabled={eligibleForPaymentSheet.length === 0}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" /> Generate Payment Sheet ({eligibleForPaymentSheet.length})
+                    </Button>
+                    <Button onClick={handleMarkPaymentCompleted} disabled={isUpdatingPayment}>
+                        {isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCheck className="mr-2 h-4 w-4" />}
+                        Mark as Payment Completed ({selectedClaims.length})
+                    </Button>
+                </div>
             )}
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -477,3 +483,5 @@ function GeneratePaymentSheetDialog({ isOpen, onOpenChange, claims, allUsers }: 
         </Dialog>
     );
 }
+
+    
