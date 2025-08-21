@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2 } from "lucide-react";
+import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2, FileSpreadsheet, CheckCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,28 +18,36 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { db } from '@/lib/config';
-import { collection, getDocs, doc, orderBy, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, orderBy, query, where, documentId } from 'firebase/firestore';
 import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { updateIncentiveClaimStatus } from '@/app/actions';
-import { generateBookIncentiveForm } from '@/app/incentive-actions';
-import { generateMembershipIncentiveForm } from '@/app/membership-actions';
-import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
+import { generateIncentivePaymentSheet } from '@/app/document-actions';
+import { markPaymentsCompleted } from '@/app/manage-claims-actions';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
-const STATUSES: IncentiveClaim['status'][] = ['Pending', 'Accepted', 'Rejected'];
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
-type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'submissionDate' | 'status' | 'claimType'>;
+type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
 
 
 export default function ManageIncentiveClaimsPage() {
   const [allClaims, setAllClaims] = useState<IncentiveClaim[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState('pending');
   const [loading, setLoading] = useState(true);
   const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
   const { toast } = useToast();
@@ -49,9 +57,10 @@ export default function ManageIncentiveClaimsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [claimTypeFilter, setClaimTypeFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
-  const [isPrintingBookForm, setIsPrintingBookForm] = useState<string | null>(null);
-  const [isPrintingMembershipForm, setIsPrintingMembershipForm] = useState<string | null>(null);
-  const [isPrintingResearchPaperForm, setIsPrintingResearchPaperForm] = useState<string | null>(null);
+  
+  const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
+  const [isGenerateSheetOpen, setIsGenerateSheetOpen] = useState(false);
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -105,12 +114,22 @@ export default function ManageIncentiveClaimsPage() {
     fetchClaimsAndUsers();
   }, [fetchClaimsAndUsers]);
   
+  const getClaimTitle = (claim: IncentiveClaim): string => {
+    return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
+  };
+
   const sortedAndFilteredClaims = useMemo(() => {
     let filtered = [...allClaims];
+    
+    const tabStatusMap = {
+      'pending': ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval'],
+      'pending-bank': ['Accepted', 'Submitted to Accounts'],
+      'approved': ['Payment Completed'],
+      'rejected': ['Rejected'],
+    };
 
-    if (activeTab !== 'all') {
-      const status = activeTab.charAt(0).toUpperCase() + activeTab.slice(1) as IncentiveClaim['status'];
-      filtered = filtered.filter(claim => claim.status === status);
+    if (activeTab in tabStatusMap) {
+        filtered = filtered.filter(claim => tabStatusMap[activeTab as keyof typeof tabStatusMap].includes(claim.status));
     }
 
     if (claimTypeFilter !== 'all') {
@@ -121,18 +140,13 @@ export default function ManageIncentiveClaimsPage() {
       const lowerCaseSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(claim =>
         claim.userName.toLowerCase().includes(lowerCaseSearch) ||
-        (claim.paperTitle && claim.paperTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.patentTitle && claim.patentTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.conferencePaperTitle && claim.conferencePaperTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.publicationTitle && claim.publicationTitle.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.professionalBodyName && claim.professionalBodyName.toLowerCase().includes(lowerCaseSearch)) ||
-        (claim.apcPaperTitle && claim.apcPaperTitle.toLowerCase().includes(lowerCaseSearch))
+        getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch)
       );
     }
 
     filtered.sort((a, b) => {
-        const aValue = a[sortConfig.key] || '';
-        const bValue = b[sortConfig.key] || '';
+        const aValue = a[sortConfig.key as keyof IncentiveClaim] || '';
+        const bValue = b[sortConfig.key as keyof IncentiveClaim] || '';
         if (aValue < bValue) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
         }
@@ -144,6 +158,10 @@ export default function ManageIncentiveClaimsPage() {
 
     return filtered;
   }, [allClaims, activeTab, searchTerm, sortConfig, claimTypeFilter]);
+  
+  useEffect(() => {
+    setSelectedClaims([]);
+  }, [activeTab, searchTerm, claimTypeFilter, sortConfig]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -152,17 +170,20 @@ export default function ManageIncentiveClaimsPage() {
     }
     setSortConfig({ key, direction });
   };
-
-
-  const handleStatusChange = useCallback(async (id: string, newStatus: IncentiveClaim['status']) => {
-    const result = await updateIncentiveClaimStatus(id, newStatus);
+  
+  const handleMarkPaymentCompleted = async () => {
+    setIsUpdatingPayment(true);
+    const result = await markPaymentsCompleted(selectedClaims);
     if (result.success) {
-      toast({ title: 'Status Updated', description: "The claim's status has been changed and the user has been notified." });
-      fetchClaimsAndUsers(); 
+      toast({ title: 'Success', description: `${selectedClaims.length} claim(s) marked as payment completed.` });
+      setSelectedClaims([]);
+      fetchClaimsAndUsers();
     } else {
-       toast({ variant: 'destructive', title: "Error", description: result.error || "Could not update status." });
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
-  }, [fetchClaimsAndUsers, toast]);
+    setIsUpdatingPayment(false);
+  };
+
 
   const handleExport = () => {
     if (sortedAndFilteredClaims.length === 0) {
@@ -195,118 +216,42 @@ export default function ManageIncentiveClaimsPage() {
     toast({ title: "Export Started", description: `Downloading ${sortedAndFilteredClaims.length} claims.` });
   };
   
-  const handlePrintBookForm = async (claim: IncentiveClaim) => {
-      if (!claim) return;
-      setIsPrintingBookForm(claim.id);
-      try {
-        const result = await generateBookIncentiveForm(claim.id);
-        if (result.success && result.fileData) {
-          const byteCharacters = atob(result.fileData);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  const eligibleForPaymentSheet = useMemo(() => {
+      return allClaims.filter(claim => selectedClaims.includes(claim.id) && (claim.status === 'Accepted' || claim.status === 'Submitted to Accounts'));
+  }, [selectedClaims, allClaims]);
 
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `Office_Noting_Book_Claim_${claim.userName.replace(/\s/g, '_')}.docx`;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
-          toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
-        } else {
-          throw new Error(result.error || "Failed to generate form.");
-        }
-      } catch (error: any) {
-        console.error("Book form generation error:", error);
-        toast({ variant: 'destructive', title: "Generation Failed", description: error.message });
-      } finally {
-        setIsPrintingBookForm(null);
-      }
-    };
-
-    const handlePrintMembershipForm = async (claim: IncentiveClaim) => {
-        if (!claim) return;
-        setIsPrintingMembershipForm(claim.id);
-        try {
-            const result = await generateMembershipIncentiveForm(claim.id);
-            if (result.success && result.fileData) {
-                const byteCharacters = atob(result.fileData);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Office_Noting_Membership_Claim_${claim.userName.replace(/\s/g, '_')}.docx`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-                toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
-            } else {
-                throw new Error(result.error || "Failed to generate form.");
-            }
-        } catch (error: any) {
-            console.error("Membership form generation error:", error);
-            toast({ variant: 'destructive', title: "Generation Failed", description: error.message });
-        } finally {
-            setIsPrintingMembershipForm(null);
-        }
-    };
-
-    const handlePrintResearchPaperForm = async (claim: IncentiveClaim) => {
-        if (!claim) return;
-        setIsPrintingResearchPaperForm(claim.id);
-        try {
-            const result = await generateResearchPaperIncentiveForm(claim.id);
-            if (result.success && result.fileData) {
-                const byteCharacters = atob(result.fileData);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                    byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Office_Noting_Research_Paper_Claim_${claim.userName.replace(/\s/g, '_')}.docx`;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                window.URL.revokeObjectURL(url);
-                toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
-            } else {
-                throw new Error(result.error || "Failed to generate form.");
-            }
-        } catch (error: any) {
-            console.error("Research Paper form generation error:", error);
-            toast({ variant: 'destructive', title: "Generation Failed", description: error.message });
-        } finally {
-            setIsPrintingResearchPaperForm(null);
-        }
-    };
   
   const renderTable = () => (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-12">
+                <Checkbox
+                    checked={sortedAndFilteredClaims.length > 0 && selectedClaims.length === sortedAndFilteredClaims.length && sortedAndFilteredClaims.length <= 30}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        if (sortedAndFilteredClaims.length > 30) {
+                          toast({ variant: 'destructive', title: 'Limit Exceeded', description: 'You can only select up to 30 claims at once.' });
+                          setSelectedClaims(sortedAndFilteredClaims.slice(0, 30).map(c => c.id));
+                        } else {
+                          setSelectedClaims(sortedAndFilteredClaims.map(c => c.id));
+                        }
+                      } else {
+                        setSelectedClaims([]);
+                      }
+                    }}
+                    disabled={sortedAndFilteredClaims.length > 30}
+                    // @ts-ignore
+                    indeterminate={selectedClaims.length > 0 && selectedClaims.length < sortedAndFilteredClaims.length}
+                />
+            </TableHead>
             <TableHead>
                <Button variant="ghost" onClick={() => requestSort('userName')}>
                   Claimant <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
+            <TableHead>Title</TableHead>
             <TableHead className="hidden md:table-cell">
                <Button variant="ghost" onClick={() => requestSort('claimType')}>
                   Claim Type <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -317,68 +262,46 @@ export default function ManageIncentiveClaimsPage() {
                   Date <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
             </TableHead>
-            <TableHead>
-               <Button variant="ghost" onClick={() => requestSort('status')}>
-                  Status <ArrowUpDown className="ml-2 h-4 w-4" />
-              </Button>
-            </TableHead>
+            <TableHead>Status</TableHead>
+            {activeTab === 'rejected' && <TableHead>Rejected At Stage</TableHead>}
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedAndFilteredClaims.map((claim) => (
-              <TableRow key={claim.id}>
+          {sortedAndFilteredClaims.map((claim) => {
+            const lastRejectedApproval = claim.approvals?.slice().reverse().find(a => a?.status === 'Rejected');
+            return (
+              <TableRow key={claim.id} data-state={selectedClaims.includes(claim.id) ? "selected" : ""}>
+                <TableCell>
+                    <Checkbox
+                        checked={selectedClaims.includes(claim.id)}
+                        onCheckedChange={(checked) => {
+                            if (checked && selectedClaims.length >= 30) {
+                                toast({ variant: 'destructive', title: 'Limit Reached', description: 'You can only select up to 30 claims at once.' });
+                                return;
+                            }
+                            setSelectedClaims(
+                                checked
+                                ? [...selectedClaims, claim.id]
+                                : selectedClaims.filter((id) => id !== claim.id)
+                            );
+                        }}
+                    />
+                </TableCell>
                 <TableCell className="font-medium whitespace-nowrap">{claim.userName}</TableCell>
+                <TableCell className="max-w-xs truncate">{getClaimTitle(claim)}</TableCell>
                 <TableCell className="hidden md:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
                 <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  <Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                  <Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' || claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                 </TableCell>
+                {activeTab === 'rejected' && <TableCell>{lastRejectedApproval ? `Stage ${lastRejectedApproval.stage}` : 'N/A'}</TableCell>}
                 <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                        {claim.claimType === 'Books' && claim.status === 'Submitted to Accounts' && (
-                            <Button onClick={() => handlePrintBookForm(claim)} disabled={isPrintingBookForm === claim.id} size="sm" variant="outline">
-                                {isPrintingBookForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-                                Notings
-                            </Button>
-                        )}
-                        {claim.claimType === 'Membership of Professional Bodies' && claim.status === 'Submitted to Accounts' && (
-                          <Button onClick={() => handlePrintMembershipForm(claim)} disabled={isPrintingMembershipForm === claim.id} size="sm" variant="outline">
-                            {isPrintingMembershipForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-                            Notings
-                          </Button>
-                        )}
-                         {claim.claimType === 'Research Papers' && claim.status === 'Submitted to Accounts' && (
-                          <Button onClick={() => handlePrintResearchPaperForm(claim)} disabled={isPrintingResearchPaperForm === claim.id} size="sm" variant="outline">
-                            {isPrintingResearchPaperForm === claim.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Printer className="mr-2 h-4 w-4" />}
-                            Notings
-                          </Button>
-                        )}
-                        <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button aria-haspopup="true" size="icon" variant="ghost">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Toggle menu</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onSelect={() => setSelectedClaim(claim)}>View Details</DropdownMenuItem>
-                          <DropdownMenuLabel>Change Status</DropdownMenuLabel>
-                            {STATUSES.map(status => (
-                              <DropdownMenuItem 
-                                  key={status} 
-                                  onClick={() => handleStatusChange(claim.id, status)}
-                                  disabled={claim.status === status}
-                              >
-                                  {status}
-                              </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setSelectedClaim(claim)}>View Details</Button>
                 </TableCell>
               </TableRow>
-            ))}
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -393,39 +316,55 @@ export default function ManageIncentiveClaimsPage() {
     : "Review and manage all submitted incentive claims.";
 
   return (
+    <>
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
-         <Button onClick={handleExport} disabled={loading}>
-            <Download className="mr-2 h-4 w-4" />
-            Export XLSX
-         </Button>
+         <div className="flex items-center gap-2">
+            <Button onClick={handleExport} disabled={loading}>
+                <Download className="mr-2 h-4 w-4" />
+                Export XLSX
+            </Button>
+        </div>
       </PageHeader>
       <div className="mt-8">
-        <div className="flex items-center py-4 gap-4">
-            <Input
-                placeholder="Filter by claimant or title..."
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                className="max-w-sm"
-            />
-            <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
-                <SelectTrigger className="w-[240px]">
-                    <SelectValue placeholder="Filter by claim type" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Claim Types</SelectItem>
-                    {CLAIM_TYPES.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+        <div className="flex items-center justify-between py-4 gap-4">
+            <div className="flex items-center gap-2">
+              <Input
+                  placeholder="Filter by claimant or title..."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  className="max-w-sm"
+              />
+              <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
+                  <SelectTrigger className="w-[240px]">
+                      <SelectValue placeholder="Filter by claim type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Claim Types</SelectItem>
+                      {CLAIM_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+            </div>
+            {activeTab === 'pending-bank' && selectedClaims.length > 0 && (
+                <div className="flex items-center gap-2">
+                    <Button onClick={() => setIsGenerateSheetOpen(true)} disabled={eligibleForPaymentSheet.length === 0}>
+                        <FileSpreadsheet className="mr-2 h-4 w-4" /> Generate Payment Sheet ({eligibleForPaymentSheet.length})
+                    </Button>
+                    <Button onClick={handleMarkPaymentCompleted} disabled={isUpdatingPayment}>
+                        {isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCheck className="mr-2 h-4 w-4" />}
+                        Mark as Payment Completed ({selectedClaims.length})
+                    </Button>
+                </div>
+            )}
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="all">All ({allClaims.filter(c => claimTypeFilter === 'all' || c.claimType === claimTypeFilter).length})</TabsTrigger>
-                <TabsTrigger value="pending">Pending ({allClaims.filter(c => c.status === 'Pending' && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
-                <TabsTrigger value="accepted">Accepted ({allClaims.filter(c => c.status === 'Accepted' && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
-                <TabsTrigger value="rejected">Rejected ({allClaims.filter(c => c.status === 'Rejected' && (claimTypeFilter === 'all' || c.claimType === claimTypeFilter)).length})</TabsTrigger>
+                <TabsTrigger value="pending">Pending</TabsTrigger>
+                <TabsTrigger value="pending-bank">Pending for Bank</TabsTrigger>
+                <TabsTrigger value="approved">Approved</TabsTrigger>
+                <TabsTrigger value="rejected">Rejected</TabsTrigger>
             </TabsList>
             <Card className="mt-4">
               <CardContent className="pt-6">
@@ -437,7 +376,7 @@ export default function ManageIncentiveClaimsPage() {
                     renderTable()
                  ) : (
                     <div className="text-center py-10 text-muted-foreground">
-                        <p>No claims found for this category or search term.</p>
+                        <p>No claims found for this category.</p>
                     </div>
                  )}
               </CardContent>
@@ -452,5 +391,95 @@ export default function ManageIncentiveClaimsPage() {
         claimant={users.find(u => u.uid === selectedClaim?.uid) || null}
       />
     </div>
+    <GeneratePaymentSheetDialog 
+        isOpen={isGenerateSheetOpen}
+        onOpenChange={setIsGenerateSheetOpen}
+        claims={eligibleForPaymentSheet}
+        allUsers={users}
+    />
+    </>
   );
+}
+
+function GeneratePaymentSheetDialog({ isOpen, onOpenChange, claims, allUsers }: { isOpen: boolean; onOpenChange: (open: boolean) => void; claims: IncentiveClaim[]; allUsers: User[] }) {
+    const { toast } = useToast();
+    const [remarks, setRemarks] = useState<Record<string, string>>({});
+    const [referenceNumber, setReferenceNumber] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+
+    const handleGenerate = async () => {
+        if (!referenceNumber.trim()) {
+            toast({ variant: 'destructive', title: 'Reference Number Required' });
+            return;
+        }
+        setIsGenerating(true);
+        try {
+            const result = await generateIncentivePaymentSheet(claims.map(c => c.id), remarks, `RDC/ACCT/PYMT/${referenceNumber}`);
+            if (result.success && result.fileData) {
+                const byteCharacters = atob(result.fileData);
+                const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Incentive_Payment_Sheet_${referenceNumber}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                toast({ title: "Export Successful", description: "Payment sheet has been generated." });
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error || "Failed to generate sheet.");
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message });
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>Generate Incentive Payment Sheet</DialogTitle>
+                    <DialogDescription>Add remarks for the selected claims and provide a reference number for the payment sheet.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                    <div className="flex items-center gap-2">
+                        <Label htmlFor="ref-no" className="whitespace-nowrap">Reference Number:</Label>
+                        <Input id="ref-no" value={`RDC/ACCT/PYMT/${referenceNumber}`} onChange={(e) => setReferenceNumber(e.target.value.replace('RDC/ACCT/PYMT/', ''))} />
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                        <h4 className="font-semibold">Add Remarks</h4>
+                        {claims.map(claim => (
+                            <div key={claim.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-2 rounded-md">
+                                <div className="md:col-span-1">
+                                    <p className="font-medium text-sm">{claim.userName}</p>
+                                    <p className="text-xs text-muted-foreground">{claim.paperTitle || claim.publicationTitle || claim.claimType}</p>
+                                    <p className="text-sm font-semibold">₹{claim.finalApprovedAmount?.toLocaleString('en-IN')}</p>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <Textarea
+                                        placeholder="Enter remarks for this claim..."
+                                        value={remarks[claim.id] || ''}
+                                        onChange={(e) => setRemarks(prev => ({ ...prev, [claim.id]: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                    <Button onClick={handleGenerate} disabled={isGenerating}>
+                        {isGenerating ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Generating...</> : 'Generate & Download'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
 }
