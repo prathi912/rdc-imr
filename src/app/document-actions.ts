@@ -142,10 +142,10 @@ export async function generateIncentivePaymentSheet(
     
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(templatePath);
-    const worksheet = workbook.getWorksheet(1);
+    const worksheet = workbook.getWorksheet("Sheet1");
 
     if (!worksheet) {
-      return { success: false, error: 'Could not find a worksheet in the template file.' };
+      return { success: false, error: 'Could not find a worksheet named "Sheet1" in the template file.' };
     }
 
     let totalAmount = 0;
