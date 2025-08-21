@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -143,7 +144,7 @@ export async function processIncentiveClaimAction(
       newStatus = 'Rejected';
     } else {
       if (stageIndex === 2) { // Final approval stage
-        newStatus = 'Submitted to Accounts';
+        newStatus = 'Accepted'; // New status after stage 3 approval
       } else {
         newStatus = `Pending Stage ${stageIndex + 2} Approval` as IncentiveClaim['status'];
       }

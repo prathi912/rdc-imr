@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2, FileSpreadsheet, CheckCheck } from "lucide-react";
+import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2, FileSpreadsheet, CheckCheck, Send } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { generateIncentivePaymentSheet } from '@/app/document-actions';
-import { markPaymentsCompleted } from '@/app/manage-claims-actions';
+import { markPaymentsCompleted, submitToAccounts } from '@/app/manage-claims-actions';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -61,7 +61,7 @@ export default function ManageIncentiveClaimsPage() {
   
   const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
   const [isGenerateSheetOpen, setIsGenerateSheetOpen] = useState(false);
-  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -181,7 +181,7 @@ export default function ManageIncentiveClaimsPage() {
   };
   
   const handleMarkPaymentCompleted = async () => {
-    setIsUpdatingPayment(true);
+    setIsUpdating(true);
     const result = await markPaymentsCompleted(selectedClaims);
     if (result.success) {
       toast({ title: 'Success', description: `${selectedClaims.length} claim(s) marked as payment completed.` });
@@ -190,7 +190,20 @@ export default function ManageIncentiveClaimsPage() {
     } else {
       toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
-    setIsUpdatingPayment(false);
+    setIsUpdating(false);
+  };
+
+  const handleSubmitToAccounts = async () => {
+    setIsUpdating(true);
+    const result = await submitToAccounts(selectedClaims);
+    if (result.success) {
+        toast({ title: 'Success', description: `${selectedClaims.length} claim(s) submitted to accounts.`});
+        setSelectedClaims([]);
+        fetchClaimsAndUsers();
+    } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.error });
+    }
+    setIsUpdating(false);
   };
 
 
@@ -358,12 +371,16 @@ export default function ManageIncentiveClaimsPage() {
             </div>
             {activeTab === 'pending-bank' && selectedClaims.length > 0 && (
                 <div className="flex items-center gap-2">
-                    <Button onClick={() => setIsGenerateSheetOpen(true)} disabled={eligibleForPaymentSheet.length === 0}>
+                    <Button onClick={() => setIsGenerateSheetOpen(true)} disabled={eligibleForPaymentSheet.length === 0 || isUpdating}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" /> Generate Payment Sheet ({eligibleForPaymentSheet.length})
                     </Button>
-                    <Button onClick={handleMarkPaymentCompleted} disabled={isUpdatingPayment}>
-                        {isUpdatingPayment ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCheck className="mr-2 h-4 w-4" />}
-                        Mark as Payment Completed ({selectedClaims.length})
+                    <Button onClick={handleSubmitToAccounts} disabled={isUpdating || !selectedClaims.every(id => allClaims.find(c => c.id === id)?.status === 'Accepted')}>
+                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                        Submit to Accounts
+                    </Button>
+                    <Button onClick={handleMarkPaymentCompleted} disabled={isUpdating || !selectedClaims.every(id => allClaims.find(c => c.id === id)?.status === 'Submitted to Accounts')}>
+                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCheck className="mr-2 h-4 w-4" />}
+                        Mark as Payment Completed
                     </Button>
                 </div>
             )}

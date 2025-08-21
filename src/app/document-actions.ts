@@ -11,7 +11,7 @@ import type { Project, User, Evaluation, IncentiveClaim } from '@/types';
 import { getDoc, doc, collection, query, where, getDocs as adminGetDocs, documentId } from 'firebase-admin/firestore';
 import { format, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
-import { toWords } from 'number-to-words';
+import numberToWords from 'number-to-words';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -140,7 +140,7 @@ export async function generateIncentivePaymentSheet(
     flatData.date = format(new Date(), 'dd/MM/yyyy');
     flatData.reference_number = referenceNumber;
     flatData.total_amount = totalAmount;
-    flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
+    flatData.amount_in_word = numberToWords.toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
 
     // This is a simplified replacement for cell placeholders like {placeholder}.
     // A more robust solution might use a library that specifically handles Excel templates.

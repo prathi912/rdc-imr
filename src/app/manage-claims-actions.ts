@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -48,6 +49,11 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
     for (const doc of claimsQuery.docs) {
       const claim = { id: doc.id, ...doc.data() } as IncentiveClaim;
       
+      if(claim.status !== 'Submitted to Accounts') {
+          console.warn(`Skipping claim ${claim.id} for payment completion as its status is not 'Submitted to Accounts'.`);
+          continue;
+      }
+      
       // Update status in the batch
       batch.update(doc.ref, { status: 'Payment Completed' });
       
@@ -95,6 +101,37 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
   } catch (error: any) {
     console.error('Error marking payments as completed:', error);
     await logActivity('ERROR', 'Failed to mark payments as completed', { claimIds, error: error.message });
+    return { success: false, error: error.message || 'An unexpected error occurred.' };
+  }
+}
+
+export async function submitToAccounts(claimIds: string[]): Promise<{ success: boolean; error?: string }> {
+  if (!claimIds || claimIds.length === 0) {
+    return { success: false, error: 'No claim IDs provided.' };
+  }
+  
+  try {
+    const claimsRef = adminDb.collection('incentiveClaims');
+    const batch = adminDb.batch();
+    
+    const claimsQuery = await claimsRef.where(adminDb.firestore.FieldPath.documentId(), 'in', claimIds).get();
+    
+    for (const doc of claimsQuery.docs) {
+        const claim = doc.data() as IncentiveClaim;
+        if(claim.status !== 'Accepted') {
+            console.warn(`Skipping claim ${doc.id} for submission to accounts as its status is not 'Accepted'.`);
+            continue;
+        }
+        batch.update(doc.ref, { status: 'Submitted to Accounts' });
+    }
+
+    await batch.commit();
+    await logActivity('INFO', 'Submitted claims to accounts', { claimIds, count: claimIds.length });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error submitting claims to accounts:', error);
+    await logActivity('ERROR', 'Failed to submit claims to accounts', { claimIds, error: error.message });
     return { success: false, error: error.message || 'An unexpected error occurred.' };
   }
 }
