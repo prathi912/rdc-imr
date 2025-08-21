@@ -35,6 +35,18 @@ async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string,
 
 function getInstituteAcronym(name?: string): string {
     if (!name) return '';
+
+    const acronymMap: { [key: string]: string } = {
+        'Parul Institute of Ayurved and Research': 'PIAR (Ayu.)',
+        'Parul Institute of Architecture & Research': 'PIAR (Arc.)',
+        'Parul Institute of Ayurved': 'PIA (Ayu.)',
+        'Parul Institute of Arts': 'PIA (Art.)'
+    };
+
+    if (acronymMap[name]) {
+        return acronymMap[name];
+    }
+
     const ignoreWords = ['of', 'and', '&', 'the', 'in'];
     return name
         .split(' ')
@@ -43,6 +55,7 @@ function getInstituteAcronym(name?: string): string {
         .join('')
         .toUpperCase();
 }
+
 
 export async function generateRecommendationForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
@@ -231,7 +244,7 @@ export async function generateOfficeNotingForm(
             phaseData[`phase${i + 1}_amount`] = formData.phases[i].amount.toLocaleString('en-IN');
             totalAmount += formData.phases[i].amount;
         } else {
-            phaseData[`phase${i + 1}_amount`] = 'N/A';
+            phaseData[`phase${i + 1}_amount`] = '';
         }
     }
 
