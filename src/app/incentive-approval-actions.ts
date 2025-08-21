@@ -9,7 +9,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 
 const EMAIL_STYLES = {
   background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
-  logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-WHITE.svg" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
+  logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-WHITE.png" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
   footer: ` 
     <p style="color:#b0bec5; margin-top: 30px;">Best Regards,</p>
     <p style="color:#b0bec5;">Research & Development Cell Team,</p>
@@ -96,7 +96,28 @@ export async function processIncentiveClaimAction(
       finalApprovedAmount: data.amount // Keep updating the final amount at each approval stage
     });
     
-    // Notifications and emails to applicants are removed as per new requirement.
+    if (action === 'reject' && claim.userEmail) {
+        const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || 'your recent incentive claim';
+        await sendEmail({
+            to: claim.userEmail,
+            subject: `Update on Your Incentive Claim: ${claimTitle}`,
+            from: 'default',
+            html: `
+                <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
+                    <p style="color:#ffffff;">Dear ${claim.userName},</p>
+                    <p style="color:#e0e0e0;">
+                        This email is to inform you about a decision on your recent incentive claim for "<strong style="color:#ffffff;">${claimTitle}</strong>".
+                    </p>
+                    <p style="color:#e0e0e0;">
+                        After careful review, your application has been <strong style="color:#ff5252;">rejected</strong>.
+                    </p>
+                    <p style="color:#e0e0e0;">For more information, please visit the portal or contact the RDC office.</p>
+                    ${EMAIL_STYLES.footer}
+                </div>
+            `
+        });
+    }
     
     await logActivity('INFO', `Incentive claim ${action}d`, { claimId, stage: stageIndex + 1, approver: approver.name });
     return { success: true };
