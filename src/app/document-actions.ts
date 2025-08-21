@@ -140,7 +140,7 @@ export async function generateIncentivePaymentSheet(
       return { success: false, error: 'Payment sheet template not found.' };
     }
     const templateBuffer = fs.readFileSync(templatePath);
-    const workbook = XLSX.read(templateBuffer, { type: 'buffer' });
+    const workbook = XLSX.read(templateBuffer, { type: 'buffer', cellStyles: true });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
     let totalAmount = 0;
@@ -173,17 +173,28 @@ export async function generateIncentivePaymentSheet(
         const cell_address = { c: C, r: R };
         const cell_ref = XLSX.utils.encode_cell(cell_address);
         let cell = worksheet[cell_ref];
+
         if (cell && cell.v && typeof cell.v === 'string') {
           const templateVarMatch = cell.v.match(/\{(.*?)\}/);
           if (templateVarMatch && templateVarMatch[1]) {
              const key = templateVarMatch[1];
-             cell.v = flatData[key] !== undefined ? flatData[key] : '';
+             const newValue = flatData[key] !== undefined ? flatData[key] : '';
+             
+             // Update the value but keep the existing style ('s' property)
+             cell.v = newValue;
+
+             // Ensure the cell type is appropriate for the data
+             if (typeof newValue === 'number') {
+                 cell.t = 'n';
+             } else {
+                 cell.t = 's';
+             }
           }
         }
       }
     }
 
-    const outputBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+    const outputBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64', cellStyles: true });
 
     return { success: true, fileData: outputBuffer };
   } catch (error: any) {
