@@ -19,25 +19,6 @@ function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId
     return null;
 }
 
-const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
-    { id: 'name', label: 'Name of the Applicant' },
-    { id: 'designation', label: 'Designation and Dept.' },
-    { id: 'publicationType', label: 'Type of publication' },
-    { id: 'journalName', label: 'Name of Journal' },
-    { id: 'locale', label: 'Whether National/International' },
-    { id: 'indexType', label: 'Indexed In' },
-    { id: 'wosType', label: 'WoS Type' },
-    { id: 'journalClassification', label: 'Q Rating of the Journal' },
-    { id: 'authorType', label: 'Role of the Author' },
-    { id: 'totalPuAuthors', label: 'No. of Authors from PU' },
-    { id: 'printIssn', label: 'ISSN' },
-    { id: 'publicationProofUrls', label: 'PROOF OF PUBLICATION ATTACHED' },
-    { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
-    { id: 'publicationMonth', label: 'Published Month & Year' },
-    { id: 'authorPosition', label: 'Author Position' },
-];
-
-
 export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, claimant, onTakeAction }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null, claimant: User | null, onTakeAction?: () => void }) {
     const { toast } = useToast();
     const [isPrinting, setIsPrinting] = useState(false);
@@ -94,7 +75,6 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const isViewerAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
-    const isClaimantViewing = currentUser?.uid === claimant?.uid;
     const isFullyApproved = claim.status === 'Submitted to Accounts';
 
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
@@ -149,7 +129,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     {renderDetail("Status", claim.status)}
                     {renderDetail("Submission Date", new Date(claim.submissionDate).toLocaleString())}
                     
-                    {claim.claimType === 'Research Papers' && isViewerAdmin ? (
+                    {claim.claimType === 'Research Papers' && isViewerAdmin && (
                         <>
                             <hr className="my-2" />
                             <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
@@ -179,7 +159,9 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                                 </div>
                             </div>
                         </>
-                    ) : claim.claimType === 'Research Papers' ? (
+                    )} 
+                    
+                    {claim.claimType === 'Research Papers' && !isViewerAdmin && (
                         <>
                            <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
@@ -209,7 +191,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
                         </>
-                    ) : null}
+                    )}
 
 
                     {claim.claimType === 'Patents' && (
