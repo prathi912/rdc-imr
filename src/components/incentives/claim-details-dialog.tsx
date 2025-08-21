@@ -346,24 +346,15 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     {(isViewerAdminOrApprover || isFullyApproved) && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     
-                    {claim.approvals && claim.approvals.length > 0 && (
+                    {isViewerAdminOrApprover && claim.approvals && claim.approvals.length > 0 && (
                         <div className="space-y-2 pt-2">
                            <h4 className="font-semibold text-base">Approval History</h4>
                            {claim.approvals.filter(a => a !== null).map(approval => (
                                <div key={approval.stage} className="p-3 border rounded-md bg-muted/50">
-                                   {isViewerAdminOrApprover ? (
-                                    <>
-                                       <p><strong>Stage {approval.stage}:</strong> {approval.status} by {approval.approverName}</p>
-                                       <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleString()}</p>
-                                       <p className="mt-1"><strong>Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
-                                       <p className="mt-1"><strong>Comments:</strong> {approval.comments}</p>
-                                    </>
-                                   ) : (
-                                    <>
-                                      <p><strong>Stage {approval.stage}:</strong> {approval.status}</p>
-                                      <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleDateString()}</p>
-                                    </>
-                                   )}
+                                   <p><strong>Stage {approval.stage}:</strong> {approval.status} by {approval.approverName}</p>
+                                   <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleString()}</p>
+                                   <p className="mt-1"><strong>Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
+                                   <p className="mt-1"><strong>Comments:</strong> {approval.comments}</p>
                                </div>
                            ))}
                         </div>
