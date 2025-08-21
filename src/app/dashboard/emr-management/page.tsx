@@ -1,3 +1,4 @@
+
 // src/app/dashboard/emr-management/page.tsx
 'use client';
 
@@ -19,7 +20,7 @@ import { Eye, Download, Edit, Send, CheckCircle, XCircle, Loader2 } from 'lucide
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { AddEditCallDialog } from '@/components/emr/emr-calendar';
-import { announceEmrCall } from '@/app/actions';
+import { announceEmrCall } from '@/app/emr-actions';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
@@ -373,3 +374,5 @@ export default function EmrManagementOverviewPage() {
         </>
     );
 }
+
+    
