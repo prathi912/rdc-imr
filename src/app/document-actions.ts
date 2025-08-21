@@ -166,6 +166,11 @@ export async function generateIncentivePaymentSheet(
     flatData.reference_number = referenceNumber;
     flatData.total_amount = totalAmount;
     flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
+    
+    const dataCellStyle = {
+        font: { sz: 26 },
+        alignment: { horizontal: 'center', vertical: 'center' }
+    };
 
     const range = XLSX.utils.decode_range(worksheet['!ref']!);
     for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -180,10 +185,9 @@ export async function generateIncentivePaymentSheet(
              const key = templateVarMatch[1];
              const newValue = flatData[key] !== undefined ? flatData[key] : '';
              
-             // Update the value but keep the existing style ('s' property)
              cell.v = newValue;
+             cell.s = { ...cell.s, ...dataCellStyle };
 
-             // Ensure the cell type is appropriate for the data
              if (typeof newValue === 'number') {
                  cell.t = 'n';
              } else {
