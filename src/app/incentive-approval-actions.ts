@@ -2,7 +2,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import type { IncentiveClaim, SystemSettings, ApprovalStage, User } from '@/types';
+import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper, Author } from '@/types';
 import { getSystemSettings } from './actions';
 import { sendEmail } from '@/lib/email';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -34,6 +34,65 @@ async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string,
   }
 }
 
+async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
+    if (claim.claimType !== 'Research Papers' || !claim.paperTitle || !claim.relevantLink) {
+        await logActivity('WARNING', 'Skipped paper creation from claim: not a research paper or missing title/link.', { claimId: claim.id });
+        return;
+    }
+
+    try {
+        const paperRef = adminDb.collection('papers').doc(); // Create a new document reference
+        const now = new Date().toISOString();
+
+        // Convert BookCoAuthor[] to Author[]
+        const authors: Author[] = (claim.bookCoAuthors || []).map(bca => ({
+            uid: bca.uid,
+            email: bca.email,
+            name: bca.name,
+            role: bca.role,
+            isExternal: bca.isExternal,
+            status: 'approved', // Automatically approved since it comes from a sanctioned claim
+        }));
+        
+        // Ensure the main claimant is in the authors list if not already present
+        if (!authors.some(a => a.uid === claim.uid)) {
+            authors.push({
+                uid: claim.uid,
+                email: claim.userEmail,
+                name: claim.userName,
+                role: 'Co-Author', // Default role, can be adjusted if more info is available
+                isExternal: false,
+                status: 'approved',
+            });
+        }
+        
+        const firstAuthor = authors.find(a => a.role === 'First Author' || a.role === 'First & Corresponding Author');
+        const mainAuthorUid = firstAuthor?.uid || claim.uid;
+
+        const newPaperData: Omit<ResearchPaper, 'id'> = {
+            title: claim.paperTitle,
+            url: claim.relevantLink,
+            mainAuthorUid,
+            authors,
+            authorUids: authors.map(a => a.uid).filter(Boolean) as string[],
+            authorEmails: authors.map(a => a.email.toLowerCase()),
+            journalName: claim.journalName || null,
+            journalWebsite: claim.journalWebsite || null,
+            qRating: claim.journalClassification || null,
+            createdAt: now,
+            updatedAt: now,
+        };
+
+        await paperRef.set(newPaperData);
+        await logActivity('INFO', 'Research paper automatically created from approved incentive claim.', { claimId: claim.id, paperId: paperRef.id, title: claim.paperTitle });
+
+    } catch (error: any) {
+        console.error('Error creating paper from claim:', error);
+        await logActivity('ERROR', 'Failed to create paper from approved claim', { claimId: claim.id, error: error.message });
+    }
+}
+
+
 export async function processIncentiveClaimAction(
   claimId: string,
   action: 'approve' | 'reject',
@@ -48,7 +107,7 @@ export async function processIncentiveClaimAction(
     if (!claimSnap.exists) {
       return { success: false, error: 'Incentive claim not found.' };
     }
-    const claim = claimSnap.data() as IncentiveClaim;
+    const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
     const settings = await getSystemSettings();
     
     if (!settings.incentiveApprovers || settings.incentiveApprovers.length <= stageIndex) {
@@ -120,26 +179,33 @@ export async function processIncentiveClaimAction(
         });
     }
 
-    if (action === 'approve' && stageIndex === 2 && claim.userEmail) {
-        await sendEmail({
-            to: claim.userEmail,
-            subject: `Congratulations! Your Incentive Claim for "${claimTitle}" has been Approved`,
-            from: 'default',
-            html: `
-                <div ${EMAIL_STYLES.background}>
-                    ${EMAIL_STYLES.logo}
-                    <p style="color:#ffffff;">Dear ${claim.userName},</p>
-                    <p style="color:#e0e0e0;">
-                        We are pleased to inform you that your incentive claim for "<strong style="color:#ffffff;">${claimTitle}</strong>" has been successfully approved by all committees.
-                    </p>
-                    <p style="color:#e0e0e0;">
-                        The final approved incentive amount is <strong style="color:#ffffff;">₹${data.amount?.toLocaleString('en-IN') || 'N/A'}</strong>. The amount will be processed by the accounts department shortly.
-                    </p>
-                    <p style="color:#e0e0e0;">Congratulations on your achievement!</p>
-                    ${EMAIL_STYLES.footer}
-                </div>
-            `
-        });
+    if (action === 'approve' && stageIndex === 2) { // Final approval
+        if (claim.userEmail) {
+            await sendEmail({
+                to: claim.userEmail,
+                subject: `Congratulations! Your Incentive Claim for "${claimTitle}" has been Approved`,
+                from: 'default',
+                html: `
+                    <div ${EMAIL_STYLES.background}>
+                        ${EMAIL_STYLES.logo}
+                        <p style="color:#ffffff;">Dear ${claim.userName},</p>
+                        <p style="color:#e0e0e0;">
+                            We are pleased to inform you that your incentive claim for "<strong style="color:#ffffff;">${claimTitle}</strong>" has been successfully approved by all committees.
+                        </p>
+                        <p style="color:#e0e0e0;">
+                            The final approved incentive amount is <strong style="color:#ffffff;">₹${data.amount?.toLocaleString('en-IN') || 'N/A'}</strong>. The amount will be processed by the accounts department shortly.
+                        </p>
+                        <p style="color:#e0e0e0;">Congratulations on your achievement!</p>
+                        ${EMAIL_STYLES.footer}
+                    </div>
+                `
+            });
+        }
+        
+        // If it's a research paper, add it to the papers collection for profiles.
+        if (claim.claimType === 'Research Papers') {
+            await addPaperFromApprovedClaim(claim);
+        }
     }
     
     await logActivity('INFO', `Incentive claim ${action}d`, { claimId, stage: stageIndex + 1, approver: approver.name });
