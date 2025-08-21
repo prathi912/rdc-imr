@@ -483,5 +483,3 @@ function GeneratePaymentSheetDialog({ isOpen, onOpenChange, claims, allUsers }: 
         </Dialog>
     );
 }
-
-    
