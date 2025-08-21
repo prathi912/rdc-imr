@@ -118,21 +118,10 @@ export default function ManageIncentiveClaimsPage() {
   const getClaimTitle = (claim: IncentiveClaim): string => {
     return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
   };
-
-  const sortedAndFilteredClaims = useMemo(() => {
+  
+  const filteredClaims = useMemo(() => {
     let filtered = [...allClaims];
     
-    const tabStatusMap = {
-      'pending': ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval'],
-      'pending-bank': ['Accepted', 'Submitted to Accounts'],
-      'approved': ['Payment Completed'],
-      'rejected': ['Rejected'],
-    };
-
-    if (activeTab in tabStatusMap) {
-        filtered = filtered.filter(claim => tabStatusMap[activeTab as keyof typeof tabStatusMap].includes(claim.status));
-    }
-
     if (claimTypeFilter !== 'all') {
       filtered = filtered.filter(claim => claim.claimType === claimTypeFilter);
     }
@@ -144,8 +133,27 @@ export default function ManageIncentiveClaimsPage() {
         getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch)
       );
     }
+    return filtered;
+  }, [allClaims, searchTerm, claimTypeFilter]);
+  
+  const tabClaims = useMemo(() => {
+    const pending = filteredClaims.filter(claim => ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval'].includes(claim.status));
+    const pendingBank = filteredClaims.filter(claim => ['Accepted', 'Submitted to Accounts'].includes(claim.status));
+    const approved = filteredClaims.filter(claim => claim.status === 'Payment Completed');
+    const rejected = filteredClaims.filter(claim => claim.status === 'Rejected');
+    
+    return {
+        pending,
+        'pending-bank': pendingBank,
+        approved,
+        rejected
+    };
+  }, [filteredClaims]);
 
-    filtered.sort((a, b) => {
+  const sortedAndFilteredClaims = useMemo(() => {
+    let claimsForTab = tabClaims[activeTab as keyof typeof tabClaims] || [];
+    
+    claimsForTab.sort((a, b) => {
         const aValue = a[sortConfig.key as keyof IncentiveClaim] || '';
         const bValue = b[sortConfig.key as keyof IncentiveClaim] || '';
         if (aValue < bValue) {
@@ -157,8 +165,8 @@ export default function ManageIncentiveClaimsPage() {
         return 0;
     });
 
-    return filtered;
-  }, [allClaims, activeTab, searchTerm, sortConfig, claimTypeFilter]);
+    return claimsForTab;
+  }, [tabClaims, activeTab, sortConfig]);
   
   useEffect(() => {
     setSelectedClaims([]);
@@ -362,10 +370,10 @@ export default function ManageIncentiveClaimsPage() {
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="pending">Pending</TabsTrigger>
-                <TabsTrigger value="pending-bank">Pending for Bank</TabsTrigger>
-                <TabsTrigger value="approved">Approved</TabsTrigger>
-                <TabsTrigger value="rejected">Rejected</TabsTrigger>
+                <TabsTrigger value="pending">Pending ({tabClaims.pending.length})</TabsTrigger>
+                <TabsTrigger value="pending-bank">Pending for Bank ({tabClaims['pending-bank'].length})</TabsTrigger>
+                <TabsTrigger value="approved">Approved ({tabClaims.approved.length})</TabsTrigger>
+                <TabsTrigger value="rejected">Rejected ({tabClaims.rejected.length})</TabsTrigger>
             </TabsList>
             <Card className="mt-4">
               <CardContent className="pt-6">
