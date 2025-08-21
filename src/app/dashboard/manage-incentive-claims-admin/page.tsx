@@ -219,8 +219,22 @@ export default function ManageIncentiveClaimsPage() {
           <TableRow>
             <TableHead className="w-12">
                 <Checkbox
-                    checked={selectedClaims.length === sortedAndFilteredClaims.length && sortedAndFilteredClaims.length > 0}
-                    onCheckedChange={(checked) => setSelectedClaims(checked ? sortedAndFilteredClaims.map(c => c.id) : [])}
+                    checked={sortedAndFilteredClaims.length > 0 && selectedClaims.length === sortedAndFilteredClaims.length}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        if (sortedAndFilteredClaims.length > 30) {
+                          toast({ variant: 'destructive', title: 'Limit Exceeded', description: 'You can only select up to 30 claims at once.' });
+                          setSelectedClaims(sortedAndFilteredClaims.slice(0, 30).map(c => c.id));
+                        } else {
+                          setSelectedClaims(sortedAndFilteredClaims.map(c => c.id));
+                        }
+                      } else {
+                        setSelectedClaims([]);
+                      }
+                    }}
+                    disabled={sortedAndFilteredClaims.length > 30}
+                    // @ts-ignore
+                    indeterminate={selectedClaims.length > 0 && selectedClaims.length < sortedAndFilteredClaims.length}
                 />
             </TableHead>
             <TableHead>
@@ -252,13 +266,17 @@ export default function ManageIncentiveClaimsPage() {
                 <TableCell>
                     <Checkbox
                         checked={selectedClaims.includes(claim.id)}
-                        onCheckedChange={(checked) =>
+                        onCheckedChange={(checked) => {
+                            if (checked && selectedClaims.length >= 30) {
+                                toast({ variant: 'destructive', title: 'Limit Reached', description: 'You can only select up to 30 claims at once.' });
+                                return;
+                            }
                             setSelectedClaims(
                                 checked
                                 ? [...selectedClaims, claim.id]
                                 : selectedClaims.filter((id) => id !== claim.id)
-                            )
-                        }
+                            );
+                        }}
                     />
                 </TableCell>
                 <TableCell className="font-medium whitespace-nowrap">{claim.userName}</TableCell>
@@ -309,7 +327,7 @@ export default function ManageIncentiveClaimsPage() {
     <>
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
-        <div className="flex items-center gap-2">
+         <div className="flex items-center gap-2">
             {eligibleForPaymentSheet.length > 0 && (
                 <Button onClick={() => setIsGenerateSheetOpen(true)}>
                     <FileSpreadsheet className="mr-2 h-4 w-4" />
