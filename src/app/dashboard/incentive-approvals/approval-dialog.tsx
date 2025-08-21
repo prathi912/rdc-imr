@@ -63,7 +63,7 @@ const createApprovalSchema = (stageIndex: number) => z.object({
 
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
 
-const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
+const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'designation' | 'authorRoleAndPosition', label: string }[] = [
     { id: 'name', label: 'Name of the Applicant' },
     { id: 'designation', label: 'Designation and Dept.' },
     { id: 'publicationType', label: 'Type of publication' },
@@ -72,13 +72,12 @@ const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'des
     { id: 'indexType', label: 'Indexed In' },
     { id: 'wosType', label: 'WoS Type' },
     { id: 'journalClassification', label: 'Q Rating of the Journal' },
-    { id: 'authorType', label: 'Role of the Author' },
+    { id: 'authorRoleAndPosition', label: 'Author Role / Position' },
     { id: 'totalPuAuthors', label: 'No. of Authors from PU' },
     { id: 'printIssn', label: 'ISSN' }, // Simplified for display
     { id: 'publicationProofUrls', label: 'PROOF OF PUBLICATION ATTACHED' },
     { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
     { id: 'publicationMonth', label: 'Published Month & Year' }, // Simplified for display
-    { id: 'authorPosition', label: 'Author Position' },
 ];
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
@@ -176,13 +175,12 @@ function ResearchPaperClaimDetails({
                 {renderDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
                 {renderDetail('wosType', 'WoS Type', claim.wosType)}
                 {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
-                {renderDetail('authorType', 'Role of the Author', claim.authorType)}
+                {renderDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
                 {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
                 {renderDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
                 {renderDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
                 {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
                 {renderDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
-                {renderDetail('authorPosition', 'Author Position', claim.authorPosition)}
             </div>
             {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
         </div>
@@ -232,7 +230,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         const claimWithUserData = {
             ...claim,
             name: claimant?.name,
-            designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`
+            designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`,
+            authorRoleAndPosition: `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`
         };
 
         return allPossibleResearchPaperFields
