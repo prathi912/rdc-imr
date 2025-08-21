@@ -5,12 +5,38 @@ import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import type { User, IncentiveClaim, Author } from '@/types';
-import { Loader2, Printer } from 'lucide-react';
+import type { User, IncentiveClaim, Author, ApprovalStage } from '@/types';
+import { Loader2, Printer, Check, X } from 'lucide-react';
 import Link from 'next/link';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 
-// NOTE: This component is a placeholder for a future feature to export to Excel.
-// The `exportClaimToExcel` action is not yet implemented.
+
+function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
+    if (!approval) return null;
+    const verifiedStatus = approval.verifiedFields?.[fieldId];
+    if (verifiedStatus === true) return <Check className="h-4 w-4 text-green-600" />;
+    if (verifiedStatus === false) return <X className="h-4 w-4 text-red-600" />;
+    return null;
+}
+
+const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
+    { id: 'name', label: 'Name of the Applicant' },
+    { id: 'designation', label: 'Designation and Dept.' },
+    { id: 'publicationType', label: 'Type of publication' },
+    { id: 'journalName', label: 'Name of Journal' },
+    { id: 'locale', label: 'Whether National/International' },
+    { id: 'indexType', label: 'Indexed In' },
+    { id: 'wosType', label: 'WoS Type' },
+    { id: 'journalClassification', label: 'Q Rating of the Journal' },
+    { id: 'authorType', label: 'Role of the Author' },
+    { id: 'totalPuAuthors', label: 'No. of Authors from PU' },
+    { id: 'printIssn', label: 'ISSN' },
+    { id: 'publicationProofUrls', label: 'PROOF OF PUBLICATION ATTACHED' },
+    { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
+    { id: 'publicationMonth', label: 'Published Month & Year' },
+    { id: 'authorPosition', label: 'Author Position' },
+];
+
 
 export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, claimant, onTakeAction }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null, claimant: User | null, onTakeAction?: () => void }) {
     const { toast } = useToast();
@@ -74,6 +100,34 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
 
+    const approval1 = claim.approvals?.find(a => a?.stage === 1);
+    const approval2 = claim.approvals?.find(a => a?.stage === 2);
+    
+    const renderVerificationDetail = (fieldId: string, label: string, value?: string | number | null | boolean | string[]) => {
+        if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
+        let displayValue = String(value);
+        if (typeof value === 'boolean') {
+            displayValue = value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            displayValue = value.join(', ');
+        }
+        return (
+            <div className="grid grid-cols-12 gap-2 text-sm items-center py-1">
+                <span className="text-muted-foreground col-span-6">{label}</span>
+                <span className="col-span-4">{displayValue}</span>
+                <div className="col-span-2 flex justify-end gap-1">
+                    <div className="w-7 h-7 flex items-center justify-center">
+                        <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
+                    </div>
+                     <div className="w-7 h-7 flex items-center justify-center">
+                         <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval2, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 2 Verification</p></TooltipContent></Tooltip></TooltipProvider>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl">
@@ -95,9 +149,39 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     {renderDetail("Status", claim.status)}
                     {renderDetail("Submission Date", new Date(claim.submissionDate).toLocaleString())}
                     
-                    {claim.claimType === 'Research Papers' && (
+                    {claim.claimType === 'Research Papers' && isViewerAdmin ? (
                         <>
                             <hr className="my-2" />
+                            <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="font-semibold">Research Paper Details (Verified)</h4>
+                                    <div className="grid grid-cols-2 gap-1 text-xs font-semibold text-center">
+                                        <span>Appr. 1</span>
+                                        <span>Appr. 2</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    {renderVerificationDetail('name', 'Name of the Applicant', claimant?.name)}
+                                    {renderVerificationDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
+                                    {renderVerificationDetail('publicationType', 'Type of publication', claim.publicationType)}
+                                    {renderVerificationDetail('journalName', 'Name of Journal', claim.journalName)}
+                                    {renderVerificationDetail('locale', 'Whether National/International', claim.locale)}
+                                    {renderVerificationDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
+                                    {renderVerificationDetail('wosType', 'WoS Type', claim.wosType)}
+                                    {renderVerificationDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
+                                    {renderVerificationDetail('authorType', 'Role of the Author', claim.authorType)}
+                                    {renderVerificationDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
+                                    {renderVerificationDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
+                                    {renderVerificationDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
+                                    {renderVerificationDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
+                                    {renderVerificationDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
+                                    {renderVerificationDetail('authorPosition', 'Author Position', claim.authorPosition)}
+                                </div>
+                            </div>
+                        </>
+                    ) : claim.claimType === 'Research Papers' ? (
+                        <>
+                           <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle)}
                             {renderDetail("Role of the Author", claim.authorType)}
@@ -125,7 +209,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
                         </>
-                    )}
+                    ) : null}
 
 
                     {claim.claimType === 'Patents' && (
