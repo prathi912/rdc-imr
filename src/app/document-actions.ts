@@ -8,7 +8,7 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { Project, User, Evaluation, IncentiveClaim } from '@/types';
-import { getDoc, doc, collection, query, where, getDocs as adminGetDocs, documentId } from 'firebase/firestore';
+import { getDoc, doc, collection, query, where, getDocs as adminGetDocs, documentId } from 'firebase-admin/firestore';
 import { format, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { toWords } from 'number-to-words';
