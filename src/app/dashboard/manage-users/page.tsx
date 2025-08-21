@@ -415,7 +415,6 @@ export default function ManageUsersPage() {
                    <TableHead className="w-[50px]">
                     <Checkbox
                       checked={isAllSelected}
-                      indeterminate={isSomeSelected}
                       onCheckedChange={(checked) => {
                         if (checked) {
                           setSelectedUsers(sortedAndFilteredUsers.map(u => u.uid));
@@ -423,6 +422,8 @@ export default function ManageUsersPage() {
                           setSelectedUsers([]);
                         }
                       }}
+                      // @ts-ignore
+                      indeterminate={isSomeSelected || undefined}
                     />
                   </TableHead>
                   <TableHead>
