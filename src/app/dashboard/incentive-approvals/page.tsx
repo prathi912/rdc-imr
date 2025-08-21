@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/page-header';
 import type { User, IncentiveClaim } from '@/types';
 import { db } from '@/lib/config';
@@ -17,6 +17,10 @@ import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog
 import { ApprovalDialog } from './approval-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
 
 export default function IncentiveApprovalsPage() {
     const [user, setUser] = useState<User | null>(null);
@@ -29,6 +33,8 @@ export default function IncentiveApprovalsPage() {
     const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const [isApprovalOpen, setIsApprovalOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [claimTypeFilter, setClaimTypeFilter] = useState('all');
 
     const fetchClaimsAndUsers = useCallback(async (currentUser: User, stage: number) => {
         setLoading(true);
@@ -36,7 +42,6 @@ export default function IncentiveApprovalsPage() {
             const claimsCollection = collection(db, 'incentiveClaims');
             const usersQuery = query(collection(db, 'users'));
             
-            // Fetch Pending Claims for the current stage
             const statusToFetch = stage === 0 ? 'Pending' : `Pending Stage ${stage + 1} Approval`;
             const pendingClaimsQuery = query(
                 claimsCollection, 
@@ -44,13 +49,12 @@ export default function IncentiveApprovalsPage() {
                 orderBy('submissionDate', 'desc')
             );
 
-            // Fetch all claims to filter history client-side
             const allClaimsQuery = query(claimsCollection, orderBy('submissionDate', 'desc'));
             
             const [pendingSnapshot, allClaimsSnapshot, usersSnapshot] = await Promise.all([
                 getDocs(pendingClaimsQuery),
                 getDocs(allClaimsQuery),
-                getDocs(usersQuery)
+                getDocs(usersSnapshot)
             ]);
 
             setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
@@ -107,6 +111,28 @@ export default function IncentiveApprovalsPage() {
             fetchClaimsAndUsers(user, approvalStage);
         }
     };
+
+    const getClaimTitle = (claim: IncentiveClaim) => {
+        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
+    };
+    
+    const filteredPendingClaims = useMemo(() => {
+        return pendingClaims.filter(claim => {
+            if (claimTypeFilter !== 'all' && claim.claimType !== claimTypeFilter) return false;
+            if (!searchTerm) return true;
+            const lowerCaseSearch = searchTerm.toLowerCase();
+            return claim.userName.toLowerCase().includes(lowerCaseSearch) || getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch);
+        });
+    }, [pendingClaims, searchTerm, claimTypeFilter]);
+
+    const filteredHistoryClaims = useMemo(() => {
+        return historyClaims.filter(claim => {
+            if (claimTypeFilter !== 'all' && claim.claimType !== claimTypeFilter) return false;
+            if (!searchTerm) return true;
+            const lowerCaseSearch = searchTerm.toLowerCase();
+            return claim.userName.toLowerCase().includes(lowerCaseSearch) || getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch);
+        });
+    }, [historyClaims, searchTerm, claimTypeFilter]);
     
     if (loading) {
         return (
@@ -131,6 +157,7 @@ export default function IncentiveApprovalsPage() {
                 <TableHead>Claimant</TableHead>
                 <TableHead>Claim Type</TableHead>
                 <TableHead>Submitted On</TableHead>
+                {isHistory && <TableHead>Approved Amount</TableHead>}
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
             </TableRow></TableHeader>
@@ -139,6 +166,7 @@ export default function IncentiveApprovalsPage() {
                     const claimant = allUsers.find(u => u.uid === claim.uid);
                     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
                     const hasProfileLink = claimant && claimant.misId;
+                    const myApproval = isHistory ? claim.approvals?.find(a => a?.approverUid === user?.uid) : null;
                     return (
                         <TableRow key={claim.id}>
                             <TableCell>
@@ -152,6 +180,7 @@ export default function IncentiveApprovalsPage() {
                             </TableCell>
                             <TableCell><Badge variant="outline">{claim.claimType}</Badge></TableCell>
                             <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
+                            {isHistory && <TableCell>₹{myApproval?.approvedAmount.toLocaleString('en-IN') || 'N/A'}</TableCell>}
                             <TableCell><Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge></TableCell>
                             <TableCell className="text-right space-x-2">
                                 <Button variant="outline" onClick={() => handleViewDetails(claim)}>
@@ -170,17 +199,36 @@ export default function IncentiveApprovalsPage() {
         <>
             <div className="container mx-auto py-10">
                 <PageHeader title={`Incentive Approvals (Stage ${approvalStage + 1})`} description="Claims awaiting your review and approval." />
-                <div className="mt-8">
+                 <div className="flex items-center py-4 gap-4">
+                    <Input
+                        placeholder="Filter by claimant or title..."
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        className="max-w-sm"
+                    />
+                    <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
+                        <SelectTrigger className="w-[240px]">
+                            <SelectValue placeholder="Filter by claim type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Claim Types</SelectItem>
+                            {CLAIM_TYPES.map(type => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="mt-4">
                      <Tabs defaultValue="pending">
                         <TabsList>
-                            <TabsTrigger value="pending">Pending ({pendingClaims.length})</TabsTrigger>
-                            <TabsTrigger value="history">History ({historyClaims.length})</TabsTrigger>
+                            <TabsTrigger value="pending">Pending ({filteredPendingClaims.length})</TabsTrigger>
+                            <TabsTrigger value="history">History ({filteredHistoryClaims.length})</TabsTrigger>
                         </TabsList>
                         <TabsContent value="pending" className="mt-4">
                             <Card>
                                 <CardContent className="pt-6">
-                                    {pendingClaims.length > 0 ? (
-                                        renderTable(pendingClaims)
+                                    {filteredPendingClaims.length > 0 ? (
+                                        renderTable(filteredPendingClaims)
                                     ) : (
                                         <div className="text-center py-12 text-muted-foreground">
                                             <p>There are no claims awaiting your approval at this stage.</p>
@@ -192,8 +240,8 @@ export default function IncentiveApprovalsPage() {
                         <TabsContent value="history" className="mt-4">
                             <Card>
                                 <CardContent className="pt-6">
-                                    {historyClaims.length > 0 ? (
-                                        renderTable(historyClaims, true)
+                                    {filteredHistoryClaims.length > 0 ? (
+                                        renderTable(filteredHistoryClaims, true)
                                     ) : (
                                         <div className="text-center py-12 text-muted-foreground">
                                             <p>You have not processed any claims yet.</p>
@@ -214,7 +262,7 @@ export default function IncentiveApprovalsPage() {
                         currentUser={user}
                         claimant={allUsers.find(u => u.uid === selectedClaim.uid) || null}
                         onTakeAction={() => {
-                            if (selectedClaim.status === `Pending Stage ${approvalStage + 1} Approval` || selectedClaim.status === 'Pending') {
+                            if (selectedClaim.status === `Pending Stage ${approvalStage + 1} Approval` || (approvalStage === 0 && selectedClaim.status === 'Pending')) {
                                 setIsDetailsOpen(false);
                                 handleOpenApproval(selectedClaim);
                             } else {
