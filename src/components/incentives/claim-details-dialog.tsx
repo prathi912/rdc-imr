@@ -28,7 +28,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[] | React.ReactNode) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         
-        let displayValue: React.ReactNode = value;
+        let displayValue: React.ReactNode;
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
         } else if (Array.isArray(value)) {
@@ -43,7 +43,10 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
             } else {
                  displayValue = (value as string[]).join(', ');
             }
-        } else if (typeof value !== 'object') { // Prevent [object Object] for React nodes
+        } else if (typeof value === 'object' && value !== null && React.isValidElement(value)) {
+            displayValue = value;
+        }
+        else if (typeof value !== 'object') {
             displayValue = String(value);
         }
 
@@ -74,7 +77,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
       );
     }
 
-    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
     const isFullyApproved = claim.status === 'Submitted to Accounts';
@@ -151,13 +154,12 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                                     {renderVerificationDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
                                     {renderVerificationDetail('wosType', 'WoS Type', claim.wosType)}
                                     {renderVerificationDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
-                                    {renderVerificationDetail('authorType', 'Role of the Author', claim.authorType)}
+                                    {renderVerificationDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
                                     {renderVerificationDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
                                     {renderVerificationDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
                                     {renderVerificationDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
                                     {renderVerificationDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
                                     {renderVerificationDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
-                                    {renderVerificationDetail('authorPosition', 'Author Position', claim.authorPosition)}
                                 </div>
                             </div>
                         </>
@@ -166,7 +168,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                            <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle)}
-                            {renderDetail("Role of the Author", claim.authorType)}
+                            {renderDetail("Author Role", claim.authorType)}
                             {renderDetail("No. of Authors from PU", claim.totalPuAuthors)}
                             {renderDetail("Author Position", claim.authorPosition)}
                             {renderLinkDetail("DOI Link", claim.relevantLink)}
@@ -346,15 +348,19 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     {(isViewerAdminOrApprover || isFullyApproved) && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     
-                    {isViewerAdminOrApprover && claim.approvals && claim.approvals.length > 0 && (
+                    {claim.approvals && claim.approvals.length > 0 && (
                         <div className="space-y-2 pt-2">
                            <h4 className="font-semibold text-base">Approval History</h4>
                            {claim.approvals.filter(a => a !== null).map(approval => (
                                <div key={approval.stage} className="p-3 border rounded-md bg-muted/50">
-                                   <p><strong>Stage {approval.stage}:</strong> {approval.status} by {approval.approverName}</p>
-                                   <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleString()}</p>
-                                   <p className="mt-1"><strong>Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
-                                   <p className="mt-1"><strong>Comments:</strong> {approval.comments}</p>
+                                   <p><strong>Stage {approval.stage}:</strong> {approval.status}</p>
+                                   {isViewerAdminOrApprover && (
+                                       <>
+                                        <p className="text-xs text-muted-foreground">by {approval.approverName} on {new Date(approval.timestamp).toLocaleString()}</p>
+                                        <p className="mt-1"><strong>Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
+                                        <p className="mt-1"><strong>Comments:</strong> {approval.comments || 'N/A'}</p>
+                                       </>
+                                   )}
                                </div>
                            ))}
                         </div>
