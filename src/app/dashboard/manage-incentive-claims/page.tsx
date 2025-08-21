@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { db } from '@/lib/config';
-import { collection, getDocs, doc, orderBy, query, where, documentId } from 'firebase/firestore';
+import { collection, getDocs, doc, orderBy, query, where } from 'firebase/firestore';
 import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -265,7 +265,7 @@ export default function ManageIncentiveClaimsPage() {
                     }}
                     disabled={sortedAndFilteredClaims.length > 30}
                     // @ts-ignore
-                    indeterminate={selectedClaims.length > 0 && selectedClaims.length < sortedAndFilteredClaims.length}
+                    indeterminate={selectedClaims.length > 0 && selectedClaims.length < sortedAndFilteredClaims.length ? "true" : undefined}
                 />
             </TableHead>
             <TableHead>
