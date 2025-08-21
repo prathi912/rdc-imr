@@ -28,11 +28,10 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[] | React.ReactNode) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         
-        let displayValue: React.ReactNode = String(value);
+        let displayValue: React.ReactNode = value;
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
-        }
-        if (Array.isArray(value)) {
+        } else if (Array.isArray(value)) {
              if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
                 displayValue = (
                     <ul className="list-disc pl-5">
@@ -44,7 +43,10 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
             } else {
                  displayValue = (value as string[]).join(', ');
             }
+        } else if (typeof value !== 'object') { // Prevent [object Object] for React nodes
+            displayValue = String(value);
         }
+
         return (
             <div className="grid grid-cols-3 gap-2 py-1">
                 <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
@@ -129,7 +131,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     {renderDetail("Status", claim.status)}
                     {renderDetail("Submission Date", new Date(claim.submissionDate).toLocaleString())}
                     
-                    {claim.claimType === 'Research Papers' && isViewerAdmin && (
+                    {claim.claimType === 'Research Papers' && isViewerAdmin ? (
                         <>
                             <hr className="my-2" />
                             <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
@@ -159,9 +161,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                                 </div>
                             </div>
                         </>
-                    )} 
-                    
-                    {claim.claimType === 'Research Papers' && !isViewerAdmin && (
+                    ) : claim.claimType === 'Research Papers' ? (
                         <>
                            <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
@@ -191,7 +191,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
                         </>
-                    )}
+                    ) : null}
 
 
                     {claim.claimType === 'Patents' && (
