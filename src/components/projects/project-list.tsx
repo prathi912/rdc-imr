@@ -24,6 +24,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { parseISO } from 'date-fns';
+import { Progress } from '@/components/ui/progress';
 
 interface ProjectListProps {
   projects: Project[];
@@ -91,6 +92,27 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
     setSortConfig({ key, direction });
   };
 
+  const calculateUtilization = (project: Project) => {
+    if (!project.grant || !project.grant.totalAmount) {
+      return null;
+    }
+    const totalGrantAmount = project.grant.totalAmount;
+    if (totalGrantAmount === 0) return null;
+
+    const totalUtilized = project.grant.phases.reduce((acc, phase) => {
+      const phaseTotal = phase.transactions?.reduce((tAcc, t) => tAcc + t.amount, 0) || 0;
+      return acc + phaseTotal;
+    }, 0);
+
+    const percentage = (totalUtilized / totalGrantAmount) * 100;
+
+    return {
+      utilized: totalUtilized,
+      total: totalGrantAmount,
+      percentage: percentage
+    };
+  };
+
 
   return (
     <Card>
@@ -129,6 +151,7 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
                 const isPI = currentUser.uid === project.pi_uid || currentUser.email === project.pi_email;
                 const isCoPi = project.coPiUids?.includes(currentUser.uid) || false;
                 const canEditDraft = (isPI || isCoPi) && project.status === 'Draft';
+                const utilization = calculateUtilization(project);
                
                 let actionButton;
                 if (canEditDraft) {
@@ -166,7 +189,22 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
 
                 return (
                   <TableRow key={project.id}>
-                    <TableCell className="font-medium">{project.title}</TableCell>
+                    <TableCell className="font-medium">
+                        <div>{project.title}</div>
+                        {utilization && (
+                            <div className="mt-2 flex items-center gap-2">
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Progress value={utilization.percentage} className="w-24 h-1.5" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>Utilized: ₹{utilization.utilized.toLocaleString('en-IN')} of ₹{utilization.total.toLocaleString('en-IN')}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                                <span className="text-xs font-mono text-muted-foreground">{utilization.percentage.toFixed(0)}%</span>
+                            </div>
+                        )}
+                    </TableCell>
                     <TableCell className="hidden sm:table-cell">
                         <div>
                           {piUser?.misId ? (
