@@ -311,7 +311,7 @@ export default function ManageIncentiveClaimsPage() {
                     />
                 </TableCell>
                 <TableCell className="font-medium whitespace-nowrap">{claim.userName}</TableCell>
-                <TableCell className="max-w-xs truncate">{getClaimTitle(claim)}</TableCell>
+                <TableCell className="max-w-xs whitespace-normal break-words">{getClaimTitle(claim)}</TableCell>
                 <TableCell className="hidden md:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
                 <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
                 <TableCell>
