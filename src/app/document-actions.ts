@@ -8,7 +8,7 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { Project, User, Evaluation, IncentiveClaim } from '@/types';
-import { getDoc, doc, collection, query, where, getDocs as adminGetDocs, documentId } from 'firebase-admin/firestore';
+import admin from 'firebase-admin';
 import { format, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
 import { toWords } from 'number-to-words';
@@ -35,15 +35,15 @@ async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string,
 
 export async function generateRecommendationForm(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
-    const projectRef = doc(adminDb, 'projects', projectId);
-    const projectSnap = await getDoc(projectRef);
-    if (!projectSnap.exists()) {
+    const projectRef = adminDb.collection('projects').doc(projectId);
+    const projectSnap = await projectRef.get();
+    if (!projectSnap.exists) {
       return { success: false, error: 'Project not found.' };
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
     
-    const evaluationsRef = collection(adminDb, 'projects', projectId, 'evaluations');
-    const evaluationsSnap = await adminGetDocs(evaluationsRef);
+    const evaluationsRef = projectRef.collection('evaluations');
+    const evaluationsSnap = await evaluationsRef.get();
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
     
     const templatePath = path.join(process.cwd(), 'src', 'templates', 'IMR_RECOMMENDATION_TEMPLATE.docx');
@@ -99,13 +99,13 @@ export async function generateIncentivePaymentSheet(
 ): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const claimsRef = adminDb.collection('incentiveClaims');
-    const q = claimsRef.where(documentId(), 'in', claimIds);
+    const q = claimsRef.where(admin.firestore.FieldPath.documentId(), 'in', claimIds);
     const claimsSnapshot = await q.get();
     const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
 
     const userIds = [...new Set(claims.map(c => c.uid))];
     const usersRef = adminDb.collection('users');
-    const usersQuery = usersRef.where(documentId(), 'in', userIds);
+    const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), 'in', userIds);
     const usersSnapshot = await usersQuery.get();
     const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
 
@@ -354,3 +354,5 @@ export async function exportClaimToExcel(
     return { success: false, error: error.message || "Failed to export data." }
   }
 }
+
+    
