@@ -96,8 +96,9 @@ export async function processIncentiveClaimAction(
       finalApprovedAmount: data.amount // Keep updating the final amount at each approval stage
     });
     
+    const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || 'your recent incentive claim';
+
     if (action === 'reject' && claim.userEmail) {
-        const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || 'your recent incentive claim';
         await sendEmail({
             to: claim.userEmail,
             subject: `Update on Your Incentive Claim: ${claimTitle}`,
@@ -113,6 +114,28 @@ export async function processIncentiveClaimAction(
                         After careful review, your application has been <strong style="color:#ff5252;">rejected</strong>.
                     </p>
                     <p style="color:#e0e0e0;">For more information, please visit the portal or contact the RDC office.</p>
+                    ${EMAIL_STYLES.footer}
+                </div>
+            `
+        });
+    }
+
+    if (action === 'approve' && stageIndex === 2 && claim.userEmail) {
+        await sendEmail({
+            to: claim.userEmail,
+            subject: `Congratulations! Your Incentive Claim for "${claimTitle}" has been Approved`,
+            from: 'default',
+            html: `
+                <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
+                    <p style="color:#ffffff;">Dear ${claim.userName},</p>
+                    <p style="color:#e0e0e0;">
+                        We are pleased to inform you that your incentive claim for "<strong style="color:#ffffff;">${claimTitle}</strong>" has been successfully approved by all committees.
+                    </p>
+                    <p style="color:#e0e0e0;">
+                        The final approved incentive amount is <strong style="color:#ffffff;">₹${data.amount?.toLocaleString('en-IN') || 'N/A'}</strong>. The amount will be processed by the accounts department shortly.
+                    </p>
+                    <p style="color:#e0e0e0;">Congratulations on your achievement!</p>
                     ${EMAIL_STYLES.footer}
                 </div>
             `
