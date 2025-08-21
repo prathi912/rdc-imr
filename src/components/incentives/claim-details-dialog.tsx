@@ -74,7 +74,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
       );
     }
 
-    const isViewerAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
     const isFullyApproved = claim.status === 'Submitted to Accounts';
@@ -131,7 +131,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     {renderDetail("Status", claim.status)}
                     {renderDetail("Submission Date", new Date(claim.submissionDate).toLocaleString())}
                     
-                    {claim.claimType === 'Research Papers' && isViewerAdmin ? (
+                    {claim.claimType === 'Research Papers' && isViewerAdminOrApprover ? (
                         <>
                             <hr className="my-2" />
                             <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
@@ -344,14 +344,14 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
-                    {(isViewerAdmin || isFullyApproved) && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                    {(isViewerAdminOrApprover || isFullyApproved) && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     
                     {claim.approvals && claim.approvals.length > 0 && (
                         <div className="space-y-2 pt-2">
                            <h4 className="font-semibold text-base">Approval History</h4>
                            {claim.approvals.filter(a => a !== null).map(approval => (
                                <div key={approval.stage} className="p-3 border rounded-md bg-muted/50">
-                                   {isViewerAdmin ? (
+                                   {isViewerAdminOrApprover ? (
                                     <>
                                        <p><strong>Stage {approval.stage}:</strong> {approval.status} by {approval.approverName}</p>
                                        <p className="text-xs text-muted-foreground">{new Date(approval.timestamp).toLocaleString()}</p>
