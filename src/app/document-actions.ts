@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import fs from 'fs';
@@ -6,11 +7,11 @@ import path from 'path';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
-import type { Project, User, Evaluation } from '@/types';
-import { getDoc, doc, collection, query, where, getDocs as adminGetDocs } from 'firebase/firestore';
+import type { Project, User, Evaluation, IncentiveClaim } from '@/types';
+import { getDoc, doc, collection, query, where, getDocs as adminGetDocs, documentId } from 'firebase/firestore';
 import { format, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
-
+import { toWords } from 'number-to-words';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -88,6 +89,83 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
   } catch (error: any) {
     console.error('Error generating recommendation form:', error);
     return { success: false, error: error.message || 'Failed to generate the form.' };
+  }
+}
+
+export async function generateIncentivePaymentSheet(
+  claimIds: string[],
+  remarks: Record<string, string>,
+  referenceNumber: string
+): Promise<{ success: boolean; fileData?: string; error?: string }> {
+  try {
+    const claimsRef = collection(adminDb, 'incentiveClaims');
+    const q = query(claimsRef, where(documentId(), 'in', claimIds));
+    const claimsSnapshot = await adminGetDocs(q);
+    const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
+
+    const userIds = [...new Set(claims.map(c => c.uid))];
+    const usersRef = collection(adminDb, 'users');
+    const usersQuery = query(usersRef, where(documentId(), 'in', userIds));
+    const usersSnapshot = await adminGetDocs(usersQuery);
+    const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
+
+    const templatePath = path.join(process.cwd(), 'src', 'templates', 'INCENTIVE_PAYMENT_SHEET.xlsx');
+    if (!fs.existsSync(templatePath)) {
+      return { success: false, error: 'Payment sheet template not found.' };
+    }
+    const templateBuffer = fs.readFileSync(templatePath);
+    const workbook = XLSX.read(templateBuffer, { type: 'buffer' });
+    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+    let totalAmount = 0;
+    const paymentData = claims.map((claim, index) => {
+      const user = usersMap.get(claim.uid);
+      const amount = claim.finalApprovedAmount || 0;
+      totalAmount += amount;
+      return {
+        [`beneficiary_${index + 1}`]: user?.bankDetails?.beneficiaryName || user?.name,
+        [`account_${index + 1}`]: user?.bankDetails?.accountNumber || 'N/A',
+        [`ifsc_${index + 1}`]: user?.bankDetails?.ifscCode || 'N/A',
+        [`branch_${index + 1}`]: user?.bankDetails?.branchName || 'N/A',
+        [`amount_${index + 1}`]: amount,
+        [`college_${index + 1}`]: user?.institute || 'N/A',
+        [`mis_${index + 1}`]: user?.misId || 'N/A',
+        [`remarks_${index + 1}`]: remarks[claim.id] || 'N/A',
+      };
+    });
+
+    // Flatten the array of objects into a single object for docxtemplater-style replacement
+    const flatData = paymentData.reduce((acc, item) => ({ ...acc, ...item }), {});
+
+    flatData.date = format(new Date(), 'dd/MM/yyyy');
+    flatData.reference_number = referenceNumber;
+    flatData.total_amount = totalAmount;
+    flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
+
+    // This is a simplified replacement for cell placeholders like {placeholder}.
+    // A more robust solution might use a library that specifically handles Excel templates.
+    const range = XLSX.utils.decode_range(worksheet['!ref']!);
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cell_address = { c: C, r: R };
+        const cell_ref = XLSX.utils.encode_cell(cell_address);
+        let cell = worksheet[cell_ref];
+        if (cell && cell.v && typeof cell.v === 'string') {
+          const templateVar = cell.v.match(/\{(.*?)\}/);
+          if (templateVar && flatData[templateVar[1]]) {
+            cell.v = flatData[templateVar[1]];
+          }
+        }
+      }
+    }
+
+    const outputBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });
+
+    return { success: true, fileData: outputBuffer };
+  } catch (error: any) {
+    console.error('Error generating payment sheet:', error);
+    await logActivity('ERROR', 'Failed to generate payment sheet', { error: error.message });
+    return { success: false, error: error.message || 'Failed to generate the sheet.' };
   }
 }
 
