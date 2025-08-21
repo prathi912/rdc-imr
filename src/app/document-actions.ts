@@ -10,7 +10,7 @@ import { adminDb } from '@/lib/admin';
 import type { Project, User, Evaluation, IncentiveClaim } from '@/types';
 import admin from 'firebase-admin';
 import { format, parseISO } from 'date-fns';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -139,9 +139,14 @@ export async function generateIncentivePaymentSheet(
     if (!fs.existsSync(templatePath)) {
       return { success: false, error: 'Payment sheet template not found.' };
     }
-    const templateBuffer = fs.readFileSync(templatePath);
-    const workbook = XLSX.read(templateBuffer, { type: 'buffer', cellStyles: true });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+    
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(templatePath);
+    const worksheet = workbook.getWorksheet(1);
+
+    if (!worksheet) {
+      return { success: false, error: 'Could not find a worksheet in the template file.' };
+    }
 
     let totalAmount = 0;
     const paymentData = claims.map((claim, index) => {
@@ -167,40 +172,26 @@ export async function generateIncentivePaymentSheet(
     flatData.total_amount = totalAmount;
     flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
     
-    const dataCellStyle = {
-        font: { sz: 26 },
-        alignment: { horizontal: 'center', vertical: 'center' }
-    };
+    worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+            if (cell.value && typeof cell.value === 'string') {
+                const templateVarMatch = cell.value.match(/\{(.*?)\}/);
+                if (templateVarMatch && templateVarMatch[1]) {
+                    const key = templateVarMatch[1];
+                    const newValue = flatData[key] !== undefined ? flatData[key] : '';
+                    
+                    cell.value = newValue;
+                    cell.font = { ...cell.font, size: 26 };
+                    cell.alignment = { ...cell.alignment, horizontal: 'center', vertical: 'middle' };
+                }
+            }
+        });
+    });
 
-    const range = XLSX.utils.decode_range(worksheet['!ref']!);
-    for (let R = range.s.r; R <= range.e.r; ++R) {
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        const cell_address = { c: C, r: R };
-        const cell_ref = XLSX.utils.encode_cell(cell_address);
-        let cell = worksheet[cell_ref];
+    const buffer = await workbook.xlsx.writeBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
 
-        if (cell && cell.v && typeof cell.v === 'string') {
-          const templateVarMatch = cell.v.match(/\{(.*?)\}/);
-          if (templateVarMatch && templateVarMatch[1]) {
-             const key = templateVarMatch[1];
-             const newValue = flatData[key] !== undefined ? flatData[key] : '';
-             
-             cell.v = newValue;
-             cell.s = { ...cell.s, ...dataCellStyle };
-
-             if (typeof newValue === 'number') {
-                 cell.t = 'n';
-             } else {
-                 cell.t = 's';
-             }
-          }
-        }
-      }
-    }
-
-    const outputBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64', cellStyles: true });
-
-    return { success: true, fileData: outputBuffer };
+    return { success: true, fileData: base64 };
   } catch (error: any) {
     console.error('Error generating payment sheet:', error);
     await logActivity('ERROR', 'Failed to generate payment sheet', { error: error.message });
@@ -337,11 +328,13 @@ export async function exportClaimToExcel(
         return { success: false, error: 'Template file "format.xlsx" not found or could not be read.' };
     }
     
-    const excelClaimTemplate = fs.readFileSync(templatePath);
-    const workbook = XLSX.read(excelClaimTemplate, { type: "buffer", cellStyles: true, sheetStubs: true });
-
-    const sheetName = workbook.SheetNames[0]
-    const worksheet = workbook.Sheets[sheetName]
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(templatePath);
+    const worksheet = workbook.getWorksheet(1); // Get the first worksheet
+    
+    if (!worksheet) {
+        return { success: false, error: 'Could not find a worksheet in the template file.' };
+    }
 
     const getClaimTitle = (claim: IncentiveClaim): string => {
       return (
@@ -365,28 +358,17 @@ export async function exportClaimToExcel(
       B5: claimTitle,
       D11: submissionDate,
     }
-
+    
     for (const cellAddress in dataMap) {
-      if (Object.prototype.hasOwnProperty.call(dataMap, cellAddress)) {
-        const value = dataMap[cellAddress]
-        if (value !== undefined && value !== null) {
-          if (worksheet[cellAddress]) {
-            // Cell exists (even if it was empty and just styled, thanks to sheetStubs).
-            // Update its value and set type to string.
-            worksheet[cellAddress].v = value
-            worksheet[cellAddress].t = "s"
-          } else {
-            // Fallback for cells that don't exist at all in the template.
-            XLSX.utils.sheet_add_aoa(worksheet, [[value]], { origin: cellAddress })
-          }
+        if (Object.prototype.hasOwnProperty.call(dataMap, cellAddress)) {
+            worksheet.getCell(cellAddress).value = dataMap[cellAddress];
         }
-      }
     }
 
-    // Explicitly tell the writer to use cell styles from the workbook object
-    const outputBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "base64", cellStyles: true })
+    const outputBuffer = await workbook.xlsx.writeBuffer();
+    const base64 = Buffer.from(outputBuffer).toString('base64');
 
-    return { success: true, fileData: outputBuffer }
+    return { success: true, fileData: base64 }
   } catch (error: any) {
     console.error("Error exporting claim to Excel:", error)
     await logActivity('ERROR', 'Failed to export claim to Excel', { claimId, error: error.message, stack: error.stack });
