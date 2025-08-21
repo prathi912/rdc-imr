@@ -11,7 +11,7 @@ import type { Project, User, Evaluation, IncentiveClaim } from '@/types';
 import { getDoc, doc, collection, query, where, getDocs as adminGetDocs, documentId } from 'firebase-admin/firestore';
 import { format, parseISO } from 'date-fns';
 import * as XLSX from 'xlsx';
-import numberToWords from 'number-to-words';
+import { toWords } from 'number-to-words';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -98,15 +98,15 @@ export async function generateIncentivePaymentSheet(
   referenceNumber: string
 ): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
-    const claimsRef = collection(adminDb, 'incentiveClaims');
-    const q = query(claimsRef, where(documentId(), 'in', claimIds));
-    const claimsSnapshot = await adminGetDocs(q);
+    const claimsRef = adminDb.collection('incentiveClaims');
+    const q = claimsRef.where(documentId(), 'in', claimIds);
+    const claimsSnapshot = await q.get();
     const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
 
     const userIds = [...new Set(claims.map(c => c.uid))];
-    const usersRef = collection(adminDb, 'users');
-    const usersQuery = query(usersRef, where(documentId(), 'in', userIds));
-    const usersSnapshot = await adminGetDocs(usersQuery);
+    const usersRef = adminDb.collection('users');
+    const usersQuery = usersRef.where(documentId(), 'in', userIds);
+    const usersSnapshot = await usersQuery.get();
     const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
 
     const templatePath = path.join(process.cwd(), 'src', 'templates', 'INCENTIVE_PAYMENT_SHEET.xlsx');
@@ -140,7 +140,7 @@ export async function generateIncentivePaymentSheet(
     flatData.date = format(new Date(), 'dd/MM/yyyy');
     flatData.reference_number = referenceNumber;
     flatData.total_amount = totalAmount;
-    flatData.amount_in_word = numberToWords.toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
+    flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
 
     // This is a simplified replacement for cell placeholders like {placeholder}.
     // A more robust solution might use a library that specifically handles Excel templates.
