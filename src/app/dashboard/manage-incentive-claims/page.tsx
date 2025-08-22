@@ -405,18 +405,18 @@ export default function ManageIncentiveClaimsPage() {
             {activeTab === 'pending-bank' && selectedClaims.length > 0 && (
                 <div className="flex items-center gap-2">
                     <Button onClick={() => setIsGenerateSheetOpen(true)} disabled={eligibleForPaymentSheet.length === 0 || isUpdating}>
-                        <FileSpreadsheet className="mr-2 h-4 w-4" /> Generate Payment Sheet ({eligibleForPaymentSheet.length})
+                        Generate Payment Sheet ({eligibleForPaymentSheet.length})
                     </Button>
                     <Button onClick={handleDownloadNotings} disabled={isDownloadingNotings}>
-                        {isDownloadingNotings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileArchive className="mr-2 h-4 w-4" />}
+                        {isDownloadingNotings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Download Notings ({selectedClaims.length})
                     </Button>
                     <Button onClick={handleSubmitToAccounts} disabled={isUpdating || !selectedClaims.every(id => allClaims.find(c => c.id === id)?.status === 'Accepted')}>
-                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Submit to Accounts
                     </Button>
                     <Button onClick={handleMarkPaymentCompleted} disabled={isUpdating || !selectedClaims.every(id => allClaims.find(c => c.id === id)?.status === 'Submitted to Accounts')}>
-                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCheck className="mr-2 h-4 w-4" />}
+                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Mark as Payment Completed
                     </Button>
                 </div>
