@@ -127,6 +127,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
   const [pendingMeetingsCount, setPendingMeetingsCount] = useState(0);
+  const [pendingIncentiveApprovalsCount, setPendingIncentiveApprovalsCount] = useState(0);
+  const [pendingBankClaimsCount, setPendingBankClaimsCount] = useState(0);
   const [menuItems, setMenuItems] = useState<NavItem[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -146,7 +148,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'my-projects', href: '/dashboard/my-projects', tooltip: 'My Projects', icon: Book, label: 'My Projects' },
     { id: 'emr-calendar', href: '/dashboard/emr-calendar', tooltip: 'EMR Calendar', icon: Calendar, label: 'EMR Calendar' },
     { id: 'incentive-claim', href: '/dashboard/incentive-claim', tooltip: 'Incentive Claims', icon: Award, label: 'Incentive Claims' },
-    { id: 'incentive-approvals', href: '/dashboard/incentive-approvals', tooltip: 'Incentive Approvals', icon: NotebookPen, label: 'Incentive Approvals' },
+    { id: 'incentive-approvals', href: '/dashboard/incentive-approvals', tooltip: 'Incentive Approvals', icon: NotebookPen, label: 'Incentive Approvals', badge: pendingIncentiveApprovalsCount },
     { id: 'evaluator-dashboard', href: '/dashboard/evaluator-dashboard', tooltip: 'Evaluation Queue', icon: ClipboardCheck, label: 'Evaluation Queue' },
     { id: 'my-evaluations', href: '/dashboard/my-evaluations', tooltip: 'My Evaluations', icon: History, label: 'My IMR Evaluations' },
     { id: 'schedule-meeting', href: '/dashboard/schedule-meeting', tooltip: 'Schedule Meeting', icon: CalendarClock, label: 'Schedule Meeting', badge: pendingMeetingsCount },
@@ -156,14 +158,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'emr-management', href: '/dashboard/emr-management', tooltip: 'EMR Management', icon: Briefcase, label: 'EMR Management' },
     { id: 'analytics', href: '/dashboard/analytics', tooltip: 'Analytics', icon: LineChart, label: 'Analytics' },
     { id: 'manage-users', href: '/dashboard/manage-users', tooltip: 'Manage Users', icon: Users, label: 'Manage Users' },
-    { id: 'manage-incentive-claims', href: '/dashboard/manage-incentive-claims', tooltip: 'Manage Incentive Claims', icon: Award, label: 'Manage Claims' },
+    { id: 'manage-incentive-claims', href: '/dashboard/manage-incentive-claims', tooltip: 'Manage Incentive Claims', icon: Award, label: 'Manage Claims', badge: pendingBankClaimsCount },
     { id: 'bulk-upload', href: '/dashboard/bulk-upload', tooltip: 'Bulk Upload Projects', icon: Upload, label: 'Bulk Upload Projects' },
     { id: 'bulk-upload-papers', href: '/dashboard/bulk-upload-papers', tooltip: 'Bulk Upload Papers', icon: BookUp, label: 'Bulk Upload Papers' },
     { id: 'bulk-upload-emr', href: '/dashboard/bulk-upload-emr', tooltip: 'Bulk Upload EMR', icon: Upload, label: 'Bulk Upload EMR' },
     { id: 'module-management', href: '/dashboard/module-management', tooltip: 'Module Management', icon: ShieldCheck, label: 'Module Management' },
     { id: 'notifications', href: '/dashboard/notifications', tooltip: 'Notifications', icon: Bell, label: 'Notifications', badge: unreadCount, condition: true },
     { id: 'settings', href: '/dashboard/settings', tooltip: 'Settings', icon: Settings, label: 'Settings', condition: true },
-  ], [unreadCount, pendingMeetingsCount]);
+  ], [unreadCount, pendingMeetingsCount, pendingIncentiveApprovalsCount, pendingBankClaimsCount]);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined;
@@ -261,37 +263,45 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 
   useEffect(() => {
-    if (user) {
-      const q = query(
-        collection(db, 'notifications'),
-        where('uid', '==', user.uid)
-      );
+    if (!user) return;
 
-      const unsubscribe = onSnapshot(q, (querySnapshot) => {
-        const sortedNotifications = querySnapshot.docs.map(doc => doc.data()).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        const unread = sortedNotifications.filter(doc => !doc.isRead).length;
-        setUnreadCount(unread);
-      }, (error) => {
-        console.error("Firestore notification listener error:", error);
-        toast({
-          variant: "destructive",
-          title: "Network Error",
-          description: "Could not fetch real-time notifications.",
-        });
-      });
+    const unsubscribes: (() => void)[] = [];
 
-      return () => unsubscribe();
+    // Notifications listener
+    const notificationsQuery = query(collection(db, 'notifications'), where('uid', '==', user.uid));
+    unsubscribes.push(onSnapshot(notificationsQuery, (snapshot) => {
+      const unread = snapshot.docs.filter(doc => !doc.data().isRead).length;
+      setUnreadCount(unread);
+    }));
+
+    // Pending Meetings listener (for admins)
+    if (user.allowedModules?.includes('schedule-meeting')) {
+      const projectsQuery = query(collection(db, 'projects'), where('status', '==', 'Submitted'));
+      unsubscribes.push(onSnapshot(projectsQuery, (snapshot) => {
+        setPendingMeetingsCount(snapshot.size);
+      }));
     }
-  }, [user, toast]);
 
-  useEffect(() => {
-    if (user && (user.role === 'admin' || user.role === 'Super-admin')) {
-        const projectsQuery = query(collection(db, 'projects'), where('status', '==', 'Submitted'));
-        const unsubscribe = onSnapshot(projectsQuery, (snapshot) => {
-            setPendingMeetingsCount(snapshot.size);
-        });
-        return () => unsubscribe();
+    // Incentive Approvals listener
+    const approverModule = user.allowedModules?.find(m => m.startsWith('incentive-approver-'));
+    if (approverModule) {
+        const stage = parseInt(approverModule.split('-')[2], 10);
+        const statusToFetch = stage === 1 ? 'Pending' : `Pending Stage ${stage} Approval`;
+        const incentiveQuery = query(collection(db, 'incentiveClaims'), where('status', '==', statusToFetch));
+        unsubscribes.push(onSnapshot(incentiveQuery, snapshot => {
+            setPendingIncentiveApprovalsCount(snapshot.size);
+        }));
     }
+
+    // Pending Bank Claims listener (for admins)
+    if (user.allowedModules?.includes('manage-incentive-claims')) {
+        const bankClaimsQuery = query(collection(db, 'incentiveClaims'), where('status', 'in', ['Accepted', 'Submitted to Accounts']));
+        unsubscribes.push(onSnapshot(bankClaimsQuery, snapshot => {
+            setPendingBankClaimsCount(snapshot.size);
+        }));
+    }
+
+    return () => unsubscribes.forEach(unsub => unsub());
   }, [user]);
 
   const handleLogout = async () => {
