@@ -144,10 +144,10 @@ export async function generateIncentivePaymentSheet(
     
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(templatePath);
-    const worksheet = workbook.getWorksheet("Sheet1");
+    const worksheet = workbook.getWorksheet(1); // Get the first worksheet
 
     if (!worksheet) {
-      return { success: false, error: 'Could not find a worksheet named "Sheet1" in the template file.' };
+      return { success: false, error: 'Could not find a worksheet in the template file.' };
     }
 
     let totalAmount = 0;
@@ -275,6 +275,20 @@ export async function generateOfficeNotingsZip(claimIds: string[]): Promise<{ su
     }
 }
 
+export async function generateOfficeNotingForClaim(claimId: string): Promise<{ success: boolean; fileData?: string; fileName?: string; error?: string }> {
+    try {
+        const result = await generateSingleOfficeNoting(claimId);
+        if (!result) {
+            return { success: false, error: 'Failed to generate the document.' };
+        }
+        const base64 = result.content.toString('base64');
+        return { success: true, fileData: base64, fileName: result.fileName };
+    } catch (error: any) {
+        console.error(`Error generating single noting for claim ${claimId}:`, error);
+        await logActivity('ERROR', 'Failed to generate single office noting', { claimId, error: error.message });
+        return { success: false, error: error.message || 'Failed to generate the form.' };
+    }
+}
 
 export async function exportClaimToExcel(
   claimId: string,

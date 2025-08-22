@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -7,9 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { User, IncentiveClaim, Author, ApprovalStage } from '@/types';
-import { Loader2, Printer, Check, X } from 'lucide-react';
+import { Loader2, Printer, Check, X, Download } from 'lucide-react';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
+import { generateOfficeNotingForClaim } from '@/app/document-actions';
 
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
@@ -25,6 +27,38 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const [isPrinting, setIsPrinting] = useState(false);
 
     if (!claim) return null;
+    
+    const handleDownloadNoting = async () => {
+        setIsPrinting(true);
+        try {
+            const result = await generateOfficeNotingForClaim(claim.id);
+            if (result.success && result.fileData && result.fileName) {
+                 const byteCharacters = atob(result.fileData);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = result.fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                toast({ title: "Download Started" });
+            } else {
+                throw new Error(result.error || "Failed to generate form.");
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: "Download Failed", description: error.message });
+        } finally {
+            setIsPrinting(false);
+        }
+    };
 
     const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[] | React.ReactNode) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
@@ -81,7 +115,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
-    const isFullyApproved = claim.status === 'Submitted to Accounts';
+    const isPendingForBank = ['Accepted', 'Submitted to Accounts'].includes(claim.status);
 
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
@@ -347,7 +381,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>
                     {renderDetail("Benefit Mode", claim.benefitMode)}
                     {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
-                    {(isViewerAdminOrApprover || isFullyApproved) && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                    {(isViewerAdminOrApprover || isPendingForBank) && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                     
                     {claim.approvals && claim.approvals.length > 0 && (
                         <div className="space-y-2 pt-2">
@@ -381,6 +415,12 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     )}
                 </div>
                 <DialogFooter className="gap-2">
+                    {isPendingForBank && (
+                         <Button onClick={handleDownloadNoting} disabled={isPrinting}>
+                            {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                            Download Office Notings
+                        </Button>
+                    )}
                     {canTakeAction && (
                         <Button onClick={onTakeAction}>Take Action</Button>
                     )}
