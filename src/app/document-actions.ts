@@ -172,7 +172,7 @@ export async function generateIncentivePaymentSheet(
     flatData.date = format(new Date(), 'dd/MM/yyyy');
     flatData.reference_number = referenceNumber;
     flatData.total_amount = totalAmount;
-    flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, l => l.toUpperCase()) + ' Only';
+    flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, (l: string) => l.toUpperCase()) + ' Only';
     
     worksheet.eachRow((row) => {
         row.eachCell((cell) => {
@@ -205,36 +205,91 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
     try {
         const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
         const claimSnap = await claimRef.get();
-        if (!claimSnap.exists()) return null;
+        if (!claimSnap.exists) return null;
 
         const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
         const userRef = adminDb.collection('users').doc(claim.uid);
         const userSnap = await userRef.get();
-        if (!userSnap.exists()) return null;
+        if (!userSnap.exists) return null;
 
         const user = userSnap.data() as User;
         
         const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.conferencePaperTitle || 'N/A';
 
+        const getTemplateName = (claimType: string): string => {
+            switch (claimType) {
+                case 'Research Paper':
+                    return 'INCENTIVE_RESEARCH_PAPER.docx';
+                case 'Professional Body Membership':
+                    return 'INCENTIVE_MEMBERSHIP.docx';
+                case 'Book Publication':
+                    return 'INCENTIVE_BOOK_PUBLICATION.docx';
+                default:
+                    return 'INCENTIVE_RESEARCH_PAPER.docx';
+            }
+        };
 
-        const content = getTemplateContent('INCENTIVE_OFFICE_NOTING.docx');
-        if (!content) return null;
+        const templateName = getTemplateName(claim.claimType);
+        const content = getTemplateContent(templateName);
+        if (!content) {
+            console.error(`Template "${templateName}" not found for claim type: ${claim.claimType}`);
+            return null;
+        }
 
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
         const data = {
-            pi_name: user.name,
-            pi_designation: user.designation || 'N/A',
-            pi_department: user.department || 'N/A',
-            claim_title: claimTitle,
-            claim_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
+            name: user.name,
+            designation: user.designation || 'N/A',
+            typeofpublication: claim.publicationType || 'N/A',
+            journal_name: claim.journalName || 'N/A',
+            locale: claim.locale || 'N/A',
+            indexed: claim.indexType || 'N/A',
+            q_rating: claim.journalClassification || 'N/A',
+            role: claim.authorPosition || 'N/A',
+            author_position: claim.authorPosition || 'N/A',
+            total_authors: claim.totalPuAuthors || 'N/A',
+            print_issn: claim.printIssn || 'N/A',
+            e_issn: claim.electronicIssn || 'N/A',
+            publish_month: claim.publicationMonth || 'N/A',
+            publish_year: claim.publicationYear || 'N/A',
+            approver1_comments: claim.approvals?.[0]?.comments || 'N/A',
+            approver2_comments: claim.approvals?.[1]?.comments || 'N/A',
+            approver1_amount: claim.approvals?.[0]?.approvedAmount || 'N/A',
+            approver2_amount: claim.approvals?.[1]?.approvedAmount || 'N/A',
+            approver3_comments: claim.approvals?.[2]?.comments || 'N/A',
+            approver3_amount: claim.approvals?.[2]?.approvedAmount || 'N/A',
+            a1_c1: claim.approvals?.[0]?.verifiedFields?.c1 ? '✔' : '✗',
+            a1_c2: claim.approvals?.[0]?.verifiedFields?.c2 ? '✔' : '✗',
+            a1_c3: claim.approvals?.[0]?.verifiedFields?.c3 ? '✔' : '✗',
+            a1_c4: claim.approvals?.[0]?.verifiedFields?.c4 ? '✔' : '✗',
+            a1_c5: claim.approvals?.[0]?.verifiedFields?.c5 ? '✔' : '✗',
+            a1_c6: claim.approvals?.[0]?.verifiedFields?.c6 ? '✔' : '✗',
+            a1_c7: claim.approvals?.[0]?.verifiedFields?.c7 ? '✔' : '✗',
+            a1_c8: claim.approvals?.[0]?.verifiedFields?.c8 ? '✔' : '✗',
+            a1_c9: claim.approvals?.[0]?.verifiedFields?.c9 ? '✔' : '✗',
+            a1_c10: claim.approvals?.[0]?.verifiedFields?.c10 ? '✔' : '✗',
+            a1_c11: claim.approvals?.[0]?.verifiedFields?.c11 ? '✔' : '✗',
+            a1_c12: claim.approvals?.[0]?.verifiedFields?.c12 ? '✔' : '✗',
+            a2_c1: claim.approvals?.[1]?.verifiedFields?.c1 ? '✔' : '✗',
+            a2_c2: claim.approvals?.[1]?.verifiedFields?.c2 ? '✔' : '✗',
+            a2_c3: claim.approvals?.[1]?.verifiedFields?.c3 ? '✔' : '✗',
+            a2_c4: claim.approvals?.[1]?.verifiedFields?.c4 ? '✔' : '✗',
+            a2_c5: claim.approvals?.[1]?.verifiedFields?.c5 ? '✔' : '✗',
+            a2_c6: claim.approvals?.[1]?.verifiedFields?.c6 ? '✔' : '✗',
+            a2_c7: claim.approvals?.[1]?.verifiedFields?.c7 ? '✔' : '✗',
+            a2_c8: claim.approvals?.[1]?.verifiedFields?.c8 ? '✔' : '✗',
+            a2_c9: claim.approvals?.[1]?.verifiedFields?.c9 ? '✔' : '✗',
+            a2_c10: claim.approvals?.[1]?.verifiedFields?.c10 ? '✔' : '✗',
+            a2_c11: claim.approvals?.[1]?.verifiedFields?.c11 ? '✔' : '✗',
+            a2_c12: claim.approvals?.[1]?.verifiedFields?.c12 ? '✔' : '✗'
         };
 
-        doc.setData(data);
-        doc.render();
+        doc.render(data);
 
         const buf = doc.getZip().generate({ type: 'nodebuffer' });
+
         const fileName = `Office_Noting_${user.name.replace(/\s+/g, '_')}_${claim.id.substring(0, 5)}.docx`;
 
         return { fileName, content: buf };
@@ -244,28 +299,43 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
     }
 }
 
+
 export async function generateOfficeNotingsZip(claimIds: string[]): Promise<{ success: boolean; fileData?: string; error?: string }> {
     try {
         const zip = new JSZip();
-        const generationPromises = claimIds.map(id => generateSingleOfficeNoting(id));
-        const results = await Promise.all(generationPromises);
-
-        let filesGenerated = 0;
-        results.forEach(result => {
-            if (result) {
-                zip.file(result.fileName, result.content);
-                filesGenerated++;
+        const generationPromises = claimIds.map(async (claimId) => {
+            try {
+                const result = await generateSingleOfficeNoting(claimId);
+                if (result) {
+                    zip.file(result.fileName, result.content);
+                    return { success: true };
+                } else {
+                    return { success: false, error: `Failed to generate document for claim ID: ${claimId}` };
+                }
+            } catch (error: any) {
+                console.error(`Error generating noting for claim ${claimId}:`, error);
+                return { success: false, error: `Failed to generate document for claim ID: ${claimId}. Error: ${error.message}` };
             }
         });
 
-        if (filesGenerated === 0) {
+        const results = await Promise.all(generationPromises);
+
+        const successfulResults = results.filter(result => result.success);
+        const failedResults = results.filter(result => !result.success);
+
+        if (successfulResults.length === 0) {
             return { success: false, error: 'Could not generate any of the requested documents.' };
+        }
+
+        if (failedResults.length > 0) {
+            const errorMessages = failedResults.map(result => result.error).join('\n');
+            return { success: false, error: `Failed to generate some documents:\n${errorMessages}` };
         }
 
         const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
         const base64 = zipContent.toString('base64');
 
-        await logActivity('INFO', 'Generated office notings ZIP', { count: filesGenerated });
+        await logActivity('INFO', 'Generated office notings ZIP', { count: successfulResults.length });
         return { success: true, fileData: base64 };
 
     } catch (error: any) {
@@ -296,7 +366,7 @@ export async function exportClaimToExcel(
   try {
     const claimRef = adminDb.collection("incentiveClaims").doc(claimId)
     const claimSnap = await claimRef.get()
-    if (!claimSnap.exists()) {
+    if (!claimSnap.exists) {
       return { success: false, error: "Claim not found." }
     }
     const claim = claimSnap.data() as IncentiveClaim
