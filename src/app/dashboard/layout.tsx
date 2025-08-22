@@ -126,6 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingMeetingsCount, setPendingMeetingsCount] = useState(0);
   const [menuItems, setMenuItems] = useState<NavItem[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -148,7 +149,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'incentive-approvals', href: '/dashboard/incentive-approvals', tooltip: 'Incentive Approvals', icon: NotebookPen, label: 'Incentive Approvals' },
     { id: 'evaluator-dashboard', href: '/dashboard/evaluator-dashboard', tooltip: 'Evaluation Queue', icon: ClipboardCheck, label: 'Evaluation Queue' },
     { id: 'my-evaluations', href: '/dashboard/my-evaluations', tooltip: 'My Evaluations', icon: History, label: 'My IMR Evaluations' },
-    { id: 'schedule-meeting', href: '/dashboard/schedule-meeting', tooltip: 'Schedule Meeting', icon: CalendarClock, label: 'Schedule Meeting' },
+    { id: 'schedule-meeting', href: '/dashboard/schedule-meeting', tooltip: 'Schedule Meeting', icon: CalendarClock, label: 'Schedule Meeting', badge: pendingMeetingsCount },
     { id: 'pending-reviews', href: '/dashboard/pending-reviews', tooltip: 'Pending Reviews', icon: GanttChartSquare, label: 'Pending Reviews' },
     { id: 'completed-reviews', href: '/dashboard/completed-reviews', tooltip: 'Completed Reviews', icon: FileCheck2, label: 'Completed Reviews' },
     { id: 'all-projects', href: '/dashboard/all-projects', tooltip: 'All Projects', icon: Book, label: 'All Projects' },
@@ -159,9 +160,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { id: 'bulk-upload', href: '/dashboard/bulk-upload', tooltip: 'Bulk Upload Projects', icon: Upload, label: 'Bulk Upload Projects' },
     { id: 'bulk-upload-papers', href: '/dashboard/bulk-upload-papers', tooltip: 'Bulk Upload Papers', icon: BookUp, label: 'Bulk Upload Papers' },
     { id: 'bulk-upload-emr', href: '/dashboard/bulk-upload-emr', tooltip: 'Bulk Upload EMR', icon: Upload, label: 'Bulk Upload EMR' },
+    { id: 'module-management', href: '/dashboard/module-management', tooltip: 'Module Management', icon: ShieldCheck, label: 'Module Management' },
     { id: 'notifications', href: '/dashboard/notifications', tooltip: 'Notifications', icon: Bell, label: 'Notifications', badge: unreadCount, condition: true },
     { id: 'settings', href: '/dashboard/settings', tooltip: 'Settings', icon: Settings, label: 'Settings', condition: true },
-  ], [unreadCount]);
+  ], [unreadCount, pendingMeetingsCount]);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined;
@@ -281,6 +283,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       return () => unsubscribe();
     }
   }, [user, toast]);
+
+  useEffect(() => {
+    if (user && (user.role === 'admin' || user.role === 'Super-admin')) {
+        const projectsQuery = query(collection(db, 'projects'), where('status', '==', 'Submitted'));
+        const unsubscribe = onSnapshot(projectsQuery, (snapshot) => {
+            setPendingMeetingsCount(snapshot.size);
+        });
+        return () => unsubscribe();
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
