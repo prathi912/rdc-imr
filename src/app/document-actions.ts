@@ -144,10 +144,10 @@ export async function generateIncentivePaymentSheet(
     
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(templatePath);
-    const worksheet = workbook.getWorksheet(1);
+    const worksheet = workbook.getWorksheet("Sheet1");
 
     if (!worksheet) {
-      return { success: false, error: 'Could not find a worksheet in the template file.' };
+      return { success: false, error: 'Could not find a worksheet named "Sheet1" in the template file.' };
     }
 
     let totalAmount = 0;
@@ -213,6 +213,9 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
         if (!userSnap.exists()) return null;
 
         const user = userSnap.data() as User;
+        
+        const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.conferencePaperTitle || 'N/A';
+
 
         const content = getTemplateContent('INCENTIVE_OFFICE_NOTING.docx');
         if (!content) return null;
@@ -224,7 +227,7 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
             pi_name: user.name,
             pi_designation: user.designation || 'N/A',
             pi_department: user.department || 'N/A',
-            claim_title: claim.paperTitle || claim.publicationTitle || 'N/A',
+            claim_title: claimTitle,
             claim_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
         };
 
