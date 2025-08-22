@@ -31,6 +31,11 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  experimental: {
+    serverFiles: {
+      dirs: ['./src/templates'],
+    },
+  },
 };
 
 export default nextConfig;
