@@ -12,6 +12,7 @@ import admin from 'firebase-admin';
 import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
+import JSZip from 'jszip';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -199,108 +200,78 @@ export async function generateIncentivePaymentSheet(
   }
 }
 
-export async function generateOfficeNotingForm(
-  projectId: string,
-  formData: {
-    projectDuration: string;
-    phases: { name: string; amount: number }[];
-  }
-): Promise<{ success: boolean; fileData?: string; error?: string }> {
-  try {
-    const projectRef = adminDb.collection('projects').doc(projectId);
-    const projectSnap = await projectRef.get();
-    if (!projectSnap.exists()) {
-      return { success: false, error: 'Project not found.' };
-    }
-    const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
-
-    const piUserRef = adminDb.collection('users').doc(project.pi_uid);
-    const piUserSnap = await piUserRef.get();
-    const piUser = piUserSnap.exists ? piUserSnap.data() as User : null;
-    
-    let coPi1User: User | null = null;
-    if (project.coPiDetails && project.coPiDetails.length > 0 && project.coPiDetails[0].uid) {
-      const coPi1UserRef = adminDb.collection('users').doc(project.coPiDetails[0].uid!);
-      const coPi1UserSnap = await coPi1UserRef.get();
-      if (coPi1UserSnap.exists) {
-        coPi1User = coPi1UserSnap.data() as User;
-      }
-    }
-    
-    const templatePath = path.join(process.cwd(), 'src', 'templates', 'IMR_OFFICE_NOTING_TEMPLATE.docx');
-     if (!fs.existsSync(templatePath)) {
-      return { success: false, error: 'Office Notings form template not found on the server.' };
-    }
-    const content = fs.readFileSync(templatePath);
-
-
-    const zip = new PizZip(content);
-
-    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-
-    const coPiData: { [key: string]: string } = {};
-    const coPiNames = project.coPiDetails?.map(c => c.name) || [];
-    for (let i = 0; i < 4; i++) {
-      coPiData[`co-pi${i + 1}`] = coPiNames[i] || '';
-    }
-    
-    const phaseData: { [key: string]: string } = {};
-    let totalAmount = 0;
-    for (let i = 0; i < 4; i++) {
-        if (formData.phases[i]) {
-            phaseData[`phase${i + 1}_amount`] = formData.phases[i].amount.toLocaleString('en-IN');
-            totalAmount += formData.phases[i].amount;
-        } else {
-            phaseData[`phase${i + 1}_amount`] = '';
-        }
-    }
-
-    const data = {
-      pi_name: project.pi,
-      pi_designation: piUser?.designation || 'N/A',
-      pi_department: piUser?.department || project.departmentName || 'N/A',
-      pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || 'N/A',
-      pi_email: project.pi_email,
-      ...coPiData,
-      copi_designation: coPi1User?.designation || 'N/A',
-      copi_department: coPi1User?.department || 'N/A',
-      project_title: project.title,
-      project_duration: formData.projectDuration,
-      ...phaseData,
-      total_amount: totalAmount.toLocaleString('en-IN'),
-      presentation_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
-      presentation_time: project.meetingDetails?.time || 'N/A',
-    };
-
-    doc.setData(data);
-
+async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: string, content: Buffer } | null> {
     try {
-      doc.render();
-    } catch (error: any) {
-      console.error('Docxtemplater render error:', error);
-      if (error.properties && error.properties.errors) {
-          console.error('Template errors:', JSON.stringify(error.properties.errors));
-      }
-      return { success: false, error: 'Failed to render the document template.' };
-    }
+        const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
+        const claimSnap = await claimRef.get();
+        if (!claimSnap.exists()) return null;
 
-    const buf = doc.getZip().generate({ type: 'nodebuffer' });
-    const base64 = buf.toString('base64');
-    
-    if (project.status === 'Recommended') {
-      await projectRef.update({
-          projectDuration: formData.projectDuration,
-          phases: formData.phases,
-      });
-    }
+        const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
+        const userRef = adminDb.collection('users').doc(claim.uid);
+        const userSnap = await userRef.get();
+        if (!userSnap.exists()) return null;
 
-    return { success: true, fileData: base64 };
-  } catch (error: any) {
-    console.error('Error generating office notings form:', error);
-    await logActivity('ERROR', 'Failed to generate office notings form', { projectId, error: error.message, stack: error.stack });
-    return { success: false, error: error.message || 'Failed to generate the form.' };
-  }
+        const user = userSnap.data() as User;
+
+        const templatePath = path.join(process.cwd(), 'src', 'templates', 'INCENTIVE_OFFICE_NOTING.docx');
+        if (!fs.existsSync(templatePath)) return null;
+
+        const content = fs.readFileSync(templatePath);
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+
+        const data = {
+            pi_name: user.name,
+            pi_designation: user.designation || 'N/A',
+            pi_department: user.department || 'N/A',
+            claim_title: claim.paperTitle || claim.publicationTitle || 'N/A',
+            claim_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
+        };
+
+        doc.setData(data);
+        doc.render();
+
+        const buf = doc.getZip().generate({ type: 'nodebuffer' });
+        const fileName = `Office_Noting_${user.name.replace(/\s+/g, '_')}_${claim.id.substring(0, 5)}.docx`;
+
+        return { fileName, content: buf };
+    } catch (error) {
+        console.error(`Error generating noting for claim ${claimId}:`, error);
+        return null;
+    }
 }
+
+export async function generateOfficeNotingsZip(claimIds: string[]): Promise<{ success: boolean; fileData?: string; error?: string }> {
+    try {
+        const zip = new JSZip();
+        const generationPromises = claimIds.map(id => generateSingleOfficeNoting(id));
+        const results = await Promise.all(generationPromises);
+
+        let filesGenerated = 0;
+        results.forEach(result => {
+            if (result) {
+                zip.file(result.fileName, result.content);
+                filesGenerated++;
+            }
+        });
+
+        if (filesGenerated === 0) {
+            return { success: false, error: 'Could not generate any of the requested documents.' };
+        }
+
+        const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
+        const base64 = zipContent.toString('base64');
+
+        await logActivity('INFO', 'Generated office notings ZIP', { count: filesGenerated });
+        return { success: true, fileData: base64 };
+
+    } catch (error: any) {
+        console.error('Error generating office notings ZIP:', error);
+        await logActivity('ERROR', 'Failed to generate office notings ZIP', { error: error.message });
+        return { success: false, error: error.message || 'Failed to generate ZIP file.' };
+    }
+}
+
 
 export async function exportClaimToExcel(
   claimId: string,

@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from '@/components/ui/input';
-import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2, FileSpreadsheet, CheckCheck, Send } from "lucide-react";
+import { MoreHorizontal, Download, ArrowUpDown, Printer, Loader2, FileSpreadsheet, CheckCheck, Send, FileArchive } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ import type { IncentiveClaim, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { generateIncentivePaymentSheet } from '@/app/document-actions';
+import { generateIncentivePaymentSheet, generateOfficeNotingsZip } from '@/app/document-actions';
 import { markPaymentsCompleted, submitToAccounts } from '@/app/manage-claims-actions';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -62,6 +62,7 @@ export default function ManageIncentiveClaimsPage() {
   const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
   const [isGenerateSheetOpen, setIsGenerateSheetOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDownloadingNotings, setIsDownloadingNotings] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -204,6 +205,38 @@ export default function ManageIncentiveClaimsPage() {
         toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
     setIsUpdating(false);
+  };
+
+  const handleDownloadNotings = async () => {
+    if (selectedClaims.length === 0) {
+        toast({ variant: 'destructive', title: 'No Claims Selected' });
+        return;
+    }
+    setIsDownloadingNotings(true);
+    try {
+        const result = await generateOfficeNotingsZip(selectedClaims);
+        if (result.success && result.fileData) {
+            const byteCharacters = atob(result.fileData);
+            const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'application/zip' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Office_Notings_${new Date().toISOString().split('T')[0]}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast({ title: "Download Started", description: `Downloading ${selectedClaims.length} office notings.` });
+        } else {
+            throw new Error(result.error || "Failed to generate ZIP file.");
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+        setIsDownloadingNotings(false);
+    }
   };
 
 
@@ -373,6 +406,10 @@ export default function ManageIncentiveClaimsPage() {
                 <div className="flex items-center gap-2">
                     <Button onClick={() => setIsGenerateSheetOpen(true)} disabled={eligibleForPaymentSheet.length === 0 || isUpdating}>
                         <FileSpreadsheet className="mr-2 h-4 w-4" /> Generate Payment Sheet ({eligibleForPaymentSheet.length})
+                    </Button>
+                    <Button onClick={handleDownloadNotings} disabled={isDownloadingNotings}>
+                        {isDownloadingNotings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileArchive className="mr-2 h-4 w-4" />}
+                        Download Notings ({selectedClaims.length})
                     </Button>
                     <Button onClick={handleSubmitToAccounts} disabled={isUpdating || !selectedClaims.every(id => allClaims.find(c => c.id === id)?.status === 'Accepted')}>
                         {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
