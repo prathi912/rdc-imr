@@ -13,6 +13,7 @@ import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
 import JSZip from 'jszip';
+import { getTemplateContent } from '@/lib/template-manager';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -213,10 +214,9 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
 
         const user = userSnap.data() as User;
 
-        const templatePath = path.join(process.cwd(), 'src', 'templates', 'INCENTIVE_OFFICE_NOTING.docx');
-        if (!fs.existsSync(templatePath)) return null;
+        const content = getTemplateContent('INCENTIVE_OFFICE_NOTING.docx');
+        if (!content) return null;
 
-        const content = fs.readFileSync(templatePath);
         const zip = new PizZip(content);
         const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
 
