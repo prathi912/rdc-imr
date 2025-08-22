@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -12,6 +11,9 @@ import { Loader2, Printer, Check, X, Download } from 'lucide-react';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { generateOfficeNotingForClaim } from '@/app/document-actions';
+import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
+import { generateBookIncentiveForm } from '@/app/incentive-actions';
+import { generateMembershipIncentiveForm } from '@/app/membership-actions';
 
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
@@ -31,8 +33,28 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const handleDownloadNoting = async () => {
         setIsPrinting(true);
         try {
-            const result = await generateOfficeNotingForClaim(claim.id);
-            if (result.success && result.fileData && result.fileName) {
+            let result;
+            let fileName = `Office_Noting_${claim.userName.replace(/\s/g, '_')}.docx`;
+
+            switch (claim.claimType) {
+                case 'Research Papers':
+                    result = await generateResearchPaperIncentiveForm(claim.id);
+                    fileName = `Research_Paper_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
+                    break;
+                case 'Books':
+                    result = await generateBookIncentiveForm(claim.id);
+                     fileName = `Book_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
+                    break;
+                case 'Membership of Professional Bodies':
+                    result = await generateMembershipIncentiveForm(claim.id);
+                    fileName = `Membership_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
+                    break;
+                default:
+                    result = await generateOfficeNotingForClaim(claim.id);
+                    fileName = result?.fileName || fileName;
+            }
+
+            if (result.success && result.fileData) {
                  const byteCharacters = atob(result.fileData);
                 const byteNumbers = new Array(byteCharacters.length);
                 for (let i = 0; i < byteCharacters.length; i++) {
@@ -44,7 +66,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = result.fileName;
+                a.download = fileName;
                 document.body.appendChild(a);
                 a.click();
                 a.remove();
@@ -418,7 +440,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     {isPendingForBank && (
                          <Button onClick={handleDownloadNoting} disabled={isPrinting}>
                             {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                            Download Office Notings
+                            Download Notings
                         </Button>
                     )}
                     {canTakeAction && (

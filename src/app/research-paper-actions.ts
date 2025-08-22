@@ -2,7 +2,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import type { IncentiveClaim, User } from '@/types';
+import type { IncentiveClaim, User, ApprovalStage } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getTemplateContent } from '@/lib/template-manager';
@@ -41,7 +41,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
     const approval2 = claim.approvals?.find(a => a?.stage === 2);
     const approval3 = claim.approvals?.find(a => a?.stage === 3);
     
-    const getVerificationMark = (approval: typeof approval1, fieldId: string) => {
+    const getVerificationMark = (approval: ApprovalStage | null | undefined, fieldId: string) => {
         if (!approval || approval.status !== 'Approved') return '';
         const verified = approval.verifiedFields?.[fieldId];
         if (verified === true) return '✓';
@@ -84,13 +84,13 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         a1_c6: getVerificationMark(approval1, 'indexType'),
         a1_c7: getVerificationMark(approval1, 'wosType'),
         a1_c8: getVerificationMark(approval1, 'journalClassification'),
-        a1_c9: getVerificationMark(approval1, 'authorType'),
+        a1_c9: getVerificationMark(approval1, 'authorRoleAndPosition'),
         a1_c10: getVerificationMark(approval1, 'totalPuAuthors'),
         a1_c11: getVerificationMark(approval1, 'printIssn'),
         a1_c12: getVerificationMark(approval1, 'publicationProofUrls'),
         a1_c13: getVerificationMark(approval1, 'isPuNameInPublication'),
         a1_c14: getVerificationMark(approval1, 'publicationMonth'),
-        a1_c15: getVerificationMark(approval1, 'authorPosition'),
+        
 
         // Verification marks for approver 2 (Verified)
         a2_c1: getVerificationMark(approval2, 'name'),
@@ -101,13 +101,13 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         a2_c6: getVerificationMark(approval2, 'indexType'),
         a2_c7: getVerificationMark(approval2, 'wosType'),
         a2_c8: getVerificationMark(approval2, 'journalClassification'),
-        a2_c9: getVerificationMark(approval2, 'authorType'),
+        a2_c9: getVerificationMark(approval2, 'authorRoleAndPosition'),
         a2_c10: getVerificationMark(approval2, 'totalPuAuthors'),
         a2_c11: getVerificationMark(approval2, 'printIssn'),
         a2_c12: getVerificationMark(approval2, 'publicationProofUrls'),
         a2_c13: getVerificationMark(approval2, 'isPuNameInPublication'),
         a2_c14: getVerificationMark(approval2, 'publicationMonth'),
-        a2_c15: getVerificationMark(approval2, 'authorPosition'),
+        
     };
     
     doc.setData(data);
