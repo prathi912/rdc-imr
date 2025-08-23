@@ -144,10 +144,10 @@ export async function generateIncentivePaymentSheet(
     
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(templatePath);
-    const worksheet = workbook.getWorksheet(1); // Get the first worksheet
+    const worksheet = workbook.getWorksheet("Sheet1");
 
     if (!worksheet) {
-      return { success: false, error: 'Could not find a worksheet in the template file.' };
+      return { success: false, error: 'Could not find a worksheet named "Sheet1" in the template file.' };
     }
 
     let totalAmount = 0;
@@ -216,23 +216,9 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
         
         const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.conferencePaperTitle || 'N/A';
 
-        const getTemplateName = (claimType: string): string => {
-            switch (claimType) {
-                case 'Research Paper':
-                    return 'INCENTIVE_RESEARCH_PAPER.docx';
-                case 'Professional Body Membership':
-                    return 'INCENTIVE_MEMBERSHIP.docx';
-                case 'Book Publication':
-                    return 'INCENTIVE_BOOK_PUBLICATION.docx';
-                default:
-                    return 'INCENTIVE_RESEARCH_PAPER.docx';
-            }
-        };
-
-        const templateName = getTemplateName(claim.claimType);
-        const content = getTemplateContent(templateName);
+        const content = getTemplateContent('INCENTIVE_OFFICE_NOTING.docx');
         if (!content) {
-            console.error(`Template "${templateName}" not found for claim type: ${claim.claimType}`);
+            console.error(`Template "INCENTIVE_OFFICE_NOTING.docx" not found.`);
             return null;
         }
 
@@ -242,51 +228,14 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
         const data = {
             name: user.name,
             designation: user.designation || 'N/A',
-            typeofpublication: claim.publicationType || 'N/A',
-            journal_name: claim.journalName || 'N/A',
-            locale: claim.locale || 'N/A',
-            indexed: claim.indexType || 'N/A',
-            q_rating: claim.journalClassification || 'N/A',
-            role: claim.authorPosition || 'N/A',
-            author_position: claim.authorPosition || 'N/A',
-            total_authors: claim.totalPuAuthors || 'N/A',
-            print_issn: claim.printIssn || 'N/A',
-            e_issn: claim.electronicIssn || 'N/A',
-            publish_month: claim.publicationMonth || 'N/A',
-            publish_year: claim.publicationYear || 'N/A',
-            approver1_comments: claim.approvals?.[0]?.comments || 'N/A',
-            approver2_comments: claim.approvals?.[1]?.comments || 'N/A',
-            approver1_amount: claim.approvals?.[0]?.approvedAmount || 'N/A',
-            approver2_amount: claim.approvals?.[1]?.approvedAmount || 'N/A',
-            approver3_comments: claim.approvals?.[2]?.comments || 'N/A',
-            approver3_amount: claim.approvals?.[2]?.approvedAmount || 'N/A',
-            a1_c1: claim.approvals?.[0]?.verifiedFields?.c1 ? '✔' : '✗',
-            a1_c2: claim.approvals?.[0]?.verifiedFields?.c2 ? '✔' : '✗',
-            a1_c3: claim.approvals?.[0]?.verifiedFields?.c3 ? '✔' : '✗',
-            a1_c4: claim.approvals?.[0]?.verifiedFields?.c4 ? '✔' : '✗',
-            a1_c5: claim.approvals?.[0]?.verifiedFields?.c5 ? '✔' : '✗',
-            a1_c6: claim.approvals?.[0]?.verifiedFields?.c6 ? '✔' : '✗',
-            a1_c7: claim.approvals?.[0]?.verifiedFields?.c7 ? '✔' : '✗',
-            a1_c8: claim.approvals?.[0]?.verifiedFields?.c8 ? '✔' : '✗',
-            a1_c9: claim.approvals?.[0]?.verifiedFields?.c9 ? '✔' : '✗',
-            a1_c10: claim.approvals?.[0]?.verifiedFields?.c10 ? '✔' : '✗',
-            a1_c11: claim.approvals?.[0]?.verifiedFields?.c11 ? '✔' : '✗',
-            a1_c12: claim.approvals?.[0]?.verifiedFields?.c12 ? '✔' : '✗',
-            a2_c1: claim.approvals?.[1]?.verifiedFields?.c1 ? '✔' : '✗',
-            a2_c2: claim.approvals?.[1]?.verifiedFields?.c2 ? '✔' : '✗',
-            a2_c3: claim.approvals?.[1]?.verifiedFields?.c3 ? '✔' : '✗',
-            a2_c4: claim.approvals?.[1]?.verifiedFields?.c4 ? '✔' : '✗',
-            a2_c5: claim.approvals?.[1]?.verifiedFields?.c5 ? '✔' : '✗',
-            a2_c6: claim.approvals?.[1]?.verifiedFields?.c6 ? '✔' : '✗',
-            a2_c7: claim.approvals?.[1]?.verifiedFields?.c7 ? '✔' : '✗',
-            a2_c8: claim.approvals?.[1]?.verifiedFields?.c8 ? '✔' : '✗',
-            a2_c9: claim.approvals?.[1]?.verifiedFields?.c9 ? '✔' : '✗',
-            a2_c10: claim.approvals?.[1]?.verifiedFields?.c10 ? '✔' : '✗',
-            a2_c11: claim.approvals?.[1]?.verifiedFields?.c11 ? '✔' : '✗',
-            a2_c12: claim.approvals?.[1]?.verifiedFields?.c12 ? '✔' : '✗'
+            claim_title: claimTitle,
+            claim_type: claim.claimType,
+            submission_date: new Date(claim.submissionDate).toLocaleDateString(),
+            final_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
         };
 
-        doc.render(data);
+        doc.setData(data);
+        doc.render();
 
         const buf = doc.getZip().generate({ type: 'nodebuffer' });
 
@@ -321,17 +270,11 @@ export async function generateOfficeNotingsZip(claimIds: string[]): Promise<{ su
         const results = await Promise.all(generationPromises);
 
         const successfulResults = results.filter(result => result.success);
-        const failedResults = results.filter(result => !result.success);
 
         if (successfulResults.length === 0) {
             return { success: false, error: 'Could not generate any of the requested documents.' };
         }
-
-        if (failedResults.length > 0) {
-            const errorMessages = failedResults.map(result => result.error).join('\n');
-            return { success: false, error: `Failed to generate some documents:\n${errorMessages}` };
-        }
-
+        
         const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
         const base64 = zipContent.toString('base64');
 
