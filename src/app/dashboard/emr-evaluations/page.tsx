@@ -130,21 +130,13 @@ export default function EmrEvaluationsPage() {
         setLoading(true);
 
         try {
-            // 1. Fetch all calls with a scheduled meeting
-            const callsQuery = query(collection(db, 'fundingCalls'), where('status', '==', 'Meeting Scheduled'));
-            const callsSnapshot = await getDocs(callsQuery);
-            const allScheduledCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-            
-            // 2. Filter for calls where the current user is an assigned evaluator
-            let relevantCalls: FundingCall[];
-            if (user.role === 'Super-admin' || user.role === 'admin') {
-                // Admins see all scheduled calls
-                relevantCalls = allScheduledCalls;
-            } else {
-                // Other roles see only calls they are assigned to
-                relevantCalls = allScheduledCalls.filter(call => call.meetingDetails?.assignedEvaluators?.includes(user.uid));
-            }
-            
+            // 1. Directly query for funding calls where the user is an assigned evaluator.
+            const relevantCallsQuery = query(
+                collection(db, 'fundingCalls'),
+                where('meetingDetails.assignedEvaluators', 'array-contains', user.uid)
+            );
+            const callsSnapshot = await getDocs(relevantCallsQuery);
+            const relevantCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
             setCalls(relevantCalls);
             
             const relevantCallIds = relevantCalls.map(call => call.id);
@@ -154,8 +146,12 @@ export default function EmrEvaluationsPage() {
                 return;
             }
             
-            // 3. Fetch all interests (applicants) for those specific calls
-            const interestsQuery = query(collection(db, 'emrInterests'), where('callId', 'in', relevantCallIds));
+            // 2. Fetch all interests (applicants) for those specific calls with "Evaluation Pending" status.
+            const interestsQuery = query(
+                collection(db, 'emrInterests'), 
+                where('callId', 'in', relevantCallIds),
+                where('status', '==', 'Evaluation Pending')
+            );
             const interestsSnapshot = await getDocs(interestsQuery);
             const interestsData = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
             
