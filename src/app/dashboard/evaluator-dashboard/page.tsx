@@ -52,20 +52,25 @@ export default function EvaluatorDashboardPage() {
         setImrProjectsToReview(pendingImrForCurrentUser);
 
         // --- EMR Fetching ---
-        // 1. Find all funding calls where the current user is an evaluator.
-        const callsWithMyUidQuery = query(collection(db, 'fundingCalls'), where('meetingDetails.assignedEvaluators', 'array-contains', user.uid));
-        const callsSnapshot = await getDocs(callsWithMyUidQuery);
-        const relevantCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+        // 1. Find all funding calls where a meeting has been scheduled.
+        const callsWithMeetingsQuery = query(collection(db, 'fundingCalls'), where('status', '==', 'Meeting Scheduled'));
+        const callsSnapshot = await getDocs(callsWithMeetingsQuery);
+        
+        // 2. From those, filter for calls where the current user is an assigned evaluator.
+        const relevantCalls = callsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as FundingCall))
+            .filter(call => call.meetingDetails?.assignedEvaluators?.includes(user.uid));
+        
         setEmrCalls(relevantCalls);
         const relevantCallIds = relevantCalls.map(doc => doc.id);
 
         if (relevantCallIds.length > 0) {
-            // 2. Fetch all interests (applicants) for those specific calls.
+            // 3. Fetch all interests (applicants) for those specific calls.
             const interestsQuery = query(collection(db, 'emrInterests'), where('callId', 'in', relevantCallIds));
             const interestsSnapshot = await getDocs(interestsQuery);
             const interestsData = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
             
-            // 3. For each interest, fetch their submitted evaluations.
+            // 4. For each interest, fetch their submitted evaluations.
             const interestsWithDetails = await Promise.all(
                 interestsData.map(async interest => {
                     const evaluationsCol = collection(db, 'emrInterests', interest.id, 'evaluations');
@@ -78,7 +83,6 @@ export default function EvaluatorDashboardPage() {
             setEmrInterests(interestsWithDetails);
         } else {
             setEmrInterests([]);
-            setEmrCalls([]);
         }
 
     } catch (error) {
