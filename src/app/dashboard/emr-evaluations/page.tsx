@@ -130,10 +130,12 @@ export default function EmrEvaluationsPage() {
         setLoading(true);
 
         try {
+            // 1. Fetch all calls with a scheduled meeting
             const callsQuery = query(collection(db, 'fundingCalls'), where('status', '==', 'Meeting Scheduled'));
             const callsSnapshot = await getDocs(callsQuery);
             const allScheduledCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
             
+            // 2. Filter for calls where the current user is an assigned evaluator
             let relevantCalls: FundingCall[];
             if (user.role === 'Super-admin' || user.role === 'admin') {
                 // Admins see all scheduled calls
@@ -152,10 +154,12 @@ export default function EmrEvaluationsPage() {
                 return;
             }
             
+            // 3. Fetch all interests (applicants) for those specific calls
             const interestsQuery = query(collection(db, 'emrInterests'), where('callId', 'in', relevantCallIds));
             const interestsSnapshot = await getDocs(interestsQuery);
             const interestsData = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
             
+            // Fetch user details for all applicants
             const allUserIds = [...new Set(interestsData.map(i => i.userId))];
             const usersMap = new Map<string, User>();
             if (allUserIds.length > 0) {
@@ -164,6 +168,7 @@ export default function EmrEvaluationsPage() {
               usersSnapshot.forEach(doc => usersMap.set(doc.id, { uid: doc.id, ...doc.data()} as User));
             }
 
+            // Fetch evaluations for each interest
             const interestsWithDetails = await Promise.all(
               interestsData.map(async interest => {
                 const evaluationsCol = collection(db, 'emrInterests', interest.id, 'evaluations');
