@@ -180,7 +180,7 @@ export async function registerEmrInterest(
         registeredAt: new Date().toISOString(),
         status: "Registered",
         coPiDetails: coPis,
-        coPiUids: coPis.map((p) => p.uid).filter((uid): uid is string => !!uid),
+        coPiUids: coPis.map((p) => p.uid).filter(Boolean) as string[],
         coPiNames: coPis.map((p) => p.name),
         coPiEmails: coPis.map((p) => p.email.toLowerCase()),
       }
