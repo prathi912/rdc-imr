@@ -52,15 +52,20 @@ export default function EvaluatorDashboardPage() {
         setImrProjectsToReview(pendingImrForCurrentUser);
 
         // --- EMR Fetching ---
+        // 1. Find all funding calls where the current user is an evaluator.
         const callsWithMyUidQuery = query(collection(db, 'fundingCalls'), where('meetingDetails.assignedEvaluators', 'array-contains', user.uid));
         const callsSnapshot = await getDocs(callsWithMyUidQuery);
-        const relevantCallIds = callsSnapshot.docs.map(doc => doc.id);
+        const relevantCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+        setEmrCalls(relevantCalls);
+        const relevantCallIds = relevantCalls.map(doc => doc.id);
 
         if (relevantCallIds.length > 0) {
+            // 2. Fetch all interests (applicants) for those specific calls.
             const interestsQuery = query(collection(db, 'emrInterests'), where('callId', 'in', relevantCallIds));
             const interestsSnapshot = await getDocs(interestsQuery);
             const interestsData = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
             
+            // 3. For each interest, fetch their submitted evaluations.
             const interestsWithDetails = await Promise.all(
                 interestsData.map(async interest => {
                     const evaluationsCol = collection(db, 'emrInterests', interest.id, 'evaluations');
@@ -71,7 +76,6 @@ export default function EvaluatorDashboardPage() {
             );
 
             setEmrInterests(interestsWithDetails);
-            setEmrCalls(callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)));
         } else {
             setEmrInterests([]);
             setEmrCalls([]);
@@ -86,8 +90,10 @@ export default function EvaluatorDashboardPage() {
   }, [user, toast]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if(user) {
+        fetchData();
+    }
+  }, [user, fetchData]);
 
   return (
     <div className="container mx-auto py-10">

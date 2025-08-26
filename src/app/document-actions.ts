@@ -73,10 +73,17 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     const evaluationsRef = projectRef.collection('evaluations');
     const evaluationsSnap = await evaluationsRef.get();
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
-    
-    const templatePath = path.join(process.cwd(), 'src', 'templates', 'IMR_RECOMMENDATION_TEMPLATE.docx');
-    if (!fs.existsSync(templatePath)) {
-      return { success: false, error: 'Recommendation form template not found on the server.' };
+    const IMR_TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/IMR_RECOMMENDATION_TEMPLATE.docx";
+
+    let templateBuffer;
+    try {
+      const response = await fetch(IMR_TEMPLATE_URL);
+      if (!response.ok) {
+        return { success: false, error: 'Recommendation form template not found on the server.' };
+      }
+      templateBuffer = Buffer.from(await response.arrayBuffer());
+    } catch (err) {
+      return { success: false, error: 'Error fetching recommendation form template.' };
     }
     const content = fs.readFileSync(templatePath, 'binary');
 
