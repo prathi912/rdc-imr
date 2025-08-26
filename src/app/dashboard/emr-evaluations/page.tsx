@@ -159,7 +159,7 @@ export default function EmrEvaluationsPage() {
             const allUserIds = [...new Set(interestsData.map(i => i.userId))];
             const usersMap = new Map<string, User>();
             if (allUserIds.length > 0) {
-              const usersQuery = query(collection(db, 'users'), where(doc(db, 'users', 'uid').id, 'in', allUserIds));
+              const usersQuery = query(collection(db, 'users'), where('__name__', 'in', allUserIds));
               const usersSnapshot = await getDocs(usersQuery);
               usersSnapshot.forEach(doc => usersMap.set(doc.id, { uid: doc.id, ...doc.data()} as User));
             }
