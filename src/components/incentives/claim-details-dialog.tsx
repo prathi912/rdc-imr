@@ -14,6 +14,7 @@ import { generateOfficeNotingForClaim } from '@/app/document-actions';
 import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
 import { generateBookIncentiveForm } from '@/app/incentive-actions';
 import { generateMembershipIncentiveForm } from '@/app/membership-actions';
+import { generatePatentIncentiveForm } from '@/app/patent-actions';
 
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
@@ -48,6 +49,10 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                 case 'Membership of Professional Bodies':
                     result = await generateMembershipIncentiveForm(claim.id);
                     fileName = `Membership_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
+                    break;
+                case 'Patents':
+                    result = await generatePatentIncentiveForm(claim.id);
+                    fileName = `Patent_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
                     break;
                 default:
                     result = await generateOfficeNotingForClaim(claim.id);
