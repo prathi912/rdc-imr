@@ -141,8 +141,11 @@ export function PatentForm() {
         const patentForm1Url = await uploadFileHelper(data.patentForm1?.[0], 'patent-form1');
         const patentGovtReceiptUrl = await uploadFileHelper(data.patentGovtReceipt?.[0], 'patent-govt-receipt');
 
+        // Create a clean data object without the file objects
+        const { patentApprovalProof, patentForm1, patentGovtReceipt, ...restOfData } = data;
+
         const claimData: Omit<IncentiveClaim, 'id'> = {
-            ...data,
+            ...restOfData,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
             claimType: 'Patents',
