@@ -160,6 +160,13 @@ export function PatentForm() {
         if (patentForm1Url) claimData.patentForm1Url = patentForm1Url;
         if (patentGovtReceiptUrl) claimData.patentGovtReceiptUrl = patentGovtReceiptUrl;
 
+        // Sanitize data: remove undefined fields before sending to Firestore
+        Object.keys(claimData).forEach(key => {
+            if ((claimData as any)[key] === undefined) {
+                delete (claimData as any)[key];
+            }
+        });
+
         await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
 
         if (status === 'Draft') {
