@@ -419,7 +419,7 @@ export default function SettingsPage() {
       localStorage.setItem("user", JSON.stringify(updatedUser))
       setUser(updatedUser)
       toast({ title: "Bank details updated successfully!" })
-    } catch (error) {
+    } catch (error: any) {
       console.error("Bank details update error:", error)
       toast({ variant: "destructive", title: "Update Failed", description: "Could not update your bank details." })
     } finally {
@@ -571,7 +571,7 @@ export default function SettingsPage() {
     await handleSystemSettingsSave({ ...systemSettings, croAssignments: currentAssignments.filter(c => c.email !== emailToRemove) });
   };
 
-  const handleApproverChange = async (stage: 1 | 2 | 3, email: string) => {
+  const handleApproverChange = async (stage: 1 | 2 | 3 | 4, email: string) => {
     if (!systemSettings) return;
     const approvers = systemSettings.incentiveApprovers || [];
     const otherApprovers = approvers.filter(a => a.stage !== stage);
@@ -754,17 +754,17 @@ export default function SettingsPage() {
                 <Form {...dummyForm}>
                   <Label className="text-base">Incentive Approval Workflow</Label>
                   <p className="text-sm text-muted-foreground">
-                    Define the email addresses for the three stages of incentive claim approval.
+                    Define the email addresses for the four stages of incentive claim approval.
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {[1, 2, 3].map(stage => (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[1, 2, 3, 4].map(stage => (
                           <FormItem key={stage}>
                               <FormLabel>Stage {stage} Approver Email</FormLabel>
                               <Input 
                                   type="email"
                                   placeholder={`approver.stage${stage}@paruluniversity.ac.in`}
                                   defaultValue={systemSettings.incentiveApprovers?.find(a => a.stage === stage)?.email || ''}
-                                  onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3, e.target.value)}
+                                  onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)}
                                   disabled={isSavingSettings}
                               />
                           </FormItem>

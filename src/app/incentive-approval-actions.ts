@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -96,9 +95,9 @@ async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
 
 export async function processIncentiveClaimAction(
   claimId: string,
-  action: 'approve' | 'reject',
+  action: 'approve' | 'reject' | 'verify',
   approver: User,
-  stageIndex: number, // 0, 1, or 2
+  stageIndex: number, // 0, 1, 2, or 3
   data: { amount?: number; comments?: string, verifiedFields?: { [key: string]: boolean } }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -123,7 +122,7 @@ export async function processIncentiveClaimAction(
     const newApproval: ApprovalStage = {
       approverUid: approver.uid,
       approverName: approver.name,
-      status: action === 'approve' ? 'Approved' : 'Rejected',
+      status: action === 'reject' ? 'Rejected' : 'Approved',
       approvedAmount: data.amount || 0,
       comments: data.comments || '',
       timestamp: new Date().toISOString(),
@@ -143,18 +142,24 @@ export async function processIncentiveClaimAction(
     if (action === 'reject') {
       newStatus = 'Rejected';
     } else {
-      if (stageIndex === 2) { // Final approval stage
-        newStatus = 'Accepted'; // New status after stage 3 approval
+      if (stageIndex === 3) { // Final approval stage is now 3 (for stage 4)
+        newStatus = 'Accepted'; 
       } else {
         newStatus = `Pending Stage ${stageIndex + 2} Approval` as IncentiveClaim['status'];
       }
     }
 
-    await claimRef.update({
-      approvals,
-      status: newStatus,
-      finalApprovedAmount: data.amount // Keep updating the final amount at each approval stage
-    });
+    const updateData: { [key: string]: any } = {
+        approvals,
+        status: newStatus,
+    };
+    
+    // Only update the final amount from Stage 2 onwards
+    if (stageIndex > 0 && action === 'approve') {
+        updateData.finalApprovedAmount = data.amount;
+    }
+
+    await claimRef.update(updateData);
     
     const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || 'your recent incentive claim';
 
@@ -180,7 +185,7 @@ export async function processIncentiveClaimAction(
         });
     }
 
-    if (action === 'approve' && stageIndex === 2) { // Final approval
+    if (action === 'approve' && stageIndex === 3) { // Final approval
         if (claim.userEmail) {
             await sendEmail({
                 to: claim.userEmail,
@@ -209,7 +214,7 @@ export async function processIncentiveClaimAction(
         }
     }
     
-    await logActivity('INFO', `Incentive claim ${action}d`, { claimId, stage: stageIndex + 1, approver: approver.name });
+    await logActivity('INFO', `Incentive claim action processed`, { claimId, action, stage: stageIndex + 1, approver: approver.name });
     return { success: true };
   } catch (error: any) {
     console.error('Error processing incentive claim action:', error);

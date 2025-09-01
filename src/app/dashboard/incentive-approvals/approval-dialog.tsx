@@ -40,18 +40,24 @@ interface ApprovalDialogProps {
 const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
 const createApprovalSchema = (stageIndex: number) => z.object({
-  action: z.enum(['approve', 'reject'], { required_error: 'Please select an action.' }),
+  action: z.enum(['approve', 'reject', 'verify'], { required_error: 'Please select an action.' }),
   amount: z.coerce.number().positive("Amount cannot be in negative.").optional(),
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
-}).refine(data => data.action !== 'approve' || (data.amount !== undefined && data.amount > 0), {
-  message: 'Approved amount must be a positive number.',
+}).refine(data => {
+    if (stageIndex > 0 && data.action === 'approve') {
+        return data.amount !== undefined && data.amount > 0;
+    }
+    return true;
+}, {
+  message: 'Approved amount must be a positive number for this stage.',
   path: ['amount'],
 }).refine(data => {
     if (data.action === 'reject') {
         return !!data.comments && data.comments.length > 0;
     }
-    if (stageIndex < 2 && data.action === 'approve') {
+    // Comments required for stages 2 and 3 on approval
+    if (stageIndex > 0 && stageIndex < 3 && data.action === 'approve') {
         return !!data.comments && data.comments.trim() !== '';
     }
     return true;
@@ -221,7 +227,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
-    const isChecklistEnabled = (isResearchPaperClaim && stageIndex < 2);
+    // Checklist is only for stage 1 (index 0) of Research Papers
+    const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0);
     
     // Dynamically determine which fields need verification based on the claim's data
     const getFieldsToVerify = () => {
@@ -245,7 +252,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const approvalSchema = createApprovalSchema(stageIndex);
     const formSchemaWithVerification = approvalSchema.refine(data => {
-        if (!isChecklistEnabled || data.action !== 'approve') return true;
+        if (!isChecklistEnabled) return true;
         // Check if every required field has a boolean value (true or false)
         return fieldsToVerify.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
     }, {
@@ -254,10 +261,10 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     });
 
     const getDefaultAmount = () => {
-        if (stageIndex === 2 && claim.approvals && claim.approvals.length > 1) {
-            const stage2Approval = claim.approvals.find(a => a?.stage === 2);
-            if (stage2Approval && stage2Approval.status === 'Approved') {
-                return stage2Approval.approvedAmount;
+        if (stageIndex >= 2 && claim.approvals && claim.approvals.length > 1) {
+            const stageApproval = claim.approvals.find(a => a?.stage === stageIndex); // Find previous stage's amount
+            if (stageApproval && stageApproval.status === 'Approved') {
+                return stageApproval.approvedAmount;
             }
         }
         return claim.finalApprovedAmount || claim.calculatedIncentive || 0;
@@ -289,9 +296,16 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const handleSubmit = async (values: ApprovalFormData) => {
         setIsSubmitting(true);
         try {
-            const result = await processIncentiveClaimAction(claim.id, values.action, approver, stageIndex, values);
+            const actionToSubmit = isChecklistEnabled ? 'verify' : values.action;
+
+            const result = await processIncentiveClaimAction(claim.id, actionToSubmit, approver, stageIndex, values);
             if (result.success) {
-                toast({ title: 'Success', description: `Claim has been ${values.action === 'approve' ? 'approved' : 'rejected'}.` });
+                let successMessage = 'Action submitted successfully.';
+                if (actionToSubmit === 'verify') successMessage = 'Checklist verified and claim forwarded.';
+                else if (actionToSubmit === 'approve') successMessage = 'Claim has been approved.';
+                else if (actionToSubmit === 'reject') successMessage = 'Claim has been rejected.';
+                
+                toast({ title: 'Success', description: successMessage });
                 onActionComplete();
                 onOpenChange(false);
                 form.reset();
@@ -309,7 +323,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const getCommentLabel = () => {
         if (action === 'reject') return 'Your Comments (Required)';
-        if (stageIndex < 2 && action === 'approve') return 'Your Comments (Required)';
+        if (stageIndex >= 1 && stageIndex <= 2 && action === 'approve') return 'Your Comments (Required)';
         return 'Your Comments (Optional)';
     };
     
@@ -343,7 +357,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         <p className={`font-semibold ${approval.status === 'Approved' ? 'text-green-600' : 'text-red-600'}`}>{approval.status}</p>
                                     </div>
                                     <p><strong className="text-muted-foreground">Comments:</strong> {approval.comments || 'N/A'}</p>
-                                    {approval.status === 'Approved' && (
+                                    {approval.status === 'Approved' && approval.stage > 1 && (
                                         <p><strong className="text-muted-foreground">Approved Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
                                     )}
                                 </div>
@@ -359,23 +373,25 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
 
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                            <FormField
-                                name="action"
-                                control={form.control}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Your Action</FormLabel>
-                                        <FormControl>
-                                            <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4">
-                                                <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="approve" /></FormControl><FormLabel className="font-normal">Approve</FormLabel></FormItem>
-                                                <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="reject" /></FormControl><FormLabel className="font-normal">Reject</FormLabel></FormItem>
-                                            </RadioGroup>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            {action === 'approve' && (
+                             {!isChecklistEnabled && (
+                                <FormField
+                                    name="action"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Your Action</FormLabel>
+                                            <FormControl>
+                                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4">
+                                                    <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="approve" /></FormControl><FormLabel className="font-normal">Approve</FormLabel></FormItem>
+                                                    <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="reject" /></FormControl><FormLabel className="font-normal">Reject</FormLabel></FormItem>
+                                                </RadioGroup>
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                            {action === 'approve' && stageIndex > 0 && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
@@ -388,24 +404,28 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            <FormField
-                                name="comments"
-                                control={form.control}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>{getCommentLabel()}</FormLabel>
-                                        <FormControl><Textarea {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                             {!isChecklistEnabled && (
+                                <FormField
+                                    name="comments"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>{getCommentLabel()}</FormLabel>
+                                            <FormControl><Textarea {...field} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                             )}
                         </form>
                     </Form>
                 </div>
                  <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button type="submit" form="approval-form" disabled={isSubmitting}>
-                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : 'Submit Action'}
+                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : (
+                            isChecklistEnabled ? 'Submit & Forward' : 'Submit Action'
+                        )}
                     </Button>
                 </DialogFooter>
             </DialogContent>
