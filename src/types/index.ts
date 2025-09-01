@@ -1,4 +1,5 @@
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -248,8 +249,7 @@ export type IncentiveClaim = {
   publicationProofUrls?: string[];
   isPuNameInPublication?: boolean;
   totalCorrespondingAuthors?: number;
-  correspondingAuthorNames?: string;
-  totalPuAuthors?: number;
+  bookCoAuthors?: Author[];
   totalPuStudentAuthors?: number;
   puStudentNames?: string;
 
@@ -307,8 +307,6 @@ export type IncentiveClaim = {
   // Book/Book Chapter Fields
   bookApplicationType?: "Book Chapter" | "Book"
   publicationTitle?: string // Title of the book chapter/Book
-  bookCoAuthors?: BookCoAuthor[]
-  coAuthorUids?: string[] // For efficient querying
   bookTitleForChapter?: string // Title of the Book (for Book Chapter)
   bookEditor?: string // Name Of the Editor (for Book Chapter)
   bookChapterPages?: number
@@ -476,4 +474,12 @@ export type LoginOtp = {
   email: string
   otp: string
   expiresAt: number // Store as timestamp
+}
+
+export type FoundUser = {
+  uid: string | null; // null if not yet registered on the portal
+  name: string;
+  email: string;
+  misId: string;
+  campus: string;
 }

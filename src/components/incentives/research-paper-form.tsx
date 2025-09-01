@@ -74,7 +74,6 @@ const researchPaperSchema = z
       .boolean()
       .refine((val) => val === true, { message: "PU name must be present in the publication." }),
     totalCorrespondingAuthors: z.coerce.number().min(1, "Please specify the number of corresponding authors."),
-    correspondingAuthorNames: z.string().min(2, "Please specify the name(s) of corresponding authors."),
     authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
     bookCoAuthors: z
       .array(
@@ -239,7 +238,6 @@ export function ResearchPaperForm() {
       bookCoAuthors: [],
       isPuNameInPublication: false,
       totalCorrespondingAuthors: 1,
-      correspondingAuthorNames: '',
       totalPuStudentAuthors: 0,
       puStudentNames: '',
     },
@@ -990,19 +988,6 @@ export function ResearchPaperForm() {
                         <FormLabel>Total No. of Corresponding Authors</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="correspondingAuthorNames"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name(s) of Corresponding Author(s)</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
