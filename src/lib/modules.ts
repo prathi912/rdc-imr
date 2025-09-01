@@ -31,7 +31,7 @@ const coreModules = ["dashboard", "notifications", "settings", "emr-calendar"]
 const facultyCoreModules = ["new-submission", "my-projects"]
 const hierarchyCoreModules = ["analytics"]
 
-const facultyDefaults = [...coreModules, ...facultyCoreModules, "bulk-upload-papers", "incentive-claim"]
+const facultyDefaults = [...coreModules, ...facultyCoreModules, "bulk-upload-papers"]
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "analytics", "manage-users", "manage-incentive-claims"]
 const superAdminDefaults = [...adminDefaults, "module-management", "bulk-upload-emr"]
