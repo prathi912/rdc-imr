@@ -8,7 +8,7 @@ import {
   query as adminQuery,
   where as adminWhere,
   getDocs as adminGetDocs,
-} from 'firebase/firestore/lite';
+} from 'firebase-firestore/lite';
 
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -47,7 +47,7 @@ export async function findUserByMisId(
       const allFound = new Map<string, FoundUser>();
   
       // 1. Search existing users in Firestore
-      const usersRef = adminCollection(adminDb, "users");
+      const usersRef = adminDb.collection("users");
       const q = adminQuery(usersRef, adminWhere("misId", "==", misId));
       const querySnapshot = await adminGetDocs(q);
   
