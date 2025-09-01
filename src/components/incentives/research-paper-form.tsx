@@ -45,7 +45,7 @@ const researchPaperSchema = z
   .object({
     publicationType: z.string({ required_error: "Please select a publication type." }),
     indexType: z.enum(["wos", "scopus", "both", "esci"]).optional(),
-    relevantLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
+    relevantLink: z.string().url("A valid DOI link is required."),
     scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4"]).optional(),
     wosType: z.enum(["SCIE", "SSCI", "A&HCI"]).optional(),

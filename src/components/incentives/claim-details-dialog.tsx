@@ -229,10 +229,10 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                            <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle)}
+                            {renderLinkDetail("DOI Link", claim.relevantLink)}
                             {renderDetail("Author Role", claim.authorType)}
                             {renderDetail("Author Position", claim.authorPosition)}
                             {renderDetail("No. of Authors from PU", claim.totalPuAuthors)}
-                            {renderLinkDetail("DOI Link", claim.relevantLink)}
                             {renderLinkDetail("Scopus Link", claim.scopusLink)}
                             {renderDetail("Journal Name", claim.journalName)}
                             {renderLinkDetail("Journal Website", claim.journalWebsite)}
