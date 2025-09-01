@@ -131,7 +131,8 @@ export default function ManageIncentiveClaimsPage() {
       const lowerCaseSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(claim =>
         claim.userName.toLowerCase().includes(lowerCaseSearch) ||
-        getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch)
+        getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch) ||
+        (claim.claimId && claim.claimId.toLowerCase().includes(lowerCaseSearch))
       );
     }
     return filtered;
@@ -385,7 +386,7 @@ export default function ManageIncentiveClaimsPage() {
         <div className="flex items-center justify-between py-4 gap-4">
             <div className="flex items-center gap-2">
               <Input
-                  placeholder="Filter by claimant or title..."
+                  placeholder="Filter by claimant, title, or Claim ID..."
                   value={searchTerm}
                   onChange={(event) => setSearchTerm(event.target.value)}
                   className="max-w-sm"

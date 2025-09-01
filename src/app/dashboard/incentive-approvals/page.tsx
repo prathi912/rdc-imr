@@ -54,7 +54,7 @@ export default function IncentiveApprovalsPage() {
             const [pendingSnapshot, allClaimsSnapshot, usersSnapshot] = await Promise.all([
                 getDocs(pendingClaimsQuery),
                 getDocs(allClaimsQuery),
-                getDocs(usersQuery)
+                getDocs(usersSnapshot)
             ]);
 
             setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
@@ -121,7 +121,9 @@ export default function IncentiveApprovalsPage() {
             if (claimTypeFilter !== 'all' && claim.claimType !== claimTypeFilter) return false;
             if (!searchTerm) return true;
             const lowerCaseSearch = searchTerm.toLowerCase();
-            return claim.userName.toLowerCase().includes(lowerCaseSearch) || getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch);
+            return claim.userName.toLowerCase().includes(lowerCaseSearch) || 
+                   getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch) ||
+                   (claim.claimId && claim.claimId.toLowerCase().includes(lowerCaseSearch));
         });
     }, [pendingClaims, searchTerm, claimTypeFilter]);
 
@@ -130,7 +132,9 @@ export default function IncentiveApprovalsPage() {
             if (claimTypeFilter !== 'all' && claim.claimType !== claimTypeFilter) return false;
             if (!searchTerm) return true;
             const lowerCaseSearch = searchTerm.toLowerCase();
-            return claim.userName.toLowerCase().includes(lowerCaseSearch) || getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch);
+            return claim.userName.toLowerCase().includes(lowerCaseSearch) || 
+                   getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch) ||
+                   (claim.claimId && claim.claimId.toLowerCase().includes(lowerCaseSearch));
         });
     }, [historyClaims, searchTerm, claimTypeFilter]);
     
@@ -206,7 +210,7 @@ export default function IncentiveApprovalsPage() {
                 <PageHeader title={`Incentive Approvals (Stage ${approvalStage + 1})`} description="Claims awaiting your review and approval." />
                  <div className="flex items-center py-4 gap-4">
                     <Input
-                        placeholder="Filter by claimant or title..."
+                        placeholder="Filter by claimant, title, or Claim ID..."
                         value={searchTerm}
                         onChange={(event) => setSearchTerm(event.target.value)}
                         className="max-w-sm"
