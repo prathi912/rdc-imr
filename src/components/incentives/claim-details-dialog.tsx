@@ -219,7 +219,6 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                                     {renderVerificationDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
                                     {renderVerificationDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
                                     {renderVerificationDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
-                                    {renderVerificationDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
                                     {renderVerificationDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
                                     {renderVerificationDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
                                 </div>
@@ -231,8 +230,8 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle)}
                             {renderDetail("Author Role", claim.authorType)}
-                            {renderDetail("No. of Authors from PU", claim.totalPuAuthors)}
                             {renderDetail("Author Position", claim.authorPosition)}
+                            {renderDetail("No. of Authors from PU", claim.totalPuAuthors)}
                             {renderLinkDetail("DOI Link", claim.relevantLink)}
                             {renderLinkDetail("Scopus Link", claim.scopusLink)}
                             {renderDetail("Journal Name", claim.journalName)}
@@ -250,7 +249,6 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderLinkDetail("Publication Proofs", claim.publicationProofUrls)}
                             {renderDetail("PU Name in Publication", claim.isPuNameInPublication)}
                             {renderDetail("Total Corresponding Authors", claim.totalCorrespondingAuthors)}
-                            {renderDetail("Corresponding Author(s)", claim.correspondingAuthorNames)}
                             {renderDetail("Authors from PU", claim.bookCoAuthors)}
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
