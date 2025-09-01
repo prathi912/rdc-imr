@@ -22,8 +22,8 @@ import { collection, doc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import {
   uploadFileToServer,
-  findUserByMisId,
 } from "@/app/actions"
+import { findUserByMisId } from "@/app/userfinding"
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2 } from "lucide-react"
