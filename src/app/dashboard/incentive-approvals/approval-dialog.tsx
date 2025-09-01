@@ -45,14 +45,12 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
 }).refine(data => {
-    // When a checklist is enabled, the action must be 'verify'.
-    // When it's not enabled, the action must be 'approve' or 'reject'.
     if (isChecklistEnabled) {
         return data.action === 'verify';
     }
     return data.action === 'approve' || data.action === 'reject';
 }, {
-    message: 'Please select an action.',
+    message: 'An action must be selected.',
     path: ['action'],
 })
 .refine(data => {
@@ -64,18 +62,12 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
   message: 'Approved amount must be a positive number for this stage.',
   path: ['amount'],
 }).refine(data => {
-    // Comments are always required for rejection.
     if (data.action === 'reject') {
         return !!data.comments && data.comments.trim() !== '';
     }
-    // Comments are required for stages 2 and 3 (index 1 and 2) on approval.
-    if (stageIndex >= 1 && data.action === 'approve') {
-        return !!data.comments && data.comments.trim() !== '';
-    }
-    // Comments are optional for Stage 1 (index 0) approval.
     return true;
 }, {
-  message: 'Comments are required for this action.',
+  message: 'Comments are required when rejecting a claim.',
   path: ['comments'],
 });
 
@@ -340,12 +332,6 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const previousApprovals = (claim.approvals || []).filter(a => a?.stage < stageIndex + 1);
     
-    const getCommentLabel = () => {
-        const currentAction = form.getValues('action');
-        if (currentAction === 'reject') return 'Your Comments (Required)';
-        if (stageIndex >= 1 && currentAction === 'approve') return 'Your Comments (Required)';
-        return 'Your Comments (Optional)';
-    };
     
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
@@ -424,13 +410,13 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                             {(action === 'reject' || (stageIndex > 0 && action === 'approve')) && (
+                             {action === 'reject' && (
                                 <FormField
                                     name="comments"
                                     control={form.control}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>{getCommentLabel()}</FormLabel>
+                                            <FormLabel>Your Comments (Required)</FormLabel>
                                             <FormControl><Textarea {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
