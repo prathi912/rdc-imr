@@ -53,13 +53,15 @@ const createApprovalSchema = (stageIndex: number) => z.object({
   message: 'Approved amount must be a positive number for this stage.',
   path: ['amount'],
 }).refine(data => {
+    // Comments are always required for rejection.
     if (data.action === 'reject') {
-        return !!data.comments && data.comments.length > 0;
-    }
-    // Comments required for stages 2 and 3 on approval
-    if (stageIndex > 0 && stageIndex < 3 && data.action === 'approve') {
         return !!data.comments && data.comments.trim() !== '';
     }
+    // Comments are required for stages 2 and 3 (index 1 and 2) on approval.
+    if (stageIndex >= 1 && stageIndex <= 2 && data.action === 'approve') {
+        return !!data.comments && data.comments.trim() !== '';
+    }
+    // Comments are optional for Stage 1 (index 0) approval.
     return true;
 }, {
   message: 'Comments are required for this action.',
