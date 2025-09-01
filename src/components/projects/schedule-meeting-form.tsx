@@ -8,6 +8,7 @@ import * as z from 'zod';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { format, startOfToday } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, ChevronDown } from 'lucide-react';
+import Link from 'next/link';
 
 import { db } from '@/lib/config';
 import type { Project, User } from '@/types';
@@ -42,7 +43,7 @@ export function ScheduleMeetingForm() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
-  const [evaluators, setEvaluators] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const { toast } = useToast();
 
   const form = useForm<z.infer<typeof scheduleSchema>>({
@@ -62,24 +63,21 @@ export function ScheduleMeetingForm() {
         orderBy('submissionDate', 'desc')
       );
       
-      const evaluatorsQuery = query(
-        collection(db, 'users'), 
-        where('role', 'in', ['CRO', 'admin', 'Super-admin'])
-      );
+      const usersQuery = query(collection(db, 'users'));
 
-      const [projectsSnapshot, evaluatorsSnapshot] = await Promise.all([
+      const [projectsSnapshot, usersSnapshot] = await Promise.all([
         getDocs(projectsQuery),
-        getDocs(evaluatorsQuery),
+        getDocs(usersQuery),
       ]);
 
       const projectList = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-      const evaluatorList = evaluatorsSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
+      const userList = usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User));
       
       setProjects(projectList);
-      setEvaluators(evaluatorList);
+      setAllUsers(userList);
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch projects or evaluators.' });
+      toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch projects or users.' });
     } finally {
       setLoading(false);
     }
@@ -88,6 +86,8 @@ export function ScheduleMeetingForm() {
   useEffect(() => {
     fetchRequiredData();
   }, [fetchRequiredData]);
+  
+  const evaluators = allUsers.filter(u => ['CRO', 'admin', 'Super-admin'].includes(u.role));
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -138,6 +138,8 @@ export function ScheduleMeetingForm() {
       toast({ variant: 'destructive', title: 'Scheduling Failed', description: result.error || 'An unknown error occurred.' });
     }
   };
+  
+  const usersMap = new Map(allUsers.map(u => [u.uid, u]));
 
   if (loading) {
     return (
@@ -179,7 +181,10 @@ export function ScheduleMeetingForm() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projects.map(project => (
+                {projects.map(project => {
+                  const piUser = usersMap.get(project.pi_uid);
+                  const profileLink = piUser?.campus === 'Goa' ? `/goa/${piUser.misId}` : `/profile/${piUser?.misId}`;
+                  return (
                   <TableRow key={project.id} data-state={selectedProjects.includes(project.id) ? "selected" : ""}>
                     <TableCell>
                       <Checkbox
@@ -189,10 +194,18 @@ export function ScheduleMeetingForm() {
                       />
                     </TableCell>
                     <TableCell className="font-medium">{project.title}</TableCell>
-                    <TableCell>{project.pi}</TableCell>
+                    <TableCell>
+                        {piUser?.misId ? (
+                            <Link href={profileLink} target="_blank" className="text-primary hover:underline">
+                                {project.pi}
+                            </Link>
+                        ) : (
+                            project.pi
+                        )}
+                    </TableCell>
                     <TableCell>{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
                   </TableRow>
-                ))}
+                )})}
               </TableBody>
             </Table>
           ) : (
