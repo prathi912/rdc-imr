@@ -81,7 +81,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
+  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string | null; name: string; email: string; misId: string; campus: string; } | null>(null);
   const [coPiList, setCoPiList] = useState<CoPiDetails[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [coPiCvFiles, setCoPiCvFiles] = useState<{ [email: string]: File }>({});

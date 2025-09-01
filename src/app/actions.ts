@@ -1689,16 +1689,14 @@ export async function findUserByMisId(misId: string): Promise<{
 
     querySnapshot.forEach((doc) => {
       const userData = doc.data() as User
-      if (userData.role !== "admin" && userData.role !== "Super-admin") {
-        const userResult = {
-          uid: doc.id,
-          name: userData.name,
-          email: userData.email,
-          misId: userData.misId!,
-          campus: userData.campus || "Vadodara",
-        }
-        allFound.set(userResult.email, userResult)
+      const userResult = {
+        uid: doc.id,
+        name: userData.name,
+        email: userData.email,
+        misId: userData.misId!,
+        campus: userData.campus || "Vadodara",
       }
+      allFound.set(userResult.email, userResult)
     })
 
     // 2. Search staff data files via API
