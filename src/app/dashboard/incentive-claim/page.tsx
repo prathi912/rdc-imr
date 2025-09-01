@@ -74,9 +74,6 @@ function UserClaimsList({
             return (
                 <div className="flex flex-col items-end">
                     <Badge variant="default">Approved</Badge>
-                    <span className="text-xs text-muted-foreground mt-1">
-                        Final Amount: ₹{claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A'}
-                    </span>
                 </div>
             );
         }
