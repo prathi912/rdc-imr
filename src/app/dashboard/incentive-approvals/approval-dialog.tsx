@@ -45,9 +45,12 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
 }).refine(data => {
-    // If it's a checklist-based approval, action is implicitly 'verify'.
-    // Otherwise, an action must be explicitly chosen.
-    return isChecklistEnabled || !!data.action;
+    // When a checklist is enabled, the action must be 'verify'.
+    // When it's not enabled, the action must be 'approve' or 'reject'.
+    if (isChecklistEnabled) {
+        return data.action === 'verify';
+    }
+    return data.action === 'approve' || data.action === 'reject';
 }, {
     message: 'Please select an action.',
     path: ['action'],
@@ -279,13 +282,18 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         }
         return claim.finalApprovedAmount || claim.calculatedIncentive || 0;
     };
+    
+    const getDefaultAction = () => {
+        return isChecklistEnabled ? 'verify' : 'approve';
+    };
+
 
     const form = useForm<ApprovalFormData>({
         resolver: zodResolver(formSchemaWithVerification),
         defaultValues: {
             amount: getDefaultAmount(),
             verifiedFields: {},
-            action: isChecklistEnabled ? 'verify' : 'approve',
+            action: getDefaultAction(),
         }
     });
 
@@ -294,7 +302,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
             form.reset({
                 amount: getDefaultAmount(),
                 verifiedFields: {},
-                action: isChecklistEnabled ? 'verify' : 'approve',
+                action: getDefaultAction(),
                 comments: '',
             });
         }
@@ -416,7 +424,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                             {((action === 'reject') || (stageIndex > 0 && action === 'approve')) && (
+                             {(action === 'reject' || (stageIndex > 0 && action === 'approve')) && (
                                 <FormField
                                     name="comments"
                                     control={form.control}
