@@ -419,7 +419,6 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                                    {isViewerAdminOrApprover && (
                                        <>
                                         <p className="text-xs text-muted-foreground">by {approval.approverName} on {new Date(approval.timestamp).toLocaleString()}</p>
-                                        <p className="mt-1"><strong>Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
                                         <p className="mt-1"><strong>Comments:</strong> {approval.comments || 'N/A'}</p>
                                        </>
                                    )}
