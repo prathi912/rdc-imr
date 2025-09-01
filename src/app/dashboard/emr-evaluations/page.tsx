@@ -131,18 +131,14 @@ export default function EmrEvaluationsPage() {
 
         try {
             // First, directly query for EMR interests with status "Evaluation Pending"
-            console.log("Fetching EMR interests with status 'Evaluation Pending'...");
             const interestsQuery = query(collection(db, 'emrInterests'), where('status', '==', 'Evaluation Pending'));
             const interestsSnapshot = await getDocs(interestsQuery);
             const interestsData = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
-            console.log("All EMR interests with Evaluation Pending status:", interestsData);
             
             // Get unique call IDs from the interests
             const callIds = [...new Set(interestsData.map(interest => interest.callId))];
-            console.log("Call IDs from EMR interests:", callIds);
             
             if (callIds.length === 0) {
-                console.log("No EMR interests with Evaluation Pending status found");
                 setInterests([]);
                 setCalls([]);
                 setLoading(false);
@@ -150,59 +146,34 @@ export default function EmrEvaluationsPage() {
             }
             
             // Fetch the funding calls for these interests
-            console.log("Fetching funding calls for the EMR interests...");
             const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
             const callsSnapshot = await getDocs(callsQuery);
             const allCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-            console.log("All funding calls:", allCalls);
-            
+            setCalls(allCalls);
+
             // Filter calls based on user role
             let relevantCalls: FundingCall[];
             if (user.role === 'Super-admin' || user.role === 'admin') {
                 // Admins see all calls
                 relevantCalls = allCalls;
-                console.log("Admin user - showing all calls:", relevantCalls);
             } else {
                 // Other roles see only calls they are assigned to
                 relevantCalls = allCalls.filter(call => call.meetingDetails?.assignedEvaluators?.includes(user.uid));
-                console.log("Non-admin user - filtered calls:", relevantCalls);
             }
-            
-            // 1. Directly query for funding calls where the user is an assigned evaluator.
-            const relevantCallsQuery = query(
-                collection(db, 'fundingCalls'),
-                where('meetingDetails.assignedEvaluators', 'array-contains', user.uid)
-            );
-            const callsSnapshot = await getDocs(relevantCallsQuery);
-            const relevantCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-            setCalls(relevantCalls);
             
             // Filter interests to only include those from relevant calls
             const relevantCallIds = relevantCalls.map(call => call.id);
-            console.log("Relevant call IDs:", relevantCallIds);
-            
             const relevantInterests = interestsData.filter(interest => relevantCallIds.includes(interest.callId));
-            console.log("Relevant EMR interests:", relevantInterests);
             
             if (relevantInterests.length === 0) {
-                console.log("No relevant EMR interests found after filtering by user role");
                 setInterests([]);
                 setLoading(false);
                 return;
             }
             
             const allUserIds = [...new Set(relevantInterests.map(i => i.userId))];
-            // 2. Fetch all interests (applicants) for those specific calls with "Evaluation Pending" status.
-            const interestsQuery = query(
-                collection(db, 'emrInterests'), 
-                where('callId', 'in', relevantCallIds),
-                where('status', '==', 'Evaluation Pending')
-            );
-            const interestsSnapshot = await getDocs(interestsQuery);
-            const interestsData = interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
             
             // Fetch user details for all applicants
-            const allUserIds = [...new Set(interestsData.map(i => i.userId))];
             const usersMap = new Map<string, User>();
             if (allUserIds.length > 0) {
               const usersQuery = query(collection(db, 'users'), where('__name__', 'in', allUserIds));
@@ -221,7 +192,6 @@ export default function EmrEvaluationsPage() {
               })
             );
 
-            console.log("Final interests with details:", interestsWithDetails);
             setInterests(interestsWithDetails);
 
         } catch (error) {
