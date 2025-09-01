@@ -3,8 +3,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import fs from 'fs';
-import path from 'path';
 
 // Define the expected structure of a row in the Excel sheet
 interface StaffData {
@@ -27,16 +25,25 @@ interface StaffData {
   Orcid?: string | number;
 }
 
-const readStaffData = (filePath: string): StaffData[] => {
-    if (!fs.existsSync(filePath)) {
-        console.warn(`Staff data file not found at: ${filePath}.`);
+const GOA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/goastaffdata.xlsx';
+const VADODARA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/staffdata.xlsx';
+
+const readStaffDataFromUrl = async (url: string): Promise<StaffData[]> => {
+    try {
+        const response = await fetch(url, { cache: 'no-store' }); // Use no-store to ensure fresh data
+        if (!response.ok) {
+            console.warn(`Failed to fetch staff data from URL: ${url}. Status: ${response.status}`);
+            return [];
+        }
+        const buffer = await response.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        return XLSX.utils.sheet_to_json<StaffData>(worksheet);
+    } catch (error) {
+        console.error(`Error reading staff data from ${url}:`, error);
         return [];
     }
-    const buffer = fs.readFileSync(filePath);
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    return XLSX.utils.sheet_to_json<StaffData>(worksheet);
 }
 
 const formatUserRecord = (record: StaffData, defaultCampus: 'Vadodara' | 'Goa') => {
@@ -73,9 +80,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email or MIS ID query parameter is required.' }, { status: 400 });
   }
 
-  const goastaffdataFilePath = path.join(process.cwd(), 'goastaffdata.xlsx');
-  const staffdataFilePath = path.join(process.cwd(), 'staffdata.xlsx');
-  
   const allFoundRecords: StaffData[] = [];
   const foundEmails = new Set<string>();
 
@@ -104,15 +108,20 @@ export async function GET(request: NextRequest) {
       });
   };
 
+  const [staffdata, goastaffdata] = await Promise.all([
+      readStaffDataFromUrl(VADODARA_STAFF_DATA_URL),
+      readStaffDataFromUrl(GOA_STAFF_DATA_URL)
+  ]);
+
   if (fetchAll) {
-      searchAndAddAll(readStaffData(staffdataFilePath), 'Vadodara');
-      searchAndAddAll(readStaffData(goastaffdataFilePath), 'Goa');
+      searchAndAddAll(staffdata, 'Vadodara');
+      searchAndAddAll(goastaffdata, 'Goa');
   } else if (email) {
     const isGoaEmail = email.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
-    searchAndAdd(readStaffData(isGoaEmail ? goastaffdataFilePath : staffdataFilePath), isGoaEmail ? 'Goa' : 'Vadodara');
+    searchAndAdd(isGoaEmail ? goastaffdata : staffdata, isGoaEmail ? 'Goa' : 'Vadodara');
   } else if (misId) {
     const isGoaContext = userEmailForFileCheck?.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
-    searchAndAdd(readStaffData(isGoaContext ? goastaffdataFilePath : staffdataFilePath), isGoaContext ? 'Goa' : 'Vadodara');
+    searchAndAdd(isGoaContext ? goastaffdata : staffdata, isGoaContext ? 'Goa' : 'Vadodara');
   }
 
   if (allFoundRecords.length > 0) {
