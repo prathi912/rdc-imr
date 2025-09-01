@@ -62,7 +62,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
             const claimId = `RDC/IC/${acronym}/${String(newCount).padStart(4, '0')}`;
             const newClaimRef = adminDb.collection('incentiveClaims').doc();
             
-            // Claims with a checklist (Research Papers) start at Stage 1. Others start at Stage 2.
+            // Claims with a checklist (Research Papers) start at Stage 1 (Pending). Others start at Stage 2.
             const initialStatus = claimData.claimType === 'Research Papers' ? 'Pending' : 'Pending Stage 2 Approval';
 
             const finalClaimData = {
