@@ -40,15 +40,14 @@ interface ApprovalDialogProps {
 const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
 const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) => z.object({
-  action: z.enum(['approve', 'reject', 'verify']).optional(),
+  action: z.enum(['approve', 'reject', 'verify']),
   amount: z.coerce.number().positive("Amount cannot be in negative.").optional(),
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
 }).refine(data => {
-    if (!isChecklistEnabled && !data.action) {
-        return false;
-    }
-    return true;
+    // If it's a checklist-based approval, action is implicitly 'verify'.
+    // Otherwise, an action must be explicitly chosen.
+    return isChecklistEnabled || !!data.action;
 }, {
     message: 'Please select an action.',
     path: ['action'],
@@ -286,7 +285,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         defaultValues: {
             amount: getDefaultAmount(),
             verifiedFields: {},
-            action: isChecklistEnabled ? 'verify' : undefined
+            action: isChecklistEnabled ? 'verify' : 'approve',
         }
     });
 
@@ -295,7 +294,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
             form.reset({
                 amount: getDefaultAmount(),
                 verifiedFields: {},
-                action: isChecklistEnabled ? 'verify' : undefined,
+                action: isChecklistEnabled ? 'verify' : 'approve',
                 comments: '',
             });
         }
@@ -308,7 +307,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const handleSubmit = async (values: ApprovalFormData) => {
         setIsSubmitting(true);
         try {
-            const actionToSubmit = isChecklistEnabled ? 'verify' : (values.action || 'approve');
+            const actionToSubmit = values.action;
 
             const result = await processIncentiveClaimAction(claim.id, actionToSubmit, approver, stageIndex, values);
             if (result.success) {
@@ -394,7 +393,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         <FormItem>
                                             <FormLabel>Your Action</FormLabel>
                                             <FormControl>
-                                                <RadioGroup onValueChange={field.onChange} defaultValue="approve" value={field.value} className="flex space-x-4">
+                                                <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
                                                     <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="approve" /></FormControl><FormLabel className="font-normal">Approve</FormLabel></FormItem>
                                                     <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="reject" /></FormControl><FormLabel className="font-normal">Reject</FormLabel></FormItem>
                                                 </RadioGroup>
