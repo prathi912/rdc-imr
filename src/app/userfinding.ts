@@ -3,12 +3,6 @@
 
 import { adminDb } from '@/lib/admin';
 import type { User, FoundUser } from '@/types';
-import {
-  collection as adminCollection,
-  query as adminQuery,
-  where as adminWhere,
-  getDocs as adminGetDocs,
-} from 'firebase-firestore/lite';
 
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -48,8 +42,8 @@ export async function findUserByMisId(
   
       // 1. Search existing users in Firestore
       const usersRef = adminDb.collection("users");
-      const q = adminQuery(usersRef, adminWhere("misId", "==", misId));
-      const querySnapshot = await adminGetDocs(q);
+      const q = usersRef.where("misId", "==", misId);
+      const querySnapshot = await q.get();
   
       querySnapshot.forEach(doc => {
         const userData = doc.data() as User;

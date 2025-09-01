@@ -31,7 +31,8 @@ import { Input } from '@/components/ui/input';
 import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send, Search } from 'lucide-react';
 import type { FundingCall, User, EmrInterest, CoPiDetails } from '@/types';
 import { registerEmrInterest, withdrawEmrInterest, uploadEndorsementForm, submitToAgency, updateEmrFinalStatus } from '@/app/emr-actions';
-import { findUserByMisId, uploadFileToServer } from '@/app/actions';
+import { uploadFileToServer } from '@/app/actions';
+import { findUserByMisId } from '@/app/userfinding';
 import { isAfter, parseISO, addDays, setHours, setMinutes, setSeconds, subDays } from 'date-fns';
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -316,8 +317,8 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
         setFoundCoPi(null);
         try {
             const result = await findUserByMisId(coPiSearchTerm);
-            if (result.success && result.user) {
-                setFoundCoPi(result.user);
+            if (result.success && result.users && result.users.length > 0) {
+                setFoundCoPi(result.users[0]);
             } else {
                 toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
             }
