@@ -58,7 +58,7 @@ const createApprovalSchema = (stageIndex: number) => z.object({
         return !!data.comments && data.comments.trim() !== '';
     }
     // Comments are required for stages 2 and 3 (index 1 and 2) on approval.
-    if (stageIndex >= 1 && stageIndex <= 2 && data.action === 'approve') {
+    if (stageIndex >= 1 && data.action === 'approve') {
         return !!data.comments && data.comments.trim() !== '';
     }
     // Comments are optional for Stage 1 (index 0) approval.
@@ -325,7 +325,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const getCommentLabel = () => {
         if (action === 'reject') return 'Your Comments (Required)';
-        if (stageIndex >= 1 && stageIndex <= 2 && action === 'approve') return 'Your Comments (Required)';
+        if (stageIndex >= 1 && action === 'approve') return 'Your Comments (Required)';
         return 'Your Comments (Optional)';
     };
     
@@ -406,7 +406,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                             {!isChecklistEnabled && (
+                             {!isChecklistEnabled && (action === 'reject' || stageIndex > 0) && (
                                 <FormField
                                     name="comments"
                                     control={form.control}
