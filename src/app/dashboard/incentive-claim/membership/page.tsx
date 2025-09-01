@@ -1,4 +1,6 @@
 
+'use client';
+
 import { PageHeader } from '@/components/page-header';
 import { MembershipForm } from '@/components/incentives/membership-form';
 

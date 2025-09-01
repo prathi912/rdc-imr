@@ -34,6 +34,53 @@ async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string,
   }
 }
 
+const getClaimTypeAcronym = (claimType: string): string => {
+    switch (claimType) {
+        case 'Research Papers': return 'PAPER';
+        case 'Patents': return 'PATENT';
+        case 'Conference Presentations': return 'CONFERENCE';
+        case 'Books': return 'BOOK';
+        case 'Membership of Professional Bodies': return 'MEMBERSHIP';
+        case 'Seed Money for APC': return 'APC';
+        default: return 'GENERAL';
+    }
+};
+
+export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' | 'claimId'>): Promise<{ success: boolean; error?: string, claimId?: string }> {
+    try {
+        const newClaim = await adminDb.runTransaction(async (transaction) => {
+            const acronym = getClaimTypeAcronym(claimData.claimType);
+            const counterRef = adminDb.collection('counters').doc(`incentiveClaim_${acronym}`);
+            const counterDoc = await transaction.get(counterRef);
+
+            let newCount = 1;
+            if (counterDoc.exists) {
+                newCount = counterDoc.data()!.current + 1;
+            }
+            transaction.set(counterRef, { current: newCount }, { merge: true });
+
+            const claimId = `RDC/IC/${acronym}/${String(newCount).padStart(4, '0')}`;
+            const newClaimRef = adminDb.collection('incentiveClaims').doc();
+            
+            const finalClaimData = {
+                ...claimData,
+                claimId: claimId,
+            };
+
+            transaction.set(newClaimRef, finalClaimData);
+            return { id: newClaimRef.id, claimId: claimId };
+        });
+
+        await logActivity('INFO', 'Incentive claim submitted', { claimId: newClaim.claimId, userId: claimData.uid });
+        return { success: true, claimId: newClaim.id };
+    } catch (error: any) {
+        console.error('Error submitting incentive claim:', error);
+        await logActivity('ERROR', 'Failed to submit incentive claim', { error: error.message });
+        return { success: false, error: error.message || 'An unexpected error occurred.' };
+    }
+}
+
+
 async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
     if (claim.claimType !== 'Research Papers' || !claim.paperTitle || !claim.relevantLink) {
         await logActivity('WARNING', 'Skipped paper creation from claim: not a research paper or missing title/link.', { claimId: claim.id });

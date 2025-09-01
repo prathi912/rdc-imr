@@ -31,6 +31,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
+import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 
 
 function UserClaimsList({ 
@@ -94,6 +95,7 @@ function UserClaimsList({
                          <div className="flex-1 space-y-1">
                             <Badge variant="outline">{claim.claimType}</Badge>
                             <p className="font-semibold">{getClaimTitle(claim)}</p>
+                            <p className="text-xs text-muted-foreground">{claim.claimId || 'N/A'}</p>
                             {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
                             {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
                             <p className="text-sm text-muted-foreground pt-1">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
@@ -149,7 +151,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         try {
             const { id, uid, userName, userEmail, status, submissionDate, publicationOrderInYear, ...originalClaimData } = claimToApply;
 
-            const newClaim: Omit<IncentiveClaim, 'id'> = {
+            const newClaim: Omit<IncentiveClaim, 'id' | 'claimId'> = {
                 ...originalClaimData,
                 publicationOrderInYear: values.publicationOrderInYear,
                 originalClaimId: id,
@@ -164,7 +166,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                 faculty: currentUser.faculty || '',
             };
             
-            await addDoc(collection(db, 'incentiveClaims'), newClaim);
+            await submitIncentiveClaim(newClaim);
 
             // Update the status on the original claim for this co-author
             const originalClaimRef = doc(db, 'incentiveClaims', claimToApply.id);

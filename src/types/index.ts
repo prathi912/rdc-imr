@@ -208,6 +208,7 @@ export type IncentiveClaim = {
   uid: string
   userName: string
   userEmail: string
+  claimId?: string; // Standardized, sequential ID like RDC/IC/PAPER/0001
   status: "Pending" | "Accepted" | "Rejected" | "Draft" | "Pending Stage 1 Approval" | "Pending Stage 2 Approval" | "Pending Stage 3 Approval" | "Submitted to Accounts";
   submissionDate: string // ISO String
   faculty: string
@@ -461,7 +462,7 @@ export type CroAssignment = {
 
 export type ApproverSetting = {
     email: string;
-    stage: 1 | 2 | 3;
+    stage: 1 | 2 | 3 | 4;
 };
 
 export type SystemSettings = {

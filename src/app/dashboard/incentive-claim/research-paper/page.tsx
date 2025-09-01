@@ -1,4 +1,6 @@
 
+'use client';
+
 import { PageHeader } from '@/components/page-header';
 import { ResearchPaperForm } from '@/components/incentives/research-paper-form';
 
