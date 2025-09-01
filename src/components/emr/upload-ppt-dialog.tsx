@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Loader2, Upload, File, Trash2, MessageSquareWarning } from 'lucide-react';
-import { uploadEmrPpt, uploadRevisedEmrPpt, removeEmrPpt } from '@/app/actions';
+import { uploadEmrPpt, uploadRevisedEmrPpt, removeEmrPpt } from '@/app/emr-actions';
 import { format, isAfter, parseISO } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
@@ -142,5 +142,3 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         </Dialog>
     )
 }
-
-    

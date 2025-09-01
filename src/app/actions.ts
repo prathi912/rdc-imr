@@ -2224,4 +2224,18 @@ export async function fetchEvaluatorProjectsForUser(
   }
 }
 
-    
+export async function saveSidebarOrder(uid: string, newOrder: string[]): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!uid || !newOrder) {
+      return { success: false, error: 'User ID and new order are required.' };
+    }
+    const userRef = adminDb.collection('users').doc(uid);
+    await userRef.update({ sidebarOrder: newOrder });
+    await logActivity('INFO', 'User sidebar order saved', { uid });
+    return { success: true };
+  } catch (error: any) {
+    console.error('Error saving sidebar order:', error);
+    await logActivity('ERROR', 'Failed to save sidebar order', { uid, error: error.message, stack: error.stack });
+    return { success: false, error: 'Failed to save sidebar order.' };
+  }
+}
