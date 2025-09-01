@@ -867,7 +867,7 @@ export async function updateEmrStatus(
           if (callSnap.exists) {
             const call = callSnap.data() as FundingCall
             if (call.meetingDetails?.date) {
-              const meetingDateTimeString = `${call.meetingDetails.date}T${call.meetingDetails.time}:00`
+              const meetingDateTimeString = `${call.meetingDetails.date}T${call.meetingDetails.time || '00:00'}:00`
               const deadline = setSeconds(setMinutes(setHours(addDays(new Date(meetingDateTimeString), 3), 17), 0), 0) // 3 days after meeting at 5:00 PM
               emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Please submit your revised presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(deadline, "Asia/Kolkata", "PPpp (z)")}</strong>.</p>`
             }
@@ -1331,4 +1331,3 @@ export async function updateEmrFinalStatus(
   }
 }
 
-    
