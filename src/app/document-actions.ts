@@ -258,34 +258,24 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
 
 export async function generateOfficeNotingsZip(claimIds: string[]): Promise<{ success: boolean; fileData?: string; error?: string }> {
     try {
-        const zip = new JSZip();
-        const generationPromises = claimIds.map(async (claimId) => {
-            try {
-                const result = await generateSingleOfficeNoting(claimId);
-                if (result) {
-                    zip.file(result.fileName, result.content);
-                    return { success: true };
-                } else {
-                    return { success: false, error: `Failed to generate document for claim ID: ${claimId}` };
-                }
-            } catch (error: any) {
-                console.error(`Error generating noting for claim ${claimId}:`, error);
-                return { success: false, error: `Failed to generate document for claim ID: ${claimId}. Error: ${error.message}` };
-            }
-        });
-
+        const generationPromises = claimIds.map(claimId => generateSingleOfficeNoting(claimId));
         const results = await Promise.all(generationPromises);
 
-        const successfulResults = results.filter(result => result.success);
+        const successfulDocs = results.filter((result): result is { fileName: string; content: Buffer } => result !== null);
 
-        if (successfulResults.length === 0) {
+        if (successfulDocs.length === 0) {
             return { success: false, error: 'Could not generate any of the requested documents.' };
         }
+
+        const zip = new JSZip();
+        successfulDocs.forEach(doc => {
+            zip.file(doc.fileName, doc.content);
+        });
         
         const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
         const base64 = zipContent.toString('base64');
 
-        await logActivity('INFO', 'Generated office notings ZIP', { count: successfulResults.length });
+        await logActivity('INFO', 'Generated office notings ZIP', { count: successfulDocs.length });
         return { success: true, fileData: base64 };
 
     } catch (error: any) {
