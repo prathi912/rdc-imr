@@ -31,9 +31,9 @@ const coreModules = ["dashboard", "notifications", "settings", "emr-calendar"]
 const facultyCoreModules = ["new-submission", "my-projects"]
 const hierarchyCoreModules = ["analytics"]
 
-const facultyDefaults = [...coreModules, ...facultyCoreModules, "bulk-upload-papers"]
+const facultyDefaults = [...coreModules, ...facultyCoreModules]
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects"]
-const adminDefaults = [...croDefaults, "schedule-meeting", "analytics", "manage-users", "manage-incentive-claims"]
+const adminDefaults = [...croDefaults, "schedule-meeting", "analytics", "manage-users"]
 const superAdminDefaults = [...adminDefaults, "module-management", "bulk-upload-emr"]
 
 // Default modules for special designations who are otherwise 'faculty' role

@@ -42,7 +42,10 @@ export default function IncentiveApprovalsPage() {
             const claimsCollection = collection(db, 'incentiveClaims');
             const usersQuery = query(collection(db, 'users'));
             
+            // Stage 1 (index 0) only sees 'Pending' claims (checklist items).
+            // Higher stages see 'Pending Stage X Approval'.
             const statusToFetch = stage === 0 ? 'Pending' : `Pending Stage ${stage + 1} Approval`;
+            
             const pendingClaimsQuery = query(
                 claimsCollection, 
                 where('status', '==', statusToFetch), 
