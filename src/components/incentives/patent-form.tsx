@@ -33,6 +33,7 @@ import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle } from 'lucide-react';
+import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 
 const patentSchema = z
   .object({
@@ -106,13 +107,13 @@ export function PatentForm() {
   
   const patentFiledFromIprCell = form.watch('patentFiledFromIprCell');
 
-  async function handleSave(status: 'Draft' | 'Pending') {
+  async function handleSave(status: 'Draft' | 'Pending Stage 2 Approval') {
     if (!user || !user.faculty) {
       toast({ variant: 'destructive', title: 'Error', description: 'User information not found. Please log in again.' });
       return;
     }
     // Re-check profile completeness on submission
-    if (status === 'Pending' && (!user.bankDetails || !user.orcidId || !user.misId)) {
+    if (status !== 'Draft' && (!user.bankDetails || !user.orcidId || !user.misId)) {
         toast({
             variant: 'destructive',
             title: 'Profile Incomplete',
@@ -124,7 +125,6 @@ export function PatentForm() {
     setIsSubmitting(true);
     try {
         const data = form.getValues();
-        const claimId = doc(collection(db, 'incentiveClaims')).id;
 
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
             if (!file || !user) return undefined;
@@ -144,7 +144,7 @@ export function PatentForm() {
         // Create a clean data object without the file objects
         const { patentApprovalProof, patentForm1, patentGovtReceipt, ...restOfData } = data;
 
-        const claimData: Omit<IncentiveClaim, 'id'> = {
+        const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
             ...restOfData,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
@@ -162,19 +162,16 @@ export function PatentForm() {
         if (patentApprovalProofUrl) claimData.patentApprovalProofUrl = patentApprovalProofUrl;
         if (patentForm1Url) claimData.patentForm1Url = patentForm1Url;
         if (patentGovtReceiptUrl) claimData.patentGovtReceiptUrl = patentGovtReceiptUrl;
+        
+        const result = await submitIncentiveClaim(claimData);
 
-        // Sanitize data: remove undefined fields before sending to Firestore
-        Object.keys(claimData).forEach(key => {
-            if ((claimData as any)[key] === undefined) {
-                delete (claimData as any)[key];
-            }
-        });
-
-        await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/patent?claimId=${claimId}`);
+          router.push(`/dashboard/incentive-claim/patent?claimId=${result.claimId}`);
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for patent has been submitted.' });
           router.push('/dashboard/incentive-claim');
@@ -191,7 +188,7 @@ export function PatentForm() {
   return (
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
+        <form onSubmit={form.handleSubmit(() => handleSave('Pending Stage 2 Approval'))}>
           <CardContent className="space-y-6 pt-6">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
