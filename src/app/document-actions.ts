@@ -73,11 +73,12 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     const evaluationsRef = projectRef.collection('evaluations');
     const evaluationsSnap = await evaluationsRef.get();
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
+    
     const IMR_TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/IMR_RECOMMENDATION_TEMPLATE.docx";
 
     let templateBuffer;
     try {
-      const response = await fetch(IMR_TEMPLATE_URL);
+      const response = await fetch(IMR_TEMPLATE_URL, { cache: 'no-store' });
       if (!response.ok) {
         return { success: false, error: 'Recommendation form template not found on the server.' };
       }
@@ -85,9 +86,8 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     } catch (err) {
       return { success: false, error: 'Error fetching recommendation form template.' };
     }
-    const content = fs.readFileSync(templatePath, 'binary');
 
-    const zip = new PizZip(content);
+    const zip = new PizZip(templateBuffer);
     const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
@@ -223,7 +223,7 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
         
         const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.conferencePaperTitle || 'N/A';
 
-        const content = getTemplateContent('INCENTIVE_OFFICE_NOTING.docx');
+        const content = await getTemplateContent('INCENTIVE_OFFICE_NOTING.docx');
         if (!content) {
             console.error(`Template "INCENTIVE_OFFICE_NOTING.docx" not found.`);
             return null;

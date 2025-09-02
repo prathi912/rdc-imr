@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -9,7 +10,7 @@ import Docxtemplater from 'docxtemplater';
 // This function fetches the template from a public URL.
 async function getTemplateContent(url: string): Promise<Buffer | null> {
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) {
             console.error(`Failed to fetch template from ${url}, status: ${response.status}`);
             return null;
