@@ -21,11 +21,11 @@ import {
   updateProjectDuration,
   updateProjectEvaluators,
   notifyAdminsOnCompletionRequest,
-  findUserByMisId,
   updateCoInvestigators,
   sendEmail,
   generateOfficeNotingForm,
 } from "@/app/actions"
+import { findUserByMisId } from '@/app/userfinding';
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
@@ -321,8 +321,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setFoundCoPi(null)
     try {
       const result = await findUserByMisId(coPiSearchTerm)
-      if (result.success && result.user) {
-        setFoundCoPi(result.user)
+      if (result.success && result.users && result.users.length > 0) {
+        setFoundCoPi({uid: result.users[0].uid!, name: result.users[0].name})
       } else {
         toast({ variant: "destructive", title: "User Not Found", description: result.error })
       }
