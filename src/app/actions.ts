@@ -1756,47 +1756,50 @@ export async function addTransaction(
   projectId: string,
   phaseId: string,
   transactionData: {
-    dateOfTransaction: string
-    amount: number
-    vendorName: string
-    isGstRegistered: boolean
-    gstNumber?: string
-    description?: string
-    invoiceFile: File
-  },
+    dateOfTransaction: string;
+    amount: number;
+    vendorName: string;
+    isGstRegistered: boolean;
+    gstNumber?: string;
+    description?: string;
+    invoiceDataUrl: string;
+    invoiceFileName: string;
+  }
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
   try {
-    const projectRef = adminDb.collection("projects").doc(projectId)
-    const projectSnap = await projectRef.get()
+    console.log("Server action 'addTransaction' received data for project:", projectId, "and phase:", phaseId);
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    const projectSnap = await projectRef.get();
 
     if (!projectSnap.exists) {
-      return { success: false, error: "Project not found." }
+      console.error("Project not found.");
+      return { success: false, error: "Project not found." };
     }
 
-    const project = projectSnap.data() as Project
+    const project = projectSnap.data() as Project;
     if (!project.grant) {
-      return { success: false, error: "Project does not have grant details." }
+      console.error("Project does not have grant details.");
+      return { success: false, error: "Project does not have grant details." };
     }
 
-    const phaseIndex = project.grant.phases.findIndex((p) => p.id === phaseId)
+    const phaseIndex = project.grant.phases.findIndex((p) => p.id === phaseId);
     if (phaseIndex === -1) {
-      return { success: false, error: "Phase not found." }
+      console.error("Phase not found.");
+      return { success: false, error: "Phase not found." };
     }
 
-    let invoiceUrl: string | undefined
-    if (transactionData.invoiceFile) {
-      // Convert file to data URL for upload
-      const buffer = await transactionData.invoiceFile.arrayBuffer()
-      const base64 = Buffer.from(buffer).toString("base64")
-      const dataUrl = `data:${transactionData.invoiceFile.type};base64,${base64}`
-
-      const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFile.name}`
-      const result = await uploadFileToServer(dataUrl, path)
+    let invoiceUrl: string | undefined;
+    if (transactionData.invoiceDataUrl) {
+      console.log("Invoice data URL found, preparing to upload.");
+      const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
+      const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
 
       if (!result.success || !result.url) {
-        return { success: false, error: result.error || "Invoice upload failed" }
+        console.error("Invoice upload failed:", result.error);
+        return { success: false, error: result.error || "Invoice upload failed" };
       }
-      invoiceUrl = result.url
+      invoiceUrl = result.url;
+      console.log("Invoice uploaded successfully. URL:", invoiceUrl);
     }
 
     const newTransaction: Transaction = {
@@ -1809,33 +1812,36 @@ export async function addTransaction(
       gstNumber: transactionData.gstNumber,
       description: transactionData.description || "",
       invoiceUrl: invoiceUrl,
-    }
+    };
+    console.log("New transaction object created:", newTransaction);
 
     const updatedPhases = project.grant.phases.map((phase, index) => {
       if (index === phaseIndex) {
         return {
           ...phase,
           transactions: [...(phase.transactions || []), newTransaction],
-        }
+        };
       }
-      return phase
-    })
+      return phase;
+    });
 
-    const updatedGrant = { ...project.grant, phases: updatedPhases }
-    await projectRef.update({ grant: updatedGrant })
-    await logActivity("INFO", "Grant transaction added", { projectId, phaseId, amount: newTransaction.amount })
+    const updatedGrant = { ...project.grant, phases: updatedPhases };
+    await projectRef.update({ grant: updatedGrant });
+    console.log("Project document updated successfully in Firestore.");
+    
+    await logActivity("INFO", "Grant transaction added", { projectId, phaseId, amount: newTransaction.amount });
 
-    const updatedProject = { ...project, grant: updatedGrant }
-    return { success: true, updatedProject }
+    const updatedProject = { ...project, grant: updatedGrant };
+    return { success: true, updatedProject };
   } catch (error: any) {
-    console.error("Error adding transaction:", error)
+    console.error("Error in addTransaction server action:", error);
     await logActivity("ERROR", "Failed to add grant transaction", {
       projectId,
       phaseId,
       error: error.message,
       stack: error.stack,
-    })
-    return { success: false, error: error.message || "Failed to add transaction." }
+    });
+    return { success: false, error: error.message || "Failed to add transaction." };
   }
 }
 

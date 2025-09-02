@@ -82,6 +82,15 @@ const transactionSchema = z
       path: ["gstNumber"],
     },
   )
+  
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
 
 export function GrantManagement({ project, user, onUpdate }: GrantManagementProps) {
   const { toast } = useToast()
@@ -163,36 +172,46 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   }
 
   const handleAddTransaction = async (values: z.infer<typeof transactionSchema>) => {
-    if (!grant || !currentPhaseId) return
-    setIsSubmitting(true)
+    if (!grant || !currentPhaseId) return;
+    setIsSubmitting(true);
+    console.log("Client: handleAddTransaction called with values:", values);
     try {
-      const invoiceFile = values.invoice?.[0]
-      const result = await addTransaction(project.id, currentPhaseId, {
-        dateOfTransaction: values.dateOfTransaction,
-        amount: values.amount,
-        vendorName: values.vendorName,
-        isGstRegistered: values.isGstRegistered,
-        gstNumber: values.gstNumber,
-        description: values.description,
-        invoiceFile: invoiceFile,
-      })
+        const invoiceFile = values.invoice?.[0];
+        if (!invoiceFile) {
+            throw new Error("Invoice file is missing.");
+        }
+        console.log("Client: Converting file to data URL...");
+        const invoiceDataUrl = await fileToDataUrl(invoiceFile);
+        console.log("Client: File converted. Calling server action...");
 
-      if (result.success && result.updatedProject) {
-        onUpdate(result.updatedProject)
-        toast({ title: "Success", description: "Transaction added successfully." })
-        transactionForm.reset()
-        setIsTransactionOpen(false)
-        setCurrentPhaseId(null)
-      } else {
-        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to add transaction." })
-      }
-    } catch (error) {
-      console.error(error)
-      toast({ variant: "destructive", title: "Error", description: "Failed to add transaction." })
+        const result = await addTransaction(project.id, currentPhaseId, {
+            dateOfTransaction: values.dateOfTransaction,
+            amount: values.amount,
+            vendorName: values.vendorName,
+            isGstRegistered: values.isGstRegistered,
+            gstNumber: values.gstNumber,
+            description: values.description,
+            invoiceDataUrl: invoiceDataUrl,
+            invoiceFileName: invoiceFile.name,
+        });
+
+        console.log("Client: Server action result:", result);
+        if (result.success && result.updatedProject) {
+            onUpdate(result.updatedProject);
+            toast({ title: "Success", description: "Transaction added successfully." });
+            transactionForm.reset();
+            setIsTransactionOpen(false);
+            setCurrentPhaseId(null);
+        } else {
+            throw new Error(result.error || "Failed to add transaction.");
+        }
+    } catch (error: any) {
+        console.error("Client error in handleAddTransaction:", error);
+        toast({ variant: "destructive", title: "Error", description: error.message || "Failed to add transaction." });
     } finally {
-      setIsSubmitting(false)
+        setIsSubmitting(false);
     }
-  }
+  };
 
   const handlePhaseStatusUpdate = async (phaseId: string, newStatus: GrantPhase["status"]) => {
     if (!grant) return
