@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '../ui/form'
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement } from '@/app/actions';
+import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement } from '@/app/emr-actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +51,7 @@ import { ScheduleMeetingDialog } from './schedule-meeting-dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
+import { UploadPptDialog } from './upload-ppt-dialog';
 
 interface EmrManagementClientProps {
     call: FundingCall;
@@ -84,11 +85,20 @@ function SignEndorsementDialog({ interest, isOpen, onOpenChange, onUpdate }: { i
         resolver: zodResolver(signEndorsementSchema),
     });
 
+    const fileToDataUrl = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = error => reject(error);
+            reader.readAsDataURL(file);
+        });
+    };
+
     const handleSubmit = async (values: z.infer<typeof signEndorsementSchema>) => {
         setIsSubmitting(true);
         try {
             const file = values.signedEndorsement[0];
-            const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`;
+            const dataUrl = await fileToDataUrl(file);
             const result = await signAndUploadEndorsement(interest.id, dataUrl, file.name);
 
             if (result.success) {
@@ -218,6 +228,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
     const [isSignEndorsementDialogOpen, setIsSignEndorsementDialogOpen] = useState(false);
+    const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
 
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
@@ -285,6 +296,11 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const handleOpenSignDialog = (interest: EmrInterest) => {
         setInterestToUpdate(interest);
         setIsSignEndorsementDialogOpen(true);
+    };
+
+    const handleOpenRevisionUpload = (interest: EmrInterest) => {
+        setInterestToUpdate(interest);
+        setIsRevisionUploadOpen(true);
     };
 
 
@@ -384,6 +400,9 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                             <Edit className="mr-2 h-4 w-4" /> Edit Bulk Data
                                                         </DropdownMenuItem>
                                                     )}
+                                                    <DropdownMenuItem onSelect={() => handleOpenRevisionUpload(interest)}>
+                                                        <Upload className="mr-2 h-4 w-4" /> Upload Revised PPT
+                                                    </DropdownMenuItem>
                                                     {isMeetingScheduled && (
                                                         <>
                                                             {interest.status === 'Endorsement Submitted' && (
@@ -494,6 +513,15 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                         isOpen={isSignEndorsementDialogOpen}
                         onOpenChange={setIsSignEndorsementDialogOpen}
                         onUpdate={onActionComplete}
+                    />
+                    <UploadPptDialog
+                        isOpen={isRevisionUploadOpen}
+                        onOpenChange={setIsRevisionUploadOpen}
+                        interest={interestToUpdate}
+                        call={call}
+                        user={userMap.get(interestToUpdate.userId)!} // Pass the applicant's user object
+                        onUploadSuccess={onActionComplete}
+                        isRevision={true}
                     />
                  </>
              )}

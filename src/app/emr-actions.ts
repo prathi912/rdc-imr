@@ -1,4 +1,3 @@
-
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
@@ -909,12 +908,17 @@ export async function uploadRevisedEmrPpt(
     }
 
     const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+        return { success: false, error: 'Interest registration not found.'}
+    }
+    const interest = interestSnap.data() as EmrInterest;
 
     // Standardize the filename
     const fileExtension = path.extname(originalFileName)
     const standardizedName = `${userName.replace(/\s+/g, "_")}_revised_${new Date().getTime()}${fileExtension}`
 
-    const filePath = `emr-presentations/${path.dirname(interestId)}/${standardizedName}`
+    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`
     const result = await uploadFileToServer(pptDataUrl, filePath)
 
     if (!result.success || !result.url) {
@@ -926,8 +930,6 @@ export async function uploadRevisedEmrPpt(
       status: "Revision Submitted",
     })
 
-    const interestSnap = await interestRef.get()
-    const interest = interestSnap.data() as EmrInterest
     await logActivity("INFO", "Revised EMR presentation uploaded", { interestId, userId: interest.userId })
     return { success: true }
   } catch (error: any) {
