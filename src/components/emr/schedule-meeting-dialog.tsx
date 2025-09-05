@@ -2,7 +2,7 @@
 // src/components/emr/schedule-meeting-dialog.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,7 +19,7 @@ import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, parseISO, startOfToday, isToday, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Calendar, ChevronDown, Loader2 } from 'lucide-react';
-import { scheduleEmrMeeting } from '@/app/actions';
+import { scheduleEmrMeeting } from '@/app/emr-actions';
 
 interface ScheduleMeetingDialogProps {
     call: FundingCall;
