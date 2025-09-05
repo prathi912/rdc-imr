@@ -195,13 +195,18 @@ export function ScheduleMeetingForm() {
                     </TableCell>
                     <TableCell className="font-medium">{project.title}</TableCell>
                     <TableCell>
-                        {piUser?.misId ? (
-                            <Link href={profileLink} target="_blank" className="text-primary hover:underline">
-                                {project.pi}
-                            </Link>
-                        ) : (
-                            project.pi
-                        )}
+                        <div>
+                            {piUser?.misId ? (
+                                <Link href={profileLink} target="_blank" className="text-primary hover:underline">
+                                    {project.pi}
+                                </Link>
+                            ) : (
+                                project.pi
+                            )}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {piUser?.department || project.departmentName}, {piUser?.institute || project.institute}
+                        </div>
                     </TableCell>
                     <TableCell>{new Date(project.submissionDate).toLocaleDateString()}</TableCell>
                   </TableRow>
