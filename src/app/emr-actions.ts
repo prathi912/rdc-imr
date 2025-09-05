@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
@@ -29,7 +30,7 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
     await adminDb.collection("logs").add(logEntry)
   } catch (error) {
     console.error("FATAL: Failed to write to logs collection.", error)
-    console.error("Original Log Entry:", { level, message, context })
+    console.error("Original Log Entry:", { level, message, context });
   }
 }
 
