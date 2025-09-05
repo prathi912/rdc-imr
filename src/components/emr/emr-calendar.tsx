@@ -75,6 +75,15 @@ const callSchema = z.object({
   path: ['interestDeadline'],
 });
 
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
+
 export function AddEditCallDialog({
   isOpen,
   onOpenChange,
@@ -123,18 +132,30 @@ export function AddEditCallDialog({
   const handleSaveCall = async (values: z.infer<typeof callSchema>) => {
     setIsSubmitting(true);
     try {
+        const callDataForServer: any = { ...values };
+
+        if (values.attachments && values.attachments.length > 0) {
+            const attachmentDataUrls = await Promise.all(
+                Array.from(values.attachments as FileList).map(async (file: File) => ({
+                    name: file.name,
+                    dataUrl: await fileToDataUrl(file),
+                }))
+            );
+            callDataForServer.attachments = attachmentDataUrls;
+        }
+
         if (existingCall) {
             // Update logic
             const callRef = doc(db, 'fundingCalls', existingCall.id);
             await updateDoc(callRef, {
-                ...values,
+                ...callDataForServer,
                 interestDeadline: values.interestDeadline.toISOString(),
                 applyDeadline: values.applyDeadline.toISOString(),
             });
             toast({ title: 'Success', description: 'Funding call has been updated.' });
         } else {
             // Create logic
-            const result = await createFundingCall(values);
+            const result = await createFundingCall(callDataForServer);
             if (!result.success) {
                 throw new Error(result.error);
             }

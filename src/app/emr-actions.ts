@@ -662,22 +662,20 @@ export async function addEmrEvaluation(
 }
 
 export async function createFundingCall(
-  callData: z.infer<any>, // Using any because the zod schema is on the client
+  callData: any,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const newCallDocRef = adminDb.collection("fundingCalls").doc()
     const attachments: { name: string; url: string }[] = []
 
     if (callData.attachments && callData.attachments.length > 0) {
-      for (let i = 0; i < callData.attachments.length; i++) {
-        const file = callData.attachments[i]
-        const dataUrl = `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString("base64")}`
-        const path = `emr-attachments/${newCallDocRef.id}/${file.name}`
-        const result = await uploadFileToServer(dataUrl, path)
+      for (const attachment of callData.attachments) {
+        const path = `emr-attachments/${newCallDocRef.id}/${attachment.name}`
+        const result = await uploadFileToServer(attachment.dataUrl, path)
         if (result.success && result.url) {
-          attachments.push({ name: file.name, url: result.url })
+          attachments.push({ name: attachment.name, url: result.url })
         } else {
-          throw new Error(`Failed to upload attachment: ${file.name}`)
+          throw new Error(`Failed to upload attachment: ${attachment.name}`)
         }
       }
     }
