@@ -59,7 +59,8 @@ const apcSchema = z.object({
 type ApcFormValues = z.infer<typeof apcSchema>;
 
 const articleTypes = ['Research Paper Publication', 'Review Article', 'Letter to Editor', 'Other'];
-const indexingStatuses = ['Scopus', 'Web of science', 'UGC-CARE Group'];
+const indexingStatuses = ['Scopus', 'Web of science', 'UGC-CARE Group-I', 'Web of Science indexed journals (ESCI)'];
+
 
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -74,7 +75,7 @@ const SPECIAL_POLICY_FACULTIES = [
     "Faculty of Applied Sciences",
     "Faculty of Medicine",
     "Faculty of Homoeopathy",
-    "Faculty of Ayurveda",
+    "Faculty of Ayurved",
     "Faculty of Nursing",
     "Faculty of Pharmacy",
     "Faculty of Physiotherapy",
@@ -115,7 +116,7 @@ export function ApcForm() {
 
   const availableIndexingStatuses = useMemo(() => {
     if (isSpecialFaculty) {
-      return indexingStatuses.filter(status => status !== 'UGC-CARE Group');
+      return indexingStatuses.filter(status => status !== 'UGC-CARE Group-I' && status !== 'Web of Science indexed journals (ESCI)');
     }
     return indexingStatuses;
   }, [isSpecialFaculty]);
@@ -137,9 +138,9 @@ export function ApcForm() {
             case 'Q4': maxIncentive = 15000; break;
         }
     } else if (!isSpecialFaculty) {
-        if (apcIndexingStatus?.includes('UGC-CARE Group')) {
+        if (apcIndexingStatus?.includes('UGC-CARE Group-I')) {
             maxIncentive = 5000;
-        } else if (apcIndexingStatus?.includes('ESCI')) { // Assuming WoS ESCI is what this refers to
+        } else if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
             maxIncentive = 8000;
         }
     }
