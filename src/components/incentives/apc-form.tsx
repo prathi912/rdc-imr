@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -68,7 +68,7 @@ const apcSchema = z.object({
 type ApcFormValues = z.infer<typeof apcSchema>;
 
 const articleTypes = ['Research Paper Publication', 'Review Article', 'Letter to Editor', 'Other'];
-const indexingStatuses = ['Scopus', 'Web of science', 'Web of Science indexed journals (ESCI)'];
+const indexingStatuses = ['Scopus', 'Web of science', 'Web of Science indexed journals (ESCI)', 'UGC-CARE Group-I'];
 const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -403,6 +403,9 @@ export function ApcForm() {
                             <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
                             <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><Plus className="h-4 w-4"/></Button>
                         </div>
+                        <FormDescription className="!mt-2 text-destructive text-xs">
+                            Important: If an external co-author is found at the approval stage that was not declared here, the claim will be rejected.
+                        </FormDescription>
                     </div>
                 </div>
 
