@@ -16,7 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -265,17 +265,15 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         path: ['verifiedFields'],
     });
 
-    const getDefaultAmount = () => {
-        // If there's a previous approval in the same flow, use its amount as the starting point.
-        if (claim.approvals && claim.approvals.length > stageIndex -1 && stageIndex > 0) {
+    const { defaultAmount, isAutoCalculated } = (() => {
+        if (claim.approvals && claim.approvals.length > stageIndex - 1 && stageIndex > 0) {
             const previousStageApproval = claim.approvals.find(a => a?.stage === stageIndex);
             if (previousStageApproval?.status === 'Approved' && previousStageApproval.approvedAmount > 0) {
-                return previousStageApproval.approvedAmount;
+                return { defaultAmount: previousStageApproval.approvedAmount, isAutoCalculated: false };
             }
         }
-        // Otherwise, fall back to the final approved amount (if any) or the initial calculated amount.
-        return claim.finalApprovedAmount || claim.calculatedIncentive || 0;
-    };
+        return { defaultAmount: claim.finalApprovedAmount || claim.calculatedIncentive || 0, isAutoCalculated: true };
+    })();
     
     const getDefaultAction = () => {
         return isChecklistEnabled ? 'verify' : 'approve';
@@ -285,7 +283,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const form = useForm<ApprovalFormData>({
         resolver: zodResolver(formSchemaWithVerification),
         defaultValues: {
-            amount: getDefaultAmount(),
+            amount: defaultAmount,
             verifiedFields: {},
             action: getDefaultAction(),
         }
@@ -294,7 +292,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     useEffect(() => {
         if (isOpen) {
             form.reset({
-                amount: getDefaultAmount(),
+                amount: defaultAmount,
                 verifiedFields: {},
                 action: getDefaultAction(),
                 comments: '',
@@ -405,7 +403,10 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     control={form.control}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Approved Amount (INR)</FormLabel>
+                                            <div className="flex items-center gap-2">
+                                                <FormLabel>Approved Amount (INR)</FormLabel>
+                                                {isAutoCalculated && <span className="text-xs text-muted-foreground">(Auto-calculated)</span>}
+                                            </div>
                                             <FormControl><Input type="number" {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
