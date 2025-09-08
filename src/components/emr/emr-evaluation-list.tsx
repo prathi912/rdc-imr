@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Eye, UserCheck, UserX, FileText } from 'lucide-react';
 import { EmrEvaluationForm } from './emr-evaluation-form';
+import { format, parseISO } from 'date-fns';
 
 interface EmrEvaluationListProps {
     interests: any[]; // Using any[] because it can have extra properties
@@ -49,6 +50,7 @@ export function EmrEvaluationList({ interests, calls, user, onActionComplete }: 
                             <TableRow>
                                 <TableHead>Applicant</TableHead>
                                 <TableHead className="hidden sm:table-cell">Funding Call</TableHead>
+                                <TableHead>Presentation Date</TableHead>
                                 <TableHead>Presentation</TableHead>
                                 <TableHead>My Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
@@ -61,6 +63,9 @@ export function EmrEvaluationList({ interests, calls, user, onActionComplete }: 
                                     <TableRow key={interest.id}>
                                         <TableCell className="font-medium whitespace-nowrap">{interest.userName}</TableCell>
                                         <TableCell className="hidden sm:table-cell">{getCallTitle(interest.callId)}</TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            {interest.meetingSlot?.date ? format(parseISO(interest.meetingSlot.date), 'PP') : 'N/A'}
+                                        </TableCell>
                                         <TableCell>
                                             {interest.pptUrl ? (
                                                 <Button asChild variant="link" className="p-0 h-auto">
