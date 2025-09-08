@@ -12,7 +12,7 @@ import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit, Eye } from 'lucide-react';
+import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit, Eye, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -32,6 +32,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { differenceInDays, parseISO, addYears, format } from 'date-fns';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 function UserClaimsList({ 
@@ -275,46 +277,6 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
 }
 
 
-const claimTypes = [
-  {
-    title: 'Research Papers',
-    description: 'Claim incentives for papers published in WoS/Scopus indexed journals.',
-    href: '/dashboard/incentive-claim/research-paper',
-    icon: FileText,
-  },
-  {
-    title: 'Patents',
-    description: 'Claim incentives for filed, published, or granted patents.',
-    href: '/dashboard/incentive-claim/patent',
-    icon: Award,
-  },
-  {
-    title: 'Conference Presentations',
-    description: 'Get assistance for presenting papers at events.',
-    href: '/dashboard/incentive-claim/conference',
-    icon: Presentation,
-  },
-  {
-    title: 'Books & Chapters',
-    description: 'Claim incentives for publishing books or book chapters.',
-    href: '/dashboard/incentive-claim/book',
-    icon: Book,
-  },
-  {
-    title: 'Professional Body Memberships',
-    description: 'Claim 50% of the fee for one membership per year.',
-    href: '/dashboard/incentive-claim/membership',
-    icon: UserPlus,
-  },
-  {
-    title: 'Seed Money for APC',
-    description: 'Claim reimbursement for Article Processing Charges after publication.',
-    href: '/dashboard/incentive-claim/apc',
-    icon: Banknote,
-  },
-];
-
-
 export default function IncentiveClaimPage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -323,6 +285,7 @@ export default function IncentiveClaimPage() {
   const { toast } = useToast();
   const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [membershipClaimInfo, setMembershipClaimInfo] = useState<{ canClaim: boolean; nextAvailableDate?: string }>({ canClaim: true });
 
   const fetchUserClaims = async (uid: string) => {
       setLoading(true);
@@ -332,6 +295,24 @@ export default function IncentiveClaimPage() {
           const claimSnapshot = await getDocs(q);
           const claimList = claimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
           setUserClaims(claimList);
+
+          // Check for membership claim eligibility
+          const lastMembershipClaim = claimList
+            .filter(c => c.claimType === 'Membership of Professional Bodies' && c.status !== 'Draft')
+            .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())[0];
+
+          if (lastMembershipClaim) {
+            const lastClaimDate = parseISO(lastMembershipClaim.submissionDate);
+            const daysSinceClaim = differenceInDays(new Date(), lastClaimDate);
+            if (daysSinceClaim < 365) {
+                const nextDate = addYears(lastClaimDate, 1);
+                setMembershipClaimInfo({
+                    canClaim: false,
+                    nextAvailableDate: format(nextDate, 'PPP')
+                });
+            }
+          }
+
       } catch (error) {
           console.error("Error fetching user claims:", error);
           toast({ variant: 'destructive', title: "Error", description: "Could not fetch your claims." });
@@ -382,6 +363,47 @@ export default function IncentiveClaimPage() {
   const draftClaims = userClaims.filter(c => c.status === 'Draft');
   const otherClaims = userClaims.filter(c => c.status !== 'Draft');
 
+  const claimTypes = [
+    {
+      title: 'Research Papers',
+      description: 'Claim incentives for papers published in WoS/Scopus indexed journals.',
+      href: '/dashboard/incentive-claim/research-paper',
+      icon: FileText,
+    },
+    {
+      title: 'Patents',
+      description: 'Claim incentives for filed, published, or granted patents.',
+      href: '/dashboard/incentive-claim/patent',
+      icon: Award,
+    },
+    {
+      title: 'Conference Presentations',
+      description: 'Get assistance for presenting papers at events.',
+      href: '/dashboard/incentive-claim/conference',
+      icon: Presentation,
+    },
+    {
+      title: 'Books & Chapters',
+      description: 'Claim incentives for publishing books or book chapters.',
+      href: '/dashboard/incentive-claim/book',
+      icon: Book,
+    },
+    {
+      title: 'Professional Body Memberships',
+      description: 'Claim 50% of the fee for one membership per year.',
+      href: '/dashboard/incentive-claim/membership',
+      icon: UserPlus,
+      disabled: !membershipClaimInfo.canClaim,
+      tooltip: !membershipClaimInfo.canClaim ? `You can apply again on ${membershipClaimInfo.nextAvailableDate}.` : undefined,
+    },
+    {
+      title: 'Seed Money for APC',
+      description: 'Claim reimbursement for Article Processing Charges after publication.',
+      href: '/dashboard/incentive-claim/apc',
+      icon: Banknote,
+    },
+  ];
+
 
   return (
     <>
@@ -401,24 +423,39 @@ export default function IncentiveClaimPage() {
           </TabsList>
           <TabsContent value="apply" className="mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {claimTypes.map(claim => (
-                <Link href={claim.href} key={claim.href} className="flex">
-                  <Card className="flex flex-col w-full hover:bg-accent/50 dark:hover:bg-accent/20 transition-colors">
-                    <CardHeader>
-                      <claim.icon className="h-7 w-7 mb-2 text-primary" />
-                      <CardTitle>{claim.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-grow">
-                      <p className="text-sm text-muted-foreground">{claim.description}</p>
-                    </CardContent>
-                    <CardFooter>
-                      <div className="text-sm font-semibold text-primary">
-                        Apply Now <ArrowRight className="inline-block ml-1 h-4 w-4" />
-                      </div>
-                    </CardFooter>
-                  </Card>
-                </Link>
-              ))}
+              {claimTypes.map(claim => {
+                  const cardContent = (
+                    <Card className={`flex flex-col w-full transition-colors ${claim.disabled ? 'bg-muted/50' : 'hover:bg-accent/50 dark:hover:bg-accent/20'}`}>
+                      <CardHeader>
+                        <claim.icon className={`h-7 w-7 mb-2 ${claim.disabled ? 'text-muted-foreground' : 'text-primary'}`} />
+                        <CardTitle>{claim.title}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex-grow">
+                        <p className="text-sm text-muted-foreground">{claim.description}</p>
+                      </CardContent>
+                      <CardFooter>
+                        <div className={`text-sm font-semibold ${claim.disabled ? 'text-muted-foreground' : 'text-primary'}`}>
+                           {claim.disabled ? 'Unavailable' : <>Apply Now <ArrowRight className="inline-block ml-1 h-4 w-4" /></>}
+                        </div>
+                      </CardFooter>
+                    </Card>
+                  );
+
+                  return (
+                    <div key={claim.href}>
+                        {claim.disabled ? (
+                             <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild><div className="flex cursor-not-allowed">{cardContent}</div></TooltipTrigger>
+                                    <TooltipContent><p>{claim.tooltip}</p></TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        ) : (
+                            <Link href={claim.href} className="flex">{cardContent}</Link>
+                        )}
+                    </div>
+                  );
+              })}
             </div>
           </TabsContent>
            <TabsContent value="my-claims">
