@@ -22,7 +22,7 @@ import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
-import { findUserByMisId } from '@/app/actions';
+import { findUserByMisId } from '@/app/userfinding';
 import { Loader2, AlertCircle, Plus, Trash2, Search, Edit } from 'lucide-react';
 import { calculateIncentive } from '@/app/incentive-actions';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
@@ -236,7 +236,8 @@ export function BookForm() {
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
       }
-      if (fields.length === 0) {
+      const isUserAlreadyAdded = fields.some(field => field.email === parsedUser.email);
+      if (!isUserAlreadyAdded) {
         append({ 
             name: parsedUser.name, 
             email: parsedUser.email,
@@ -246,7 +247,7 @@ export function BookForm() {
         });
       }
     }
-  }, [form, append, fields.length]);
+  }, [form, append, fields]);
 
   const bookApplicationType = form.watch('bookApplicationType');
   const publicationMode = form.watch('publicationMode');

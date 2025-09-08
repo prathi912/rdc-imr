@@ -151,7 +151,7 @@ export function ApcForm() {
     const { apcIndexingStatus, apcQRating, apcTotalAmount, bookCoAuthors } = formValues;
     
     // Calculate based on internal (PU) authors only
-    const internalAuthorCount = bookCoAuthors ? bookCoAuthors.filter(author => !author.isExternal).length : 1;
+    const internalAuthorCount = bookCoAuthors ? bookCoAuthors.filter(author => !author.isExternal).length : 0;
     const actualApcPaid = apcTotalAmount || 0;
 
     let maxIncentive = 0;
@@ -187,7 +187,9 @@ export function ApcForm() {
       setUser(parsedUser);
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
-       if (fields.length === 0 && parsedUser) {
+      // Ensure the current user is added as an author only once on form load
+      const isUserAlreadyAdded = fields.some(field => field.email === parsedUser.email);
+      if (!isUserAlreadyAdded) {
         append({ 
             name: parsedUser.name, 
             email: parsedUser.email,
@@ -197,7 +199,7 @@ export function ApcForm() {
         });
       }
     }
-  }, [append, fields.length]);
+  }, [append, fields]);
   
   const watchAuthors = form.watch('bookCoAuthors');
   const firstAuthorExists = useMemo(() => 
@@ -269,6 +271,16 @@ export function ApcForm() {
         setExternalAuthorEmail('');
         setExternalAuthorRole('Co-Author'); // Reset role selector
     };
+
+  const removeAuthor = (index: number) => {
+    // Prevent the primary user from being removed
+    const authorToRemove = fields[index];
+    if (authorToRemove.email === user?.email) {
+      toast({ variant: 'destructive', title: 'Action not allowed', description: 'You cannot remove yourself as the primary author.' });
+      return;
+    }
+    remove(index);
+  };
 
   const updateAuthorRole = (index: number, role: Author['role']) => {
     const author = fields[index];
@@ -405,7 +417,9 @@ export function ApcForm() {
                                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                                 <SelectContent>{getAvailableRoles(field).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
-                            {index > 0 && ( <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => remove(index)}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button> )}
+                            {field.email !== user?.email && (
+                              <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => removeAuthor(index)}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button> 
+                            )}
                         </div>
                     ))}
                      <div className="space-y-2 p-3 border rounded-md">
@@ -428,7 +442,7 @@ export function ApcForm() {
                             <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
                             <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
-                                <SelectContent>{getAvailableRoles().map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                                <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
                             <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><Plus className="h-4 w-4"/></Button>
                         </div>

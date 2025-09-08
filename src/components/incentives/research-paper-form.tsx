@@ -88,7 +88,7 @@ const researchPaperSchema = z
       .min(1, "At least one author is required.").refine(data => {
       const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
       return firstAuthors.length <= 1;
-    }, { message: 'Only one author can be designated as the First Author.' }),
+    }, { message: 'Only one author can be designated as the First Author.', path: ["bookCoAuthors"] }),
     totalPuStudentAuthors: z.coerce.number().optional(),
     puStudentNames: z.string().optional(),
   })
@@ -263,7 +263,8 @@ export function ResearchPaperForm() {
       setUser(parsedUser)
       setBankDetailsMissing(!parsedUser.bankDetails)
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId)
-      if (fields.length === 0) {
+      const isUserAlreadyAdded = fields.some(field => field.email === parsedUser.email);
+      if (!isUserAlreadyAdded) {
         append({
           name: parsedUser.name,
           email: parsedUser.email,
@@ -273,7 +274,7 @@ export function ResearchPaperForm() {
         })
       }
     }
-  }, [form, append, fields.length])
+  }, [form, append, fields])
 
   const indexType = form.watch("indexType")
 
@@ -435,6 +436,15 @@ export function ResearchPaperForm() {
     setFoundCoPi(null)
     setCoPiSearchTerm("")
   }
+
+  const removeAuthor = (index: number) => {
+    const authorToRemove = fields[index];
+    if (authorToRemove.email === user?.email) {
+      toast({ variant: 'destructive', title: 'Action not allowed', description: 'You cannot remove yourself as the primary author.' });
+      return;
+    }
+    remove(index);
+  };
 
   async function handleSave(status: "Draft" | "Pending") {
     if (!user || !user.faculty) {
@@ -920,13 +930,13 @@ export function ResearchPaperForm() {
                             </FormItem>
                           )}
                         />
-                        {index > 0 && (
+                        {field.email !== user?.email && (
                           <Button
                             type="button"
                             variant="destructive"
                             size="sm"
                             className="md:col-start-4 justify-self-end mt-2"
-                            onClick={() => remove(index)}
+                            onClick={() => removeAuthor(index)}
                           >
                             <Trash2 className="h-4 w-4 mr-2" /> Remove
                           </Button>
