@@ -22,7 +22,7 @@ export type User = {
   uid: string
   name: string
   email: string
-  role: "admin" | "faculty" | "CRO" | "Super-admin" | "Evaluator"
+  role: "admin" | "faculty" | "CRO" | "Super-admin" | "Evaluator" | "IQAC"
   designation?: "Principal" | "HOD" | "Super-admin" | "faculty" | string
   campus?: 'Vadodara' | 'Ahmedabad' | 'Rajkot' | 'Goa';
   faculties?: string[] // A user can be associated with multiple faculties, especially CROs
@@ -468,6 +468,7 @@ export type SystemSettings = {
   allowedDomains?: string[]
   croAssignments?: CroAssignment[]
   incentiveApprovers?: ApproverSetting[];
+  iqacEmail?: string;
 }
 
 export type LoginOtp = {

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -272,6 +273,7 @@ export default function AllProjectsPage() {
         const emrInterestsCol = collection(db, 'emrInterests');
         const isSuperAdmin = user?.role === 'Super-admin';
         const isAdmin = user?.role === 'admin';
+        const isIqac = user?.role === 'IQAC';
         const isCro = user?.role === 'CRO';
         const isPrincipal = user?.designation === 'Principal';
         const isHod = user?.designation === 'HOD';
@@ -279,7 +281,7 @@ export default function AllProjectsPage() {
         let imrQuery;
         let emrQuery;
 
-        if (isSuperAdmin || isAdmin) {
+        if (isSuperAdmin || isAdmin || isIqac) {
             imrQuery = query(projectsCol, orderBy('submissionDate', 'desc'));
             emrQuery = query(emrInterestsCol, where('isBulkUploaded', '==', true));
         } else if (isCro && user.faculties && user.faculties.length > 0) {
@@ -338,7 +340,7 @@ export default function AllProjectsPage() {
     fetchAllData();
   }, [fetchAllData]);
   
-  const hasAdminView = user?.role === 'Super-admin' || user?.role === 'admin' || user?.role === 'CRO' || user?.designation === 'Principal' || user?.designation === 'HOD';
+  const hasAdminView = ['Super-admin', 'admin', 'CRO', 'IQAC'].includes(user?.role || '') || user?.designation === 'Principal' || user?.designation === 'HOD';
   const canEditCoPis = user?.role === 'Super-admin';
 
   const filteredImrProjects = useMemo(() => {

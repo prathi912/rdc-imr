@@ -1669,30 +1669,37 @@ export async function updateProjectEvaluators(
 
 export async function isEmailDomainAllowed(
   email: string,
-): Promise<{ allowed: boolean; isCro: boolean; croFaculty?: string; croCampus?: string }> {
+): Promise<{ allowed: boolean; isCro: boolean; croFaculty?: string; croCampus?: string; isIqac: boolean; }> {
   try {
     const settings = await getSystemSettings()
     const allowedDomains = settings.allowedDomains || ["@paruluniversity.ac.in", "@goa.paruluniversity.ac.in"]
     const croAssignments = settings.croAssignments || []
+    const iqacEmail = settings.iqacEmail || ''
+
 
     // Special case for primary super admin
     if (email === "rathipranav07@gmail.com") {
-      return { allowed: true, isCro: false }
+      return { allowed: true, isCro: false, isIqac: false }
+    }
+    
+    const isIqac = iqacEmail.toLowerCase() === email.toLowerCase()
+    if (isIqac) {
+        return { allowed: true, isCro: false, isIqac: true };
     }
 
     const isAllowed = allowedDomains.some((domain) => email.endsWith(domain))
     const croAssignment = croAssignments.find((c) => c.email.toLowerCase() === email.toLowerCase())
 
     if (croAssignment) {
-      return { allowed: true, isCro: true, croFaculty: croAssignment.faculty, croCampus: croAssignment.campus }
+      return { allowed: true, isCro: true, croFaculty: croAssignment.faculty, croCampus: croAssignment.campus, isIqac: false }
     }
 
-    return { allowed: isAllowed, isCro: false }
+    return { allowed: isAllowed, isCro: false, isIqac: false }
   } catch (error) {
     console.error("Error checking email domain:", error)
     // Default to original domains on error
     const defaultAllowed = email.endsWith("@paruluniversity.ac.in") || email.endsWith("@goa.paruluniversity.ac.in")
-    return { allowed: defaultAllowed, isCro: false }
+    return { allowed: defaultAllowed, isCro: false, isIqac: false }
   }
 }
 

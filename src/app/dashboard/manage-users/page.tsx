@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -53,7 +54,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { bulkGrantModuleAccess } from '@/app/actions';
 
-const ROLES: User['role'][] = ['faculty', 'admin', 'CRO'];
+const ROLES: User['role'][] = ['faculty', 'admin', 'CRO', 'IQAC'];
 const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin';
 const PRIMARY_SUPER_ADMIN_EMAIL = 'rathipranav07@gmail.com';
 type SortableKeys = keyof Pick<User, 'name' | 'email' | 'role' | 'faculty'> | 'claimsCount';
@@ -490,7 +491,7 @@ export default function ManageUsersPage() {
                       </TableCell>
                       <TableCell className="hidden md:table-cell">{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'admin' || user.role === 'Super-admin' ? 'default' : 'secondary'}>{user.role}</Badge>
+                        <Badge variant={user.role === 'admin' || user.role === 'Super-admin' || user.role === 'IQAC' ? 'default' : 'secondary'}>{user.role}</Badge>
                       </TableCell>
                        <TableCell className="hidden lg:table-cell">{user.faculty || 'N/A'}</TableCell>
                       <TableCell className="text-right">
