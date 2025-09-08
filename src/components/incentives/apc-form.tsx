@@ -14,14 +14,15 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Info } from 'lucide-react';
+import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 
 const apcSchema = z.object({
   apcTypeOfArticle: z.string({ required_error: 'Please select an article type.' }),
@@ -31,7 +32,7 @@ const apcSchema = z.object({
   apcTotalStudentAuthors: z.coerce.number().optional(),
   apcStudentNames: z.string().optional(),
   apcJournalDetails: z.string().min(5, 'Journal details are required.'),
-  apcQRating: z.string().optional(),
+  apcQRating: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
   apcNationalInternational: z.enum(['National', 'International'], { required_error: 'This field is required.' }),
   apcApcWaiverRequested: z.boolean().optional(),
   apcApcWaiverProof: z.any().optional(),
@@ -71,6 +72,19 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
+const SPECIAL_POLICY_FACULTIES = [
+    "Faculty of Applied Sciences",
+    "Faculty of Medicine",
+    "Faculty of Homoeopathy",
+    "Faculty of Ayurveda",
+    "Faculty of Nursing",
+    "Faculty of Pharmacy",
+    "Faculty of Physiotherapy",
+    "Faculty of Public Health",
+    "Faculty of Engineering & Technology"
+];
+
+
 export function ApcForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -78,6 +92,7 @@ export function ApcForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   
   const form = useForm<ApcFormValues>({
     resolver: zodResolver(apcSchema),
@@ -94,6 +109,44 @@ export function ApcForm() {
       apcSelfDeclaration: false,
     },
   });
+
+  const isSpecialFaculty = useMemo(() =>
+    user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false,
+    [user?.faculty]
+  );
+
+  const formValues = form.watch();
+
+  useEffect(() => {
+    const { apcIndexingStatus, apcQRating, apcTotalAmount, apcAuthors } = formValues;
+    const authorCount = apcAuthors ? apcAuthors.split(',').filter(a => a.trim() !== '').length : 1;
+    const actualApcPaid = apcTotalAmount || 0;
+
+    let maxIncentive = 0;
+
+    if (apcIndexingStatus?.includes('Scopus') || apcIndexingStatus?.includes('Web of science')) {
+        switch (apcQRating) {
+            case 'Q1': maxIncentive = 40000; break;
+            case 'Q2': maxIncentive = 30000; break;
+            case 'Q3': maxIncentive = 20000; break;
+            case 'Q4': maxIncentive = 15000; break;
+        }
+    } else if (!isSpecialFaculty) {
+        if (apcIndexingStatus?.includes('UGC - CARE list')) {
+            maxIncentive = 5000;
+        } else if (apcIndexingStatus?.includes('ESCI')) { // Assuming WoS ESCI is what this refers to
+            maxIncentive = 8000;
+        }
+    }
+
+    if (maxIncentive > 0 && actualApcPaid > 0 && authorCount > 0) {
+        const admissibleApc = actualApcPaid / authorCount;
+        setCalculatedIncentive(Math.min(admissibleApc, maxIncentive));
+    } else {
+        setCalculatedIncentive(null);
+    }
+
+  }, [formValues, isSpecialFaculty]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -114,7 +167,6 @@ export function ApcForm() {
       toast({ variant: 'destructive', title: 'Error', description: 'User information not found. Please log in again.' });
       return;
     }
-    // Re-check profile completeness on submission
     if (status === 'Pending' && (!user.bankDetails || !user.orcidId || !user.misId)) {
         toast({
             variant: 'destructive',
@@ -127,8 +179,7 @@ export function ApcForm() {
     setIsSubmitting(true);
     try {
         const data = form.getValues();
-        const claimId = doc(collection(db, 'incentiveClaims')).id;
-
+        
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
             if (!file || !user) return undefined;
             const dataUrl = await fileToDataUrl(file);
@@ -146,8 +197,11 @@ export function ApcForm() {
             uploadFileHelper(data.apcInvoiceProof?.[0], 'apc-invoice-proof'),
         ]);
 
-        const claimData: Omit<IncentiveClaim, 'id'> = {
-            ...data,
+        const { apcPublicationProof, apcInvoiceProof, apcApcWaiverProof, ...restOfData } = data;
+
+        const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
+            ...restOfData,
+            calculatedIncentive,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
             claimType: 'Seed Money for APC',
@@ -165,11 +219,15 @@ export function ApcForm() {
         if (apcPublicationProofUrl) claimData.apcPublicationProofUrl = apcPublicationProofUrl;
         if (apcInvoiceProofUrl) claimData.apcInvoiceProofUrl = apcInvoiceProofUrl;
         
-        await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
+        const result = await submitIncentiveClaim(claimData);
+
+        if (!result.success) {
+            throw new Error(result.error);
+        }
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/apc?claimId=${claimId}`);
+          router.push(`/dashboard/incentive-claim/apc?claimId=${result.claimId}`);
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for APC has been submitted.' });
           router.push('/dashboard/incentive-claim');
@@ -198,17 +256,28 @@ export function ApcForm() {
                 </Alert>
             )}
 
+            <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>APC Reimbursement Policy</AlertTitle>
+                <AlertDescription>
+                    Admissible APC = (Actual APC paid to the publisher ÷ total number of authors) — with a limit of maximum APC as per the policy.
+                    <br/>
+                    The author must request the Editor for an APC waiver and submit the proof along with this application.
+                </AlertDescription>
+            </Alert>
+
+
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">ARTICLE & JOURNAL DETAILS</h3>
                 <Separator />
                 <FormField control={form.control} name="apcTypeOfArticle" render={({ field }) => ( <FormItem><FormLabel>Type of Article</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-6">{articleTypes.map(type => (<FormItem key={type} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={type} /></FormControl><FormLabel className="font-normal">{type}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
                 {watchArticleType === 'Other' && <FormField name="apcOtherArticleType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Please specify other article type</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
                 <FormField name="apcPaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Paper</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="apcAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Author(s)</FormLabel><FormControl><Textarea placeholder="Comma-separated list of authors" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="apcAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Author(s)</FormLabel><FormControl><Textarea placeholder="Comma-separated list of all authors" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcTotalStudentAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Number of Student authors</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Names of Student Authors</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcJournalDetails" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Details of the Journal</FormLabel><FormControl><Textarea placeholder="Name, Vol, Page No., Year, DOI" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="apcQRating" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Q Rating of the Journal</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="apcQRating" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Q Rating of the Journal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Q Rating" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Q1">Q1</SelectItem><SelectItem value="Q2">Q2</SelectItem><SelectItem value="Q3">Q3</SelectItem><SelectItem value="Q4">Q4</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
                 <FormField name="apcNationalInternational" control={form.control} render={({ field }) => ( <FormItem><FormLabel>National / International</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="National" /></FormControl><FormLabel className="font-normal">National</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="International" /></FormControl><FormLabel className="font-normal">International</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcJournalWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Journal Website</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcIssnNo" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISSN No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
@@ -225,9 +294,15 @@ export function ApcForm() {
                 <FormField name="apcApcWaiverRequested" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Whether APC waiver was requested</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
                 {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>If yes, give proof</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField name="apcAmountClaimed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount claimed (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                   <FormField name="apcTotalAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total amount of APC (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField name="apcAmountClaimed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount claimed (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
+                 {calculatedIncentive !== null && (
+                    <div className="p-4 bg-secondary rounded-md">
+                        <p className="text-sm font-medium">Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                        <p className="text-xs text-muted-foreground">This is the maximum reimbursable amount based on policy.</p>
+                    </div>
+                )}
                 <FormField name="apcInvoiceProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attachment Proof (Invoice, Receipt, Payment Proof & Abstract)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
                  <FormField control={form.control} name="apcSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
             </div>
