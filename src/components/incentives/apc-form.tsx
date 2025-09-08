@@ -72,7 +72,6 @@ const apcSchema = z.object({
 type ApcFormValues = z.infer<typeof apcSchema>;
 
 const articleTypes = ['Research Paper Publication', 'Review Article', 'Letter to Editor', 'Other'];
-const indexingStatuses = ['Scopus', 'Web of science', 'Web of Science indexed journals (ESCI)', 'UGC-CARE Group-I'];
 const coAuthorRoles: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -186,7 +185,7 @@ export function ApcForm() {
       setUser(parsedUser);
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
-       if (fields.length === 0) {
+       if (fields.length === 0 && parsedUser) {
         append({ 
             name: parsedUser.name, 
             email: parsedUser.email,
@@ -196,7 +195,7 @@ export function ApcForm() {
         });
       }
     }
-  }, [form, append, fields.length]);
+  }, [append, fields.length]);
   
   const watchAuthors = form.watch('bookCoAuthors');
   const firstAuthorExists = useMemo(() => 
@@ -238,7 +237,7 @@ export function ApcForm() {
   const handleAddCoPi = () => {
     if (foundCoPi && !fields.some(field => field.email === foundCoPi.email)) {
         if (user && foundCoPi.email === user.email) {
-            toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself again.' });
+            toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You are already listed as an author.' });
             return;
         }
         append({ 
@@ -395,7 +394,7 @@ export function ApcForm() {
                                 <p className="font-medium text-sm">{field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}</p>
                                 <p className="text-xs text-muted-foreground">{field.email}</p>
                             </div>
-                            <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} defaultValue={field.role}>
+                            <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
                                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                                 <SelectContent>{getAvailableRoles(field).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
