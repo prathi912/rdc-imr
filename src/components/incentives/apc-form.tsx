@@ -53,7 +53,6 @@ const apcSchema = z.object({
   apcJournalWebsite: z.string().url('Please enter a valid URL.'),
   apcIssnNo: z.string().min(5, 'ISSN is required.'),
   apcIndexingStatus: z.array(z.string()).refine(value => value.some(item => item), { message: "You have to select at least one indexing status." }),
-  apcOtherIndexingStatus: z.string().optional(),
   apcSciImpactFactor: z.coerce.number().optional(),
   apcPublicationProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.'),
   apcInvoiceProof: z.any().refine((files) => files?.length > 0, 'Proof of payment/invoice is required.'),
@@ -110,6 +109,7 @@ export function ApcForm() {
   const [isSearching, setIsSearching] = useState(false);
   const [externalAuthorName, setExternalAuthorName] = useState('');
   const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
+  const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
 
   const form = useForm<ApcFormValues>({
     resolver: zodResolver(apcSchema),
@@ -203,8 +203,8 @@ export function ApcForm() {
     [watchAuthors]
   );
   
-  const getAvailableRoles = (currentAuthor: Author) => {
-    const isCurrentAuthorFirst = currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author';
+  const getAvailableRoles = (currentAuthor?: Author) => {
+    const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
     if (firstAuthorExists && !isCurrentAuthorFirst) {
       return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
     }
@@ -213,7 +213,6 @@ export function ApcForm() {
 
   const watchArticleType = form.watch('apcTypeOfArticle');
   const watchWaiverRequested = form.watch('apcApcWaiverRequested');
-  const watchIndexingStatus = form.watch('apcIndexingStatus');
 
   const handleSearchCoPi = async () => {
     if (!coPiSearchTerm) return;
@@ -235,8 +234,8 @@ export function ApcForm() {
   };
 
   const handleAddCoPi = () => {
-    if (foundCoPi && !fields.some(field => field.email === foundCoPi.email)) {
-        if (user && foundCoPi.email === user.email) {
+    if (foundCoPi && !fields.some(field => field.email.toLowerCase() === foundCoPi.email.toLowerCase())) {
+        if (user && foundCoPi.email.toLowerCase() === user.email.toLowerCase()) {
             toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You are already listed as an author.' });
             return;
         }
@@ -259,17 +258,23 @@ export function ApcForm() {
             toast({ title: 'Name and email are required for external authors', variant: 'destructive' });
             return;
         }
-         if (fields.some(a => a.email === email)) {
+         if (fields.some(a => a.email.toLowerCase() === email)) {
             toast({ title: 'Author already added', variant: 'destructive' });
             return;
         }
-        append({ name, email, role: 'Co-Author', isExternal: true, uid: null });
+        append({ name, email, role: externalAuthorRole, isExternal: true, uid: null });
         setExternalAuthorName('');
         setExternalAuthorEmail('');
+        setExternalAuthorRole('Co-Author'); // Reset role selector
     };
 
   const updateAuthorRole = (index: number, role: Author['role']) => {
     const author = fields[index];
+    // Check for conflict before updating
+    if ((role === 'First Author' || role === 'First & Corresponding Author') && firstAuthorExists && author.role !== 'First Author' && author.role !== 'First & Corresponding Author') {
+        toast({ title: 'Conflict', description: 'Another author is already the First Author.', variant: 'destructive'});
+        return;
+    }
     update(index, { ...author, role });
   };
 
@@ -416,13 +421,17 @@ export function ApcForm() {
                     </div>
                      <div className="space-y-2 p-3 border rounded-md">
                         <FormLabel className="text-sm">Add External Co-Author</FormLabel>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex flex-col md:flex-row gap-2 mt-1">
                             <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
                             <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                            <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>{getAvailableRoles().map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                            </Select>
                             <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><Plus className="h-4 w-4"/></Button>
                         </div>
                         <FormDescription className="!mt-2 text-destructive text-xs">
-                            Important: If an external co-author is found at the approval stage that was not declared here, the claim will be rejected.
+                           Important: If an external co-author is found at the approval stage that was not declared here, the claim will be rejected.
                         </FormDescription>
                     </div>
                      <FormMessage>{form.formState.errors.bookCoAuthors?.message || form.formState.errors.bookCoAuthors?.root?.message}</FormMessage>
