@@ -266,12 +266,14 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     });
 
     const getDefaultAmount = () => {
-        if (stageIndex >= 2 && claim.approvals && claim.approvals.length > 1) {
-            const stageApproval = claim.approvals.find(a => a?.stage === stageIndex); // Find previous stage's amount
-            if (stageApproval && stageApproval.status === 'Approved') {
-                return stageApproval.approvedAmount;
+        // If there's a previous approval in the same flow, use its amount as the starting point.
+        if (claim.approvals && claim.approvals.length > stageIndex -1 && stageIndex > 0) {
+            const previousStageApproval = claim.approvals.find(a => a?.stage === stageIndex);
+            if (previousStageApproval?.status === 'Approved' && previousStageApproval.approvedAmount > 0) {
+                return previousStageApproval.approvedAmount;
             }
         }
+        // Otherwise, fall back to the final approved amount (if any) or the initial calculated amount.
         return claim.finalApprovedAmount || claim.calculatedIncentive || 0;
     };
     
@@ -410,13 +412,13 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                             {action === 'reject' && (
+                             {action !== 'verify' && (
                                 <FormField
                                     name="comments"
                                     control={form.control}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Your Comments (Required)</FormLabel>
+                                            <FormLabel>Your Comments {action === 'reject' && '(Required)'}</FormLabel>
                                             <FormControl><Textarea {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
