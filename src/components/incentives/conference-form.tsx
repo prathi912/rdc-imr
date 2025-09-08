@@ -33,14 +33,15 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Info } from 'lucide-react';
+import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 
 const conferenceSchema = z
   .object({
@@ -115,6 +116,7 @@ export function ConferenceForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   
   const form = useForm<ConferenceFormValues>({
     resolver: zodResolver(conferenceSchema),
@@ -148,6 +150,55 @@ export function ConferenceForm() {
       conferenceSelfDeclaration: false,
     },
   });
+  
+  const formValues = form.watch();
+
+  useEffect(() => {
+    const {
+      conferenceType,
+      conferenceVenue,
+      presentationType,
+      conferenceMode,
+      registrationFee,
+      travelFare,
+      onlinePresentationOrder,
+      organizerName,
+    } = formValues;
+
+    const totalExpenses = (registrationFee || 0) + (travelFare || 0);
+    let maxReimbursement = 0;
+
+    if (organizerName?.toLowerCase().includes('parul university')) {
+      maxReimbursement = (registrationFee || 0) * 0.75;
+    } else if (conferenceMode === 'Online') {
+      const regFee = registrationFee || 0;
+      switch (onlinePresentationOrder) {
+        case 'First': maxReimbursement = Math.min(regFee * 0.75, 15000); break;
+        case 'Second': maxReimbursement = Math.min(regFee * 0.60, 10000); break;
+        case 'Third': maxReimbursement = Math.min(regFee * 0.50, 7000); break;
+        case 'Additional': maxReimbursement = Math.min(regFee * 0.30, 2000); break;
+      }
+    } else if (conferenceMode === 'Offline') {
+      if (conferenceType === 'International') {
+        switch (conferenceVenue) {
+          case 'Indian Subcontinent': maxReimbursement = 30000; break;
+          case 'South Korea, Japan, Australia and Middle East': maxReimbursement = 45000; break;
+          case 'Europe': maxReimbursement = 60000; break;
+          case 'African/South American/North American': maxReimbursement = 75000; break;
+          case 'India':
+            maxReimbursement = presentationType === 'Oral' ? 20000 : 15000;
+            break;
+        }
+      } else if (conferenceType === 'National') {
+        maxReimbursement = presentationType === 'Oral' ? 12000 : 10000;
+      } else if (conferenceType === 'Regional/State') {
+        maxReimbursement = 7500;
+      }
+    }
+    
+    setCalculatedIncentive(Math.min(totalExpenses, maxReimbursement));
+
+  }, [formValues]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -194,8 +245,9 @@ export function ConferenceForm() {
             return result.url;
         };
 
-        const claimData: Omit<IncentiveClaim, 'id'> = {
+        const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
             ...data,
+            calculatedIncentive,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
             claimType: 'Conference Presentations',
@@ -223,11 +275,15 @@ export function ConferenceForm() {
         if (prizeProofUrl) claimData.prizeProofUrl = prizeProofUrl;
         if (travelReceiptsUrl) claimData.travelReceiptsUrl = travelReceiptsUrl;
 
-        await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
+        const result = await submitIncentiveClaim(claimData);
+
+        if (!result.success) {
+            throw new Error(result.error);
+        }
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/conference?claimId=${claimId}`);
+          router.push(`/dashboard/incentive-claim/conference?claimId=${result.claimId}`);
         } else {
           toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
           router.push('/dashboard/incentive-claim');
@@ -256,6 +312,15 @@ export function ConferenceForm() {
                     </AlertDescription>
                 </Alert>
             )}
+
+             <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>Conference Reimbursement Policy</AlertTitle>
+              <AlertDescription>
+                Reimbursement (registration + travel) is offered for various activities. Airfare for International travel and II-AC train fare (or actual, whichever is lesser) for travel within India shall be reimbursed within limits. Only the presenting author is entitled for reimbursement. Please refer to the full SOP for detailed limits and conditions.
+              </AlertDescription>
+            </Alert>
+
 
             <div className="rounded-lg border p-4 space-y-6 animate-in fade-in-0">
                 <div>
@@ -288,6 +353,12 @@ export function ConferenceForm() {
                  <div>
                     <h3 className="font-semibold text-sm -mb-2">EXPENSE &amp; TRAVEL DETAILS</h3>
                     <Separator className="mt-4"/><div className="space-y-4 mt-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField name="registrationFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Registration Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} /></FormControl><FormMessage /></FormItem> )} /><FormField name="registrationFeeProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Registration Fee Payment</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} /></div>{conferenceMode === 'Offline' && (<div className="space-y-4"><FormField name="travelPlaceVisited" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Place Visited</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} /><FormField name="travelMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Mode</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select travel mode" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Bus">Bus</SelectItem><SelectItem value="Train">Train</SelectItem><SelectItem value="Air">Air</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} /><FormField name="travelFare" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Fare Incurred (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} /><FormField name="travelReceipts" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach All Tickets/Travel Receipts</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} /></div>)}{conferenceVenue && conferenceVenue !== 'India' && (<FormField name="govtFundingRequestProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Govt. Funding Request</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormDescription>Required for conferences outside India.</FormDescription><FormMessage /></FormItem> )} />)}</div>
+                     {calculatedIncentive !== null && calculatedIncentive > 0 && (
+                        <div className="p-4 bg-secondary rounded-md">
+                            <p className="text-sm font-medium">Eligible Reimbursement Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                            <p className="text-xs text-muted-foreground">This is the maximum reimbursable amount based on policy. Actual amount is subject to verification.</p>
+                        </div>
+                    )}
                  </div>
                 <div>
                     <h3 className="font-semibold text-sm -mb-2">DECLARATIONS</h3>
