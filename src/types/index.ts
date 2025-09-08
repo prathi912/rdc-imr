@@ -204,6 +204,12 @@ export type ApprovalStage = {
   verifiedFields?: { [key: string]: boolean };
 };
 
+export type PatentInventor = {
+    name: string;
+    misId: string;
+    uid?: string | null;
+}
+
 export type IncentiveClaim = {
   id: string
   uid: string
@@ -226,6 +232,7 @@ export type IncentiveClaim = {
 
   // Common fields
   benefitMode: string
+  sdgGoals?: string[];
 
   // Research Paper Fields
   publicationType?: string;
@@ -245,7 +252,6 @@ export type IncentiveClaim = {
   electronicIssn?: string;
   publicationMonth?: string;
   publicationYear?: string;
-  sdgGoals?: string[];
   publicationProofUrls?: string[];
   isPuNameInPublication?: boolean;
   totalCorrespondingAuthors?: number;
@@ -269,6 +275,21 @@ export type IncentiveClaim = {
   patentForm1Url?: string
   patentGovtReceiptUrl?: string
   patentSelfDeclaration?: boolean
+  patentLocale?: 'National' | 'International';
+  patentCountry?: string;
+  patentCoApplicants?: PatentInventor[];
+  patentInventors?: PatentInventor[];
+  patentDomain?: string;
+  isCollaboration?: 'Yes' | 'No' | 'NA';
+  collaborationDetails?: string;
+  isIprSdg?: 'Yes' | 'No' | 'NA';
+  isIprDisciplinary?: 'Yes' | 'No' | 'NA';
+  disciplinaryType?: 'Interdisciplinary' | 'Multidisciplinary' | 'Transdisciplinary';
+  filingDate?: string; // ISO
+  publicationDate?: string; // ISO
+  grantDate?: string; // ISO
+  currentStatus?: string;
+
 
   // Conference Fields
   conferenceName?: string
@@ -350,7 +371,6 @@ export type IncentiveClaim = {
   apcStudentNames?: string
   apcJournalDetails?: string
   apcQRating?: string
-  apcNationalInternational?: "National" | "International"
   apcApcWaiverRequested?: boolean
   apcApcWaiverProofUrl?: string
   apcJournalWebsite?: string

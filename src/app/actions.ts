@@ -56,6 +56,37 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
   }
 }
 
+export async function checkPatentUniqueness(title: string, applicationNumber: string, currentClaimId?: string): Promise<{ isUnique: boolean; message?: string }> {
+    try {
+        const claimsRef = adminDb.collection('incentiveClaims');
+        
+        const titleQuery = query(claimsRef, where('patentTitle', '==', title));
+        const appNumberQuery = query(claimsRef, where('patentApplicationNumber', '==', applicationNumber));
+
+        const [titleSnapshot, appNumberSnapshot] = await Promise.all([
+            getDocs(titleQuery),
+            getDocs(appNumberQuery)
+        ]);
+        
+        const conflictingTitle = titleSnapshot.docs.find(doc => doc.id !== currentClaimId);
+        if (conflictingTitle) {
+            return { isUnique: false, message: `A claim with the title "${title}" already exists.` };
+        }
+
+        const conflictingAppNumber = appNumberSnapshot.docs.find(doc => doc.id !== currentClaimId);
+        if (conflictingAppNumber) {
+            return { isUnique: false, message: `A claim with the application number "${applicationNumber}" already exists.` };
+        }
+
+        return { isUnique: true };
+    } catch (error: any) {
+        console.error("Error checking patent uniqueness:", error);
+        await logActivity('ERROR', 'Failed to check patent uniqueness', { title, applicationNumber, error: error.message });
+        // Fail open to avoid blocking users due to server errors, but log it.
+        return { isUnique: true }; 
+    }
+}
+
 export async function bulkGrantModuleAccess(
   userIds: string[],
   moduleId: string,
