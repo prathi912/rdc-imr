@@ -57,9 +57,13 @@ export function MembershipForm() {
     resolver: zodResolver(membershipSchema),
     defaultValues: {
       professionalBodyName: '',
+      membershipType: undefined,
+      membershipLocale: 'International',
+      membershipNumber: '',
+      membershipAmountPaid: 0,
+      membershipPaymentDate: '',
       membershipProof: undefined,
       membershipSelfDeclaration: false,
-      membershipLocale: 'International',
     },
   });
 
