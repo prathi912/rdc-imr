@@ -32,7 +32,7 @@ import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Info } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 
 const patentSchema = z
@@ -200,6 +200,21 @@ export function PatentForm() {
                     </AlertDescription>
                 </Alert>
             )}
+
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertTitle>Important Note on Patent Incentives</AlertTitle>
+              <AlertDescription>
+                <ol className="list-decimal list-inside space-y-2 mt-2">
+                  <li>No incentives shall be offered for the grant of Industrial Designs, Trademarks or Copyrights.</li>
+                  <li>Financial and technical support shall be provided by the IPR Cell for the protection of any form of intellectual property by filing of applications subject to the condition that 'Parul University' is the sole/Joint applicant.</li>
+                  <li>The above specified support shall be provided for filing applications within India only.</li>
+                  <li>No reimbursement shall be given for the patent applications filed from outside agencies, without taking IPR Cell in confidence.</li>
+                  <li>IPR arising out of the research work performed in PU or using PU facility, must be filed from RDC, PU, with PU name as an applicant. For filing IPR application outside RDC, PU, the applicant must take due permission from the University in case of some extraordinary situation. If due permission is not obtained, the university can take disciplinary action against the applicant(s) for non-compliance.</li>
+                </ol>
+              </AlertDescription>
+            </Alert>
+            
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">PATENT DETAILS</h3>
                 <Separator />
