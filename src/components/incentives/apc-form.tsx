@@ -146,35 +146,41 @@ export function ApcForm() {
 
   const formValues = form.watch();
 
-  useEffect(() => {
+   useEffect(() => {
     const { apcIndexingStatus, apcQRating, apcTotalAmount, bookCoAuthors } = formValues;
     
     const internalAuthorCount = bookCoAuthors ? bookCoAuthors.filter(author => !author.isExternal).length : 0;
-    const actualApcPaid = apcTotalAmount || 0;
-
-    let maxIncentivePerAuthor = 0;
+    if (internalAuthorCount === 0) {
+      setCalculatedIncentive(0);
+      return;
+    }
+    
+    let maxTotalIncentive = 0;
 
     if (apcIndexingStatus?.includes('Scopus') || apcIndexingStatus?.includes('Web of science')) {
         switch (apcQRating) {
-            case 'Q1': maxIncentivePerAuthor = 40000; break;
-            case 'Q2': maxIncentivePerAuthor = 30000; break;
-            case 'Q3': maxIncentivePerAuthor = 20000; break;
-            case 'Q4': maxIncentivePerAuthor = 15000; break;
+            case 'Q1': maxTotalIncentive = 40000; break;
+            case 'Q2': maxTotalIncentive = 30000; break;
+            case 'Q3': maxTotalIncentive = 20000; break;
+            case 'Q4': maxTotalIncentive = 15000; break;
         }
     } else if (!isSpecialFaculty) {
         if (apcIndexingStatus?.includes('UGC-CARE Group-I')) {
-            maxIncentivePerAuthor = 5000;
+            maxTotalIncentive = 5000;
         } else if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
-            maxIncentivePerAuthor = 8000;
+            maxTotalIncentive = 8000;
         }
     }
+    
+    const actualApcPaid = apcTotalAmount || 0;
+    
+    // The total amount eligible for reimbursement is the lesser of the actual amount paid and the policy cap.
+    const totalEligibleAmount = Math.min(actualApcPaid, maxTotalIncentive);
 
-    if (maxIncentivePerAuthor > 0 && actualApcPaid > 0 && internalAuthorCount > 0) {
-        const admissibleApcPerAuthor = actualApcPaid / internalAuthorCount;
-        setCalculatedIncentive(Math.min(admissibleApcPerAuthor, maxIncentivePerAuthor));
-    } else {
-        setCalculatedIncentive(null);
-    }
+    // This total eligible amount is then divided among the PU authors.
+    const individualIncentive = totalEligibleAmount / internalAuthorCount;
+    
+    setCalculatedIncentive(individualIncentive > 0 ? individualIncentive : 0);
 
   }, [formValues, isSpecialFaculty]);
 
@@ -197,7 +203,6 @@ export function ApcForm() {
         });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   const watchAuthors = form.watch('bookCoAuthors');
@@ -475,7 +480,7 @@ export function ApcForm() {
                  {calculatedIncentive !== null && (
                     <div className="p-4 bg-secondary rounded-md">
                         <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
-                        <p className="text-xs text-muted-foreground">This is the maximum reimbursable amount based on policy.</p>
+                        <p className="text-xs text-muted-foreground">This is your individual share of the reimbursement based on the policy and number of PU authors.</p>
                     </div>
                 )}
                 <FormField name="apcInvoiceProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attachment Proof (Invoice, Receipt, Payment Proof & Abstract)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
