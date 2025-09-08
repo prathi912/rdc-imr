@@ -62,7 +62,7 @@ const apcSchema = z.object({
 type ApcFormValues = z.infer<typeof apcSchema>;
 
 const articleTypes = ['Research Paper Publication', 'Review Article', 'Letter to Editor', 'Other'];
-const indexingStatuses = ['Scopus', 'Web of science', 'Pubmed', 'UGC - CARE list', 'Other'];
+const indexingStatuses = ['Scopus', 'Web of science', 'UGC-CARE Group', 'Other'];
 
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -133,7 +133,7 @@ export function ApcForm() {
             case 'Q4': maxIncentive = 15000; break;
         }
     } else if (!isSpecialFaculty) {
-        if (apcIndexingStatus?.includes('UGC - CARE list')) {
+        if (apcIndexingStatus?.includes('UGC-CARE Group')) {
             maxIncentive = 5000;
         } else if (apcIndexingStatus?.includes('ESCI')) { // Assuming WoS ESCI is what this refers to
             maxIncentive = 8000;
