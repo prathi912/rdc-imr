@@ -51,9 +51,6 @@ const apcSchema = z.object({
 }).refine(data => data.apcTypeOfArticle !== 'Other' || (!!data.apcOtherArticleType && data.apcOtherArticleType.length > 0), {
   message: 'Please specify the article type.',
   path: ['apcOtherArticleType'],
-}).refine(data => !data.apcIndexingStatus.includes('Other') || (!!data.apcOtherIndexingStatus && data.apcOtherIndexingStatus.length > 0), {
-  message: 'Please specify the other indexing status.',
-  path: ['apcOtherIndexingStatus'],
 }).refine(data => !data.apcApcWaiverRequested || (!!data.apcApcWaiverProof && data.apcApcWaiverProof.length > 0), {
   message: 'Proof of waiver request is required.',
   path: ['apcApcWaiverProof'],
@@ -62,7 +59,7 @@ const apcSchema = z.object({
 type ApcFormValues = z.infer<typeof apcSchema>;
 
 const articleTypes = ['Research Paper Publication', 'Review Article', 'Letter to Editor', 'Other'];
-const indexingStatuses = ['Scopus', 'Web of science', 'UGC-CARE Group', 'Other'];
+const indexingStatuses = ['Scopus', 'Web of science', 'UGC-CARE Group'];
 
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -283,7 +280,6 @@ export function ApcForm() {
                 <FormField name="apcJournalWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Journal Website</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcIssnNo" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISSN No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcIndexingStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Indexing/Listing status of the Journal</FormLabel>{indexingStatuses.map(item => (<FormField key={item} control={form.control} name="apcIndexingStatus" render={({ field }) => ( <FormItem key={item} className="flex flex-row items-start space-x-3 space-y-0"><FormControl><Checkbox checked={field.value?.includes(item)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), item]) : field.onChange(field.value?.filter(value => value !== item)); }} /></FormControl><FormLabel className="font-normal">{item}</FormLabel></FormItem> )} />))}<FormMessage /></FormItem> )} />
-                {watchIndexingStatus?.includes('Other') && <FormField name="apcOtherIndexingStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Please specify other indexing status</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
                 <FormField name="apcSciImpactFactor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>SCI Impact Factor</FormLabel><FormControl><Input type="number" step="any" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcPuNameInPublication" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Is "PU" name present in the publication?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
                 <FormField name="apcPublicationProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Publication Attached</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
