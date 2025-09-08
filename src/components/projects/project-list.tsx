@@ -112,6 +112,8 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
       percentage: percentage
     };
   };
+  
+  const showMeetingDateColumn = sortedProjects.some(p => p.status === 'Under Review');
 
 
   return (
@@ -136,6 +138,13 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
                       Date <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
+                {showMeetingDateColumn && (
+                  <TableHead className="hidden md:table-cell">
+                    <Button variant="ghost" onClick={() => requestSort('meetingDate')}>
+                        Meeting Date <ArrowUpDown className="ml-2 h-4 w-4" />
+                    </Button>
+                  </TableHead>
+                )}
                 <TableHead className="hidden md:table-cell">
                   <Button variant="ghost" onClick={() => requestSort('status')}>
                       Status <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -222,6 +231,11 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
                         )}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell whitespace-nowrap">{new Date(displayDate).toLocaleDateString()}</TableCell>
+                    {showMeetingDateColumn && (
+                        <TableCell className="hidden md:table-cell whitespace-nowrap">
+                            {project.meetingDetails?.date ? new Date(project.meetingDetails.date.replace(/-/g, '/')).toLocaleDateString() : 'N/A'}
+                        </TableCell>
+                    )}
                     <TableCell className="hidden md:table-cell">
                       <Badge variant={statusVariant[project.status] || 'secondary'}>{project.status}</Badge>
                     </TableCell>
