@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import type { User, EmrInterest, EmrEvaluation } from '@/types';
-import { addEmrEvaluation } from '@/app/actions';
+import { addEmrEvaluation } from '@/app/emr-actions';
 import {
   Dialog,
   DialogContent,
