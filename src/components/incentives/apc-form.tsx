@@ -23,6 +23,7 @@ import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle, Info } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const apcSchema = z.object({
   apcTypeOfArticle: z.string({ required_error: 'Please select an article type.' }),
