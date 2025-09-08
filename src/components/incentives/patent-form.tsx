@@ -39,7 +39,7 @@ const patentSchema = z
   .object({
     patentTitle: z.string().min(3, 'Patent title is required.'),
     patentStatus: z.enum(['Filed', 'Published', 'Granted'], { required_error: 'Patent status is required.' }),
-    patentApplicantType: z.enum(['Sole', 'Joint']).optional(),
+    patentApplicantType: z.enum(['Sole', 'Joint'], { required_error: 'Applicant type is required.' }),
     patentSpecificationType: z.enum(['Full', 'Provisional'], { required_error: 'Specification type is required.' }),
     patentApplicationNumber: z.string().min(3, 'Application number is required.'),
     patentTotalStudents: z.coerce.number().optional(),
@@ -74,6 +74,7 @@ export function PatentForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   
   const form = useForm<PatentFormValues>({
     resolver: zodResolver(patentSchema),
@@ -94,6 +95,23 @@ export function PatentForm() {
       patentSelfDeclaration: false,
     },
   });
+
+  const patentStatus = form.watch('patentStatus');
+  const applicantType = form.watch('patentApplicantType');
+
+  useEffect(() => {
+    if (patentStatus && applicantType) {
+        let amount = 0;
+        if (patentStatus === 'Published') {
+            amount = applicantType === 'Sole' ? 3000 : 3000 * 0.8;
+        } else if (patentStatus === 'Granted') {
+            amount = applicantType === 'Sole' ? 15000 : 15000 * 0.8;
+        }
+        setCalculatedIncentive(amount);
+    } else {
+        setCalculatedIncentive(null);
+    }
+  }, [patentStatus, applicantType]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -146,6 +164,7 @@ export function PatentForm() {
 
         const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
             ...restOfData,
+            calculatedIncentive,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
             claimType: 'Patents',
@@ -219,6 +238,13 @@ export function PatentForm() {
                 <h3 className="font-semibold text-sm -mb-2">PATENT DETAILS</h3>
                 <Separator />
                 <FormField name="patentTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Patent</FormLabel><FormControl><Textarea placeholder="Enter the full title of your patent" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="patentStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Status of Application</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Filed" /></FormControl><FormLabel className="font-normal">Filed</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Published" /></FormControl><FormLabel className="font-normal">Published</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Granted" /></FormControl><FormLabel className="font-normal">Granted</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="patentApplicantType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Applicant Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Sole" /></FormControl><FormLabel className="font-normal">PU as Sole Applicant</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Joint" /></FormControl><FormLabel className="font-normal">PU as Joint Applicant</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                {calculatedIncentive !== null && (
+                    <div className="p-4 bg-secondary rounded-md">
+                        <p className="text-sm font-medium">Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                    </div>
+                )}
                 <FormField name="patentSpecificationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Specification Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Full" /></FormControl><FormLabel className="font-normal">Full</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Provisional" /></FormControl><FormLabel className="font-normal">Provisional</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentApplicationNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Ref. No/Application Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentTotalStudents" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Number of Students</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
@@ -228,7 +254,6 @@ export function PatentForm() {
                 {patentFiledFromIprCell === false && (
                      <FormField name="patentPermissionTaken" control={form.control} render={({ field }) => ( <FormItem><FormLabel>If No, was permission from PU taken?</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 )}
-                <FormField name="patentStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Status of Application</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Filed" /></FormControl><FormLabel className="font-normal">Filed</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Published" /></FormControl><FormLabel className="font-normal">Published</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Granted" /></FormControl><FormLabel className="font-normal">Granted</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentApprovalProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof of Approval (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentForm1" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof (Form 1) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentGovtReceipt" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof (Govt. Receipt) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
