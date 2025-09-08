@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
@@ -19,17 +19,25 @@ import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
-import type { User, IncentiveClaim } from '@/types';
-import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle, Info } from 'lucide-react';
+import type { User, IncentiveClaim, Author } from '@/types';
+import { uploadFileToServer, findUserByMisId } from '@/app/actions';
+import { Loader2, AlertCircle, Info, Plus, Trash2, Search } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+const authorSchema = z.object({
+    name: z.string().min(2, 'Author name is required.'),
+    email: z.string().email('Invalid email format.'),
+    uid: z.string().optional().nullable(),
+    role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
+    isExternal: z.boolean(),
+});
 
 const apcSchema = z.object({
   apcTypeOfArticle: z.string({ required_error: 'Please select an article type.' }),
   apcOtherArticleType: z.string().optional(),
   apcPaperTitle: z.string().min(5, 'Paper title is required.'),
-  apcAuthors: z.string().min(3, 'Author names are required.'),
+  bookCoAuthors: z.array(authorSchema).min(1, 'At least one author is required.'),
   apcTotalStudentAuthors: z.coerce.number().optional(),
   apcStudentNames: z.string().optional(),
   apcJournalDetails: z.string().min(5, 'Journal details are required.'),
@@ -59,8 +67,8 @@ const apcSchema = z.object({
 type ApcFormValues = z.infer<typeof apcSchema>;
 
 const articleTypes = ['Research Paper Publication', 'Review Article', 'Letter to Editor', 'Other'];
-const indexingStatuses = ['Scopus', 'Web of science', 'UGC-CARE Group-I', 'Web of Science indexed journals (ESCI)'];
-
+const indexingStatuses = ['Scopus', 'Web of science', 'Web of Science indexed journals (ESCI)'];
+const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -93,13 +101,19 @@ export function ApcForm() {
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   
+  const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [externalAuthorName, setExternalAuthorName] = useState('');
+  const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
+
   const form = useForm<ApcFormValues>({
     resolver: zodResolver(apcSchema),
     defaultValues: {
       apcTypeOfArticle: '',
       apcOtherArticleType: '',
       apcPaperTitle: '',
-      apcAuthors: '',
+      bookCoAuthors: [],
       apcJournalDetails: '',
       apcJournalWebsite: '',
       apcIssnNo: '',
@@ -107,6 +121,11 @@ export function ApcForm() {
       apcIndexingStatus: [],
       apcSelfDeclaration: false,
     },
+  });
+
+  const { fields, append, remove, update } = useFieldArray({
+      control: form.control,
+      name: "bookCoAuthors",
   });
 
   const isSpecialFaculty = useMemo(() =>
@@ -124,8 +143,8 @@ export function ApcForm() {
   const formValues = form.watch();
 
   useEffect(() => {
-    const { apcIndexingStatus, apcQRating, apcTotalAmount, apcAuthors } = formValues;
-    const authorCount = apcAuthors ? apcAuthors.split(',').filter(a => a.trim() !== '').length : 1;
+    const { apcIndexingStatus, apcQRating, apcTotalAmount, bookCoAuthors } = formValues;
+    const authorCount = bookCoAuthors ? bookCoAuthors.length : 1;
     const actualApcPaid = apcTotalAmount || 0;
 
     let maxIncentive = 0;
@@ -161,12 +180,80 @@ export function ApcForm() {
       setUser(parsedUser);
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
+       if (fields.length === 0) {
+        append({ 
+            name: parsedUser.name, 
+            email: parsedUser.email,
+            uid: parsedUser.uid,
+            role: 'First Author',
+            isExternal: false,
+        });
+      }
     }
-  }, []);
+  }, [form, append, fields.length]);
 
   const watchArticleType = form.watch('apcTypeOfArticle');
   const watchWaiverRequested = form.watch('apcApcWaiverRequested');
   const watchIndexingStatus = form.watch('apcIndexingStatus');
+
+  const handleSearchCoPi = async () => {
+    if (!coPiSearchTerm) return;
+    setIsSearching(true);
+    setFoundCoPi(null);
+    try {
+        const result = await findUserByMisId(coPiSearchTerm);
+        if (result.success && result.users && result.users.length > 0) {
+            const user = result.users[0];
+            setFoundCoPi({ ...user });
+        } else {
+            toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+        }
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+    } finally {
+        setIsSearching(false);
+    }
+  };
+
+  const handleAddCoPi = () => {
+    if (foundCoPi && !fields.some(field => field.email === foundCoPi.email)) {
+        if (user && foundCoPi.email === user.email) {
+            toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself again.' });
+            return;
+        }
+        append({ 
+            name: foundCoPi.name, 
+            email: foundCoPi.email,
+            uid: foundCoPi.uid,
+            role: 'Co-Author',
+            isExternal: !foundCoPi.uid,
+        });
+    }
+    setFoundCoPi(null);
+    setCoPiSearchTerm('');
+  };
+  
+   const addExternalAuthor = () => {
+        const name = externalAuthorName.trim();
+        const email = externalAuthorEmail.trim().toLowerCase();
+        if (!name || !email) {
+            toast({ title: 'Name and email are required for external authors', variant: 'destructive' });
+            return;
+        }
+         if (fields.some(a => a.email === email)) {
+            toast({ title: 'Author already added', variant: 'destructive' });
+            return;
+        }
+        append({ name, email, role: 'Co-Author', isExternal: true, uid: null });
+        setExternalAuthorName('');
+        setExternalAuthorEmail('');
+    };
+
+  const updateAuthorRole = (index: number, role: Author['role']) => {
+    const author = fields[index];
+    update(index, { ...author, role });
+  };
+
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -279,7 +366,45 @@ export function ApcForm() {
                 <FormField control={form.control} name="apcTypeOfArticle" render={({ field }) => ( <FormItem><FormLabel>Type of Article</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-6">{articleTypes.map(type => (<FormItem key={type} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={type} /></FormControl><FormLabel className="font-normal">{type}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
                 {watchArticleType === 'Other' && <FormField name="apcOtherArticleType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Please specify other article type</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
                 <FormField name="apcPaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Paper</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="apcAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Author(s)</FormLabel><FormControl><Textarea placeholder="Comma-separated list of all authors" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                
+                <div className="space-y-4">
+                    <FormLabel>Author(s) & Roles</FormLabel>
+                     {fields.map((field, index) => (
+                        <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-3 rounded-md items-center">
+                            <div className="md:col-span-2">
+                                <p className="font-medium text-sm">{field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}</p>
+                                <p className="text-xs text-muted-foreground">{field.email}</p>
+                            </div>
+                            <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} defaultValue={field.role}>
+                                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                                <SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                            </Select>
+                            {index > 0 && ( <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => remove(index)}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button> )}
+                        </div>
+                    ))}
+                     <div className="space-y-2 p-3 border rounded-md">
+                        <FormLabel className="text-sm">Add PU Co-Author</FormLabel>
+                        <div className="flex items-center gap-2">
+                            <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
+                            <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                        </div>
+                        {foundCoPi && (
+                            <div className="flex items-center justify-between p-2 border rounded-md mt-2">
+                                <div><p className="text-sm">{foundCoPi.name}</p></div>
+                                <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
+                            </div>
+                        )}
+                    </div>
+                     <div className="space-y-2 p-3 border rounded-md">
+                        <FormLabel className="text-sm">Add External Co-Author</FormLabel>
+                        <div className="flex gap-2 mt-1">
+                            <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
+                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><Plus className="h-4 w-4"/></Button>
+                        </div>
+                    </div>
+                </div>
+
                 <FormField name="apcTotalStudentAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Number of Student authors</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Names of Student Authors</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcJournalDetails" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Details of the Journal</FormLabel><FormControl><Textarea placeholder="Name, Vol, Page No., Year, DOI" {...field} /></FormControl><FormMessage /></FormItem> )} />
