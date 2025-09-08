@@ -300,7 +300,7 @@ export function ApcForm() {
                 </div>
                  {calculatedIncentive !== null && (
                     <div className="p-4 bg-secondary rounded-md">
-                        <p className="text-sm font-medium">Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                        <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
                         <p className="text-xs text-muted-foreground">This is the maximum reimbursable amount based on policy.</p>
                     </div>
                 )}
