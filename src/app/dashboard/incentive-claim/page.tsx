@@ -298,7 +298,7 @@ export default function IncentiveClaimPage() {
 
           // Check for membership claim eligibility
           const lastMembershipClaim = claimList
-            .filter(c => c.claimType === 'Membership of Professional Bodies' && c.status !== 'Draft')
+            .filter(c => c.claimType === 'Membership of Professional Bodies' && c.status !== 'Draft' && c.status !== 'Rejected')
             .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())[0];
 
           if (lastMembershipClaim) {
