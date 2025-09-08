@@ -20,7 +20,7 @@ import { collection, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const membershipSchema = z.object({
     professionalBodyName: z.string().min(3, 'Name of the professional body is required.'),
@@ -51,6 +51,7 @@ export function MembershipForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   
   const form = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipSchema),
@@ -61,6 +62,17 @@ export function MembershipForm() {
       membershipLocale: 'International',
     },
   });
+
+  const amountPaid = form.watch('membershipAmountPaid');
+
+  useEffect(() => {
+    if (amountPaid && amountPaid > 0) {
+        const incentive = Math.min(amountPaid * 0.5, 10000);
+        setCalculatedIncentive(incentive);
+    } else {
+        setCalculatedIncentive(null);
+    }
+  }, [amountPaid]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -110,6 +122,7 @@ export function MembershipForm() {
 
         const claimData: Omit<IncentiveClaim, 'id'> = {
             ...restOfData,
+            calculatedIncentive,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
             claimType: 'Membership of Professional Bodies',
@@ -169,6 +182,12 @@ export function MembershipForm() {
                     <FormField name="membershipAmountPaid" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount Paid (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10000" {...field} /></FormControl><FormMessage /></FormItem> )} />
                     <FormField name="membershipPaymentDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Payment Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
+                {calculatedIncentive !== null && (
+                    <div className="p-4 bg-secondary rounded-md">
+                        <p className="text-sm font-medium">Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                        <p className="text-xs text-muted-foreground">50% of the membership fee, capped at ₹10,000.</p>
+                    </div>
+                )}
                 <FormField name="membershipProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof (Membership Certificate, Invoice/Receipt and Payment Proof)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
                 <FormField control={form.control} name="membershipSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
             </div>
