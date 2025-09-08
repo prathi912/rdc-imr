@@ -689,7 +689,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     <>
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
-        {isAdmin && project.status === "Under Review" && allEvaluationsIn && (
+        {isSuperAdmin && project.status === "Under Review" && allEvaluationsIn && (
           <Button onClick={handleOpenNotingDialog} disabled={isPrinting}>
               <Download className="mr-2 h-4 w-4" />
               Download Office Notings
@@ -714,7 +714,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
                 {project.status}
               </Badge>
-              {isAdmin && (
+              {isSuperAdmin && (
                 <>
                   {project.status === "Under Review" && (
                      <TooltipProvider>
