@@ -38,7 +38,11 @@ const apcSchema = z.object({
   apcTypeOfArticle: z.string({ required_error: 'Please select an article type.' }),
   apcOtherArticleType: z.string().optional(),
   apcPaperTitle: z.string().min(5, 'Paper title is required.'),
-  bookCoAuthors: z.array(authorSchema).min(1, 'At least one author is required.'),
+  bookCoAuthors: z.array(authorSchema).min(1, 'At least one author is required.')
+  .refine(data => {
+      const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+      return firstAuthors.length <= 1;
+  }, { message: 'Only one author can be designated as the First Author.', path: ['bookCoAuthors'] }),
   apcTotalStudentAuthors: z.coerce.number().optional(),
   apcStudentNames: z.string().optional(),
   apcJournalDetails: z.string().min(5, 'Journal details are required.'),
@@ -69,7 +73,7 @@ type ApcFormValues = z.infer<typeof apcSchema>;
 
 const articleTypes = ['Research Paper Publication', 'Review Article', 'Letter to Editor', 'Other'];
 const indexingStatuses = ['Scopus', 'Web of science', 'Web of Science indexed journals (ESCI)', 'UGC-CARE Group-I'];
-const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
+const coAuthorRoles: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -135,10 +139,11 @@ export function ApcForm() {
   );
 
   const availableIndexingStatuses = useMemo(() => {
-    if (isSpecialFaculty) {
-      return indexingStatuses.filter(status => status !== 'UGC-CARE Group-I' && status !== 'Web of Science indexed journals (ESCI)');
+    let statuses = ['Scopus', 'Web of science'];
+    if (!isSpecialFaculty) {
+        statuses.push('Web of Science indexed journals (ESCI)', 'UGC-CARE Group-I');
     }
-    return indexingStatuses;
+    return statuses;
   }, [isSpecialFaculty]);
 
   const formValues = form.watch();
@@ -192,6 +197,20 @@ export function ApcForm() {
       }
     }
   }, [form, append, fields.length]);
+  
+  const watchAuthors = form.watch('bookCoAuthors');
+  const firstAuthorExists = useMemo(() => 
+    watchAuthors.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author'),
+    [watchAuthors]
+  );
+  
+  const getAvailableRoles = (currentAuthor: Author) => {
+    const isCurrentAuthorFirst = currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author';
+    if (firstAuthorExists && !isCurrentAuthorFirst) {
+      return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
+    }
+    return coAuthorRoles;
+  };
 
   const watchArticleType = form.watch('apcTypeOfArticle');
   const watchWaiverRequested = form.watch('apcApcWaiverRequested');
@@ -378,7 +397,7 @@ export function ApcForm() {
                             </div>
                             <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} defaultValue={field.role}>
                                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-                                <SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                                <SelectContent>{getAvailableRoles(field).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
                             {index > 0 && ( <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => remove(index)}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button> )}
                         </div>
@@ -407,6 +426,7 @@ export function ApcForm() {
                             Important: If an external co-author is found at the approval stage that was not declared here, the claim will be rejected.
                         </FormDescription>
                     </div>
+                     <FormMessage>{form.formState.errors.bookCoAuthors?.message || form.formState.errors.bookCoAuthors?.root?.message}</FormMessage>
                 </div>
 
                 <FormField name="apcTotalStudentAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Number of Student authors</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />

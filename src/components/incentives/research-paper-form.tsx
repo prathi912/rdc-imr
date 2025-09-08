@@ -85,7 +85,10 @@ const researchPaperSchema = z
           isExternal: z.boolean(),
         }),
       )
-      .min(1, "At least one author is required."),
+      .min(1, "At least one author is required.").refine(data => {
+      const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+      return firstAuthors.length <= 1;
+    }, { message: 'Only one author can be designated as the First Author.' }),
     totalPuStudentAuthors: z.coerce.number().optional(),
     puStudentNames: z.string().optional(),
   })
@@ -97,15 +100,6 @@ const researchPaperSchema = z
       return true
     },
     { message: "For WoS or Both, you must select a WoS Type.", path: ["wosType"] },
-  )
-  .refine(
-    (data) => {
-      const firstAuthors = data.bookCoAuthors.filter(
-        (author) => author.role === "First Author" || author.role === "First & Corresponding Author",
-      )
-      return firstAuthors.length <= 1
-    },
-    { message: "Only one author can be designated as the First Author.", path: ["bookCoAuthors"] },
   )
   .refine(
     (data) => {
@@ -159,7 +153,7 @@ const sdgGoalsList = [
   "Goal 17: Partnerships for the Goals",
 ]
 
-const coAuthorRoles = ["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"]
+const coAuthorRoles: Author['role'][] = ["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"]
 const authorPositions = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 
 const wosTypeOptions = [
@@ -247,6 +241,20 @@ export function ResearchPaperForm() {
     control: form.control,
     name: "bookCoAuthors",
   })
+  
+  const watchAuthors = form.watch('bookCoAuthors');
+  const firstAuthorExists = useMemo(() => 
+    watchAuthors.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author'),
+    [watchAuthors]
+  );
+  
+  const getAvailableRoles = (currentAuthor: Author) => {
+    const isCurrentAuthorFirst = currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author';
+    if (firstAuthorExists && !isCurrentAuthorFirst) {
+      return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
+    }
+    return coAuthorRoles;
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -901,7 +909,7 @@ export function ResearchPaperForm() {
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  {coAuthorRoles.map((role) => (
+                                  {getAvailableRoles(field).map((role) => (
                                     <SelectItem key={role} value={role}>
                                       {role}
                                     </SelectItem>
