@@ -150,30 +150,29 @@ export function ApcForm() {
   useEffect(() => {
     const { apcIndexingStatus, apcQRating, apcTotalAmount, bookCoAuthors } = formValues;
     
-    // Calculate based on internal (PU) authors only
     const internalAuthorCount = bookCoAuthors ? bookCoAuthors.filter(author => !author.isExternal).length : 0;
     const actualApcPaid = apcTotalAmount || 0;
 
-    let maxIncentive = 0;
+    let maxIncentivePerAuthor = 0;
 
     if (apcIndexingStatus?.includes('Scopus') || apcIndexingStatus?.includes('Web of science')) {
         switch (apcQRating) {
-            case 'Q1': maxIncentive = 40000; break;
-            case 'Q2': maxIncentive = 30000; break;
-            case 'Q3': maxIncentive = 20000; break;
-            case 'Q4': maxIncentive = 15000; break;
+            case 'Q1': maxIncentivePerAuthor = 40000; break;
+            case 'Q2': maxIncentivePerAuthor = 30000; break;
+            case 'Q3': maxIncentivePerAuthor = 20000; break;
+            case 'Q4': maxIncentivePerAuthor = 15000; break;
         }
     } else if (!isSpecialFaculty) {
         if (apcIndexingStatus?.includes('UGC-CARE Group-I')) {
-            maxIncentive = 5000;
+            maxIncentivePerAuthor = 5000;
         } else if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
-            maxIncentive = 8000;
+            maxIncentivePerAuthor = 8000;
         }
     }
 
-    if (maxIncentive > 0 && actualApcPaid > 0 && internalAuthorCount > 0) {
-        const admissibleApc = actualApcPaid / internalAuthorCount;
-        setCalculatedIncentive(Math.min(admissibleApc, maxIncentive));
+    if (maxIncentivePerAuthor > 0 && actualApcPaid > 0 && internalAuthorCount > 0) {
+        const admissibleApcPerAuthor = actualApcPaid / internalAuthorCount;
+        setCalculatedIncentive(Math.min(admissibleApcPerAuthor, maxIncentivePerAuthor));
     } else {
         setCalculatedIncentive(null);
     }
@@ -187,7 +186,6 @@ export function ApcForm() {
       setUser(parsedUser);
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
-      // Ensure the current user is added as an author only once on form load
       const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({ 
