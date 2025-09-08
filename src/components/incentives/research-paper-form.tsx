@@ -263,6 +263,7 @@ export function ResearchPaperForm() {
       setUser(parsedUser)
       setBankDetailsMissing(!parsedUser.bankDetails)
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId)
+
       const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({

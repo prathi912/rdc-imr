@@ -38,7 +38,11 @@ const bookSchema = z
         uid: z.string().optional().nullable(),
         role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
         isExternal: z.boolean(),
-    })).min(1, 'At least one author is required.'),
+    })).min(1, 'At least one author is required.')
+    .refine(data => {
+        const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+        return firstAuthors.length <= 1;
+    }, { message: 'Only one author can be designated as the First Author.', path: ['bookCoAuthors'] }),
     bookTitleForChapter: z.string().optional(),
     bookEditor: z.string().optional(),
     totalPuStudents: z.coerce.number().optional(),
@@ -72,15 +76,11 @@ const bookSchema = z
   .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Print Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnPrint && data.isbnPrint.length >= 10), { message: 'A valid Print ISBN is required.', path: ['isbnPrint']})
   .refine(data => !(data.bookApplicationType === 'Book' && (data.publicationMode === 'Electronic Only' || data.publicationMode === 'Print & Electronic')) || (!!data.isbnElectronic && data.isbnElectronic.length >= 10), { message: 'A valid Electronic ISBN is required.', path: ['isbnElectronic']})
   .refine(data => !(data.bookApplicationType === 'Book') || !!data.authorRole, { message: 'Applicant type is required for book publications.', path: ['authorRole'] })
-  .refine(data => !(data.bookApplicationType === 'Book') || (data.bookTotalChapters !== undefined && data.bookTotalChapters >= 0), { message: 'Total chapters are required for book publications.', path: ['bookTotalChapters'] })
-  .refine(data => {
-      const firstAuthors = data.bookCoAuthors.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
-      return firstAuthors.length <= 1;
-  }, { message: 'Only one author can be designated as the First Author.', path: ['bookCoAuthors'] });
+  .refine(data => !(data.bookApplicationType === 'Book') || (data.bookTotalChapters !== undefined && data.bookTotalChapters >= 0), { message: 'Total chapters are required for book publications.', path: ['bookTotalChapters'] });
 
 type BookFormValues = z.infer<typeof bookSchema>;
 
-const coAuthorRoles = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
+const coAuthorRoles: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
 
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -223,7 +223,7 @@ export function BookForm() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
       control: form.control,
       name: "bookCoAuthors",
   });
@@ -236,6 +236,7 @@ export function BookForm() {
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
       }
+      
       const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({ 

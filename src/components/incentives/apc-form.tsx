@@ -186,6 +186,8 @@ export function ApcForm() {
       setUser(parsedUser);
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
+
+      // This logic ensures the user is added only once on mount.
       const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({ 
@@ -272,7 +274,6 @@ export function ApcForm() {
     };
 
   const removeAuthor = (index: number) => {
-    // Prevent the primary user from being removed
     const authorToRemove = fields[index];
     if (authorToRemove.email === user?.email) {
       toast({ variant: 'destructive', title: 'Action not allowed', description: 'You cannot remove yourself as the primary author.' });
