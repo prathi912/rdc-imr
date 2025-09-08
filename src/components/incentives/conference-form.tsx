@@ -217,6 +217,7 @@ export function ConferenceForm() {
               claimsRef, 
               where('uid', '==', parsedUser.uid), 
               where('claimType', '==', 'Conference Presentations'),
+              where('conferenceMode', '==', 'Offline'),
               where('status', 'in', ['Accepted', 'Submitted to Accounts', 'Payment Completed']),
               orderBy('submissionDate', 'desc')
           );
@@ -326,7 +327,8 @@ export function ConferenceForm() {
     }
   }
 
-  const isFormDisabled = !eligibility.eligible || isSubmitting;
+  const isFormDisabled = (!eligibility.eligible && form.watch('conferenceMode') === 'Offline') || isSubmitting;
+
 
   return (
     <Card>
@@ -347,9 +349,9 @@ export function ConferenceForm() {
             {!eligibility.eligible && (
                  <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Not Eligible</AlertTitle>
+                    <AlertTitle>Not Eligible for Offline Conference</AlertTitle>
                     <AlertDescription>
-                        As per policy, a faculty member is eligible for conference assistance once every two years. You will be eligible to apply again on <strong>{eligibility.nextAvailableDate}</strong>.
+                        As per policy, a faculty member is eligible for <strong>offline</strong> conference assistance once every two years. You will be eligible to apply again on <strong>{eligibility.nextAvailableDate}</strong>. You may still apply for online conferences.
                     </AlertDescription>
                 </Alert>
             )}
@@ -360,7 +362,8 @@ export function ConferenceForm() {
               <AlertDescription>
                 <ul className="list-disc list-inside space-y-1 mt-2 text-xs">
                     <li>Only the presenting author is entitled for reimbursement.</li>
-                    <li>For conferences outside India, proof of application for government travel grants is mandatory.</li>
+                    <li>For <strong>offline conferences outside India</strong>, proof of application for government travel grants is mandatory.</li>
+                    <li>A faculty member is eligible for assistance for <strong>offline</strong> conferences ONCE in TWO years. There is no limit for online presentations.</li>
                     <li>Airfare for International travel and II-AC train fare (or actual, whichever is lesser) for travel within India shall be reimbursed within policy limits.</li>
                      <li>Please refer to the full SOP for detailed limits and conditions.</li>
                 </ul>
@@ -386,7 +389,7 @@ export function ConferenceForm() {
                             <FormField name="presentationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Oral">Oral</SelectItem><SelectItem value="Poster">Poster</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
                         </div>
                          <FormField control={form.control} name="conferenceVenue" render={({ field }) => ( <FormItem><FormLabel>Conference Venue/Location</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!conferenceType || isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select venue" /></SelectTrigger></FormControl><SelectContent>{(conferenceVenueOptions[conferenceType as keyof typeof conferenceVenueOptions] || []).map(venue => (<SelectItem key={venue} value={venue}>{venue}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                         <FormField name="conferenceMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Mode</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Online" disabled={isFormDisabled} /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Offline" disabled={isFormDisabled} /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                         <FormField name="conferenceMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Mode</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Online" disabled={isSubmitting} /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Offline" disabled={isFormDisabled} /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                          {conferenceMode === 'Online' && (<FormField name="onlinePresentationOrder" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Online Presentation Order</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem><SelectItem value="Additional">Additional</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />)}
                         <FormField name="abstractUpload" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Full Abstract (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="participationCertificate" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Participation/Presentation Certificate (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} />
@@ -417,7 +420,7 @@ export function ConferenceForm() {
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
-              disabled={isFormDisabled}
+              disabled={isSubmitting}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
