@@ -188,7 +188,7 @@ export function ApcForm() {
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
       // Ensure the current user is added as an author only once on form load
-      const isUserAlreadyAdded = fields.some(field => field.email === parsedUser.email);
+      const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({ 
             name: parsedUser.name, 
@@ -199,7 +199,8 @@ export function ApcForm() {
         });
       }
     }
-  }, [append, fields]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   const watchAuthors = form.watch('bookCoAuthors');
   const firstAuthorExists = useMemo(() => 
@@ -417,7 +418,7 @@ export function ApcForm() {
                                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                                 <SelectContent>{getAvailableRoles(field).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
-                            {field.email !== user?.email && (
+                            {field.email.toLowerCase() !== user?.email.toLowerCase() && (
                               <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => removeAuthor(index)}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button> 
                             )}
                         </div>

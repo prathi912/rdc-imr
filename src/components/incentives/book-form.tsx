@@ -236,7 +236,7 @@ export function BookForm() {
       if (!parsedUser.bankDetails) {
         setBankDetailsMissing(true);
       }
-      const isUserAlreadyAdded = fields.some(field => field.email === parsedUser.email);
+      const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({ 
             name: parsedUser.name, 
@@ -247,7 +247,8 @@ export function BookForm() {
         });
       }
     }
-  }, [form, append, fields]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const bookApplicationType = form.watch('bookApplicationType');
   const publicationMode = form.watch('publicationMode');
@@ -356,12 +357,9 @@ export function BookForm() {
     setFoundCoPi(null);
     try {
         const result = await findUserByMisId(coPiSearchTerm);
-        if (result.success) {
-            if (result.user) {
-                setFoundCoPi({ ...result.user });
-            } else if (result.staff) {
-                setFoundCoPi({ ...result.staff, uid: undefined });
-            }
+        if (result.success && result.users && result.users.length > 0) {
+            const user = result.users[0];
+            setFoundCoPi({ ...user, uid: user.uid || undefined });
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
         }
@@ -373,8 +371,8 @@ export function BookForm() {
   };
 
   const handleAddCoPi = () => {
-    if (foundCoPi && !fields.some(field => field.email === foundCoPi.email)) {
-        if (user && foundCoPi.email === user.email) {
+    if (foundCoPi && !fields.some(field => field.email.toLowerCase() === foundCoPi.email.toLowerCase())) {
+        if (user && foundCoPi.email.toLowerCase() === user.email.toLowerCase()) {
             toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
             return;
         }

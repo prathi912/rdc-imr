@@ -263,7 +263,7 @@ export function ResearchPaperForm() {
       setUser(parsedUser)
       setBankDetailsMissing(!parsedUser.bankDetails)
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId)
-      const isUserAlreadyAdded = fields.some(field => field.email === parsedUser.email);
+      const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({
           name: parsedUser.name,
@@ -274,7 +274,8 @@ export function ResearchPaperForm() {
         })
       }
     }
-  }, [form, append, fields])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const indexType = form.watch("indexType")
 
@@ -420,8 +421,8 @@ export function ResearchPaperForm() {
   }
 
   const handleAddCoPi = () => {
-    if (foundCoPi && !fields.some((field) => field.email === foundCoPi.email)) {
-      if (user && foundCoPi.email === user.email) {
+    if (foundCoPi && !fields.some((field) => field.email.toLowerCase() === foundCoPi.email.toLowerCase())) {
+      if (user && foundCoPi.email.toLowerCase() === user.email.toLowerCase()) {
         toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself again." })
         return
       }
@@ -930,7 +931,7 @@ export function ResearchPaperForm() {
                             </FormItem>
                           )}
                         />
-                        {field.email !== user?.email && (
+                        {field.email.toLowerCase() !== user?.email.toLowerCase() && (
                           <Button
                             type="button"
                             variant="destructive"
