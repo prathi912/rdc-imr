@@ -20,7 +20,7 @@ import { collection, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const membershipSchema = z.object({
     professionalBodyName: z.string().min(3, 'Name of the professional body is required.'),
