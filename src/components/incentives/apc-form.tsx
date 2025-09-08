@@ -149,7 +149,9 @@ export function ApcForm() {
 
   useEffect(() => {
     const { apcIndexingStatus, apcQRating, apcTotalAmount, bookCoAuthors } = formValues;
-    const authorCount = bookCoAuthors ? bookCoAuthors.length : 1;
+    
+    // Calculate based on internal (PU) authors only
+    const internalAuthorCount = bookCoAuthors ? bookCoAuthors.filter(author => !author.isExternal).length : 1;
     const actualApcPaid = apcTotalAmount || 0;
 
     let maxIncentive = 0;
@@ -169,8 +171,8 @@ export function ApcForm() {
         }
     }
 
-    if (maxIncentive > 0 && actualApcPaid > 0 && authorCount > 0) {
-        const admissibleApc = actualApcPaid / authorCount;
+    if (maxIncentive > 0 && actualApcPaid > 0 && internalAuthorCount > 0) {
+        const admissibleApc = actualApcPaid / internalAuthorCount;
         setCalculatedIncentive(Math.min(admissibleApc, maxIncentive));
     } else {
         setCalculatedIncentive(null);
@@ -377,7 +379,7 @@ export function ApcForm() {
                 <Info className="h-4 w-4" />
                 <AlertTitle>APC Reimbursement Policy</AlertTitle>
                 <AlertDescription>
-                    Admissible APC = (Actual APC paid to the publisher ÷ total number of authors) — with a limit of maximum APC as per the policy.
+                    Admissible APC = (Actual APC paid to the publisher ÷ total number of authors from PU) — with a limit of maximum APC as per the policy.
                     <br/>
                     The author must request the Editor for an APC waiver and submit the proof along with this application.
                 </AlertDescription>
