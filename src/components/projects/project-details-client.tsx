@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import * as z from "zod"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { format, startOfToday, isToday, parseISO } from "date-fns"
+import { format, startOfToday, isToday, parseISO, isAfter, subDays, addDays, isBefore } from "date-fns"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -266,9 +266,20 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
     return false
   }, [user, isSuperAdmin, isAssignedEvaluator, project.meetingDetails])
+  
+  const isEvaluationPeriodActive = useMemo(() => {
+    if (!project.meetingDetails?.date) return false;
+    const meetingDate = parseISO(project.meetingDetails.date);
+    const today = startOfToday();
+    const sevenDaysAfterMeeting = addDays(meetingDate, 7);
 
-  const isMeetingToday = project.meetingDetails?.date ? isToday(parseISO(project.meetingDetails.date)) : false
-  const showEvaluationForm = user && project.status === "Under Review" && isAssignedEvaluator && isMeetingToday
+    // The evaluation is active if today is on or after the meeting date,
+    // and on or before 7 days after the meeting date.
+    return !isBefore(today, meetingDate) && !isAfter(today, sevenDaysAfterMeeting);
+  }, [project.meetingDetails?.date]);
+  
+  const showEvaluationForm = user && project.status === "Under Review" && isAssignedEvaluator && isEvaluationPeriodActive;
+
 
   const allEvaluationsIn =
     (project.meetingDetails?.assignedEvaluators?.length ?? 0) > 0 &&
