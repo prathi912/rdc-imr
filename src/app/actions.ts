@@ -1,4 +1,5 @@
 
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -60,8 +61,8 @@ export async function checkPatentUniqueness(title: string, applicationNumber: st
     try {
         const claimsRef = adminDb.collection('incentiveClaims');
         
-        const titleQuery = query(claimsRef, where('patentTitle', '==', title));
-        const appNumberQuery = query(claimsRef, where('patentApplicationNumber', '==', applicationNumber));
+        const titleQuery = claimsRef.where('patentTitle', '==', title);
+        const appNumberQuery = claimsRef.where('patentApplicationNumber', '==', applicationNumber);
 
         const [titleSnapshot, appNumberSnapshot] = await Promise.all([
             getDocs(titleQuery),
