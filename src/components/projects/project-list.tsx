@@ -23,7 +23,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { parseISO } from 'date-fns';
+import { parseISO, format } from 'date-fns';
 import { Progress } from '@/components/ui/progress';
 
 interface ProjectListProps {
@@ -233,7 +233,7 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
                     <TableCell className="hidden sm:table-cell whitespace-nowrap">{new Date(displayDate).toLocaleDateString()}</TableCell>
                     {showMeetingDateColumn && (
                         <TableCell className="hidden md:table-cell whitespace-nowrap">
-                            {project.meetingDetails?.date ? new Date(project.meetingDetails.date.replace(/-/g, '/')).toLocaleDateString() : 'N/A'}
+                            {project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'PPP') : 'N/A'}
                         </TableCell>
                     )}
                     <TableCell className="hidden md:table-cell">
