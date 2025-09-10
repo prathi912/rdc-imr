@@ -1,5 +1,4 @@
 
-
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -216,7 +215,7 @@ export type IncentiveClaim = {
   userName: string
   userEmail: string
   claimId?: string; // Standardized, sequential ID like RDC/IC/PAPER/0001
-  status: "Pending" | "Accepted" | "Rejected" | "Draft" | "Pending Stage 1 Approval" | "Pending Stage 2 Approval" | "Pending Stage 3 Approval" | "Submitted to Accounts";
+  status: "Pending" | "Accepted" | "Rejected" | "Draft" | "Pending Stage 1 Approval" | "Pending Stage 2 Approval" | "Pending Stage 3 Approval" | "Submitted to Accounts" | "Payment Completed";
   submissionDate: string // ISO String
   faculty: string
   bankDetails?: UserBankDetails
