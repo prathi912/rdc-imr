@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
@@ -194,6 +194,7 @@ export function BookForm() {
   const [externalAuthorName, setExternalAuthorName] = useState('');
   const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
   const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
 
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
@@ -232,6 +233,22 @@ export function BookForm() {
       control: form.control,
       name: "authors",
   });
+  
+  const formValues = form.watch();
+
+  const calculate = useCallback(async () => {
+    const result = await calculateBookIncentive(formValues);
+    if (result.success) {
+        setCalculatedIncentive(result.amount ?? null);
+    } else {
+        console.error("Incentive calculation failed:", result.error);
+        setCalculatedIncentive(null);
+    }
+  }, [formValues]);
+
+  useEffect(() => {
+    calculate();
+  }, [calculate]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -564,6 +581,12 @@ export function BookForm() {
                 
                 <FormField name="publisherWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Publisher Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publicationOrderInYear" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select publication order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                 {calculatedIncentive !== null && (
+                    <div className="p-4 bg-secondary rounded-md">
+                        <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                        <p className="text-xs text-muted-foreground">This is your individual share based on policy, publication type, and author roles.</p>
+                    </div>
+                )}
                 <FormField name="bookProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach copy of Book / Book Chapter (First Page, Publisher Page, Index, Abstract) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
                 {isScopusIndexed && <FormField name="scopusProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof of indexed in Scopus (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />}
                 <FormField control={form.control} name="bookSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
