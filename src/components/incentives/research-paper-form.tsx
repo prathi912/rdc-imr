@@ -525,7 +525,7 @@ export function ResearchPaperForm() {
       
       const publicationProofFiles = data.publicationProof ? Array.from(data.publicationProof as FileList) : [];
       const publicationProofUrls = await Promise.all(
-          publicationProofFiles.map((file, index) => 
+          publicationProofFiles.map(async (file, index) => 
               uploadFileToServer(
                   `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`,
                   `incentive-proofs/${user.uid}/publication-proof/${new Date().toISOString()}-${index}-${file.name}`
