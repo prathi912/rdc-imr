@@ -63,7 +63,7 @@ export default function LandingPage() {
                     Empowering University Research
                   </h1>
                   <p className="max-w-[600px] text-muted-foreground md:text-xl">
-                    This comprehensive portal streamlines the entire research lifecycle at Parul University. From IMR & EMR proposal submissions to AI-assisted evaluations, it is designed to foster innovation from within.
+                    Our comprehensive portal streamlines the entire research lifecycle. From IMR & EMR proposal submissions to AI-assisted evaluations, it is designed to foster innovation from within.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
