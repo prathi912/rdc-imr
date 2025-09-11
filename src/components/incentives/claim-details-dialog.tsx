@@ -258,19 +258,23 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Patent Details</h4>
                             {renderDetail("Patent Title", claim.patentTitle)}
-                            {renderDetail("Specification Type", claim.patentSpecificationType)}
                             {renderDetail("Application/Ref No.", claim.patentApplicationNumber)}
-                            {renderDetail("Patent Status", claim.patentStatus)}
-                            {renderDetail("Applicant Type", claim.patentApplicantType === 'Sole' ? 'Parul University as Sole Applicant' : 'Parul University as Joint Applicant')}
-                            {renderDetail("PU as Applicant?", claim.patentFiledInPuName)}
-                            {renderDetail("Filed from IPR Cell?", claim.patentFiledFromIprCell)}
-                            {renderDetail("Permission Taken (if not from IPR Cell)", claim.patentPermissionTaken)}
-                            {renderDetail("Total Students", claim.patentTotalStudents)}
-                            {renderDetail("Student Names", claim.patentStudentNames)}
-                            {renderLinkDetail("Approval Proof", claim.patentApprovalProofUrl)}
+                            {renderDetail("Current Status", claim.currentStatus)}
+                            {renderDetail("Domain", claim.patentDomain)}
+                            {renderDetail("Locale", claim.patentLocale)}
+                            {renderDetail("Country (if Intl.)", claim.patentCountry)}
+                            {renderDetail("Filing Date", claim.filingDate ? new Date(claim.filingDate).toLocaleDateString() : 'N/A')}
+                            {renderDetail("Publication Date", claim.publicationDate ? new Date(claim.publicationDate).toLocaleDateString() : 'N/A')}
+                            {renderDetail("Grant Date", claim.grantDate ? new Date(claim.grantDate).toLocaleDateString() : 'N/A')}
+                            {renderDetail("Inventors", claim.patentInventors?.map(i => `${i.name} (${i.misId})`).join(', '))}
+                            {renderDetail("Co-Applicants", claim.patentCoApplicants?.map(i => `${i.name} (${i.misId})`).join(', '))}
+                            {renderDetail("Collaboration", claim.isCollaboration)}
+                            {renderDetail("Collaboration Details", claim.collaborationDetails)}
+                            {renderDetail("Relates to SDGs", claim.isIprSdg)}
+                            {renderDetail("Selected SDGs", claim.sdgGoals)}
+                            {renderDetail("Disciplinary Type", claim.isIprDisciplinary)}
+                            {renderDetail("Disciplinary Details", claim.disciplinaryType)}
                             {renderLinkDetail("Form 1 Proof", claim.patentForm1Url)}
-                            {renderLinkDetail("Govt. Receipt Proof", claim.patentGovtReceiptUrl)}
-                            {renderDetail("Self Declaration", claim.patentSelfDeclaration)}
                         </>
                     )}
                     
@@ -332,7 +336,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {claim.bookApplicationType === 'Book Chapter' && renderDetail("Editor(s)", claim.bookEditor)}
                             {renderDetail("Publisher", claim.publisherName)}
                             {renderDetail("Publisher Type", claim.publisherType)}
-                            {renderDetail("Publisher Website", claim.publisherWebsite)}
+                            {renderLinkDetail("Publisher Website", claim.publisherWebsite)}
                             {claim.publicationMode === 'Print Only' && renderDetail("ISBN (Print)", claim.isbnPrint)}
                             {claim.publicationMode === 'Electronic Only' && renderDetail("ISBN (Electronic)", claim.isbnElectronic)}
                             {claim.publicationMode === 'Print & Electronic' && (
