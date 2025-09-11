@@ -20,13 +20,11 @@ import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
 import { collection, doc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
-import {
-  uploadFileToServer,
-  calculateIncentive,
-} from "@/app/actions"
+import { uploadFileToServer } from "@/app/actions"
 import { findUserByMisId } from "@/app/userfinding";
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
+import { calculateResearchPaperIncentive } from "@/app/incentive-calculation";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search } from "lucide-react"
 import {
   DropdownMenu,
@@ -250,7 +248,7 @@ export function ResearchPaperForm() {
 
   const calculate = useCallback(async () => {
     if (!user || !user.faculty) return;
-    const result = await calculateIncentive(formValues, user.faculty);
+    const result = await calculateResearchPaperIncentive(formValues, user.faculty);
     if (result.success) {
         setCalculatedIncentive(result.amount ?? null);
     } else {
@@ -1124,5 +1122,3 @@ export function ResearchPaperForm() {
     </div>
   )
 }
-
-    
