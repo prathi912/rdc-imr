@@ -48,14 +48,14 @@ const conferenceSchema = z
   .object({
     conferencePaperTitle: z.string().min(5, 'Paper title is required.'),
     conferenceName: z.string().min(3, 'Conference name is required.'),
+    conferenceMode: z.enum(['Online', 'Offline'], { required_error: 'Presentation mode is required.' }),
+    onlinePresentationOrder: z.enum(['First', 'Second', 'Third', 'Additional']).optional(),
     conferenceType: z.enum(['International', 'National', 'Regional/State'], { required_error: 'Conference type is required.' }),
-    conferenceVenue: z.enum(['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American'], { required_error: 'Conference venue is required.' }),
-    presentationType: z.enum(['Oral', 'Poster', 'Other'], { required_error: 'Presentation type is required.' }),
+    conferenceVenue: z.enum(['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American', 'Other'], { required_error: 'Conference venue is required.' }),
+    presentationType: z.enum(['Oral', 'Poster', 'Other']).optional(),
     govtFundingRequestProof: z.any().optional(),
     registrationFee: z.coerce.number().optional(),
     travelFare: z.coerce.number().optional(),
-    conferenceMode: z.enum(['Online', 'Offline'], { required_error: 'Presentation mode is required.' }),
-    onlinePresentationOrder: z.enum(['First', 'Second', 'Third', 'Additional']).optional(),
     wasPresentingAuthor: z.boolean().optional(),
     isPuNamePresent: z.boolean().optional(),
     abstractUpload: z.any().optional(),
@@ -81,6 +81,7 @@ const conferenceSchema = z
   .refine(data => !(data.conferenceVenue && data.conferenceVenue !== 'India') || (!!data.govtFundingRequestProof && data.govtFundingRequestProof.length > 0), { message: 'Proof of government funding request is required for conferences outside India.', path: ['govtFundingRequestProof']})
   .refine(data => !(data.wonPrize) || (!!data.prizeDetails && data.prizeDetails.length > 2), { message: 'Prize details are required if you won a prize.', path: ['prizeDetails']})
   .refine(data => !(data.wonPrize) || (!!data.prizeProof && data.prizeProof.length > 0), { message: 'Proof of prize is required if you won a prize.', path: ['prizeProof']})
+  .refine(data => data.conferenceMode === 'Online' || !!data.presentationType, { message: 'Presentation type is required for offline conferences.', path: ['presentationType'] })
   .refine(data => !data.conferenceDate || !data.presentationDate || new Date(data.presentationDate) >= new Date(data.conferenceDate), {
     message: 'Presentation date must be on or after the conference start date.',
     path: ['presentationDate'],
@@ -89,7 +90,7 @@ const conferenceSchema = z
 type ConferenceFormValues = z.infer<typeof conferenceSchema>;
 
 const conferenceVenueOptions = {
-    'International': ['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American'],
+    'International': ['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American', 'Other'],
     'National': ['India'],
     'Regional/State': ['India'],
 }
@@ -189,6 +190,9 @@ export function ConferenceForm() {
           case 'African/South American/North American': maxReimbursement = 75000; break;
           case 'India':
             maxReimbursement = presentationType === 'Oral' ? 20000 : 15000;
+            break;
+          case 'Other':
+            maxReimbursement = 75000; // Defaulting to max for "Other" international
             break;
         }
       } else if (conferenceType === 'National') {
@@ -378,6 +382,8 @@ export function ConferenceForm() {
                     <div className="space-y-4 mt-4">
                         <FormField name="conferencePaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Paper Title</FormLabel><FormControl><Input placeholder="Title of the paper presented" {...field} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="conferenceName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference/Event Name</FormLabel><FormControl><Input placeholder="Full name of the conference" {...field} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="conferenceMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Mode</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Online" disabled={isSubmitting} /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Offline" disabled={isFormDisabled} /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                        {conferenceMode === 'Online' && (<FormField name="onlinePresentationOrder" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Online Presentation Order</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem><SelectItem value="Additional">Additional</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />)}
                         <FormField name="organizerName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Organizer Name</FormLabel><FormControl><Input placeholder="Name of Institution/Organisation" {...field} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} />
                          <FormField name="eventWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Event Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -386,11 +392,9 @@ export function ConferenceForm() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField name="conferenceType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Conference Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="International">International</SelectItem><SelectItem value="National">National</SelectItem><SelectItem value="Regional/State">Regional/State</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
-                            <FormField name="presentationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Oral">Oral</SelectItem><SelectItem value="Poster">Poster</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                            {conferenceMode === 'Offline' && <FormField name="presentationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Oral">Oral</SelectItem><SelectItem value="Poster">Poster</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />}
                         </div>
                          <FormField control={form.control} name="conferenceVenue" render={({ field }) => ( <FormItem><FormLabel>Conference Venue/Location</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!conferenceType || isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select venue" /></SelectTrigger></FormControl><SelectContent>{(conferenceVenueOptions[conferenceType as keyof typeof conferenceVenueOptions] || []).map(venue => (<SelectItem key={venue} value={venue}>{venue}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                         <FormField name="conferenceMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Mode</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Online" disabled={isSubmitting} /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Offline" disabled={isFormDisabled} /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
-                         {conferenceMode === 'Online' && (<FormField name="onlinePresentationOrder" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Online Presentation Order</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem><SelectItem value="Additional">Additional</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />)}
                         <FormField name="abstractUpload" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Full Abstract (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="participationCertificate" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Participation/Presentation Certificate (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
