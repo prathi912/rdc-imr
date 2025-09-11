@@ -229,9 +229,10 @@ export async function processIncentiveClaimAction(
     if (action === 'reject') {
       newStatus = 'Rejected';
     } else {
-        const isChecklistStage = stageIndex === 0 && claim.claimType === 'Research Papers';
-        if (stageIndex === 0 && (action === 'verify' || action === 'approve')) {
-             newStatus = 'Pending Stage 2 Approval';
+        const isChecklistStage = (stageIndex === 0 || stageIndex === 1) && claim.claimType === 'Research Papers';
+
+        if (isChecklistStage && (action === 'verify' || action === 'approve')) {
+             newStatus = `Pending Stage ${stageIndex + 2} Approval` as IncentiveClaim['status'];
         } else if (stageIndex === 3) { // Final approval stage is now 3 (for stage 4)
              newStatus = 'Accepted';
         } else {
@@ -245,7 +246,7 @@ export async function processIncentiveClaimAction(
     };
     
     // Only update the final amount from Stage 2 onwards
-    if (stageIndex > 0 && action === 'approve') {
+    if (stageIndex > 1 && action === 'approve') {
         updateData.finalApprovedAmount = data.amount;
     }
 
