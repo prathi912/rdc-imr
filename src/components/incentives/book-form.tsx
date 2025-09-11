@@ -24,7 +24,8 @@ import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { findUserByMisId } from '@/app/userfinding';
 import { Loader2, AlertCircle, Plus, Trash2, Search, Edit } from 'lucide-react';
-import { calculateIncentive } from '@/app/incentive-actions';
+import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { calculateBookIncentive } from '@/app/incentive-calculation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Badge } from '../ui/badge';
 
@@ -32,17 +33,18 @@ const bookSchema = z
   .object({
     bookApplicationType: z.enum(['Book Chapter', 'Book'], { required_error: 'Please select an application type.' }),
     publicationTitle: z.string().min(3, 'Title is required.'),
-    bookCoAuthors: z.array(z.object({
+    authors: z.array(z.object({
         name: z.string().min(2, 'Author name is required.'),
         email: z.string().email('Invalid email format.'),
         uid: z.string().optional().nullable(),
         role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
         isExternal: z.boolean(),
+        status: z.enum(['approved', 'pending', 'Applied']),
     })).min(1, 'At least one author is required.')
     .refine(data => {
         const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
         return firstAuthors.length <= 1;
-    }, { message: 'Only one author can be designated as the First Author.', path: ['bookCoAuthors'] }),
+    }, { message: 'Only one author can be designated as the First Author.', path: ['authors'] }),
     bookTitleForChapter: z.string().optional(),
     bookEditor: z.string().optional(),
     totalPuStudents: z.coerce.number().optional(),
@@ -92,7 +94,7 @@ const fileToDataUrl = (file: File): Promise<string> => {
 };
 
 function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => void }) {
-    const renderDetail = (label: string, value?: string | number | boolean | string[] | BookCoAuthor[]) => {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[]) => {
         if (!value && value !== 0 && value !== false) return null;
         
         let displayValue: React.ReactNode = String(value);
@@ -112,7 +114,7 @@ function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => v
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {(value as BookCoAuthor[]).map((author, idx) => (
+                                {(value as Author[]).map((author, idx) => (
                                     <TableRow key={idx}>
                                         <TableCell>{author.name}</TableCell>
                                         <TableCell><Badge variant="secondary">{author.role}</Badge></TableCell>
@@ -151,7 +153,7 @@ function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => v
                 {renderDetail("Application Type", data.bookApplicationType)}
                 {renderDetail("Title", data.publicationTitle)}
                 {renderDetail("Book Title (for Chapter)", data.bookTitleForChapter)}
-                {renderDetail("Authors", data.bookCoAuthors)}
+                {renderDetail("Authors", data.authors)}
                 {renderDetail("Editor", data.bookEditor)}
                 {renderDetail("Total PU Students", data.totalPuStudents)}
                 {renderDetail("PU Student Names", data.puStudentNames)}
@@ -189,13 +191,16 @@ export function BookForm() {
   const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [externalAuthorName, setExternalAuthorName] = useState('');
+  const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
+  const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
 
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
     defaultValues: {
       bookApplicationType: undefined,
       publicationTitle: '',
-      bookCoAuthors: [],
+      authors: [],
       bookTitleForChapter: '',
       bookEditor: '',
       totalPuStudents: 0,
@@ -225,7 +230,7 @@ export function BookForm() {
 
   const { fields, append, remove, update } = useFieldArray({
       control: form.control,
-      name: "bookCoAuthors",
+      name: "authors",
   });
 
   useEffect(() => {
@@ -237,7 +242,7 @@ export function BookForm() {
         setBankDetailsMissing(true);
       }
       
-      const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
+      const isUserAlreadyAdded = form.getValues('authors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({ 
             name: parsedUser.name, 
@@ -245,6 +250,7 @@ export function BookForm() {
             uid: parsedUser.uid,
             role: 'First Author',
             isExternal: false,
+            status: 'approved',
         });
       }
     }
@@ -282,7 +288,7 @@ export function BookForm() {
     setIsSubmitting(true);
     try {
         const data = form.getValues();
-        const calculationResult = await calculateIncentive(data);
+        const calculationResult = await calculateBookIncentive(data);
 
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
             if (!file || !user) return undefined;
@@ -301,15 +307,12 @@ export function BookForm() {
         const bookProofUrl = await uploadFileHelper(bookProofFile, 'book-proof');
         const scopusProofUrl = await uploadFileHelper(scopusProofFile, 'book-scopus-proof');
         
-        const coAuthorUids = data.bookCoAuthors.map(a => a.uid).filter(Boolean) as string[];
-
         // Create a clean data object without the file objects
         const { bookProof, scopusProof, ...restOfData } = data;
 
         const claimData: Partial<IncentiveClaim> = {
             ...restOfData,
             calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
-            coAuthorUids,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
             claimType: 'Books',
@@ -332,12 +335,14 @@ export function BookForm() {
             }
         });
         
-        const claimId = doc(collection(db, 'incentiveClaims')).id;
-        await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
+        const result = await submitIncentiveClaim(claimData as Omit<IncentiveClaim, 'id' | 'claimId'>);
+        if (!result.success || !result.claimId) {
+            throw new Error(result.error);
+        }
         
         if (status === 'Draft') {
             toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-            router.push(`/dashboard/incentive-claim`);
+            router.push(`/dashboard/incentive-claim/book?claimId=${result.claimId}`);
         } else {
             toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
             router.push('/dashboard/incentive-claim');
@@ -370,6 +375,17 @@ export function BookForm() {
         setIsSearching(false);
     }
   };
+  
+  const watchAuthors = form.watch('authors');
+  const firstAuthorExists = watchAuthors.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+
+  const getAvailableRoles = (currentAuthor?: Author) => {
+    const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
+    if (firstAuthorExists && !isCurrentAuthorFirst) {
+      return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
+    }
+    return coAuthorRoles;
+  };
 
   const handleAddCoPi = () => {
     if (foundCoPi && !fields.some(field => field.email.toLowerCase() === foundCoPi.email.toLowerCase())) {
@@ -383,6 +399,7 @@ export function BookForm() {
             uid: foundCoPi.uid,
             role: 'Co-Author',
             isExternal: !foundCoPi.uid,
+            status: 'approved',
         });
     }
     setFoundCoPi(null);
@@ -442,13 +459,13 @@ export function BookForm() {
                                 </FormItem>
                                 <FormField
                                     control={form.control}
-                                    name={`bookCoAuthors.${index}.role`}
+                                    name={`authors.${index}.role`}
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormLabel>Role</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl>
-                                                <SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                                                <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                                             </Select>
                                             <FormMessage />
                                         </FormItem>
@@ -483,7 +500,19 @@ export function BookForm() {
                             </div>
                         )}
                     </div>
-                     <FormMessage>{form.formState.errors.bookCoAuthors?.message || form.formState.errors.bookCoAuthors?.root?.message}</FormMessage>
+                    <div className="space-y-2 p-4 border rounded-md">
+                        <FormLabel>Add External Co-Author</FormLabel>
+                        <div className="flex flex-col md:flex-row gap-2 mt-1">
+                            <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
+                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                            <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                            </Select>
+                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><Plus className="h-4 w-4"/></Button>
+                        </div>
+                    </div>
+                     <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
                 </div>
 
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookEditor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of the Editor (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
