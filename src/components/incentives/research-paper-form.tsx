@@ -289,6 +289,17 @@ function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit
     );
 }
 
+const SPECIAL_POLICY_FACULTIES = [
+    "Faculty of Applied Sciences",
+    "Faculty of Medicine",
+    "Faculty of Homoeopathy",
+    "Faculty of Ayurved",
+    "Faculty of Nursing",
+    "Faculty of Pharmacy",
+    "Faculty of Physiotherapy",
+    "Faculty of Public Health",
+    "Faculty of Engineering & Technology"
+];
 
 export function ResearchPaperForm() {
   const { toast } = useToast()
