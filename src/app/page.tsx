@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
 import Image from 'next/image';
-import { BookCheck, GanttChartSquare, Check, Users, ShieldCheck } from 'lucide-react';
+import { BookCheck, GanttChartSquare, Check, Users, ShieldCheck, Bot, User, Library } from 'lucide-react';
 import { auth } from '@/lib/config';
 import { onAuthStateChanged, type User as FirebaseUser } from 'firebase/auth';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -113,12 +113,12 @@ export default function LandingPage() {
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">A Unified Platform for Your Research Journey</h2>
                 <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  One portal to manage everything from initial project funding to tracking your submissions.
+                  One portal to manage everything from initial project funding to tracking publications and incentive claims.
                 </p>
               </div>
             </div>
             <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 py-12 sm:grid-cols-2 lg:grid-cols-2">
-              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
+               <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <GanttChartSquare className="h-8 w-8" />
                 </div>
@@ -131,6 +131,20 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-xl font-bold">Role-Based Workflows</h3>
                 <p className="text-muted-foreground mt-2">A tailored experience for faculty, evaluators, and administrators, ensuring everyone has the right tools and access for their responsibilities.</p>
+              </div>
+              <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Library className="h-8 w-8" />
+                </div>
+                <h3 className="text-xl font-bold">User Profiles & Publication Tracking</h3>
+                <p className="text-muted-foreground mt-2">Maintain a public-facing profile showcasing your research contributions, projects, and a comprehensive, automatically updated list of your publications.</p>
+              </div>
+               <div className="flex flex-col items-center text-center p-6 rounded-lg bg-card shadow-sm">
+                <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Bot className="h-8 w-8" />
+                </div>
+                <h3 className="text-xl font-bold">AI-Powered Assistance</h3>
+                <p className="text-muted-foreground mt-2">Leverage Google Genkit for AI-powered features like project summarization, research domain suggestions, and AI-assisted evaluation prompts to streamline reviews.</p>
               </div>
             </div>
           </div>
@@ -152,15 +166,16 @@ export default function LandingPage() {
                      <div className="grid gap-4">
                         <div className="flex items-center gap-4">
                             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                               <Users className="h-6 w-6" />
+                               <User className="h-6 w-6" />
                             </div>
                             <h3 className="text-xl font-bold">For Faculty</h3>
                         </div>
-                        <p className="text-muted-foreground">Submit, track, and manage your research projects from a personalized dashboard.</p>
+                        <p className="text-muted-foreground">Submit, track, and manage your research projects and publications from a personalized dashboard.</p>
                         <ul className="grid gap-2 text-sm">
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Simplified Proposal Submission</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> EMR Funding Calendar</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Real-time Status Tracking</li>
+                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Manage Your Public Profile</li>
                         </ul>
                     </div>
                     <div className="grid gap-4">
@@ -175,6 +190,7 @@ export default function LandingPage() {
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Dedicated Evaluation Queue</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> AI-Generated Evaluation Prompts</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Fair and Consistent Scoring</li>
+                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> View Evaluation History</li>
                         </ul>
                     </div>
                     <div className="grid gap-4">
@@ -188,7 +204,8 @@ export default function LandingPage() {
                          <ul className="grid gap-2 text-sm">
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Centralized Project Oversight</li>
                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Meeting & User Management</li>
-                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Data Analytics & Reporting</li>
+                            <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Grant Disbursement Tracking</li>
+                             <li className="flex items-center gap-2"><Check className="h-4 w-4 text-green-500" /> Data Analytics & Reporting</li>
                         </ul>
                     </div>
                  </div>
