@@ -334,6 +334,8 @@ export default function IncentiveClaimPage() {
         const claims = snapshot.docs
             .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
             .filter(claim => 
+                // Ensure it's not the user's own claim and they are listed as a pending co-author
+                claim.uid !== uid &&
                 claim.authors?.some(author => author.uid === uid && author.status === 'Pending')
             );
         
