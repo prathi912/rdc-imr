@@ -2,7 +2,7 @@
 
 'use server';
 
-import type { IncentiveClaim, CoAuthor } from '@/types';
+import type { IncentiveClaim, CoAuthor, Author } from '@/types';
 
 // --- Research Paper Calculation ---
 
@@ -64,7 +64,7 @@ function adjustForPublicationType(baseAmount: number, publicationType: string | 
         case 'Review Articles':
             return baseAmount * 0.8;
         case 'Letter to the Editor/Editorial':
-            return 2500; // This is the total cap for this type
+             return 2500; // Total amount to be distributed
         default:
             return baseAmount;
     }
@@ -80,49 +80,60 @@ export async function calculateResearchPaperIncentive(
         }
         
         const { authors = [], userEmail, publicationType } = claimData;
-        const internalAuthors = authors.filter(a => !a.isExternal);
-        const totalPuAuthors = internalAuthors.length;
-
-        if (totalPuAuthors === 0) {
-            return { success: true, amount: 0 };
-        }
-
-        const baseIncentive = getBaseIncentiveForPaper(claimData, faculty);
-        const adjustedIncentive = adjustForPublicationType(baseIncentive, publicationType);
+        const totalAuthors = authors.length || 1;
         
-        // Special case for Letter to Editor
-        if (publicationType === 'Letter to the Editor/Editorial') {
-            const totalAuthors = authors.length || 1;
-            const amount = Math.round(adjustedIncentive / totalAuthors);
-            return { success: true, amount };
+        // Find the claimant in the author list
+        const claimant = authors.find(a => a.email.toLowerCase() === userEmail?.toLowerCase());
+        if (!claimant) {
+            return { success: false, error: "Claimant not found in the author list." };
         }
+        
+        const baseIncentive = getBaseIncentiveForPaper(claimData, faculty);
+        const totalSpecifiedIncentive = adjustForPublicationType(baseIncentive, publicationType);
+
+        // Special case for Letter to Editor/Editorial
+        if (publicationType === 'Letter to the Editor/Editorial') {
+            const amountPerAuthor = totalSpecifiedIncentive / totalAuthors;
+            return { success: true, amount: Math.round(amountPerAuthor) };
+        }
+
+        const internalAuthors = authors.filter(a => !a.isExternal);
+        if (internalAuthors.length === 0) {
+            return { success: true, amount: 0 }; // No PU authors
+        }
+        
+        const mainAuthors = internalAuthors.filter(a => a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author');
+        const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
 
         let finalAmount = 0;
-        const myRole = authors.find(a => a.email === userEmail)?.role;
 
-        if (totalPuAuthors === 1) {
-            finalAmount = adjustedIncentive;
-        } else {
-            const mainAuthors = internalAuthors.filter(a => a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author');
-            const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
+        // Rule 1: First or Corresponding author from PU is the sole internal author
+        if (mainAuthors.length === 1 && coAuthors.length === 0 && internalAuthors.length === 1) {
+            finalAmount = totalSpecifiedIncentive;
+        }
+        // Rule 4: First/Corresponding author from PU and one or more Co-authors also from PU
+        else if (mainAuthors.length > 0 && coAuthors.length > 0) {
+            const mainAuthorSharePool = totalSpecifiedIncentive * 0.7;
+            const coAuthorSharePool = totalSpecifiedIncentive * 0.3;
             
-            if (mainAuthors.length > 0) {
-                const mainAuthorShare = (adjustedIncentive * 0.7) / (mainAuthors.length || 1);
-                const coAuthorShare = coAuthors.length > 0 ? (adjustedIncentive * 0.3) / coAuthors.length : 0;
-                
-                if (myRole === 'Co-Author') {
-                    finalAmount = coAuthorShare;
-                } else {
-                    finalAmount = mainAuthorShare;
-                }
-            } else { // No main authors, all are co-authors
-                finalAmount = (adjustedIncentive * 0.8) / (totalPuAuthors || 1);
+            if (claimant.role === 'Co-Author') {
+                finalAmount = coAuthorSharePool / (coAuthors.length || 1);
+            } else { // Is a main author
+                finalAmount = mainAuthorSharePool / (mainAuthors.length || 1);
             }
         }
-        
-        // A single co-author from PU gets 40% of the total amount.
-        if (totalPuAuthors > 1 && myRole === 'Co-Author' && internalAuthors.filter(a => a.role === 'Co-Author').length === 1) {
-            finalAmount = adjustedIncentive * 0.4;
+        // Rule 2: Single Co-author from PU with other Co-authors from other institutions
+        else if (coAuthors.length === 1 && mainAuthors.length === 0 && internalAuthors.length === 1) {
+             finalAmount = totalSpecifiedIncentive * 0.8;
+        }
+        // Rule 3: Multiple Co-authors from PU (and no main authors from PU)
+        else if (coAuthors.length > 1 && mainAuthors.length === 0) {
+            const sharePerCoAuthor = (totalSpecifiedIncentive * 0.8) / (coAuthors.length || 1);
+            finalAmount = sharePerCoAuthor;
+        }
+        // Fallback for cases like multiple main authors from PU but no co-authors
+        else if (mainAuthors.length > 0 && coAuthors.length === 0) {
+            finalAmount = totalSpecifiedIncentive / mainAuthors.length;
         }
 
         return { success: true, amount: Math.round(finalAmount) };
@@ -282,6 +293,9 @@ export async function calculateConferenceIncentive(claimData: Partial<IncentiveC
               case 'African/South American/North American': maxReimbursement = 75000; break;
               case 'India':
                 maxReimbursement = presentationType === 'Oral' ? 20000 : 15000;
+                break;
+              case 'Other':
+                maxReimbursement = 75000; // Defaulting to max for "Other" international
                 break;
             }
           } else if (conferenceType === 'National') {
