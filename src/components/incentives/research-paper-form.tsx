@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
@@ -23,10 +23,11 @@ import type { User, IncentiveClaim, Author } from "@/types"
 import {
   uploadFileToServer,
 } from "@/app/actions"
-import { findUserByMisId } from "@/app/userfinding"
+import { findUserByMisId } from "@/app/userfinding";
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
-import { Loader2, AlertCircle, Bot, ChevronDown, Trash2 } from "lucide-react"
+import { calculateIncentive } from "@/app/research-paper-actions";
+import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -47,7 +48,7 @@ const researchPaperSchema = z
     indexType: z.enum(["wos", "scopus", "both", "esci"]).optional(),
     relevantLink: z.string().url("A valid DOI link is required."),
     scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
-    journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4"]).optional(),
+    journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"]).optional(),
     wosType: z.enum(["SCIE", "SSCI", "A&HCI"]).optional(),
     journalName: z.string().min(3, "Journal name is required."),
     journalWebsite: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
@@ -83,6 +84,7 @@ const researchPaperSchema = z
           uid: z.string().optional().nullable(),
           role: z.enum(["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"]),
           isExternal: z.boolean(),
+          status: z.enum(['approved', 'pending'])
         }),
       )
       .min(1, "At least one author is required.").refine(data => {
@@ -168,11 +170,14 @@ const indexTypeOptions = [
   { value: "esci", label: "ESCI" },
 ]
 const journalClassificationOptions = [
-  { value: "Q1", label: "Q1" },
-  { value: "Q2", label: "Q2" },
-  { value: "Q3", label: "Q3" },
-  { value: "Q4", label: "Q4" },
-]
+    { value: 'Nature/Science/Lancet', label: 'Nature/Science/Lancet' },
+    { value: 'Top 1% Journals', label: 'Top 1% Journals' },
+    { value: 'Q1', label: 'Q1' },
+    { value: 'Q2', label: 'Q2' },
+    { value: 'Q3', label: 'Q3' },
+    { value: 'Q4', label: 'Q4' },
+];
+
 
 const months = [
   "January",
@@ -210,6 +215,7 @@ export function ResearchPaperForm() {
   const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
   const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string } | null>(null)
   const [isSearching, setIsSearching] = useState(false)
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
 
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
@@ -242,19 +248,22 @@ export function ResearchPaperForm() {
     name: "bookCoAuthors",
   })
   
-  const watchAuthors = form.watch('bookCoAuthors');
-  const firstAuthorExists = useMemo(() => 
-    watchAuthors.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author'),
-    [watchAuthors]
-  );
-  
-  const getAvailableRoles = (currentAuthor: Author) => {
-    const isCurrentAuthorFirst = currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author';
-    if (firstAuthorExists && !isCurrentAuthorFirst) {
-      return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
-    }
-    return coAuthorRoles;
-  };
+  const formValues = form.watch();
+
+  useEffect(() => {
+    const calculate = async () => {
+        if (!user || !user.faculty) return;
+        const result = await calculateIncentive(formValues, user.faculty);
+        if (result.success) {
+            setCalculatedIncentive(result.amount ?? null);
+        } else {
+            console.error("Incentive calculation failed:", result.error);
+            setCalculatedIncentive(null);
+        }
+    };
+    calculate();
+  }, [formValues, user]);
+
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -272,6 +281,7 @@ export function ResearchPaperForm() {
           uid: parsedUser.uid,
           role: "First Author",
           isExternal: false,
+          status: 'approved'
         })
       }
     }
@@ -284,7 +294,7 @@ export function ResearchPaperForm() {
     "Faculty of Applied Sciences",
     "Faculty of Medicine",
     "Faculty of Homoeopathy",
-    "Faculty of Ayurveda",
+    "Faculty of Ayurved",
     "Faculty of Nursing",
     "Faculty of Pharmacy",
     "Faculty of Physiotherapy",
@@ -433,6 +443,7 @@ export function ResearchPaperForm() {
         uid: foundCoPi.uid,
         role: "Co-Author",
         isExternal: false,
+        status: 'approved'
       })
     }
     setFoundCoPi(null)
@@ -447,13 +458,27 @@ export function ResearchPaperForm() {
     }
     remove(index);
   };
+  
+  const updateAuthorRole = (index: number, role: Author['role']) => {
+    const currentAuthors = form.getValues('bookCoAuthors');
+    const author = currentAuthors[index];
+    const isTryingToBeFirst = role === 'First Author' || role === 'First & Corresponding Author';
+    const isAnotherFirst = currentAuthors.some((a, i) => i !== index && (a.role === 'First Author' || a.role === 'First & Corresponding Author'));
+    
+    if (isTryingToBeFirst && isAnotherFirst) {
+        toast({ title: 'Conflict', description: 'Another author is already the First Author.', variant: 'destructive'});
+        // Don't update the form state
+        return;
+    }
+    
+    update(index, { ...author, role });
+  };
 
   async function handleSave(status: "Draft" | "Pending") {
     if (!user || !user.faculty) {
       toast({ variant: "destructive", title: "Error", description: "User information not found. Please log in again." })
       return
     }
-    // Re-check profile completeness on submission
     if (status === "Pending" && (!user.bankDetails || !user.orcidId || !user.misId)) {
       toast({
         variant: "destructive",
@@ -466,51 +491,27 @@ export function ResearchPaperForm() {
     setIsSubmitting(true)
     try {
       const data = form.getValues()
-      const claimId = doc(collection(db, "incentiveClaims")).id
-
-      const uploadFilesAndGetUrls = async (files: FileList | undefined, folderName: string): Promise<string[]> => {
-        if (!files || files.length === 0 || !user) return []
-        const uploadPromises = Array.from(files).map(async (file) => {
-          const dataUrl = await fileToDataUrl(file)
-          const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`
-          const result = await uploadFileToServer(dataUrl, path)
-          if (!result.success || !result.url) {
-            throw new Error(result.error || `File upload failed for ${file.name}`)
-          }
-          return result.url
-        })
-        return Promise.all(uploadPromises)
-      }
-
-      const publicationProofUrls = await uploadFilesAndGetUrls(data.publicationProof, "publication-proof")
-
-      const { publicationProof, ...restOfData } = data
-
-      const claimData: Omit<IncentiveClaim, "id"> = {
-        ...restOfData,
-        publicationProofUrls,
-        misId: user.misId || null,
-        orcidId: user.orcidId || null,
-        claimType: "Research Papers",
-        benefitMode: "incentives",
-        uid: user.uid,
-        userName: user.name,
-        userEmail: user.email,
-        faculty: user.faculty,
-        status,
-        submissionDate: new Date().toISOString(),
-        bankDetails: user.bankDetails || null,
-        totalPuAuthors: data.bookCoAuthors.length, // Add total PU authors
-      }
-
-      // Sanitize data: remove undefined fields
-      Object.keys(claimData).forEach(key => {
-        if ((claimData as any)[key] === undefined) {
-          delete (claimData as any)[key];
-        }
+      const result = await submitIncentiveClaim({
+          ...data,
+          calculatedIncentive,
+          misId: user.misId || null,
+          orcidId: user.orcidId || null,
+          claimType: "Research Papers",
+          benefitMode: "incentives",
+          uid: user.uid,
+          userName: user.name,
+          userEmail: user.email,
+          faculty: user.faculty,
+          status,
+          submissionDate: new Date().toISOString(),
+          bankDetails: user.bankDetails || null,
       });
 
-      await setDoc(doc(db, "incentiveClaims", claimId), claimData)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+
+      const claimId = result.claimId;
 
       if (status === "Draft") {
         toast({ title: "Draft Saved!", description: "You can continue editing from the 'Incentive Claim' page." })
@@ -914,19 +915,13 @@ export function ResearchPaperForm() {
                           render={({ field: roleField }) => (
                             <FormItem>
                               <FormLabel className="text-xs">Role</FormLabel>
-                              <Select onValueChange={roleField.onChange} value={roleField.value}>
+                              <Select onValueChange={(value) => update(index, { ...field, role: value as Author['role'] })} value={roleField.value}>
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select role" />
                                   </SelectTrigger>
                                 </FormControl>
-                                <SelectContent>
-                                  {getAvailableRoles(field).map((role) => (
-                                    <SelectItem key={role} value={role}>
-                                      {role}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
+                                <SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                               </Select>
                               <FormMessage />
                             </FormItem>
@@ -1040,7 +1035,12 @@ export function ResearchPaperForm() {
                     )}
                   />
                 </div>
-
+                 {calculatedIncentive !== null && (
+                    <div className="p-4 bg-secondary rounded-md">
+                        <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                        <p className="text-xs text-muted-foreground">This is your individual share based on the policy, publication type, and author roles.</p>
+                    </div>
+                )}
                 <Separator />
                 <FormField
                   control={form.control}
