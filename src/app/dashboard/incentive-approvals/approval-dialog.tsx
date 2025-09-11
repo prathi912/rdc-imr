@@ -266,13 +266,17 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     });
 
     const { defaultAmount, isAutoCalculated } = (() => {
-        if (claim.approvals && claim.approvals.length > stageIndex - 1 && stageIndex > 0) {
-            const previousStageApproval = claim.approvals.find(a => a?.stage === stageIndex);
-            if (previousStageApproval?.status === 'Approved' && previousStageApproval.approvedAmount > 0) {
-                return { defaultAmount: previousStageApproval.approvedAmount, isAutoCalculated: false };
+        if (stageIndex > 0 && claim.approvals) {
+            // Find the most recent approval before the current stage
+            const previousApprovals = claim.approvals
+                .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved' && a.approvedAmount > 0)
+                .sort((a, b) => b!.stage - a!.stage);
+
+            if (previousApprovals.length > 0) {
+                return { defaultAmount: previousApprovals[0]!.approvedAmount, isAutoCalculated: false };
             }
         }
-        return { defaultAmount: claim.finalApprovedAmount || claim.calculatedIncentive || 0, isAutoCalculated: true };
+        return { defaultAmount: claim.calculatedIncentive || 0, isAutoCalculated: true };
     })();
     
     const getDefaultAction = () => {
