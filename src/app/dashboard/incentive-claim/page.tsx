@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -145,7 +146,11 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
     });
     
     const handleApply = async (values: CoAuthorApplyValues) => {
-        if (!claimToApply || !currentUser || !currentUser.bankDetails) {
+        if (!claimToApply || !currentUser) {
+            toast({ variant: 'destructive', title: 'Action Required', description: 'Cannot process claim application.' });
+            return;
+        }
+        if (!currentUser.bankDetails) {
             toast({ variant: 'destructive', title: 'Action Required', description: 'Please complete your bank details in settings before applying.' });
             return;
         }
@@ -187,11 +192,16 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         }
     };
     
-    if (claims.length === 0) {
+    const claimsToShow = claims.filter(claim => {
+        const myDetails = claim.authors?.find(a => a.uid === currentUser?.uid);
+        return myDetails && myDetails.status === 'pending';
+    });
+    
+    if (claimsToShow.length === 0) {
         return (
             <Card>
                 <CardContent className="pt-6">
-                    <p className="text-center text-muted-foreground">You have not been listed as a co-author on any incentive claims yet.</p>
+                    <p className="text-center text-muted-foreground">You have no pending co-author claims that require your action.</p>
                 </CardContent>
             </Card>
         );
@@ -208,10 +218,9 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
     return (
       <>
         <div className="space-y-4">
-            {claims.map(claim => {
+            {claimsToShow.map(claim => {
                  const myDetails = getMyCoAuthorDetails(claim);
-                 const myStatus = myDetails?.status;
-                 const canApply = myStatus === 'pending' && !!currentUser?.bankDetails;
+                 const canApply = myDetails?.status === 'pending' && !!currentUser?.bankDetails;
 
                 return (
                  <Card key={claim.id}>
@@ -221,7 +230,6 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                             <p className="text-sm text-muted-foreground">Primary Author: <span className="font-medium text-foreground">{claim.userName}</span></p>
                              <div className="flex items-center gap-2">
                                 <Badge variant="outline">{claim.claimType}</Badge>
-                                {myStatus === 'Applied' && <Badge variant="default"><CheckSquare className="h-4 w-4 mr-2"/> Applied</Badge>}
                              </div>
                         </div>
                         <Button onClick={() => setClaimToApply(claim)} disabled={!canApply}>
@@ -420,7 +428,7 @@ export default function IncentiveClaimPage() {
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="apply">Apply</TabsTrigger>
             <TabsTrigger value="my-claims">My Claims ({otherClaims.length})</TabsTrigger>
-            <TabsTrigger value="co-author">Co-Author Claims ({coAuthorClaims.length})</TabsTrigger>
+            <TabsTrigger value="co-author">Co-Author Claims ({coAuthorClaims.filter(c => c.authors?.find(a => a.uid === user?.uid)?.status === 'pending').length})</TabsTrigger>
             <TabsTrigger value="draft">Drafts ({draftClaims.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="apply" className="mt-4">

@@ -70,6 +70,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
             ...claimData,
             claimId: standardizedClaimId,
             status: claimData.status === 'Draft' ? 'Draft' : initialStatus,
+            authors: claimData.authors || [],
             authorUids: (claimData.authors || []).map(a => a.uid).filter(Boolean) as string[],
         };
 
