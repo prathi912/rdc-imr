@@ -32,17 +32,18 @@ const authorSchema = z.object({
     uid: z.string().optional().nullable(),
     role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
     isExternal: z.boolean(),
+    status: z.enum(['approved', 'pending'])
 });
 
 const apcSchema = z.object({
   apcTypeOfArticle: z.string({ required_error: 'Please select an article type.' }),
   apcOtherArticleType: z.string().optional(),
   apcPaperTitle: z.string().min(5, 'Paper title is required.'),
-  bookCoAuthors: z.array(authorSchema).min(1, 'At least one author is required.')
+  authors: z.array(authorSchema).min(1, 'At least one author is required.')
   .refine(data => {
       const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
       return firstAuthors.length <= 1;
-  }, { message: 'Only one author can be designated as the First Author.', path: ['bookCoAuthors'] }),
+  }, { message: 'Only one author can be designated as the First Author.', path: ['authors'] }),
   apcTotalStudentAuthors: z.coerce.number().optional(),
   apcStudentNames: z.string().optional(),
   apcJournalDetails: z.string().min(5, 'Journal details are required.'),
@@ -116,7 +117,7 @@ export function ApcForm() {
       apcTypeOfArticle: '',
       apcOtherArticleType: '',
       apcPaperTitle: '',
-      bookCoAuthors: [],
+      authors: [],
       apcJournalDetails: '',
       apcJournalWebsite: '',
       apcIssnNo: '',
@@ -128,7 +129,7 @@ export function ApcForm() {
 
   const { fields, append, remove, update } = useFieldArray({
       control: form.control,
-      name: "bookCoAuthors",
+      name: "authors",
   });
 
   const isSpecialFaculty = useMemo(() =>
@@ -147,9 +148,9 @@ export function ApcForm() {
   const formValues = form.watch();
 
    useEffect(() => {
-    const { apcIndexingStatus, apcQRating, apcTotalAmount, bookCoAuthors } = formValues;
+    const { apcIndexingStatus, apcQRating, apcTotalAmount, authors } = formValues;
     
-    const internalAuthorCount = bookCoAuthors ? bookCoAuthors.filter(author => !author.isExternal).length : 0;
+    const internalAuthorCount = authors ? authors.filter(author => !author.isExternal).length : 0;
     if (internalAuthorCount === 0) {
       setCalculatedIncentive(0);
       return;
@@ -172,7 +173,7 @@ export function ApcForm() {
         }
     }
     
-    const individualIncentive = maxTotalIncentive / internalAuthorCount;
+    const individualIncentive = maxTotalIncentive > 0 ? maxTotalIncentive / internalAuthorCount : 0;
     
     setCalculatedIncentive(individualIncentive > 0 ? individualIncentive : 0);
 
@@ -186,7 +187,7 @@ export function ApcForm() {
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
 
-      const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
+      const isUserAlreadyAdded = form.getValues('authors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({ 
             name: parsedUser.name, 
@@ -194,12 +195,13 @@ export function ApcForm() {
             uid: parsedUser.uid,
             role: 'First Author',
             isExternal: false,
+            status: 'approved',
         });
       }
     }
   }, [append, form]);
   
-  const watchAuthors = form.watch('bookCoAuthors');
+  const watchAuthors = form.watch('authors');
   const firstAuthorExists = useMemo(() => 
     watchAuthors.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author'),
     [watchAuthors]
@@ -247,6 +249,7 @@ export function ApcForm() {
             uid: foundCoPi.uid,
             role: 'Co-Author',
             isExternal: !foundCoPi.uid,
+            status: 'approved',
         });
     }
     setFoundCoPi(null);
@@ -264,7 +267,7 @@ export function ApcForm() {
             toast({ title: 'Author already added', variant: 'destructive' });
             return;
         }
-        append({ name, email, role: externalAuthorRole, isExternal: true, uid: null });
+        append({ name, email, role: externalAuthorRole, isExternal: true, uid: null, status: 'approved' });
         setExternalAuthorName('');
         setExternalAuthorEmail('');
         setExternalAuthorRole('Co-Author'); // Reset role selector
@@ -446,7 +449,7 @@ export function ApcForm() {
                            Important: If an external co-author is found at the approval stage that was not declared here, the claim will be rejected.
                         </FormDescription>
                     </div>
-                     <FormMessage>{form.formState.errors.bookCoAuthors?.message || form.formState.errors.bookCoAuthors?.root?.message}</FormMessage>
+                     <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
                 </div>
 
                 <FormField name="apcTotalStudentAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Number of Student authors</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />

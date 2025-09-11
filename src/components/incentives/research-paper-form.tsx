@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -73,7 +74,7 @@ const researchPaperSchema = z
       .boolean()
       .refine((val) => val === true, { message: "PU name must be present in the publication for an incentive." }),
     authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
-    bookCoAuthors: z
+    authors: z
       .array(
         z.object({
           name: z.string(),
@@ -87,7 +88,7 @@ const researchPaperSchema = z
       .min(1, "At least one author is required.").refine(data => {
       const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
       return firstAuthors.length <= 1;
-    }, { message: 'Only one author can be designated as the First Author.', path: ["bookCoAuthors"] }),
+    }, { message: 'Only one author can be designated as the First Author.', path: ["authors"] }),
     totalPuStudentAuthors: z.coerce.number().optional(),
     puStudentNames: z.string().optional(),
   })
@@ -102,12 +103,12 @@ const researchPaperSchema = z
   )
   .refine(
     (data) => {
-      const correspondingAuthors = data.bookCoAuthors.filter(
+      const correspondingAuthors = data.authors.filter(
         (author) => author.role === "Corresponding Author" || author.role === "First & Corresponding Author",
       )
       return correspondingAuthors.length <= 1
     },
-    { message: "Only one author can be designated as the Corresponding Author.", path: ["bookCoAuthors"] },
+    { message: "Only one author can be designated as the Corresponding Author.", path: ["authors"] },
   )
   .refine(
     (data) => {
@@ -235,7 +236,7 @@ export function ResearchPaperForm() {
       publicationMonth: '',
       publicationYear: '',
       sdgGoals: [],
-      bookCoAuthors: [],
+      authors: [],
       isPuNameInPublication: true,
       totalPuStudentAuthors: 0,
       puStudentNames: '',
@@ -244,7 +245,7 @@ export function ResearchPaperForm() {
 
   const { fields, append, remove, update } = useFieldArray({
     control: form.control,
-    name: "bookCoAuthors",
+    name: "authors",
   })
   
   const formValues = form.watch();
@@ -273,7 +274,7 @@ export function ResearchPaperForm() {
       setBankDetailsMissing(!parsedUser.bankDetails)
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId)
 
-      const isUserAlreadyAdded = form.getValues('bookCoAuthors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
+      const isUserAlreadyAdded = form.getValues('authors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
       if (!isUserAlreadyAdded) {
         append({
           name: parsedUser.name,
@@ -320,7 +321,7 @@ export function ResearchPaperForm() {
     [isSpecialFaculty, indexType],
   )
   
-  const watchAuthors = form.watch('bookCoAuthors');
+  const watchAuthors = form.watch('authors');
   const firstAuthorExists = useMemo(() => 
     watchAuthors.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author'),
     [watchAuthors]
@@ -491,7 +492,7 @@ export function ResearchPaperForm() {
   };
   
   const updateAuthorRole = (index: number, role: Author['role']) => {
-    const currentAuthors = form.getValues('bookCoAuthors');
+    const currentAuthors = form.getValues('authors');
     const author = currentAuthors[index];
     const isTryingToBeFirst = role === 'First Author' || role === 'First & Corresponding Author';
     const isAnotherFirst = currentAuthors.some((a, i) => i !== index && (a.role === 'First Author' || a.role === 'First & Corresponding Author'));
@@ -1008,7 +1009,7 @@ export function ResearchPaperForm() {
                       </div>
                   </div>
                   <FormMessage>
-                    {form.formState.errors.bookCoAuthors?.message || form.formState.errors.bookCoAuthors?.root?.message}
+                    {form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}
                   </FormMessage>
                 </div>
                 <Separator />

@@ -188,7 +188,7 @@ export function MembershipForm() {
                 </div>
                 {calculatedIncentive !== null && (
                     <div className="p-4 bg-secondary rounded-md">
-                        <p className="text-sm font-medium">Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                        <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
                         <p className="text-xs text-muted-foreground">50% of the membership fee, capped at ₹10,000.</p>
                     </div>
                 )}
