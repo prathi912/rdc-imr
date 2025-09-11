@@ -1334,22 +1334,21 @@ export async function updateProjectEvaluators(
 
 export async function isEmailDomainAllowed(
   email: string,
-): Promise<{ allowed: boolean; isCro: boolean; croFaculty?: string; croCampus?: string; isIqac: boolean; }> {
+): Promise<{ allowed: boolean; isCro: boolean; croFaculty?: string; croCampus?: string; isIqac: boolean }> {
   try {
     const settings = await getSystemSettings()
     const allowedDomains = settings.allowedDomains || ["@paruluniversity.ac.in", "@goa.paruluniversity.ac.in"]
     const croAssignments = settings.croAssignments || []
-    const iqacEmail = settings.iqacEmail || ''
-
+    const iqacEmail = settings.iqacEmail || ""
 
     // Special case for primary super admin
     if (email === "rathipranav07@gmail.com") {
       return { allowed: true, isCro: false, isIqac: false }
     }
-    
+
     const isIqac = iqacEmail.toLowerCase() === email.toLowerCase()
     if (isIqac) {
-        return { allowed: true, isCro: false, isIqac: true };
+      return { allowed: true, isCro: false, isIqac: true }
     }
 
     const isAllowed = allowedDomains.some((domain) => email.endsWith(domain))
@@ -1852,3 +1851,4 @@ export async function saveSidebarOrder(uid: string, newOrder: string[]): Promise
     
 
     
+

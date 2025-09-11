@@ -236,7 +236,7 @@ export type IncentiveClaim = {
   // Research Paper Fields
   publicationType?: string;
   indexType?: "wos" | "scopus" | "both" | "esci";
-  journalClassification?: "Q1" | "Q2" | "Q3" | "Q4";
+  journalClassification?: "Q1" | "Q2" | "Q3" | "Q4" | "Nature/Science/Lancet" | "Top 1% Journals";
   wosType?: "SCIE" | "SSCI" | "A&HCI";
   journalName?: string;
   journalWebsite?: string;
@@ -287,7 +287,7 @@ export type IncentiveClaim = {
   filingDate?: string; // ISO
   publicationDate?: string; // ISO
   grantDate?: string; // ISO
-  currentStatus?: string;
+  currentStatus?: 'Awarded' | 'Published' | 'Under Examination' | 'FER Responded' | 'Amended Examination';
 
 
   // Conference Fields
