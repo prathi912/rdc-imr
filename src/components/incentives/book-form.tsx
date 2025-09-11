@@ -399,12 +399,30 @@ export function BookForm() {
             uid: foundCoPi.uid,
             role: 'Co-Author',
             isExternal: !foundCoPi.uid,
-            status: 'approved',
+            status: 'pending',
         });
     }
     setFoundCoPi(null);
     setCoPiSearchTerm('');
   };
+  
+   const addExternalAuthor = () => {
+        const name = externalAuthorName.trim();
+        const email = externalAuthorEmail.trim().toLowerCase();
+        if (!name || !email) {
+            toast({ title: 'Name and email are required for external authors', variant: 'destructive' });
+            return;
+        }
+         if (fields.some(a => a.email.toLowerCase() === email)) {
+            toast({ title: 'Author already added', variant: 'destructive' });
+            return;
+        }
+        append({ name, email, role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
+        setExternalAuthorName('');
+        setExternalAuthorEmail('');
+        setExternalAuthorRole('Co-Author'); // Reset role selector
+    };
+
 
   if (currentStep === 2) {
     return (

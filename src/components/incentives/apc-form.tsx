@@ -32,7 +32,7 @@ const authorSchema = z.object({
     uid: z.string().optional().nullable(),
     role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
     isExternal: z.boolean(),
-    status: z.enum(['approved', 'pending'])
+    status: z.enum(['approved', 'pending', 'Applied'])
 });
 
 const apcSchema = z.object({
@@ -249,7 +249,7 @@ export function ApcForm() {
             uid: foundCoPi.uid,
             role: 'Co-Author',
             isExternal: !foundCoPi.uid,
-            status: 'approved',
+            status: 'pending',
         });
     }
     setFoundCoPi(null);
@@ -267,7 +267,7 @@ export function ApcForm() {
             toast({ title: 'Author already added', variant: 'destructive' });
             return;
         }
-        append({ name, email, role: externalAuthorRole, isExternal: true, uid: null, status: 'approved' });
+        append({ name, email, role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
         setExternalAuthorName('');
         setExternalAuthorEmail('');
         setExternalAuthorRole('Co-Author'); // Reset role selector
