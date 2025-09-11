@@ -20,12 +20,11 @@ import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
 import { collection, doc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
-import { uploadFileToServer } from "@/app/actions"
+import { uploadFileToServer, calculateIncentive } from "@/app/actions"
 import { findUserByMisId } from "@/app/userfinding";
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
-import { calculateResearchPaperIncentive } from "@/app/incentive-calculation";
-import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search } from "lucide-react"
+import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -35,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "../ui/checkbox"
+import { calculateResearchPaperIncentive } from "@/app/incentive-calculation"
 
 const MAX_FILES = 10
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -213,6 +213,9 @@ export function ResearchPaperForm() {
   const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string } | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
+  const [externalAuthorName, setExternalAuthorName] = useState('');
+  const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
+  const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
 
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
@@ -316,6 +319,20 @@ export function ResearchPaperForm() {
         : journalClassificationOptions,
     [isSpecialFaculty, indexType],
   )
+  
+  const watchAuthors = form.watch('bookCoAuthors');
+  const firstAuthorExists = useMemo(() => 
+    watchAuthors.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author'),
+    [watchAuthors]
+  );
+  
+  const getAvailableRoles = (currentAuthor?: Author) => {
+    const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
+    if (firstAuthorExists && !isCurrentAuthorFirst) {
+      return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
+    }
+    return coAuthorRoles;
+  };
 
   useEffect(() => {
     const currentClassification = form.getValues("journalClassification")
@@ -447,6 +464,23 @@ export function ResearchPaperForm() {
     setCoPiSearchTerm("")
   }
 
+  const addExternalAuthor = () => {
+    const name = externalAuthorName.trim();
+    const email = externalAuthorEmail.trim().toLowerCase();
+    if (!name || !email) {
+        toast({ title: 'Name and email are required for external authors', variant: 'destructive' });
+        return;
+    }
+     if (fields.some(a => a.email.toLowerCase() === email)) {
+        toast({ title: 'Author already added', variant: 'destructive' });
+        return;
+    }
+    append({ name, email, role: externalAuthorRole, isExternal: true, uid: null, status: 'approved' });
+    setExternalAuthorName('');
+    setExternalAuthorEmail('');
+    setExternalAuthorRole('Co-Author'); // Reset role selector
+  };
+
   const removeAuthor = (index: number) => {
     const authorToRemove = fields[index];
     if (authorToRemove.email === user?.email) {
@@ -464,7 +498,6 @@ export function ResearchPaperForm() {
     
     if (isTryingToBeFirst && isAnotherFirst) {
         toast({ title: 'Conflict', description: 'Another author is already the First Author.', variant: 'destructive'});
-        // Don't update the form state
         return;
     }
     
@@ -488,8 +521,23 @@ export function ResearchPaperForm() {
     setIsSubmitting(true)
     try {
       const data = form.getValues()
-      const result = await submitIncentiveClaim({
+      
+      const publicationProofFiles = data.publicationProof ? Array.from(data.publicationProof as FileList) : [];
+      const publicationProofUrls = await Promise.all(
+          publicationProofFiles.map((file, index) => 
+              uploadFileToServer(
+                  `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`,
+                  `incentive-proofs/${user.uid}/publication-proof/${new Date().toISOString()}-${index}-${file.name}`
+              ).then(result => {
+                  if (!result.success) throw new Error(result.error);
+                  return result.url!;
+              })
+          )
+      );
+
+      const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
           ...data,
+          publicationProofUrls,
           calculatedIncentive,
           misId: user.misId || null,
           orcidId: user.orcidId || null,
@@ -502,7 +550,9 @@ export function ResearchPaperForm() {
           status,
           submissionDate: new Date().toISOString(),
           bankDetails: user.bankDetails || null,
-      });
+      };
+
+      const result = await submitIncentiveClaim(claimData);
 
       if (!result.success) {
         throw new Error(result.error)
@@ -891,52 +941,35 @@ export function ResearchPaperForm() {
                 </div>
                 <Separator />
                 <div className="space-y-4">
-                  <FormLabel>Author(s) from PU</FormLabel>
-                  <div className="space-y-2">
-                    {fields.map((field, index) => (
-                      <div
-                        key={field.id}
-                        className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-3 rounded-md items-center"
-                      >
-                        <FormItem className="md:col-span-2">
-                          <FormLabel className="text-xs">Name</FormLabel>
-                          <FormControl>
-                            <Input value={field.name} readOnly />
-                          </FormControl>
-                        </FormItem>
-                        <FormField
-                          control={form.control}
-                          name={`bookCoAuthors.${index}.role`}
-                          render={({ field: roleField }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs">Role</FormLabel>
-                              <Select onValueChange={(value) => update(index, { ...field, role: value as Author['role'] })} value={roleField.value}>
-                                <FormControl>
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="Select role" />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>{coAuthorRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        {field.email.toLowerCase() !== user?.email.toLowerCase() && (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="md:col-start-4 justify-self-end mt-2"
-                            onClick={() => removeAuthor(index)}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" /> Remove
-                          </Button>
-                        )}
+                  <FormLabel>Author(s) & Roles</FormLabel>
+                  {fields.map((field, index) => (
+                    <div
+                      key={field.id}
+                      className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-3 rounded-md items-center"
+                    >
+                      <div className="md:col-span-2">
+                        <p className="font-medium text-sm">
+                          {field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{field.email}</p>
                       </div>
-                    ))}
-                  </div>
-
+                      <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
+                          <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                          <SelectContent>{getAvailableRoles(field).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                      </Select>
+                      {field.email.toLowerCase() !== user?.email.toLowerCase() && (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="md:col-start-4 justify-self-end mt-2"
+                          onClick={() => removeAuthor(index)}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> Remove
+                        </Button>
+                      )}
+                    </div>
+                  ))}
                   <div className="space-y-2 p-3 border rounded-md">
                     <FormLabel className="text-sm">Add PU Co-Author</FormLabel>
                     <div className="flex items-center gap-2">
@@ -959,6 +992,18 @@ export function ResearchPaperForm() {
                         </Button>
                       </div>
                     )}
+                  </div>
+                  <div className="space-y-2 p-3 border rounded-md">
+                      <FormLabel className="text-sm">Add External Co-Author</FormLabel>
+                      <div className="flex flex-col md:flex-row gap-2 mt-1">
+                          <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
+                          <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                          <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
+                              <SelectTrigger><SelectValue/></SelectTrigger>
+                              <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                          </Select>
+                          <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button>
+                      </div>
                   </div>
                   <FormMessage>
                     {form.formState.errors.bookCoAuthors?.message || form.formState.errors.bookCoAuthors?.root?.message}
