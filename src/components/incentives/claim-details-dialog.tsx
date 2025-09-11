@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import * as React from 'react';
@@ -10,8 +11,7 @@ import type { User, IncentiveClaim, Author, ApprovalStage } from '@/types';
 import { Loader2, Printer, Check, X, Download } from 'lucide-react';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
-import { generateOfficeNotingForClaim } from '@/app/document-actions';
-import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
+import { generateOfficeNotingForClaim, generateResearchPaperIncentiveForm } from '@/app/document-actions';
 import { generateBookIncentiveForm } from '@/app/incentive-actions';
 import { generateMembershipIncentiveForm } from '@/app/membership-actions';
 import { generatePatentIncentiveForm } from '@/app/patent-actions';
