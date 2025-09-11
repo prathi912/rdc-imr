@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
 import { collection, doc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
-import { uploadFileToServer, calculateIncentive } from "@/app/actions"
+import { uploadFileToServer } from "@/app/actions"
 import { findUserByMisId } from "@/app/userfinding";
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "../ui/checkbox"
 import { calculateResearchPaperIncentive } from "@/app/incentive-calculation"
+import { submitIncentiveClaim } from "@/app/incentive-approval-actions"
 
 const MAX_FILES = 10
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -749,19 +750,19 @@ export function ResearchPaperForm() {
                             value={field.value}
                             className="flex items-center space-x-6"
                           >
-                            <FormItem key={field.value} className="flex items-center space-x-2 space-y-0">
+                            <FormItem key="SCIE" className="flex items-center space-x-2 space-y-0">
                               <FormControl>
                                 <RadioGroupItem value="SCIE" />
                               </FormControl>
                               <FormLabel className="font-normal">SCIE</FormLabel>
                             </FormItem>
-                            <FormItem key={field.value} className="flex items-center space-x-2 space-y-0">
+                            <FormItem key="SSCI" className="flex items-center space-x-2 space-y-0">
                               <FormControl>
                                 <RadioGroupItem value="SSCI" />
                               </FormControl>
                               <FormLabel className="font-normal">SSCI</FormLabel>
                             </FormItem>
-                            <FormItem key={field.value} className="flex items-center space-x-2 space-y-0">
+                            <FormItem key="A&HCI" className="flex items-center space-x-2 space-y-0">
                               <FormControl>
                                 <RadioGroupItem value="A&HCI" />
                               </FormControl>
