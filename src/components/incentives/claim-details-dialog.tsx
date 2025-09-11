@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import * as React from 'react';
@@ -70,7 +69,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
 
                 const url = window.URL.createObjectURL(blob);
                 const a = document.createElement('a');
-                a.href = url;
+a.href = url;
                 a.download = fileName;
                 document.body.appendChild(a);
                 a.click();
@@ -196,35 +195,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                     {renderDetail("Status", claim.status)}
                     {renderDetail("Submission Date", new Date(claim.submissionDate).toLocaleString())}
                     
-                    {claim.claimType === 'Research Papers' && isViewerAdminOrApprover ? (
-                        <>
-                            <hr className="my-2" />
-                            <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="font-semibold">Research Paper Details (Verified)</h4>
-                                    <div className="grid grid-cols-2 gap-1 text-xs font-semibold text-center">
-                                        <span>Appr. 1</span>
-                                        <span>Appr. 2</span>
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    {renderVerificationDetail('name', 'Name of the Applicant', claimant?.name)}
-                                    {renderVerificationDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
-                                    {renderVerificationDetail('publicationType', 'Type of publication', claim.publicationType)}
-                                    {renderVerificationDetail('journalName', 'Name of Journal', claim.journalName)}
-                                    {renderVerificationDetail('locale', 'Whether National/International', claim.locale)}
-                                    {renderVerificationDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
-                                    {renderVerificationDetail('wosType', 'WoS Type', claim.wosType)}
-                                    {renderVerificationDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
-                                    {renderVerificationDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
-                                    {renderVerificationDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
-                                    {renderVerificationDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
-                                    {renderVerificationDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
-                                    {renderVerificationDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
-                                </div>
-                            </div>
-                        </>
-                    ) : claim.claimType === 'Research Papers' ? (
+                    {claim.claimType === 'Research Papers' && (
                         <>
                            <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
@@ -249,8 +220,35 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderDetail("Authors", claim.authors)}
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
+                            
+                            {isViewerAdminOrApprover && (
+                                <div className="space-y-4 rounded-lg border bg-muted/50 p-4 mt-4">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="font-semibold">Verified Fields</h4>
+                                        <div className="grid grid-cols-2 gap-1 text-xs font-semibold text-center">
+                                            <span>Appr. 1</span>
+                                            <span>Appr. 2</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        {renderVerificationDetail('name', 'Name of the Applicant', claimant?.name)}
+                                        {renderVerificationDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
+                                        {renderVerificationDetail('publicationType', 'Type of publication', claim.publicationType)}
+                                        {renderVerificationDetail('journalName', 'Name of Journal', claim.journalName)}
+                                        {renderVerificationDetail('locale', 'Whether National/International', claim.locale)}
+                                        {renderVerificationDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
+                                        {renderVerificationDetail('wosType', 'WoS Type', claim.wosType)}
+                                        {renderVerificationDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
+                                        {renderVerificationDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
+                                        {renderVerificationDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
+                                        {renderVerificationDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
+                                        {renderVerificationDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
+                                        {renderVerificationDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
+                                    </div>
+                                </div>
+                            )}
                         </>
-                    ) : null}
+                    )}
 
 
                     {claim.claimType === 'Patents' && (
