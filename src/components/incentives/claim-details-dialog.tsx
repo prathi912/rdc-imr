@@ -230,9 +230,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle)}
                             {renderLinkDetail("DOI Link", claim.relevantLink)}
-                            {renderDetail("Author Role", claim.authorType)}
                             {renderDetail("Author Position", claim.authorPosition)}
-                            {renderDetail("No. of Authors from PU", claim.totalPuAuthors)}
                             {renderLinkDetail("Scopus Link", claim.scopusLink)}
                             {renderDetail("Journal Name", claim.journalName)}
                             {renderLinkDetail("Journal Website", claim.journalWebsite)}
@@ -248,8 +246,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderDetail("SDGs", claim.sdgGoals)}
                             {renderLinkDetail("Publication Proofs", claim.publicationProofUrls)}
                             {renderDetail("PU Name in Publication", claim.isPuNameInPublication)}
-                            {renderDetail("Total Corresponding Authors", claim.totalCorrespondingAuthors)}
-                            {renderDetail("Authors from PU", claim.bookCoAuthors)}
+                            {renderDetail("Authors", claim.authors)}
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
                         </>
@@ -331,7 +328,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             {renderDetail("Application Type", claim.bookApplicationType)}
                             {renderDetail("Title", claim.publicationTitle)}
                             {claim.bookApplicationType === 'Book Chapter' && renderDetail("Book Title", claim.bookTitleForChapter)}
-                            {renderDetail("Author(s)", claim.bookCoAuthors)}
+                            {renderDetail("Author(s)", claim.authors)}
                             {claim.bookApplicationType === 'Book Chapter' && renderDetail("Editor(s)", claim.bookEditor)}
                             {renderDetail("Publisher", claim.publisherName)}
                             {renderDetail("Publisher Type", claim.publisherType)}
@@ -345,7 +342,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                                 </>
                             )}
                             {renderDetail("Publication Year Order", claim.publicationOrderInYear)}
-                            {renderDetail("Total PU Authors", claim.bookCoAuthors?.filter(a => !a.isExternal).length)}
+                            {renderDetail("Total PU Authors", claim.authors?.filter(a => !a.isExternal).length)}
                             {renderDetail("Total PU Students", claim.totalPuStudents)}
                             {renderDetail("Student Names", claim.puStudentNames)}
                             {claim.bookApplicationType === 'Book Chapter' ? renderDetail("Chapter Pages", claim.bookChapterPages) : renderDetail("Total Book Pages", claim.bookTotalPages)}
@@ -378,12 +375,11 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
                             <h4 className="font-semibold text-base mt-2">APC Claim Details</h4>
                             {renderDetail("Article Type", claim.apcTypeOfArticle === 'Other' ? claim.apcOtherArticleType : claim.apcTypeOfArticle)}
                             {renderDetail("Paper Title", claim.apcPaperTitle)}
-                            {renderDetail("Authors", claim.apcAuthors)}
+                            {renderDetail("Authors", claim.authors)}
                             {renderDetail("Total Student Authors", claim.apcTotalStudentAuthors)}
                             {renderDetail("Student Names", claim.apcStudentNames)}
                             {renderDetail("Journal Details", claim.apcJournalDetails)}
                             {renderDetail("Journal Q-Rating", claim.apcQRating)}
-                            {renderDetail("Journal Type", claim.apcNationalInternational)}
                             {renderLinkDetail("Journal Website", claim.apcJournalWebsite)}
                             {renderDetail("ISSN", claim.apcIssnNo)}
                             {renderDetail("Indexing Status", claim.apcIndexingStatus)}
