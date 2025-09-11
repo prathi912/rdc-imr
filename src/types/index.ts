@@ -50,7 +50,7 @@ export type Author = {
   name: string
   role: "First Author" | "Corresponding Author" | "Co-Author" | "First & Corresponding Author"
   isExternal: boolean
-  status: 'approved' | 'pending';
+  status: 'approved' | 'pending' | 'Applied';
 }
 
 export type ResearchPaper = {
@@ -184,15 +184,6 @@ export type Notification = {
   requester?: Author;
 }
 
-export type CoAuthor = {
-  name: string
-  email: string
-  uid?: string | null
-  role: "First Author" | "Corresponding Author" | "Co-Author" | "First & Corresponding Author"
-  status?: "Pending" | "Applied"
-  isExternal: boolean
-}
-
 export type ApprovalStage = {
   approverUid: string;
   approverName: string;
@@ -233,7 +224,8 @@ export type IncentiveClaim = {
   // Common fields
   benefitMode: string
   sdgGoals?: string[];
-  authors?: CoAuthor[]; // Replaces bookCoAuthors
+  authors?: Author[];
+  authorUids?: string[];
 
   // Research Paper Fields
   publicationType?: string;
@@ -245,9 +237,7 @@ export type IncentiveClaim = {
   paperTitle?: string;
   relevantLink?: string;
   scopusLink?: string;
-  authorType?: string;
   authorPosition?: '1st' | '2nd' | '3rd' | '4th' | '5th' | '6th';
-  totalAuthors?: string;
   locale?: 'National' | 'International';
   printIssn?: string;
   electronicIssn?: string;
@@ -255,7 +245,6 @@ export type IncentiveClaim = {
   publicationYear?: string;
   publicationProofUrls?: string[];
   isPuNameInPublication?: boolean;
-  totalCorrespondingAuthors?: number;
   totalPuStudentAuthors?: number;
   puStudentNames?: string;
 
@@ -301,6 +290,7 @@ export type IncentiveClaim = {
     | "South Korea, Japan, Australia and Middle East"
     | "Europe"
     | "African/South American/North American"
+    | 'Other'
   presentationType?: "Oral" | "Poster" | "Other"
   govtFundingRequestProofUrl?: string
   registrationFee?: number
@@ -324,6 +314,9 @@ export type IncentiveClaim = {
   travelMode?: "Bus" | "Train" | "Air" | "Other"
   travelReceiptsUrl?: string
   conferenceSelfDeclaration?: boolean
+  authorType?: string;
+  totalAuthors?: string;
+
 
   // Book/Book Chapter Fields
   bookApplicationType?: "Book Chapter" | "Book"

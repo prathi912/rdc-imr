@@ -3,7 +3,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper, Author, CoAuthor } from '@/types';
+import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper, Author } from '@/types';
 import { getSystemSettings } from './actions';
 import { sendEmail } from '@/lib/email';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -70,6 +70,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
             ...claimData,
             claimId: standardizedClaimId,
             status: claimData.status === 'Draft' ? 'Draft' : initialStatus,
+            authorUids: (claimData.authors || []).map(a => a.uid).filter(Boolean) as string[],
         };
 
         await newClaimRef.set(finalClaimData);

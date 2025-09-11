@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import type { User, IncentiveClaim } from '@/types';
+import type { User, IncentiveClaim, Author } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
@@ -172,10 +172,10 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
 
             // Update the status on the original claim for this co-author
             const originalClaimRef = doc(db, 'incentiveClaims', claimToApply.id);
-            const updatedCoAuthors = claimToApply.bookCoAuthors?.map(author => 
+            const updatedCoAuthors = claimToApply.authors?.map(author => 
                 author.uid === currentUser.uid ? { ...author, status: 'Applied' } : author
             );
-            await updateDoc(originalClaimRef, { bookCoAuthors: updatedCoAuthors });
+            await updateDoc(originalClaimRef, { authors: updatedCoAuthors });
             
             toast({ title: 'Success', description: 'Your claim has been submitted based on the original publication details.' });
             setClaimToApply(null);
@@ -191,15 +191,19 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         return (
             <Card>
                 <CardContent className="pt-6">
-                    <p className="text-center text-muted-foreground">You have not been listed as a co-author on any book incentive claims yet.</p>
+                    <p className="text-center text-muted-foreground">You have not been listed as a co-author on any incentive claims yet.</p>
                 </CardContent>
             </Card>
         );
     }
     
     const getMyCoAuthorDetails = (claim: IncentiveClaim) => {
-        return claim.bookCoAuthors?.find(a => a.uid === currentUser?.uid);
+        return claim.authors?.find(a => a.uid === currentUser?.uid);
     }
+    
+    const getClaimTitle = (claim: IncentiveClaim): string => {
+        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
+    };
 
     return (
       <>
@@ -213,10 +217,10 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                  <Card key={claim.id}>
                     <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                          <div className="flex-1 space-y-2">
-                            <p className="font-semibold">{claim.publicationTitle}</p>
+                            <p className="font-semibold">{getClaimTitle(claim)}</p>
                             <p className="text-sm text-muted-foreground">Primary Author: <span className="font-medium text-foreground">{claim.userName}</span></p>
                              <div className="flex items-center gap-2">
-                                <Badge variant="outline">{claim.bookApplicationType}</Badge>
+                                <Badge variant="outline">{claim.claimType}</Badge>
                                 {myStatus === 'Applied' && <Badge variant="default"><CheckSquare className="h-4 w-4 mr-2"/> Applied</Badge>}
                              </div>
                         </div>
@@ -233,7 +237,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                     <DialogHeader>
                         <DialogTitle>Apply for Co-Author Incentive</DialogTitle>
                         <p className="text-sm text-muted-foreground pt-2">
-                           You are applying for an incentive for the publication: "{claimToApply.publicationTitle}". Please confirm the publication order for your records.
+                           You are applying for an incentive for the publication: "{getClaimTitle(claimToApply)}". Please confirm the publication order for your records.
                         </p>
                     </DialogHeader>
                     <Form {...form}>
@@ -324,13 +328,13 @@ export default function IncentiveClaimPage() {
   const fetchCoAuthorClaims = async (uid: string) => {
     try {
         const claimsRef = collection(db, 'incentiveClaims');
-        const q = query(claimsRef, where('coAuthorUids', 'array-contains', uid));
+        const q = query(claimsRef, where('authorUids', 'array-contains', uid));
         const snapshot = await getDocs(q);
         
         const claims = snapshot.docs
             .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
             .filter(claim => 
-                claim.bookCoAuthors?.some(author => author.uid === uid && author.status === 'Pending')
+                claim.authors?.some(author => author.uid === uid && author.status === 'Pending')
             );
         
         setCoAuthorClaims(claims);
