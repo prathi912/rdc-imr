@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -72,7 +73,7 @@ const researchPaperSchema = z
       ),
     isPuNameInPublication: z
       .boolean()
-      .refine((val) => val === true, { message: "PU name must be present in the publication." }),
+      .refine((val) => val === true, { message: "PU name must be present in the publication for an incentive." }),
     authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
     bookCoAuthors: z
       .array(
@@ -234,7 +235,7 @@ export function ResearchPaperForm() {
       publicationYear: '',
       sdgGoals: [],
       bookCoAuthors: [],
-      isPuNameInPublication: false,
+      isPuNameInPublication: true,
       totalPuStudentAuthors: 0,
       puStudentNames: '',
     },
@@ -247,19 +248,20 @@ export function ResearchPaperForm() {
   
   const formValues = form.watch();
 
-  useEffect(() => {
-    const calculate = async () => {
-        if (!user || !user.faculty) return;
-        const result = await calculateIncentive(formValues, user.faculty);
-        if (result.success) {
-            setCalculatedIncentive(result.amount ?? null);
-        } else {
-            console.error("Incentive calculation failed:", result.error);
-            setCalculatedIncentive(null);
-        }
-    };
-    calculate();
+  const calculate = useCallback(async () => {
+    if (!user || !user.faculty) return;
+    const result = await calculateIncentive(formValues, user.faculty);
+    if (result.success) {
+        setCalculatedIncentive(result.amount ?? null);
+    } else {
+        console.error("Incentive calculation failed:", result.error);
+        setCalculatedIncentive(null);
+    }
   }, [formValues, user]);
+
+  useEffect(() => {
+    calculate();
+  }, [calculate]);
 
 
   useEffect(() => {
@@ -1122,3 +1124,5 @@ export function ResearchPaperForm() {
     </div>
   )
 }
+
+    

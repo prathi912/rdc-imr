@@ -1,3 +1,4 @@
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -2290,38 +2291,38 @@ export async function calculateIncentive(
             return { success: true, amount: 0 };
         }
         
-        const { authorPosition, bookCoAuthors = [] } = claimData;
-        const totalPuAuthors = bookCoAuthors.filter(a => !a.isExternal).length || 1;
+        const { bookCoAuthors = [], userEmail } = claimData;
+        const internalAuthors = bookCoAuthors.filter(a => !a.isExternal);
+        const totalPuAuthors = internalAuthors.length;
+
+        if (totalPuAuthors === 0) {
+            return { success: true, amount: 0 };
+        }
 
         const baseIncentive = getBaseIncentive(claimData, faculty);
         const adjustedIncentive = adjustForPublicationType(baseIncentive, claimData.publicationType);
         
         let finalAmount = 0;
 
-        if (authorPosition === '1st') {
+        const mainAuthors = internalAuthors.filter(a => a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author');
+        const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
+        
+        const myRole = bookCoAuthors.find(a => a.email === userEmail)?.role;
+
+        if (totalPuAuthors === 1) {
             finalAmount = adjustedIncentive;
         } else {
-            if (totalPuAuthors === 1) {
-                finalAmount = adjustedIncentive * 0.8;
-            } else {
-                const mainAuthors = bookCoAuthors.filter(a => !a.isExternal && (a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'));
+            if (mainAuthors.length > 0) {
+                const mainAuthorShare = (adjustedIncentive * 0.7) / (mainAuthors.length || 1);
+                const coAuthorShare = coAuthors.length > 0 ? (adjustedIncentive * 0.3) / coAuthors.length : 0;
                 
-                if (mainAuthors.length > 0) {
-                    const coAuthors = bookCoAuthors.filter(a => !a.isExternal && a.role === 'Co-Author');
-                    
-                    const mainAuthorShare = (adjustedIncentive * 0.7) / (mainAuthors.length || 1);
-                    const coAuthorShare = (coAuthors.length > 0) ? (adjustedIncentive * 0.3) / coAuthors.length : 0;
-
-                    const myRole = bookCoAuthors.find(a => a.email === claimData.userEmail)?.role;
-
-                    if (myRole === 'First Author' || myRole === 'Corresponding Author' || myRole === 'First & Corresponding Author') {
-                        finalAmount = mainAuthorShare;
-                    } else {
-                        finalAmount = coAuthorShare;
-                    }
+                if (myRole === 'Co-Author') {
+                    finalAmount = coAuthorShare;
                 } else {
-                    finalAmount = (adjustedIncentive * 0.8) / totalPuAuthors;
+                    finalAmount = mainAuthorShare;
                 }
+            } else { // No main authors, all are co-authors
+                finalAmount = (adjustedIncentive * 0.8) / (totalPuAuthors || 1);
             }
         }
 
@@ -2332,4 +2333,6 @@ export async function calculateIncentive(
         return { success: false, error: "Calculation failed: " + error.message };
     }
 }
+    
+
     
