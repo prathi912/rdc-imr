@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -24,7 +24,7 @@ import { uploadFileToServer } from "@/app/actions"
 import { findUserByMisId } from "@/app/userfinding";
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
-import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus } from "lucide-react"
+import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -36,6 +36,9 @@ import {
 import { Checkbox } from "../ui/checkbox"
 import { calculateResearchPaperIncentive } from "@/app/incentive-calculation"
 import { submitIncentiveClaim } from "@/app/incentive-approval-actions"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
+import { Badge } from "../ui/badge"
+
 
 const MAX_FILES = 10
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -202,6 +205,91 @@ const fileToDataUrl = (file: File): Promise<string> => {
   })
 }
 
+function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit: () => void }) {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[]) => {
+        if (!value && value !== 0 && value !== false) return null;
+        
+        let displayValue: React.ReactNode = String(value);
+        if (typeof value === 'boolean') {
+            displayValue = value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
+                 displayValue = (
+                    <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Author Name</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Email</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {(value as Author[]).map((author, idx) => (
+                                    <TableRow key={idx}>
+                                        <TableCell>{author.name}</TableCell>
+                                        <TableCell><Badge variant="secondary">{author.role}</Badge></TableCell>
+                                        <TableCell>{author.email}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                );
+            } else {
+                displayValue = (value as string[]).join(', ');
+            }
+        }
+
+        return (
+            <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
+                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
+                <dd className="col-span-2">{displayValue}</dd>
+            </div>
+        );
+    };
+
+    const fileList = data.publicationProof ? Array.from(data.publicationProof as FileList).map(f => f.name).join(', ') : 'No file selected';
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Review Your Application</CardTitle>
+                        <CardDescription>Please review the details below before final submission.</CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={onEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {renderDetail("Publication Type", data.publicationType)}
+                {renderDetail("Indexing Status", data.indexType)}
+                {renderDetail("Paper Title", data.paperTitle)}
+                {renderDetail("Authors", data.authors)}
+                {renderDetail("Journal Name", data.journalName)}
+                {renderDetail("Journal Website", data.journalWebsite)}
+                {renderDetail("DOI Link", data.relevantLink)}
+                {renderDetail("Scopus Link", data.scopusLink)}
+                {renderDetail("Journal Classification", data.journalClassification)}
+                {renderDetail("WoS Type", data.wosType)}
+                {renderDetail("Locale", data.locale)}
+                {renderDetail("Print ISSN", data.printIssn)}
+                {renderDetail("Electronic ISSN", data.electronicIssn)}
+                {renderDetail("Publication Month/Year", `${data.publicationMonth}, ${data.publicationYear}`)}
+                {renderDetail("Your Author Position", data.authorPosition)}
+                {renderDetail("PU Name in Publication", data.isPuNameInPublication)}
+                {renderDetail("Total PU Student Authors", data.totalPuStudentAuthors)}
+                {renderDetail("PU Student Names", data.puStudentNames)}
+                {renderDetail("SDGs", data.sdgGoals)}
+                {renderDetail("Publication Proof", fileList)}
+            </CardContent>
+        </Card>
+    );
+}
+
+
 export function ResearchPaperForm() {
   const { toast } = useToast()
   const router = useRouter()
@@ -217,6 +305,8 @@ export function ResearchPaperForm() {
   const [externalAuthorName, setExternalAuthorName] = useState('');
   const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
   const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
+  const [currentStep, setCurrentStep] = useState(1);
+
 
   const form = useForm<ResearchPaperFormValues>({
     resolver: zodResolver(researchPaperSchema),
@@ -290,18 +380,6 @@ export function ResearchPaperForm() {
   }, [])
 
   const indexType = form.watch("indexType")
-
-  const SPECIAL_POLICY_FACULTIES = [
-    "Faculty of Applied Sciences",
-    "Faculty of Medicine",
-    "Faculty of Homoeopathy",
-    "Faculty of Ayurved",
-    "Faculty of Nursing",
-    "Faculty of Pharmacy",
-    "Faculty of Physiotherapy",
-    "Faculty of Public Health",
-    "Faculty of Engineering & Technology",
-  ]
 
   const isSpecialFaculty = useMemo(
     () => (user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false),
@@ -582,11 +660,44 @@ export function ResearchPaperForm() {
     }
   }
 
+  const handleProceedToReview = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+      setCurrentStep(2);
+    } else {
+      toast({
+        variant: 'destructive',
+        title: 'Validation Error',
+        description: 'Please correct the errors on the form before proceeding.',
+      });
+    }
+  };
+
+  const onFinalSubmit = () => handleSave('Pending');
+
+  if (currentStep === 2) {
+    return (
+      <Card>
+        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+          <CardContent className="pt-6">
+            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    );
+  }
+
   return (
     <div className="w-full">
       <Card>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(() => handleSave("Pending"))}>
+          <form>
             <CardContent className="space-y-6 pt-6">
               {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
@@ -1159,9 +1270,8 @@ export function ResearchPaperForm() {
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save as Draft
               </Button>
-              <Button type="submit" disabled={isSubmitting || orcidOrMisIdMissing || bankDetailsMissing}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSubmitting ? "Submitting..." : "Submit Claim"}
+               <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || orcidOrMisIdMissing || bankDetailsMissing}>
+                Proceed to Review
               </Button>
             </CardFooter>
           </form>
