@@ -751,6 +751,18 @@ export default function SettingsPage() {
                 )}
               </div>
               <div className="space-y-4">
+                  <Label className="text-base">IQAC Email Address</Label>
+                   <p className="text-sm text-muted-foreground">
+                    The user who signs up with this email will be automatically assigned the IQAC role.
+                  </p>
+                   <Input 
+                      placeholder="iqac@paruluniversity.ac.in"
+                      defaultValue={systemSettings.iqacEmail || ''}
+                      onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, iqacEmail: e.target.value })}
+                      disabled={isSavingSettings}
+                  />
+              </div>
+              <div className="space-y-4">
                 <Form {...dummyForm}>
                   <Label className="text-base">Incentive Approval Workflow</Label>
                   <p className="text-sm text-muted-foreground">
@@ -1202,3 +1214,5 @@ export default function SettingsPage() {
     </div>
   )
 }
+
+    
