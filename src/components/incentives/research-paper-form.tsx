@@ -252,7 +252,7 @@ export function ResearchPaperForm() {
 
   const calculate = useCallback(async () => {
     if (!user || !user.faculty) return;
-    const result = await calculateResearchPaperIncentive(formValues, user.faculty);
+    const result = await calculateResearchPaperIncentive({ ...formValues, userEmail: user.email }, user.faculty);
     if (result.success) {
         setCalculatedIncentive(result.amount ?? null);
     } else {
