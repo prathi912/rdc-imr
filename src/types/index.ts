@@ -1,4 +1,5 @@
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -183,7 +184,7 @@ export type Notification = {
   requester?: Author;
 }
 
-export type BookCoAuthor = {
+export type CoAuthor = {
   name: string
   email: string
   uid?: string | null
@@ -232,6 +233,7 @@ export type IncentiveClaim = {
   // Common fields
   benefitMode: string
   sdgGoals?: string[];
+  authors?: CoAuthor[]; // Replaces bookCoAuthors
 
   // Research Paper Fields
   publicationType?: string;
@@ -254,7 +256,6 @@ export type IncentiveClaim = {
   publicationProofUrls?: string[];
   isPuNameInPublication?: boolean;
   totalCorrespondingAuthors?: number;
-  bookCoAuthors?: Author[];
   totalPuStudentAuthors?: number;
   puStudentNames?: string;
 
@@ -365,7 +366,6 @@ export type IncentiveClaim = {
   apcTypeOfArticle?: string
   apcOtherArticleType?: string
   apcPaperTitle?: string
-  apcAuthors?: string
   apcTotalStudentAuthors?: number
   apcStudentNames?: string
   apcJournalDetails?: string
@@ -404,7 +404,8 @@ export type FundingCall = {
     time?: string // HH:mm
     venue: string
     pptDeadline?: string // ISO String for PPT deadline
-    assignedEvaluators?: string[]
+    assignedEvaluators?: string[],
+    absentEvaluators?: string[],
   }
   isAnnounced?: boolean
 }
@@ -441,6 +442,7 @@ export type EmrInterest = {
     | "Sanctioned"
     | "Not Sanctioned"
     | "Process Complete"
+    | "Awaiting Rescheduling"
   adminRemarks?: string
   revisedPptUrl?: string
   meetingSlot?: {
@@ -461,6 +463,7 @@ export type EmrInterest = {
   isOpenToPi?: boolean
   proofUrl?: string
   sanctionDate?: string // ISO String
+  wasAbsent?: boolean
 }
 
 export type EmrEvaluation = {

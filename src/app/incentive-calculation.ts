@@ -1,7 +1,8 @@
 
+
 'use server';
 
-import type { IncentiveClaim } from '@/types';
+import type { IncentiveClaim, CoAuthor } from '@/types';
 
 // --- Research Paper Calculation ---
 
@@ -63,7 +64,7 @@ function adjustForPublicationType(baseAmount: number, publicationType: string | 
         case 'Review Articles':
             return baseAmount * 0.8;
         case 'Letter to the Editor/Editorial':
-            return 2500;
+            return 2500; // This is the total cap for this type
         default:
             return baseAmount;
     }
@@ -78,8 +79,8 @@ export async function calculateResearchPaperIncentive(
             return { success: true, amount: 0 };
         }
         
-        const { bookCoAuthors = [], userEmail } = claimData;
-        const internalAuthors = bookCoAuthors.filter(a => !a.isExternal);
+        const { authors = [], userEmail, publicationType } = claimData;
+        const internalAuthors = authors.filter(a => !a.isExternal);
         const totalPuAuthors = internalAuthors.length;
 
         if (totalPuAuthors === 0) {
@@ -87,18 +88,24 @@ export async function calculateResearchPaperIncentive(
         }
 
         const baseIncentive = getBaseIncentiveForPaper(claimData, faculty);
-        const adjustedIncentive = adjustForPublicationType(baseIncentive, claimData.publicationType);
+        const adjustedIncentive = adjustForPublicationType(baseIncentive, publicationType);
         
-        let finalAmount = 0;
+        // Special case for Letter to Editor
+        if (publicationType === 'Letter to the Editor/Editorial') {
+            const totalAuthors = authors.length || 1;
+            const amount = Math.round(adjustedIncentive / totalAuthors);
+            return { success: true, amount };
+        }
 
-        const mainAuthors = internalAuthors.filter(a => a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author');
-        const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
-        
-        const myRole = bookCoAuthors.find(a => a.email === userEmail)?.role;
+        let finalAmount = 0;
+        const myRole = authors.find(a => a.email === userEmail)?.role;
 
         if (totalPuAuthors === 1) {
             finalAmount = adjustedIncentive;
         } else {
+            const mainAuthors = internalAuthors.filter(a => a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author');
+            const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
+            
             if (mainAuthors.length > 0) {
                 const mainAuthorShare = (adjustedIncentive * 0.7) / (mainAuthors.length || 1);
                 const coAuthorShare = coAuthors.length > 0 ? (adjustedIncentive * 0.3) / coAuthors.length : 0;
@@ -111,6 +118,11 @@ export async function calculateResearchPaperIncentive(
             } else { // No main authors, all are co-authors
                 finalAmount = (adjustedIncentive * 0.8) / (totalPuAuthors || 1);
             }
+        }
+        
+        // A single co-author from PU gets 40% of the total amount.
+        if (totalPuAuthors > 1 && myRole === 'Co-Author' && internalAuthors.filter(a => a.role === 'Co-Author').length === 1) {
+            finalAmount = adjustedIncentive * 0.4;
         }
 
         return { success: true, amount: Math.round(finalAmount) };
@@ -184,7 +196,7 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
             totalIncentive = Math.min(sum, baseBookIncentive);
         }
 
-        const internalAuthorsCount = claimData.bookCoAuthors?.filter(a => !a.isExternal).length || 0;
+        const internalAuthorsCount = claimData.authors?.filter(a => !a.isExternal).length || 0;
         if (internalAuthorsCount > 1) {
             totalIncentive /= internalAuthorsCount;
         }
@@ -200,9 +212,9 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
 
 export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, isSpecialFaculty: boolean): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { apcIndexingStatus, apcQRating, bookCoAuthors } = claimData;
+        const { apcIndexingStatus, apcQRating, authors } = claimData;
         
-        const internalAuthorCount = bookCoAuthors ? bookCoAuthors.filter(author => !author.isExternal).length : 0;
+        const internalAuthorCount = authors ? authors.filter(author => !author.isExternal).length : 0;
         if (internalAuthorCount === 0) {
           return { success: true, amount: 0 };
         }

@@ -1,8 +1,9 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper, Author } from '@/types';
+import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper, Author, CoAuthor } from '@/types';
 import { getSystemSettings } from './actions';
 import { sendEmail } from '@/lib/email';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -48,35 +49,70 @@ const getClaimTypeAcronym = (claimType: string): string => {
 
 export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' | 'claimId'>): Promise<{ success: boolean; error?: string, claimId?: string }> {
     try {
-        const newClaim = await adminDb.runTransaction(async (transaction) => {
-            const acronym = getClaimTypeAcronym(claimData.claimType);
-            const counterRef = adminDb.collection('counters').doc(`incentiveClaim_${acronym}`);
+        const newClaimRef = adminDb.collection('incentiveClaims').doc();
+        const claimId = newClaimRef.id;
+
+        const acronym = getClaimTypeAcronym(claimData.claimType);
+        const counterRef = adminDb.collection('counters').doc(`incentiveClaim_${acronym}`);
+        
+        const { current } = await adminDb.runTransaction(async (transaction) => {
             const counterDoc = await transaction.get(counterRef);
-
-            let newCount = 1;
-            if (counterDoc.exists) {
-                newCount = counterDoc.data()!.current + 1;
-            }
+            const newCount = (counterDoc.data()?.current || 0) + 1;
             transaction.set(counterRef, { current: newCount }, { merge: true });
-
-            const claimId = `RDC/IC/${acronym}/${String(newCount).padStart(4, '0')}`;
-            const newClaimRef = adminDb.collection('incentiveClaims').doc();
-            
-            // Claims with a checklist (Research Papers) start at Stage 1 (Pending). Others start at Stage 2.
-            const initialStatus = claimData.claimType === 'Research Papers' ? 'Pending' : 'Pending Stage 2 Approval';
-
-            const finalClaimData = {
-                ...claimData,
-                claimId: claimId,
-                status: claimData.status === 'Draft' ? 'Draft' : initialStatus,
-            };
-
-            transaction.set(newClaimRef, finalClaimData);
-            return { id: newClaimRef.id, claimId: claimId };
+            return { current: newCount };
         });
 
-        await logActivity('INFO', 'Incentive claim submitted', { claimId: newClaim.claimId, userId: claimData.uid });
-        return { success: true, claimId: newClaim.id };
+        const standardizedClaimId = `RDC/IC/${acronym}/${String(current).padStart(4, '0')}`;
+        
+        const initialStatus = claimData.claimType === 'Research Papers' ? 'Pending' : 'Pending Stage 2 Approval';
+
+        const finalClaimData: Omit<IncentiveClaim, 'id'> = {
+            ...claimData,
+            claimId: standardizedClaimId,
+            status: claimData.status === 'Draft' ? 'Draft' : initialStatus,
+        };
+
+        await newClaimRef.set(finalClaimData);
+
+        // Send notifications to co-authors if it's not a draft
+        if (finalClaimData.status !== 'Draft' && finalClaimData.authors) {
+            const coAuthorsToNotify = finalClaimData.authors.filter(a => a.uid && a.uid !== claimData.uid);
+            for (const coAuthor of coAuthorsToNotify) {
+                const notification = {
+                    uid: coAuthor.uid,
+                    title: `${claimData.userName} has listed you as a co-author on an incentive claim.`,
+                    createdAt: new Date().toISOString(),
+                    isRead: false,
+                    type: 'default',
+                    projectId: '/dashboard/incentive-claim'
+                };
+                await adminDb.collection('notifications').add(notification);
+
+                if (coAuthor.email) {
+                    await sendEmail({
+                        to: coAuthor.email,
+                        subject: `You've been added as a co-author on an incentive claim`,
+                        from: 'default',
+                        html: `
+                            <div ${EMAIL_STYLES.background}>
+                                ${EMAIL_STYLES.logo}
+                                <p style="color:#ffffff;">Dear ${coAuthor.name},</p>
+                                <p style="color:#e0e0e0;">
+                                    This is to inform you that ${claimData.userName} has submitted an incentive claim for the publication/work titled "<strong style="color:#ffffff;">${claimData.paperTitle || claimData.publicationTitle || 'N/A'}</strong>" and has listed you as a co-author.
+                                </p>
+                                <p style="color:#e0e0e0;">
+                                    If you wish to claim your share of the incentive, please log in to the portal and visit the "Co-Author Claims" tab on the Incentive Claim page to submit your application.
+                                </p>
+                                ${EMAIL_STYLES.footer}
+                            </div>
+                        `
+                    });
+                }
+            }
+        }
+
+        await logActivity('INFO', 'Incentive claim submitted', { claimId: standardizedClaimId, userId: claimData.uid });
+        return { success: true, claimId: claimId };
     } catch (error: any) {
         console.error('Error submitting incentive claim:', error);
         await logActivity('ERROR', 'Failed to submit incentive claim', { error: error.message });
@@ -95,8 +131,8 @@ async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
         const paperRef = adminDb.collection('papers').doc(); // Create a new document reference
         const now = new Date().toISOString();
 
-        // Convert BookCoAuthor[] to Author[]
-        const authors: Author[] = (claim.bookCoAuthors || []).map(bca => ({
+        // Convert CoAuthor[] to Author[]
+        const authors: Author[] = (claim.authors || []).map(bca => ({
             uid: bca.uid,
             email: bca.email,
             name: bca.name,
