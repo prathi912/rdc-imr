@@ -146,34 +146,6 @@ a.href = url;
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
 
-    const approval1 = claim.approvals?.find(a => a?.stage === 1);
-    const approval2 = claim.approvals?.find(a => a?.stage === 2);
-    
-    const renderVerificationDetail = (fieldId: string, label: string, value?: string | number | null | boolean | string[]) => {
-        if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
-        let displayValue = String(value);
-        if (typeof value === 'boolean') {
-            displayValue = value ? 'Yes' : 'No';
-        }
-        if (Array.isArray(value)) {
-            displayValue = value.join(', ');
-        }
-        return (
-            <div className="grid grid-cols-12 gap-2 text-sm items-center py-1">
-                <span className="text-muted-foreground col-span-6">{label}</span>
-                <span className="col-span-4">{displayValue}</span>
-                <div className="col-span-2 flex justify-end gap-1">
-                    <div className="w-7 h-7 flex items-center justify-center">
-                        <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
-                    </div>
-                     <div className="w-7 h-7 flex items-center justify-center">
-                         <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval2, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 2 Verification</p></TooltipContent></Tooltip></TooltipProvider>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl">
@@ -201,52 +173,25 @@ a.href = url;
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle)}
                             {renderLinkDetail("DOI Link", claim.relevantLink)}
-                            {renderDetail("Author Position", claim.authorPosition)}
                             {renderLinkDetail("Scopus Link", claim.scopusLink)}
-                            {renderDetail("Journal Name", claim.journalName)}
-                            {renderLinkDetail("Journal Website", claim.journalWebsite)}
                             {renderDetail("Publication Type", claim.publicationType)}
                             {renderDetail("Index Type", claim.indexType?.toUpperCase())}
-                            {renderDetail("Journal Classification", claim.journalClassification)}
                             {renderDetail("WoS Type", claim.wosType)}
+                            {renderDetail("Journal Classification", claim.journalClassification)}
+                            {renderDetail("Journal Name", claim.journalName)}
+                            {renderLinkDetail("Journal Website", claim.journalWebsite)}
                             {renderDetail("Locale", claim.locale)}
                             {renderDetail("Print ISSN", claim.printIssn)}
                             {renderDetail("Electronic ISSN", claim.electronicIssn)}
                             {renderDetail("Publication Month", claim.publicationMonth)}
                             {renderDetail("Publication Year", claim.publicationYear)}
-                            {renderDetail("SDGs", claim.sdgGoals)}
-                            {renderLinkDetail("Publication Proofs", claim.publicationProofUrls)}
+                            {renderDetail("Author Position", claim.authorPosition)}
                             {renderDetail("PU Name in Publication", claim.isPuNameInPublication)}
                             {renderDetail("Authors", claim.authors)}
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
-                            
-                            {isViewerAdminOrApprover && (
-                                <div className="space-y-4 rounded-lg border bg-muted/50 p-4 mt-4">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="font-semibold">Verified Fields</h4>
-                                        <div className="grid grid-cols-2 gap-1 text-xs font-semibold text-center">
-                                            <span>Appr. 1</span>
-                                            <span>Appr. 2</span>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        {renderVerificationDetail('name', 'Name of the Applicant', claimant?.name)}
-                                        {renderVerificationDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
-                                        {renderVerificationDetail('publicationType', 'Type of publication', claim.publicationType)}
-                                        {renderVerificationDetail('journalName', 'Name of Journal', claim.journalName)}
-                                        {renderVerificationDetail('locale', 'Whether National/International', claim.locale)}
-                                        {renderVerificationDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
-                                        {renderVerificationDetail('wosType', 'WoS Type', claim.wosType)}
-                                        {renderVerificationDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
-                                        {renderVerificationDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
-                                        {renderVerificationDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
-                                        {renderVerificationDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
-                                        {renderVerificationDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
-                                        {renderVerificationDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
-                                    </div>
-                                </div>
-                            )}
+                            {renderDetail("SDGs", claim.sdgGoals)}
+                            {renderLinkDetail("Publication Proofs", claim.publicationProofUrls)}
                         </>
                     )}
 
