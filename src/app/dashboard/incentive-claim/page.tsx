@@ -211,7 +211,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
             {claims.map(claim => {
                  const myDetails = getMyCoAuthorDetails(claim);
                  const myStatus = myDetails?.status;
-                 const canApply = myStatus === 'Pending' && !!currentUser?.bankDetails;
+                 const canApply = myStatus === 'pending' && !!currentUser?.bankDetails;
 
                 return (
                  <Card key={claim.id}>
@@ -333,11 +333,7 @@ export default function IncentiveClaimPage() {
         
         const claims = snapshot.docs
             .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
-            .filter(claim => 
-                // Ensure it's not the user's own claim and they are listed as a pending co-author
-                claim.uid !== uid &&
-                claim.authors?.some(author => author.uid === uid && author.status === 'Pending')
-            );
+            .filter(claim => claim.uid !== uid); // Ensure it's not the user's own claim
         
         setCoAuthorClaims(claims);
     } catch (error) {
