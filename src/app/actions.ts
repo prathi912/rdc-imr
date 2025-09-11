@@ -121,6 +121,39 @@ export async function bulkGrantModuleAccess(
   }
 }
 
+export async function bulkRevokeModuleAccess(
+  userIds: string[],
+  moduleId: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!userIds || userIds.length === 0 || !moduleId) {
+      return { success: false, error: "User IDs and a module ID are required." }
+    }
+    const batch = adminDb.batch()
+    const usersRef = adminDb.collection("users")
+
+    userIds.forEach((uid) => {
+      const userRef = usersRef.doc(uid)
+      batch.update(userRef, {
+        allowedModules: FieldValue.arrayRemove(moduleId),
+      })
+    })
+
+    await batch.commit()
+    await logActivity("INFO", "Bulk module access revoked", { userIds, moduleId })
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in bulkRevokeModuleAccess:", error)
+    await logActivity("ERROR", "Failed to revoke bulk module access", {
+      userIds,
+      moduleId,
+      error: error.message,
+      stack: error.stack,
+    })
+    return { success: false, error: error.message || "Failed to update user permissions." }
+  }
+}
+
 export async function getEmrInterests(callId: string): Promise<EmrInterest[]> {
   try {
     const interestsRef = adminDb.collection("emrInterests")
@@ -1342,7 +1375,7 @@ export async function isEmailDomainAllowed(
     const iqacEmail = settings.iqacEmail || ""
 
     // Special case for primary super admin
-    if (email === "rathipranav07@gmail.com") {
+    if (email === "rathipranav07@gmail.com" || email === "vicepresident_86@paruluniversity.ac.in") {
       return { allowed: true, isCro: false, isIqac: false }
     }
 
@@ -1851,4 +1884,5 @@ export async function saveSidebarOrder(uid: string, newOrder: string[]): Promise
     
 
     
+
 

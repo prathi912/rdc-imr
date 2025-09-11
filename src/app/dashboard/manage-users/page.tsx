@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, ArrowUpDown, ChevronDown, ShieldCheck, Loader2, Library, Users2 } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ChevronDown, ShieldCheck, Loader2, Library, Users2, Ban } from "lucide-react";
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -52,7 +52,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { bulkGrantModuleAccess } from '@/app/actions';
+import { bulkGrantModuleAccess, bulkRevokeModuleAccess } from '@/app/actions';
 
 const ROLES: User['role'][] = ['faculty', 'admin', 'CRO', 'IQAC'];
 const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin';
@@ -217,7 +217,7 @@ export default function ManageUsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'name', direction: 'ascending' });
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [isBulkActionSubmitting, setIsBulkActionSubmitting] = useState(false);
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -348,7 +348,7 @@ export default function ManageUsersPage() {
   }, [fetchUsersAndClaims, toast]);
   
   const handleBulkGrant = async (moduleId: string) => {
-    setIsBulkActionSubmitting(true);
+    setIsBulkSubmitting(true);
     const result = await bulkGrantModuleAccess(selectedUsers, moduleId);
     if (result.success) {
       toast({ title: 'Success', description: `Granted access to '${moduleId}' for ${selectedUsers.length} users.` });
@@ -357,7 +357,20 @@ export default function ManageUsersPage() {
     } else {
       toast({ variant: 'destructive', title: 'Error', description: result.error });
     }
-    setIsBulkActionSubmitting(false);
+    setIsBulkSubmitting(false);
+  };
+  
+  const handleBulkRevoke = async (moduleId: string) => {
+    setIsBulkSubmitting(true);
+    const result = await bulkRevokeModuleAccess(selectedUsers, moduleId);
+    if (result.success) {
+      toast({ title: 'Success', description: `Revoked access to '${moduleId}' for ${selectedUsers.length} users.` });
+      setSelectedUsers([]);
+      fetchUsersAndClaims();
+    } else {
+      toast({ variant: 'destructive', title: 'Error', description: result.error });
+    }
+    setIsBulkSubmitting(false);
   };
   
   if (loading) {
@@ -572,7 +585,7 @@ export default function ManageUsersPage() {
                   <span className="text-sm text-muted-foreground">{selectedUsers.length} user(s) selected</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" disabled={isBulkActionSubmitting}>
+                      <Button variant="outline" disabled={isBulkSubmitting}>
                         <Library className="mr-2 h-4 w-4" /> Grant Module Access
                       </Button>
                     </DropdownMenuTrigger>
@@ -584,7 +597,21 @@ export default function ManageUsersPage() {
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                   {isBulkActionSubmitting && <Loader2 className="h-5 w-5 animate-spin" />}
+                   <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="destructive" disabled={isBulkSubmitting}>
+                        <Ban className="mr-2 h-4 w-4" /> Revoke Module Access
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      {ALL_MODULES.map(module => (
+                        <DropdownMenuItem key={module.id} onSelect={() => handleBulkRevoke(module.id)}>
+                          {module.label}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                   {isBulkSubmitting && <Loader2 className="h-5 w-5 animate-spin" />}
                 </div>
               </CardFooter>
           )}
