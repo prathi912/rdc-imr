@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -525,19 +524,21 @@ export function ResearchPaperForm() {
       
       const publicationProofFiles = data.publicationProof ? Array.from(data.publicationProof as FileList) : [];
       const publicationProofUrls = await Promise.all(
-          publicationProofFiles.map(async (file, index) => 
-              uploadFileToServer(
-                  `data:${file.type};base64,${Buffer.from(await file.arrayBuffer()).toString('base64')}`,
-                  `incentive-proofs/${user.uid}/publication-proof/${new Date().toISOString()}-${index}-${file.name}`
-              ).then(result => {
-                  if (!result.success) throw new Error(result.error);
-                  return result.url!;
-              })
-          )
+          publicationProofFiles.map(async (file, index) => {
+              const dataUrl = await fileToDataUrl(file);
+              const path = `incentive-proofs/${user.uid}/publication-proof/${new Date().toISOString()}-${index}-${file.name}`;
+              const result = await uploadFileToServer(dataUrl, path);
+              if (!result.success || !result.url) {
+                  throw new Error(result.error || `Failed to upload file ${file.name}`);
+              }
+              return result.url;
+          })
       );
 
+      const { publicationProof, ...restOfData } = data;
+
       const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
-          ...data,
+          ...restOfData,
           publicationProofUrls,
           calculatedIncentive,
           misId: user.misId || null,
