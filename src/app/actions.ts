@@ -65,8 +65,8 @@ export async function checkPatentUniqueness(title: string, applicationNumber: st
         const appNumberQuery = claimsRef.where('patentApplicationNumber', '==', applicationNumber);
 
         const [titleSnapshot, appNumberSnapshot] = await Promise.all([
-            getDocs(titleQuery),
-            getDocs(appNumberQuery)
+            titleQuery.get(),
+            appNumberQuery.get()
         ]);
         
         const conflictingTitle = titleSnapshot.docs.find(doc => doc.id !== currentClaimId);
@@ -2217,4 +2217,117 @@ export async function saveSidebarOrder(uid: string, newOrder: string[]): Promise
   }
 }
 
+// Research Paper Incentive Calculation
+const SPECIAL_POLICY_FACULTIES = [
+    "Faculty of Applied Sciences",
+    "Faculty of Medicine",
+    "Faculty of Homoeopathy",
+    "Faculty of Ayurved",
+    "Faculty of Nursing",
+    "Faculty of Pharmacy",
+    "Faculty of Physiotherapy",
+    "Faculty of Public Health",
+    "Faculty of Engineering & Technology"
+];
+
+function getBaseIncentive(claimData: Partial<IncentiveClaim>, faculty: string): number {
+    const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(faculty);
+    const { journalClassification, indexType } = claimData;
+
+    if (isSpecialFaculty) {
+        // Category A rules
+        switch (journalClassification) {
+            case 'Nature/Science/Lancet': return 50000;
+            case 'Top 1% Journals': return 25000;
+            case 'Q1': return 15000;
+            case 'Q2': return 10000;
+            case 'Q3': return 6000;
+            case 'Q4': return 4000;
+            default: return 0;
+        }
+    } else {
+        // Category B rules
+        if (journalClassification && ['Q1', 'Q2', 'Q3', 'Q4', 'Top 1% Journals', 'Nature/Science/Lancet'].includes(journalClassification)) {
+             switch (journalClassification) {
+                case 'Nature/Science/Lancet': return 50000;
+                case 'Top 1% Journals': return 25000;
+                case 'Q1': return 15000;
+                case 'Q2': return 10000;
+                case 'Q3': return 6000; // This seems to overlap, but we follow the provided rules
+                case 'Q4': return 4000;
+                default: return 0;
+            }
+        }
+        if (indexType === 'esci') return 2000;
+        if (claimData.wosType === 'Q3' || claimData.wosType === 'Q4') return 3000;
+        if (claimData.publicationType === 'UGC listed journals (Journals found qualified through UGC-CARE Protocol, Group-I)') return 1000;
+
+        return 0;
+    }
+}
+
+function adjustForPublicationType(baseAmount: number, publicationType: string): number {
+    switch (publicationType) {
+        case 'Research Articles/Short Communications':
+            return baseAmount;
+        case 'Case Reports/Short Surveys':
+            return baseAmount * 0.9;
+        case 'Review Articles':
+            return baseAmount * 0.8;
+        case 'Letter to the Editor/Editorial':
+            return 2500;
+        default:
+            return baseAmount;
+    }
+}
+
+export async function calculateIncentive(
+    claimData: Partial<IncentiveClaim>,
+    faculty: string
+): Promise<{ success: boolean; amount?: number; error?: string }> {
+    try {
+        const { authorPosition, bookCoAuthors } = claimData;
+        const totalPuAuthors = bookCoAuthors?.filter(a => !a.isExternal).length || 1;
+
+        const baseIncentive = getBaseIncentive(claimData, faculty);
+        const adjustedIncentive = adjustForPublicationType(baseIncentive, claimData.publicationType || '');
+        
+        let finalAmount = 0;
+
+        if (authorPosition === '1st') {
+            finalAmount = adjustedIncentive;
+        } else {
+            if (totalPuAuthors === 1) {
+                finalAmount = adjustedIncentive * 0.8;
+            } else {
+                const firstOrCorresponding = bookCoAuthors?.find(a => !a.isExternal && (a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'));
+                
+                if (firstOrCorresponding) {
+                    const mainAuthors = bookCoAuthors.filter(a => !a.isExternal && (a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'));
+                    const coAuthors = bookCoAuthors.filter(a => !a.isExternal && a.role === 'Co-Author');
+                    
+                    const mainAuthorShare = (adjustedIncentive * 0.7) / mainAuthors.length;
+                    const coAuthorShare = (adjustedIncentive * 0.3) / coAuthors.length;
+
+                    const myRole = bookCoAuthors.find(a => a.email === claimData.userEmail)?.role;
+
+                    if (myRole === 'First Author' || myRole === 'Corresponding Author' || myRole === 'First & Corresponding Author') {
+                        finalAmount = mainAuthorShare;
+                    } else {
+                        finalAmount = coAuthorShare;
+                    }
+                } else {
+                    finalAmount = (adjustedIncentive * 0.8) / totalPuAuthors;
+                }
+            }
+        }
+
+        return { success: true, amount: Math.round(finalAmount) };
+
+    } catch (error: any) {
+        console.error("Error calculating incentive:", error);
+        return { success: false, error: "Calculation failed: " + error.message };
+    }
+}
     
+
