@@ -138,7 +138,7 @@ a.href = url;
       );
     }
 
-    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
     const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
     const isPendingForBank = ['Accepted', 'Submitted to Accounts'].includes(claim.status);
@@ -345,44 +345,44 @@ a.href = url;
                         </>
                     )}
 
-                    <hr className="my-2" />
-                    <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>
-                    {renderDetail("Benefit Mode", claim.benefitMode)}
-                    {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
-                    {(isViewerAdminOrApprover || isPendingForBank) && renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
-                    
-                    {claim.approvals && claim.approvals.length > 0 && (
-                        <div className="space-y-2 pt-2">
-                           <h4 className="font-semibold text-base">Approval History</h4>
-                           {claim.approvals.filter(a => a !== null).map(approval => (
-                               <div key={approval.stage} className="p-3 border rounded-md bg-muted/50">
-                                   <p><strong>Stage {approval.stage}:</strong> {approval.status}</p>
-                                   {isViewerAdminOrApprover && (
-                                       <>
-                                        <p className="text-xs text-muted-foreground">by {approval.approverName} on {new Date(approval.timestamp).toLocaleString()}</p>
-                                        <p className="mt-1"><strong>Comments:</strong> {approval.comments || 'N/A'}</p>
-                                       </>
-                                   )}
-                               </div>
-                           ))}
-                        </div>
-                    )}
-                    
-                    {canViewBankDetails && claim.bankDetails && (
+                    {isViewerAdminOrApprover && (
                         <>
                             <hr className="my-2" />
-                            <h4 className="font-semibold text-base mt-2">Bank Account Details (Visible to Admins only)</h4>
-                            {renderDetail("Beneficiary Name", claim.bankDetails.beneficiaryName)}
-                            {renderDetail("Account Number", claim.bankDetails.accountNumber)}
-                            {renderDetail("Bank Name", claim.bankDetails.bankName)}
-                            {renderDetail("Branch Name", claim.bankDetails.branchName)}
-                            {renderDetail("City", claim.bankDetails.city)}
-                            {renderDetail("IFSC Code", claim.bankDetails.ifscCode)}
+                            <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>
+                            {renderDetail("Benefit Mode", claim.benefitMode)}
+                            {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            
+                            {claim.approvals && claim.approvals.length > 0 && (
+                                <div className="space-y-2 pt-2">
+                                   <h4 className="font-semibold text-base">Approval History</h4>
+                                   {claim.approvals.filter(a => a !== null).map(approval => (
+                                       <div key={approval.stage} className="p-3 border rounded-md bg-muted/50">
+                                           <p><strong>Stage {approval.stage}:</strong> {approval.status}</p>
+                                           <p className="text-xs text-muted-foreground">by {approval.approverName} on {new Date(approval.timestamp).toLocaleString()}</p>
+                                           <p className="mt-1"><strong>Comments:</strong> {approval.comments || 'N/A'}</p>
+                                       </div>
+                                   ))}
+                                </div>
+                            )}
+                            
+                            {canViewBankDetails && claim.bankDetails && (
+                                <>
+                                    <hr className="my-2" />
+                                    <h4 className="font-semibold text-base mt-2">Bank Account Details (Visible to Admins only)</h4>
+                                    {renderDetail("Beneficiary Name", claim.bankDetails.beneficiaryName)}
+                                    {renderDetail("Account Number", claim.bankDetails.accountNumber)}
+                                    {renderDetail("Bank Name", claim.bankDetails.bankName)}
+                                    {renderDetail("Branch Name", claim.bankDetails.branchName)}
+                                    {renderDetail("City", claim.bankDetails.city)}
+                                    {renderDetail("IFSC Code", claim.bankDetails.ifscCode)}
+                                </>
+                            )}
                         </>
                     )}
                 </div>
                 <DialogFooter className="gap-2">
-                    {isPendingForBank && (
+                    {isPendingForBank && isViewerAdminOrApprover && (
                          <Button onClick={handleDownloadNoting} disabled={isPrinting}>
                             {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                             Download Notings
