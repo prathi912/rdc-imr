@@ -211,7 +211,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
             {claims.map(claim => {
                  const myDetails = getMyCoAuthorDetails(claim);
                  const myStatus = myDetails?.status;
-                 const canApply = myStatus === 'Pending';
+                 const canApply = myStatus === 'Pending' && !!currentUser?.bankDetails;
 
                 return (
                  <Card key={claim.id}>
