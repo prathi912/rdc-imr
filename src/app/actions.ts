@@ -1,5 +1,3 @@
-
-
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -24,6 +22,7 @@ import type {
   SystemSettings,
   LoginOtp,
   CoPiDetails,
+  Author,
 } from "@/types"
 import { sendEmail as sendEmailUtility } from "@/lib/email"
 import fs from "fs"
@@ -2232,7 +2231,7 @@ const SPECIAL_POLICY_FACULTIES = [
 
 function getBaseIncentive(claimData: Partial<IncentiveClaim>, faculty: string): number {
     const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(faculty);
-    const { journalClassification, indexType } = claimData;
+    const { journalClassification, indexType, wosType, publicationType } = claimData;
 
     if (isSpecialFaculty) {
         // Category A rules
@@ -2253,20 +2252,21 @@ function getBaseIncentive(claimData: Partial<IncentiveClaim>, faculty: string): 
                 case 'Top 1% Journals': return 25000;
                 case 'Q1': return 15000;
                 case 'Q2': return 10000;
-                case 'Q3': return 6000; // This seems to overlap, but we follow the provided rules
+                case 'Q3': return 6000; 
                 case 'Q4': return 4000;
                 default: return 0;
             }
         }
         if (indexType === 'esci') return 2000;
-        if (claimData.wosType === 'Q3' || claimData.wosType === 'Q4') return 3000;
-        if (claimData.publicationType === 'UGC listed journals (Journals found qualified through UGC-CARE Protocol, Group-I)') return 1000;
+        if (wosType === 'Q3' || wosType === 'Q4') return 3000;
+        if (publicationType === 'UGC listed journals (Journals found qualified through UGC-CARE Protocol, Group-I)') return 1000;
 
         return 0;
     }
 }
 
-function adjustForPublicationType(baseAmount: number, publicationType: string): number {
+function adjustForPublicationType(baseAmount: number, publicationType: string | undefined): number {
+    if (!publicationType) return baseAmount;
     switch (publicationType) {
         case 'Research Articles/Short Communications':
             return baseAmount;
@@ -2286,11 +2286,15 @@ export async function calculateIncentive(
     faculty: string
 ): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { authorPosition, bookCoAuthors } = claimData;
-        const totalPuAuthors = bookCoAuthors?.filter(a => !a.isExternal).length || 1;
+        if (claimData.isPuNameInPublication === false) {
+            return { success: true, amount: 0 };
+        }
+        
+        const { authorPosition, bookCoAuthors = [] } = claimData;
+        const totalPuAuthors = bookCoAuthors.filter(a => !a.isExternal).length || 1;
 
         const baseIncentive = getBaseIncentive(claimData, faculty);
-        const adjustedIncentive = adjustForPublicationType(baseIncentive, claimData.publicationType || '');
+        const adjustedIncentive = adjustForPublicationType(baseIncentive, claimData.publicationType);
         
         let finalAmount = 0;
 
@@ -2300,14 +2304,13 @@ export async function calculateIncentive(
             if (totalPuAuthors === 1) {
                 finalAmount = adjustedIncentive * 0.8;
             } else {
-                const firstOrCorresponding = bookCoAuthors?.find(a => !a.isExternal && (a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'));
+                const mainAuthors = bookCoAuthors.filter(a => !a.isExternal && (a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'));
                 
-                if (firstOrCorresponding) {
-                    const mainAuthors = bookCoAuthors.filter(a => !a.isExternal && (a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author'));
+                if (mainAuthors.length > 0) {
                     const coAuthors = bookCoAuthors.filter(a => !a.isExternal && a.role === 'Co-Author');
                     
-                    const mainAuthorShare = (adjustedIncentive * 0.7) / mainAuthors.length;
-                    const coAuthorShare = (adjustedIncentive * 0.3) / coAuthors.length;
+                    const mainAuthorShare = (adjustedIncentive * 0.7) / (mainAuthors.length || 1);
+                    const coAuthorShare = (coAuthors.length > 0) ? (adjustedIncentive * 0.3) / coAuthors.length : 0;
 
                     const myRole = bookCoAuthors.find(a => a.email === claimData.userEmail)?.role;
 
@@ -2330,4 +2333,3 @@ export async function calculateIncentive(
     }
 }
     
-

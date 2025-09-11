@@ -1,5 +1,3 @@
-
-
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -23,11 +21,11 @@ import { collection, doc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import {
   uploadFileToServer,
+  calculateIncentive,
 } from "@/app/actions"
 import { findUserByMisId } from "@/app/userfinding";
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
-import { calculateIncentive } from "@/app/actions";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search } from "lucide-react"
 import {
   DropdownMenu,
@@ -75,7 +73,6 @@ const researchPaperSchema = z
     isPuNameInPublication: z
       .boolean()
       .refine((val) => val === true, { message: "PU name must be present in the publication." }),
-    totalCorrespondingAuthors: z.coerce.number().min(1, "Please specify the number of corresponding authors."),
     authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
     bookCoAuthors: z
       .array(
@@ -238,7 +235,6 @@ export function ResearchPaperForm() {
       sdgGoals: [],
       bookCoAuthors: [],
       isPuNameInPublication: false,
-      totalCorrespondingAuthors: 1,
       totalPuStudentAuthors: 0,
       puStudentNames: '',
     },
@@ -996,19 +992,6 @@ export function ResearchPaperForm() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="totalCorrespondingAuthors"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total No. of Corresponding Authors</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
                     name="totalPuStudentAuthors"
                     render={({ field }) => (
                       <FormItem>
@@ -1139,4 +1122,3 @@ export function ResearchPaperForm() {
     </div>
   )
 }
-
