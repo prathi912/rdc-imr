@@ -64,13 +64,13 @@ const researchPaperSchema = z
     publicationProof: z
       .any()
       .refine((files) => files?.length > 0, "Proof of publication is required.")
-      .refine((files) => files?.length <= MAX_FILES, `You can upload a maximum of ${MAX_FILES} files.`)
+      .refine((files) => !files || files?.length <= MAX_FILES, `You can upload a maximum of ${MAX_FILES} files.`)
       .refine(
-        (files) => Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE),
+        (files) => !files || Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE),
         `Each file must be less than 5MB.`,
       )
       .refine(
-        (files) => Array.from(files).every((file: any) => ACCEPTED_FILE_TYPES.includes(file.type)),
+        (files) => !files || Array.from(files).every((file: any) => ACCEPTED_FILE_TYPES.includes(file.type)),
         "Only PDF files are allowed.",
       ),
     isPuNameInPublication: z
@@ -457,22 +457,7 @@ export function ResearchPaperForm() {
         if (result.success && result.data) {
             form.setValue('paperTitle', result.data.paperTitle, { shouldValidate: true });
             form.setValue('journalName', result.data.journalName, { shouldValidate: true });
-            if (result.data.journalClassification) {
-                form.setValue('journalClassification', result.data.journalClassification, { shouldValidate: true });
-            }
-            form.setValue('publicationMonth', result.data.publicationMonth, { shouldValidate: true });
-            form.setValue('publicationYear', result.data.publicationYear, { shouldValidate: true });
-            form.setValue('relevantLink', result.data.relevantLink, { shouldValidate: true });
-            form.setValue('isPuNameInPublication', result.data.isPuNameInPublication, { shouldValidate: true });
-            if (result.data.journalWebsite) {
-                form.setValue('journalWebsite', result.data.journalWebsite, { shouldValidate: true });
-            }
-            if (result.data.printIssn) {
-                form.setValue('printIssn', result.data.printIssn, { shouldValidate: true });
-            }
-            if (result.data.electronicIssn) {
-                form.setValue('electronicIssn', result.data.electronicIssn, { shouldValidate: true });
-            }
+            
             toast({ title: 'Success', description: 'Form fields have been pre-filled from Scopus.' });
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data from Scopus.' });
@@ -1080,7 +1065,7 @@ export function ResearchPaperForm() {
                       </div>
                       <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
                           <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-                          <SelectContent>{getAvailableRoles(field).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                          <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                       </Select>
                       {field.email.toLowerCase() !== user?.email.toLowerCase() && (
                         <Button
