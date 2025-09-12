@@ -263,11 +263,20 @@ export default function EmrManagementOverviewPage() {
     const filteredCalls = useMemo(() => {
         if (!searchTerm) return calls;
         const lowercasedFilter = searchTerm.toLowerCase();
+        
+        // Find call IDs where an applicant's name matches
+        const matchingCallIds = new Set(
+            interests
+                .filter(interest => interest.userName.toLowerCase().includes(lowercasedFilter))
+                .map(interest => interest.callId)
+        );
+
         return calls.filter(call => 
             call.title.toLowerCase().includes(lowercasedFilter) ||
-            call.agency.toLowerCase().includes(lowercasedFilter)
+            call.agency.toLowerCase().includes(lowercasedFilter) ||
+            matchingCallIds.has(call.id)
         );
-    }, [calls, searchTerm]);
+    }, [calls, interests, searchTerm]);
 
     const isSuperAdmin = user?.role === 'Super-admin';
 
@@ -284,7 +293,7 @@ export default function EmrManagementOverviewPage() {
                         <TabsContent value="calls" className="mt-4">
                             <div className="flex justify-between items-center mb-4">
                                 <Input 
-                                    placeholder="Search by call title or agency..." 
+                                    placeholder="Search by call, agency, or applicant..." 
                                     value={searchTerm} 
                                     onChange={(e) => setSearchTerm(e.target.value)} 
                                     className="max-w-sm" 
