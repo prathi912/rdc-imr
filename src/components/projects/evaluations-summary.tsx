@@ -27,7 +27,7 @@ const getRecommendationBadge = (recommendation: Evaluation['recommendation']) =>
 }
 
 export function EvaluationsSummary({ project, evaluations, currentUser }: EvaluationsSummaryProps) {
-    const isAdmin = ['Super-admin', 'admin'].includes(currentUser.role);
+    const isAdmin = ['Super-admin', 'admin', 'CRO'].includes(currentUser.role);
     const isEvaluator = currentUser.role === 'Evaluator';
 
     const evaluationsToShow = useMemo(() => {
