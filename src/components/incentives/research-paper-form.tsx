@@ -66,11 +66,11 @@ const researchPaperSchema = z
       .refine((files) => files?.length > 0, "Proof of publication is required.")
       .refine((files) => !files || files?.length <= MAX_FILES, `You can upload a maximum of ${MAX_FILES} files.`)
       .refine(
-        (files) => !files || Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE),
+        (files) => !files || Array.from(files as FileList).every((file: any) => file.size <= MAX_FILE_SIZE),
         `Each file must be less than 5MB.`,
       )
       .refine(
-        (files) => !files || Array.from(files).every((file: any) => ACCEPTED_FILE_TYPES.includes(file.type)),
+        (files) => !files || Array.from(files as FileList).every((file: any) => ACCEPTED_FILE_TYPES.includes(file.type)),
         "Only PDF files are allowed.",
       ),
     isPuNameInPublication: z
@@ -462,6 +462,12 @@ export function ResearchPaperForm() {
             }
             if (result.data.publicationYear) {
               form.setValue('publicationYear', result.data.publicationYear, { shouldValidate: true });
+            }
+            if (result.data.printIssn) {
+                form.setValue('printIssn', result.data.printIssn, { shouldValidate: true });
+            }
+            if (result.data.electronicIssn) {
+                form.setValue('electronicIssn', result.data.electronicIssn, { shouldValidate: true });
             }
             
             toast({ title: 'Success', description: 'Form fields have been pre-filled from Scopus.' });

@@ -13,6 +13,8 @@ export async function fetchAdvancedScopusData(
     journalName: string;
     publicationMonth: string;
     publicationYear: string;
+    printIssn?: string;
+    electronicIssn?: string;
   }
   error?: string
 }> {
@@ -55,6 +57,8 @@ export async function fetchAdvancedScopusData(
     const paperTitle = coredata["dc:title"] || "";
     const journalName = coredata["prism:publicationName"] || "";
     const coverDate = coredata["prism:coverDate"];
+    const printIssn = coredata["prism:issn"];
+    const electronicIssn = coredata["prism:eIssn"];
 
     let publicationMonth = '';
     let publicationYear = '';
@@ -72,6 +76,8 @@ export async function fetchAdvancedScopusData(
         journalName,
         publicationMonth,
         publicationYear,
+        printIssn,
+        electronicIssn,
       },
     }
   } catch (error: any) {
