@@ -1,8 +1,8 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { format, isAfter, isBefore, startOfToday, parseISO } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
@@ -242,16 +242,22 @@ function EditEmrProjectDialog({ interest, isOpen, onOpenChange, onActionComplete
 }
 
 export default function AllProjectsPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [allImrProjects, setAllImrProjects] = useState<Project[]>([]);
   const [allEmrProjects, setAllEmrProjects] = useState<EmrInterest[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [facultyFilter, setFacultyFilter] = useState('all');
-  const [activeTab, setActiveTab] = useState('imr');
+  
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
+  const [facultyFilter, setFacultyFilter] = useState(searchParams.get('faculty') || 'all');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'imr');
+
   const isMobile = useIsMobile();
 
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
@@ -259,6 +265,18 @@ export default function AllProjectsPage() {
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(IMR_EXPORT_COLUMNS.map(c => c.id));
   const [projectToEdit, setProjectToEdit] = useState<EmrInterest | null>(null);
   
+  const updateUrlParams = useCallback((newValues: { q?: string; status?: string; faculty?: string, tab?: string }) => {
+    const params = new URLSearchParams(searchParams.toString());
+    Object.entries(newValues).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [pathname, router, searchParams]);
+
   const fetchAllData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -325,16 +343,17 @@ export default function AllProjectsPage() {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
       if (parsedUser.role === 'CRO') {
-        setFacultyFilter('all');
+        setFacultyFilter(searchParams.get('faculty') || 'all');
       }
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [searchParams]);
   
   useEffect(() => {
       setSelectedExportColumns(activeTab === 'imr' ? IMR_EXPORT_COLUMNS.map(c => c.id) : EMR_EXPORT_COLUMNS.map(c => c.id));
-  }, [activeTab]);
+      updateUrlParams({ tab: activeTab });
+  }, [activeTab, updateUrlParams]);
 
   useEffect(() => {
     fetchAllData();
@@ -488,14 +507,14 @@ export default function AllProjectsPage() {
       </PageHeader>
       
       <div className="flex flex-col sm:flex-row flex-wrap items-center py-4 gap-2 sm:gap-4">
-        <Input placeholder="Filter by title or PI..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-xs" />
+        <Input placeholder="Filter by title or PI..." value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); updateUrlParams({ q: event.target.value || undefined }); }} className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-xs" />
         <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-            <Select value={statusFilter} onValueChange={setStatusFilter} disabled={activeTab === 'emr'}>
+            <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); updateUrlParams({ status: value === 'all' ? undefined : value }); }} disabled={activeTab === 'emr'}>
                 <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
                 <SelectContent><SelectItem value="all">All Statuses</SelectItem>{STATUSES.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
             </Select>
             {user?.role === 'CRO' && user.faculties && user.faculties.length > 1 && (
-                 <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                 <Select value={facultyFilter} onValueChange={(value) => { setFacultyFilter(value); updateUrlParams({ faculty: value === 'all' ? undefined : value }); }}>
                     <SelectTrigger className="w-full sm:w-[280px]"><SelectValue placeholder="Filter by faculty" /></SelectTrigger>
                     <SelectContent><SelectItem value="all">All Assigned Faculties</SelectItem>{user.faculties.map(faculty => (<SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>))}</SelectContent>
                 </Select>
