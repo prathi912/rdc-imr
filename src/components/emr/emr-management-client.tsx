@@ -10,14 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload } from 'lucide-react';
+import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '../ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement } from '@/app/emr-actions';
+import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement, markEmrAttendance } from '@/app/emr-actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,6 +53,8 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { UploadPptDialog } from './upload-ppt-dialog';
+import { Checkbox } from '../ui/checkbox';
+
 
 interface EmrManagementClientProps {
     call: FundingCall;
@@ -78,6 +80,119 @@ const bulkEditSchema = z.object({
 const signEndorsementSchema = z.object({
     signedEndorsement: z.any().refine(files => files?.length > 0, "A signed PDF is required."),
 });
+
+const attendanceSchema = z.object({
+  absentApplicantIds: z.array(z.string()),
+  absentEvaluatorUids: z.array(z.string()),
+});
+
+function AttendanceDialog({ call, interests, allUsers, isOpen, onOpenChange, onUpdate }: { call: FundingCall; interests: EmrInterest[]; allUsers: User[]; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const form = useForm<z.infer<typeof attendanceSchema>>({
+        resolver: zodResolver(attendanceSchema),
+        defaultValues: {
+            absentApplicantIds: [],
+            absentEvaluatorUids: [],
+        },
+    });
+
+    const scheduledApplicants = interests.filter(i => i.meetingSlot);
+    const assignedEvaluators = allUsers.filter(u => call.meetingDetails?.assignedEvaluators?.includes(u.uid));
+
+    const handleSubmit = async (values: z.infer<typeof attendanceSchema>) => {
+        setIsSubmitting(true);
+        try {
+            const result = await markEmrAttendance(call.id, values.absentApplicantIds, values.absentEvaluatorUids);
+            if (result.success) {
+                toast({ title: 'Success', description: 'Attendance has been marked.' });
+                onUpdate();
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Mark Meeting Attendance</DialogTitle>
+                    <DialogDescription>Select any applicants or evaluators who were absent from the meeting.</DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="attendance-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                        <div>
+                            <h4 className="font-semibold mb-2">Applicants ({scheduledApplicants.length})</h4>
+                            <div className="space-y-2">
+                                {scheduledApplicants.map(interest => (
+                                    <FormField
+                                        key={interest.id}
+                                        control={form.control}
+                                        name="absentApplicantIds"
+                                        render={({ field }) => (
+                                            <FormItem className="flex items-center space-x-3 space-y-0 p-2 border rounded-md">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={field.value?.includes(interest.id)}
+                                                        onCheckedChange={(checked) => {
+                                                            return checked
+                                                                ? field.onChange([...field.value, interest.id])
+                                                                : field.onChange(field.value?.filter(id => id !== interest.id));
+                                                        }}
+                                                    />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">{interest.userName}</FormLabel>
+                                            </FormItem>
+                                        )}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-2">Evaluators ({assignedEvaluators.length})</h4>
+                            <div className="space-y-2">
+                                {assignedEvaluators.map(evaluator => (
+                                     <FormField
+                                        key={evaluator.uid}
+                                        control={form.control}
+                                        name="absentEvaluatorUids"
+                                        render={({ field }) => (
+                                            <FormItem className="flex items-center space-x-3 space-y-0 p-2 border rounded-md">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={field.value?.includes(evaluator.uid)}
+                                                        onCheckedChange={(checked) => {
+                                                            return checked
+                                                                ? field.onChange([...field.value, evaluator.uid])
+                                                                : field.onChange(field.value?.filter(id => id !== evaluator.uid));
+                                                        }}
+                                                    />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">{evaluator.name}</FormLabel>
+                                            </FormItem>
+                                        )}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="attendance-form" disabled={isSubmitting}>
+                        {isSubmitting ? 'Saving...' : 'Save Attendance'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function SignEndorsementDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
     const { toast } = useToast();
@@ -230,6 +345,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
     const [isSignEndorsementDialogOpen, setIsSignEndorsementDialogOpen] = useState(false);
     const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
+    const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
 
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
@@ -326,7 +442,9 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     };
     
     
-    const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot);
+    const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot && !i.wasAbsent);
+    const meetingIsScheduled = !!call.meetingDetails?.date;
+
 
     return (
         <Card>
@@ -337,6 +455,11 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                          {unscheduledApplicantsExist && (
                             <Button onClick={() => setIsScheduleDialogOpen(true)}>
                                 <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
+                            </Button>
+                         )}
+                         {meetingIsScheduled && (
+                            <Button variant="outline" onClick={() => setIsAttendanceDialogOpen(true)}>
+                                <UserCheck className="mr-2 h-4 w-4" /> Attendance
                             </Button>
                          )}
                         <Button variant="outline" onClick={handleExport} disabled={interests.length === 0}>
@@ -497,6 +620,14 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 isOpen={isScheduleDialogOpen}
                 onOpenChange={setIsScheduleDialogOpen}
                 onActionComplete={onActionComplete}
+                call={call}
+                interests={interests}
+                allUsers={allUsers}
+             />
+             <AttendanceDialog
+                isOpen={isAttendanceDialogOpen}
+                onOpenChange={setIsAttendanceDialogOpen}
+                onUpdate={onActionComplete}
                 call={call}
                 interests={interests}
                 allUsers={allUsers}

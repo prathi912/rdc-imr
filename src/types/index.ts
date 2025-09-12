@@ -359,6 +359,7 @@ export type IncentiveClaim = {
   apcTypeOfArticle?: string
   apcOtherArticleType?: string
   apcPaperTitle?: string
+  apcAuthors?: string
   apcTotalStudentAuthors?: number
   apcStudentNames?: string
   apcJournalDetails?: string
