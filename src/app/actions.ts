@@ -1955,16 +1955,33 @@ export async function saveSidebarOrder(uid: string, newOrder: string[]): Promise
 export async function markImrAttendance(
   meetingProjects: { projectId: string; piUid: string }[],
   absentPiUids: string[],
-  absentEvaluatorUids: string[]
+  absentEvaluatorUids: string[],
+  meetingIdentifier?: { date: string; time: string; venue: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const batch = adminDb.batch();
     const projectsRef = adminDb.collection("projects");
-    const presentProjects = meetingProjects.filter(p => !absentPiUids.includes(p.piUid));
+    let allMeetingProjects = [...meetingProjects];
+
+    // If triggered from a single project detail page, find all other projects in the same meeting
+    if (meetingIdentifier) {
+        const q = query(projectsRef, 
+            where('meetingDetails.date', '==', meetingIdentifier.date),
+            where('meetingDetails.time', '==', meetingIdentifier.time),
+            where('meetingDetails.venue', '==', meetingIdentifier.venue)
+        );
+        const meetingSnapshot = await getDocs(q);
+        allMeetingProjects = meetingSnapshot.docs.map(doc => ({
+            projectId: doc.id,
+            piUid: doc.data().pi_uid,
+        }));
+    }
+
+    const presentProjects = allMeetingProjects.filter(p => !absentPiUids.includes(p.piUid));
 
     // Update absent applicants
     for (const piUid of absentPiUids) {
-      const absentProject = meetingProjects.find(p => p.piUid === piUid);
+      const absentProject = allMeetingProjects.find(p => p.piUid === piUid);
       if (absentProject) {
         const projectRef = projectsRef.doc(absentProject.projectId);
         batch.update(projectRef, {
@@ -1987,7 +2004,7 @@ export async function markImrAttendance(
 
     await batch.commit();
     await logActivity('INFO', 'IMR meeting attendance marked', { 
-      totalProjects: meetingProjects.length,
+      totalProjects: allMeetingProjects.length,
       absentPiUids, 
       absentEvaluatorUids 
     });
@@ -2004,6 +2021,7 @@ export async function markImrAttendance(
     
 
     
+
 
 
 

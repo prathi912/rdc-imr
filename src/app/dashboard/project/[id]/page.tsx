@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { doc, getDoc, collection, getDocs, query, where, limit } from "firebase/firestore"
 import { db } from "@/lib/config"
 import type { Project, User } from "@/types"
@@ -153,10 +153,8 @@ export default function ProjectDetailsPage() {
         <ProjectSummary project={project} />
       </PageHeader>
       <div className="mt-8">
-        <ProjectDetailsClient project={project} allUsers={allUsers} piUser={piUser} />
+        <ProjectDetailsClient project={project} allUsers={allUsers} piUser={piUser} onProjectUpdate={setProject} />
       </div>
     </div>
   )
 }
-
-  
