@@ -1,7 +1,7 @@
 // src/components/emr/emr-evaluation-list.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { User, FundingCall, EmrInterest, EmrEvaluation } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -29,8 +29,12 @@ export function EmrEvaluationList({ interests, calls, user, onActionComplete }: 
         setSelectedInterest(null);
         onActionComplete();
     };
+    
+    const presentInterests = useMemo(() => {
+        return interests.filter(interest => !interest.wasAbsent);
+    }, [interests]);
 
-    if (interests.length === 0) {
+    if (presentInterests.length === 0) {
         return (
             <Card>
                 <CardContent className="py-12 text-center text-muted-foreground">
@@ -56,7 +60,7 @@ export function EmrEvaluationList({ interests, calls, user, onActionComplete }: 
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {interests.map(interest => {
+                            {presentInterests.map(interest => {
                                 const myEvaluation = interest.evaluations.find((e: EmrEvaluation) => e.evaluatorUid === user?.uid);
                                 return (
                                     <TableRow key={interest.id}>
