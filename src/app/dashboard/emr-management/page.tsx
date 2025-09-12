@@ -180,6 +180,7 @@ export default function EmrManagementOverviewPage() {
     const [isAddEditDialogOpen, setIsAddEditDialogOpen] = useState(false);
     const [isAnnounceDialogOpen, setIsAnnounceDialogOpen] = useState(false);
     const [isAnnouncing, setIsAnnouncing] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const fetchData = useCallback(() => {
         setLoading(true);
@@ -258,6 +259,15 @@ export default function EmrManagementOverviewPage() {
             return acc;
         }, {} as Record<string, number>);
     }, [interests]);
+    
+    const filteredCalls = useMemo(() => {
+        if (!searchTerm) return calls;
+        const lowercasedFilter = searchTerm.toLowerCase();
+        return calls.filter(call => 
+            call.title.toLowerCase().includes(lowercasedFilter) ||
+            call.agency.toLowerCase().includes(lowercasedFilter)
+        );
+    }, [calls, searchTerm]);
 
     const isSuperAdmin = user?.role === 'Super-admin';
 
@@ -272,6 +282,14 @@ export default function EmrManagementOverviewPage() {
                             <TabsTrigger value="logs">Submission Logs</TabsTrigger>
                         </TabsList>
                         <TabsContent value="calls" className="mt-4">
+                            <div className="flex justify-between items-center mb-4">
+                                <Input 
+                                    placeholder="Search by call title or agency..." 
+                                    value={searchTerm} 
+                                    onChange={(e) => setSearchTerm(e.target.value)} 
+                                    className="max-w-sm" 
+                                />
+                            </div>
                             <Card>
                                  <CardHeader>
                                     <p className="text-sm text-muted-foreground">
@@ -284,7 +302,7 @@ export default function EmrManagementOverviewPage() {
                                             <Skeleton className="h-10 w-full" />
                                             <Skeleton className="h-10 w-full" />
                                         </div>
-                                    ) : calls.length > 0 ? (
+                                    ) : filteredCalls.length > 0 ? (
                                         <div className="overflow-x-auto">
                                             <Table>
                                                 <TableHeader><TableRow>
@@ -295,7 +313,7 @@ export default function EmrManagementOverviewPage() {
                                                     <TableHead>Announced</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow></TableHeader>
-                                                <TableBody>{calls.map(call => (
+                                                <TableBody>{filteredCalls.map(call => (
                                                     <TableRow key={call.id}>
                                                         <TableCell className="font-medium whitespace-normal">{call.title}</TableCell>
                                                         <TableCell className="whitespace-normal">{call.agency}</TableCell>
@@ -330,7 +348,7 @@ export default function EmrManagementOverviewPage() {
                                             </Table>
                                         </div>
                                     ) : (
-                                        <div className="text-center text-muted-foreground py-8">No funding calls have been created.</div>
+                                        <div className="text-center text-muted-foreground py-8">No funding calls have been created or match your search.</div>
                                     )}
                                 </CardContent>
                             </Card>
@@ -375,4 +393,3 @@ export default function EmrManagementOverviewPage() {
     );
 }
 
-    
