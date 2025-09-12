@@ -25,6 +25,7 @@ import {
   sendEmail,
   generateOfficeNotingForm,
   deleteImrProject,
+  markImrAttendance
 } from "@/app/actions"
 import { findUserByMisId } from '@/app/userfinding';
 import { useToast } from "@/hooks/use-toast"
@@ -66,7 +67,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText, Trash2, UserCheck } from 'lucide-react'
 
 import { GrantManagement } from "./grant-management"
 import { EvaluationForm } from "./evaluation-form"
@@ -76,11 +77,13 @@ import { Textarea } from "../ui/textarea"
 import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover"
 import { Calendar } from "../ui/calendar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip"
+import { Checkbox } from "../ui/checkbox"
 
 interface ProjectDetailsClientProps {
   project: Project
   allUsers: User[]
   piUser: User | null
+  onProjectUpdate: (project: Project) => void;
 }
 
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
@@ -129,6 +132,11 @@ const deleteProjectSchema = z.object({
 });
 type DeleteProjectFormData = z.infer<typeof deleteProjectSchema>;
 
+const attendanceSchema = z.object({
+  absentPiUids: z.array(z.string()),
+  absentEvaluatorUids: z.array(z.string()),
+});
+
 const venues = ["RDC Committee Room, PIMSR"]
 
 const fileToDataUrl = (file: File): Promise<string> => {
@@ -140,7 +148,120 @@ const fileToDataUrl = (file: File): Promise<string> => {
   })
 }
 
-export function ProjectDetailsClient({ project: initialProject, allUsers, piUser }: ProjectDetailsClientProps) {
+function AttendanceDialog({ isOpen, onOpenChange, project, allUsers, onUpdate }: {
+    isOpen: boolean;
+    onOpenChange: (open: boolean) => void;
+    project: Project;
+    allUsers: User[];
+    onUpdate: () => void;
+}) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const form = useForm<z.infer<typeof attendanceSchema>>({
+        resolver: zodResolver(attendanceSchema),
+        defaultValues: {
+            absentPiUids: [],
+            absentEvaluatorUids: [],
+        },
+    });
+
+    const assignedEvaluators = allUsers.filter(u => project.meetingDetails?.assignedEvaluators?.includes(u.uid));
+
+    const handleSubmit = async (values: z.infer<typeof attendanceSchema>) => {
+        setIsSubmitting(true);
+        try {
+            const result = await markImrAttendance(
+                [{ projectId: project.id, piUid: project.pi_uid }],
+                values.absentPiUids,
+                values.absentEvaluatorUids,
+                project.meetingDetails // Pass meeting details to find other projects in the same meeting
+            );
+            if (result.success) {
+                toast({ title: 'Success', description: 'Attendance has been marked.' });
+                onUpdate();
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Mark Meeting Attendance</DialogTitle>
+                    <DialogDescription>Select any PI or evaluators who were absent from the meeting.</DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form id="attendance-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                        <div>
+                            <h4 className="font-semibold mb-2">Principal Investigator</h4>
+                            <FormField
+                                control={form.control}
+                                name="absentPiUids"
+                                render={({ field }) => (
+                                    <FormItem className="flex items-center space-x-3 space-y-0 p-2 border rounded-md">
+                                        <FormControl>
+                                            <Checkbox
+                                                checked={field.value?.includes(project.pi_uid)}
+                                                onCheckedChange={(checked) => {
+                                                    return checked
+                                                        ? field.onChange([project.pi_uid])
+                                                        : field.onChange([]);
+                                                }}
+                                            />
+                                        </FormControl>
+                                        <FormLabel className="font-normal">{project.pi}</FormLabel>
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        <div>
+                            <h4 className="font-semibold mb-2">Evaluators ({assignedEvaluators.length})</h4>
+                            <div className="space-y-2">
+                                {assignedEvaluators.map(evaluator => (
+                                     <FormField
+                                        key={evaluator.uid}
+                                        control={form.control}
+                                        name="absentEvaluatorUids"
+                                        render={({ field }) => (
+                                            <FormItem className="flex items-center space-x-3 space-y-0 p-2 border rounded-md">
+                                                <FormControl>
+                                                    <Checkbox
+                                                        checked={field.value?.includes(evaluator.uid)}
+                                                        onCheckedChange={(checked) => {
+                                                            return checked
+                                                                ? field.onChange([...(field.value || []), evaluator.uid])
+                                                                : field.onChange(field.value?.filter(id => id !== evaluator.uid));
+                                                        }}
+                                                    />
+                                                </FormControl>
+                                                <FormLabel className="font-normal">{evaluator.name}</FormLabel>
+                                            </FormItem>
+                                        )}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="attendance-form" disabled={isSubmitting}>
+                        {isSubmitting ? 'Saving...' : 'Save Attendance'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export function ProjectDetailsClient({ project: initialProject, allUsers, piUser, onProjectUpdate }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject)
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [user, setUser] = useState<User | null>(null)
@@ -167,6 +288,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isPrinting, setIsPrinting] = useState(false)
   const [isNotingDialogOpen, setIsNotingDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const isMobile = useIsMobile();
 
   // Co-PI management state
@@ -201,6 +323,20 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             phases: [{ name: 'Phase 1', amount: 0 }],
         }
     });
+
+  const refetchProject = useCallback(async () => {
+    try {
+        const projectRef = doc(db, 'projects', initialProject.id);
+        const projectSnap = await getDoc(projectRef);
+        if (projectSnap.exists()) {
+            const updatedProject = { id: projectSnap.id, ...projectSnap.data() } as Project;
+            setProject(updatedProject);
+            onProjectUpdate(updatedProject);
+        }
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not refresh project data.' });
+    }
+  }, [initialProject.id, toast, onProjectUpdate]);
 
   const refetchEvaluations = useCallback(async () => {
     try {
@@ -668,7 +804,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setIsUpdating(true);
     const result = await deleteImrProject(project.id, values.reason, user?.name || 'Unknown Admin');
     if (result.success) {
-        toast({ title: "Project Deleted", description: "The project and all associated data have been removed." });
+        toast({ title: "Project Deleted", description: "The project and all its associated data have been removed." });
         router.push('/dashboard/all-projects');
     } else {
         toast({ variant: "destructive", title: "Deletion Failed", description: result.error });
@@ -710,7 +846,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
   };
 
-  const canViewEvaluations = isAdmin || isAssignedEvaluator;
+  const canViewEvaluations = isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive);
 
   return (
     <>
@@ -1014,6 +1150,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
                 <div className="flex justify-between items-start flex-wrap gap-2">
                   <h3 className="font-semibold text-lg">IMR Evaluation Meeting Details</h3>
+                   {isSuperAdmin && project.status === 'Under Review' && (
+                    <Button variant="outline" size="sm" onClick={() => setIsAttendanceDialogOpen(true)}>
+                        <UserCheck className="mr-2 h-4 w-4" /> Mark Attendance
+                    </Button>
+                  )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                   <p>
@@ -1467,6 +1608,15 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             </Form>
           </AlertDialogContent>
       </AlertDialog>
+       {isSuperAdmin && project.meetingDetails && (
+        <AttendanceDialog
+            isOpen={isAttendanceDialogOpen}
+            onOpenChange={setIsAttendanceDialogOpen}
+            project={project}
+            allUsers={allUsers}
+            onUpdate={refetchProject}
+        />
+      )}
     </>
   )
 }
