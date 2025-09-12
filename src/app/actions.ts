@@ -1951,9 +1951,60 @@ export async function saveSidebarOrder(uid: string, newOrder: string[]): Promise
     return { success: false, error: 'Failed to save sidebar order.' };
   }
 }
+
+export async function markImrAttendance(
+  meetingProjects: { projectId: string; piUid: string }[],
+  absentPiUids: string[],
+  absentEvaluatorUids: string[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const batch = adminDb.batch();
+    const projectsRef = adminDb.collection("projects");
+    const presentProjects = meetingProjects.filter(p => !absentPiUids.includes(p.piUid));
+
+    // Update absent applicants
+    for (const piUid of absentPiUids) {
+      const absentProject = meetingProjects.find(p => p.piUid === piUid);
+      if (absentProject) {
+        const projectRef = projectsRef.doc(absentProject.projectId);
+        batch.update(projectRef, {
+          status: 'Submitted', // Revert to Submitted to allow rescheduling
+          meetingDetails: FieldValue.delete(),
+          wasAbsent: true
+        });
+      }
+    }
+
+    // Update present projects with evaluator absences
+    if (absentEvaluatorUids.length > 0) {
+      for (const project of presentProjects) {
+        const projectRef = projectsRef.doc(project.projectId);
+        batch.update(projectRef, {
+          'meetingDetails.absentEvaluators': FieldValue.arrayUnion(...absentEvaluatorUids)
+        });
+      }
+    }
+
+    await batch.commit();
+    await logActivity('INFO', 'IMR meeting attendance marked', { 
+      totalProjects: meetingProjects.length,
+      absentPiUids, 
+      absentEvaluatorUids 
+    });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking IMR attendance:", error);
+    await logActivity('ERROR', 'Failed to mark IMR attendance', {
+      error: error.message,
+      stack: error.stack
+    });
+    return { success: false, error: "Failed to update attendance." };
+  }
+}
     
 
     
+
 
 
 

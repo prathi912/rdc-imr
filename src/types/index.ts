@@ -159,7 +159,9 @@ export type Project = {
     time: string
     venue: string
     assignedEvaluators?: string[]
+    absentEvaluators?: string[];
   }
+  wasAbsent?: boolean;
   revisedProposalUrl?: string
   revisionSubmissionDate?: string
   revisionComments?: string
