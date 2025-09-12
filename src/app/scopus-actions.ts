@@ -26,10 +26,10 @@ export async function fetchAdvancedScopusData(
 
   if (doiMatch && doiMatch[1]) {
     const doi = doiMatch[1];
-    apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}?view=STANDARD`;
+    apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}`;
   } else if (eidMatch && eidMatch[1]) {
     const eid = eidMatch[1];
-    apiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}?view=STANDARD`;
+    apiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}`;
   } else {
     return { success: false, error: "Could not find a valid DOI or Scopus EID in the provided link." }
   }
