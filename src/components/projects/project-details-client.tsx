@@ -24,6 +24,7 @@ import {
   updateCoInvestigators,
   sendEmail,
   generateOfficeNotingForm,
+  deleteImrProject,
 } from "@/app/actions"
 import { findUserByMisId } from '@/app/userfinding';
 import { useToast } from "@/hooks/use-toast"
@@ -65,7 +66,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText } from 'lucide-react'
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText, Trash2 } from 'lucide-react'
 
 import { GrantManagement } from "./grant-management"
 import { EvaluationForm } from "./evaluation-form"
@@ -121,7 +122,12 @@ const notingFormSchema = z.object({
         amount: z.coerce.number().positive('Amount must be a positive number.'),
     })).min(1, 'At least one funding phase is required.')
 });
-type NotingFormData = z.infer<typeof notingFormSchema>;
+type NotingFormData = z.infer<typeof notingFormSchema>
+
+const deleteProjectSchema = z.object({
+    reason: z.string().min(10, "A reason for deletion is required."),
+});
+type DeleteProjectFormData = z.infer<typeof deleteProjectSchema>;
 
 const venues = ["RDC Committee Room, PIMSR"]
 
@@ -160,6 +166,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isRevisionCommentDialogOpen, setIsRevisionCommentDialogOpen] = useState(false)
   const [isPrinting, setIsPrinting] = useState(false)
   const [isNotingDialogOpen, setIsNotingDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const isMobile = useIsMobile();
 
   // Co-PI management state
@@ -180,6 +187,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const revisionCommentForm = useForm<RevisionCommentFormData>({
     resolver: zodResolver(revisionCommentSchema),
     defaultValues: { comments: "" },
+  })
+
+  const deleteProjectForm = useForm<DeleteProjectFormData>({
+    resolver: zodResolver(deleteProjectSchema),
+    defaultValues: { reason: "" },
   })
 
     const notingForm = useForm<NotingFormData>({
@@ -206,18 +218,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setProject(initialProject)
   }, [initialProject])
 
-  const canFetchEvaluations = useMemo(() => {
-    if (!user) return false
-    const isAdmin = ["Super-admin", "admin", "CRO"].includes(user.role)
-    const isAssignedEvaluator = initialProject.meetingDetails?.assignedEvaluators?.includes(user.uid)
-    return isAdmin || isAssignedEvaluator
-  }, [user, initialProject])
-
   useEffect(() => {
-    if (canFetchEvaluations) {
-      refetchEvaluations()
-    }
-  }, [canFetchEvaluations, refetchEvaluations])
+    refetchEvaluations()
+  }, [refetchEvaluations])
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -660,6 +663,18 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     });
     setIsNotingDialogOpen(true);
   };
+  
+  const handleDeleteProject = async (values: DeleteProjectFormData) => {
+    setIsUpdating(true);
+    const result = await deleteImrProject(project.id, values.reason, user?.name || 'Unknown Admin');
+    if (result.success) {
+        toast({ title: "Project Deleted", description: "The project and all associated data have been removed." });
+        router.push('/dashboard/all-projects');
+    } else {
+        toast({ variant: "destructive", title: "Deletion Failed", description: result.error });
+        setIsUpdating(false);
+    }
+  };
 
   const handlePrint = async (data: NotingFormData) => {
     setIsPrinting(true);
@@ -695,17 +710,25 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
   };
 
+  const canViewEvaluations = isAdmin || isAssignedEvaluator;
 
   return (
     <>
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
-        {isSuperAdmin && project.status === "Under Review" && allEvaluationsIn && (
-          <Button onClick={handleOpenNotingDialog} disabled={isPrinting}>
-              <Download className="mr-2 h-4 w-4" />
-              Download Office Notings
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+            {isSuperAdmin && project.status === "Under Review" && allEvaluationsIn && (
+              <Button onClick={handleOpenNotingDialog} disabled={isPrinting}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Office Notings
+              </Button>
+            )}
+             {isSuperAdmin && (
+                <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete Project
+                </Button>
+            )}
+        </div>
       </div>
 
       <Card>
@@ -1323,9 +1346,22 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           </Card>
         )}
 
-      {isAdmin && evaluations.length > 0 && <EvaluationsSummary project={project} evaluations={evaluations} />}
+      {canViewEvaluations && evaluations.length > 0 && user && (
+          <EvaluationsSummary project={project} evaluations={evaluations} currentUser={user} />
+      )}
+      
+      {isPI && !canViewEvaluations && (
+          <Card className="mt-8">
+              <CardHeader>
+                  <CardTitle>Evaluation Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <p className="text-muted-foreground">{evaluations.length} of {project.meetingDetails?.assignedEvaluators?.length || 0} evaluations submitted.</p>
+              </CardContent>
+          </Card>
+      )}
 
-      {showEvaluationForm && (
+      {showEvaluationForm && user && (
         <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchEvaluations} />
       )}
 
@@ -1397,6 +1433,40 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         isPrinting={isPrinting}
         form={notingForm}
       />
+       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <Form {...deleteProjectForm}>
+              <form id="delete-project-form" onSubmit={deleteProjectForm.handleSubmit(handleDeleteProject)}>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the project and all its associated data, including evaluations and uploaded files. Please provide a reason for deletion.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-4">
+                  <FormField
+                    control={deleteProjectForm.control}
+                    name="reason"
+                    render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Reason for Deletion</FormLabel>
+                          <FormControl><Textarea {...field} /></FormControl>
+                          <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <Button type="submit" variant="destructive" disabled={isUpdating}>
+                      {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Confirm & Delete
+                    </Button>
+                </AlertDialogFooter>
+              </form>
+            </Form>
+          </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

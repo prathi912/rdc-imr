@@ -57,6 +57,76 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
   }
 }
 
+export async function deleteImrProject(
+  projectId: string,
+  reason: string,
+  deletedBy: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const projectRef = adminDb.collection("projects").doc(projectId)
+    const projectSnap = await projectRef.get()
+
+    if (!projectSnap.exists) {
+      return { success: false, error: "Project not found." }
+    }
+    const project = projectSnap.data() as Project
+
+    // --- Clean up subcollections ---
+    const evaluationsRef = projectRef.collection("evaluations")
+    const evaluationsSnap = await evaluationsRef.get()
+    const batch = adminDb.batch()
+    evaluationsSnap.docs.forEach((doc) => batch.delete(doc.ref))
+    await batch.commit()
+
+    // --- Clean up associated files in Storage ---
+    const bucket = adminStorage.bucket()
+    const prefix = `projects/${projectId}/`
+    await bucket.deleteFiles({ prefix })
+
+    // --- Delete the main project document ---
+    await projectRef.delete()
+
+    // --- Notify the PI ---
+    if (project.pi_email) {
+      const emailHtml = `
+        <div ${EMAIL_STYLES.background}>
+            ${EMAIL_STYLES.logo}
+            <p style="color:#ffffff;">Dear ${project.pi},</p>
+            <p style="color:#e0e0e0;">
+                This is to inform you that your IMR project submission, "<strong style="color:#ffffff;">${project.title}</strong>," has been deleted from the portal by an administrator.
+            </p>
+            <div style="margin-top:20px; padding:15px; border:1px solid #4f5b62; border-radius:6px; background-color:#2c3e50;">
+                <h4 style="color:#ffffff; margin-top:0;">Reason for Deletion:</h4>
+                <p style="color:#e0e0e0; white-space: pre-wrap;">${reason}</p>
+            </div>
+            <p style="color:#e0e0e0; margin-top:20px;">
+                If you believe this is an error or have any questions, please contact the RDC office.
+            </p>
+            ${EMAIL_STYLES.footer}
+        </div>`
+
+      await sendEmailUtility({
+        to: project.pi_email,
+        subject: `Regarding Your IMR Project Submission: ${project.title}`,
+        html: emailHtml,
+        from: "default",
+      })
+    }
+    
+    await logActivity("INFO", "IMR project deleted", { projectId, title: project.title, deletedBy, reason });
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error deleting IMR project:", error)
+    await logActivity("ERROR", "Failed to delete IMR project", {
+      projectId,
+      deletedBy,
+      error: error.message,
+      stack: error.stack,
+    })
+    return { success: false, error: error.message || "Could not delete project." }
+  }
+}
+
 export async function checkPatentUniqueness(title: string, applicationNumber: string, currentClaimId?: string): Promise<{ isUnique: boolean; message?: string }> {
     try {
         const claimsRef = adminDb.collection('incentiveClaims');
@@ -1884,5 +1954,6 @@ export async function saveSidebarOrder(uid: string, newOrder: string[]): Promise
     
 
     
+
 
 

@@ -2,15 +2,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import type { Project, Evaluation } from '@/types';
+import type { Project, Evaluation, User } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserCheck, UserX, ThumbsUp, ThumbsDown, History } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 interface EvaluationsSummaryProps {
   project: Project;
   evaluations: Evaluation[];
+  currentUser: User;
 }
 
 const getRecommendationBadge = (recommendation: Evaluation['recommendation']) => {
@@ -26,13 +26,29 @@ const getRecommendationBadge = (recommendation: Evaluation['recommendation']) =>
     }
 }
 
-export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryProps) {
+export function EvaluationsSummary({ project, evaluations, currentUser }: EvaluationsSummaryProps) {
+    const isAdmin = ['Super-admin', 'admin'].includes(currentUser.role);
+    const isEvaluator = currentUser.role === 'Evaluator';
+
+    const evaluationsToShow = useMemo(() => {
+        if (isAdmin) {
+            return evaluations; // Admins see all
+        }
+        if (isEvaluator) {
+            // Evaluators only see their own
+            return evaluations.filter(e => e.evaluatorUid === currentUser.uid);
+        }
+        return []; // Applicants see none
+    }, [evaluations, currentUser, isAdmin, isEvaluator]);
+
     const recommendationCounts = useMemo(() => {
-        return evaluations.reduce((acc, evaluation) => {
+        // Admins see a summary of all evaluations
+        const source = isAdmin ? evaluations : evaluationsToShow;
+        return source.reduce((acc, evaluation) => {
             acc[evaluation.recommendation] = (acc[evaluation.recommendation] || 0) + 1;
             return acc;
         }, {} as Record<Evaluation['recommendation'], number>);
-    }, [evaluations]);
+    }, [evaluations, evaluationsToShow, isAdmin]);
 
     const summaryText = Object.entries(recommendationCounts)
         .map(([key, value]) => `${value} ${key}`)
@@ -46,14 +62,17 @@ export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryP
             <CardTitle>Evaluations Summary</CardTitle>
         </div>
         <CardDescription>
-          {evaluations.length} evaluations submitted.
-          {summaryText && <span className="font-semibold text-primary"> | {summaryText}</span>}
+          {isAdmin 
+            ? `${evaluations.length} total evaluations submitted.`
+            : 'Your submitted evaluation for this project.'
+          }
+          {isAdmin && summaryText && <span className="font-semibold text-primary"> | {summaryText}</span>}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {evaluations.length > 0 ? (
+        {evaluationsToShow.length > 0 ? (
              <div className="space-y-4">
-                {evaluations.map((evaluation) => (
+                {evaluationsToShow.map((evaluation) => (
                     <div key={evaluation.evaluatorUid} className="p-4 border rounded-lg">
                         <div className="flex justify-between items-start">
                            <div>
@@ -71,7 +90,9 @@ export function EvaluationsSummary({ project, evaluations }: EvaluationsSummaryP
         ) : (
              <div className="text-center py-8 text-muted-foreground">
                 <UserX className="mx-auto h-12 w-12" />
-                <p className="mt-4">No evaluations have been submitted yet.</p>
+                <p className="mt-4">
+                  {isAdmin ? 'No evaluations have been submitted yet.' : 'Your evaluation has not been submitted yet.'}
+                </p>
              </div>
         )}
       </CardContent>
