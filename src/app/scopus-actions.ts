@@ -20,26 +20,30 @@ export async function fetchAdvancedScopusData(
     return { success: false, error: "Scopus integration is not configured on the server." }
   }
 
-  let doi: string | null = null;
+  let apiUrl = '';
   const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+  const eidMatch = url.match(/eid=([^&]+)/);
+
   if (doiMatch && doiMatch[1]) {
-    doi = doiMatch[1];
+    const doi = doiMatch[1];
+    apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}?view=STANDARD`;
+  } else if (eidMatch && eidMatch[1]) {
+    const eid = eidMatch[1];
+    apiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}?view=STANDARD`;
+  } else {
+    return { success: false, error: "Could not find a valid DOI or Scopus EID in the provided link." }
   }
-
-  if (!doi) {
-    return { success: false, error: "Could not find a valid DOI in the provided link." }
-  }
-
-  const abstractApiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}?view=STANDARD`
 
   try {
-    const abstractResponse = await fetch(abstractApiUrl, {
+    const response = await fetch(apiUrl, {
       headers: { "X-ELS-APIKey": apiKey, Accept: "application/json" },
     });
-    if (!abstractResponse.ok) {
-        throw new Error(`Scopus Abstract API Error: ${abstractResponse.statusText}`);
+    if (!response.ok) {
+        const errorData = await response.json();
+        const errorMessage = errorData?.['service-error']?.status?.statusText || response.statusText;
+        throw new Error(`Scopus Abstract API Error: ${errorMessage}`);
     }
-    const abstractData = await abstractResponse.json();
+    const abstractData = await response.json();
     const coredata = abstractData?.["abstracts-retrieval-response"]?.coredata;
 
     if (!coredata) {
