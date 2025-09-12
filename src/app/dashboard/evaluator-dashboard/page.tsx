@@ -48,7 +48,7 @@ export default function EvaluatorDashboardPage() {
       )
       const imrSnapshot = await getDocs(imrQuery)
       const imrProjectList = imrSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Project)
-      const pendingImrForCurrentUser = imrProjectList.filter((p) => !p.evaluatedBy?.includes(user.uid))
+      const pendingImrForCurrentUser = imrProjectList.filter((p) => !p.evaluatedBy?.includes(user.uid) && !p.wasAbsent)
       setImrProjectsToReview(pendingImrForCurrentUser)
 
       // --- EMR Fetching (Corrected Logic) ---
