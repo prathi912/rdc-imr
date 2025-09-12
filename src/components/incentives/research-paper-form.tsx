@@ -469,6 +469,9 @@ export function ResearchPaperForm() {
             if (result.data.electronicIssn) {
                 form.setValue('electronicIssn', result.data.electronicIssn, { shouldValidate: true });
             }
+            if (result.data.journalWebsite) {
+                form.setValue('journalWebsite', result.data.journalWebsite, { shouldValidate: true });
+            }
             
             toast({ title: 'Success', description: 'Form fields have been pre-filled from Scopus.' });
         } else {

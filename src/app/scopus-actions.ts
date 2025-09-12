@@ -15,6 +15,7 @@ export async function fetchAdvancedScopusData(
     publicationYear: string;
     printIssn?: string;
     electronicIssn?: string;
+    journalWebsite?: string;
   }
   error?: string
 }> {
@@ -62,12 +63,37 @@ export async function fetchAdvancedScopusData(
 
     let publicationMonth = '';
     let publicationYear = '';
+    let journalWebsite: string | undefined = undefined;
 
     if (coverDate) {
         const date = new Date(coverDate);
         publicationYear = date.getFullYear().toString();
         publicationMonth = date.toLocaleString('en-US', { month: 'long' });
     }
+
+    // After getting journalName, try to find its website via Springer Nature API
+    if (journalName) {
+      const springerApiKey = process.env.SPRINGER_API_KEY;
+      if (springerApiKey) {
+        try {
+          const springerUrl = `https://api.springernature.com/meta/v2/json?q=journal:"${encodeURIComponent(journalName)}"&p=1&api_key=${springerApiKey}`;
+          const springerResponse = await fetch(springerUrl);
+          if (springerResponse.ok) {
+            const springerData = await springerResponse.json();
+            if (springerData.records && springerData.records.length > 0 && springerData.records[0].url && springerData.records[0].url.length > 0) {
+              const springerLink = springerData.records[0].url.find((u: { platform: string; value: string; }) => u.platform === 'springerlink');
+              if (springerLink && springerLink.value) {
+                journalWebsite = springerLink.value;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Springer Nature API call failed, proceeding without website.", e);
+          // Do not throw an error, just proceed without the website.
+        }
+      }
+    }
+
 
     return {
       success: true,
@@ -78,6 +104,7 @@ export async function fetchAdvancedScopusData(
         publicationYear,
         printIssn,
         electronicIssn,
+        journalWebsite,
       },
     }
   } catch (error: any) {
