@@ -496,10 +496,28 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                             ) : (
                                                 interest.userName
                                             )}
+                                            <div className="text-xs text-muted-foreground">{interestedUser?.department}, {interestedUser?.institute}</div>
                                             <div className="text-xs text-muted-foreground">{interest.interestId}</div>
                                         </TableCell>
                                         <TableCell>
-                                            <span className="text-xs text-muted-foreground">{interest.coPiNames?.join(', ') || 'None'}</span>
+                                            <div className="flex flex-col text-xs text-muted-foreground">
+                                                {(interest.coPiDetails || []).map(coPi => {
+                                                    const coPiUser = userMap.get(coPi.uid!);
+                                                    return (
+                                                        <div key={coPi.email} className="mb-1">
+                                                            {coPiUser?.misId ? (
+                                                                <Link href={`/profile/${coPiUser.misId}`} target="_blank" className="text-primary hover:underline">
+                                                                    {coPi.name}
+                                                                </Link>
+                                                            ) : (
+                                                                coPi.name
+                                                            )}
+                                                            <div className="text-xs text-muted-foreground/80">{coPiUser?.department}, {coPiUser?.institute}</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                {interest.coPiDetails?.length === 0 && 'None'}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="hidden sm:table-cell">
                                             <Badge variant={interest.status === 'Recommended' ? 'default' : 'secondary'}>{interest.status}</Badge>
