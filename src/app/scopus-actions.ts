@@ -45,13 +45,13 @@ export async function fetchAdvancedScopusData(
   const eidMatch = url.match(/eid=([^&]+)/);
   if (eidMatch && eidMatch[1]) {
     eid = eidMatch[1];
-    searchApiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}?view=FULL`;
+    searchApiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}?view=STANDARD`;
   } else {
     // Fallback to DOI if EID is not found
     const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
     if (doiMatch && doiMatch[1]) {
         doi = doiMatch[1];
-        searchApiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}?view=FULL`;
+        searchApiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}?view=STANDARD`;
     }
   }
 
