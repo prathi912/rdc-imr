@@ -457,6 +457,12 @@ export function ResearchPaperForm() {
         if (result.success && result.data) {
             form.setValue('paperTitle', result.data.paperTitle, { shouldValidate: true });
             form.setValue('journalName', result.data.journalName, { shouldValidate: true });
+            if (result.data.publicationMonth) {
+              form.setValue('publicationMonth', result.data.publicationMonth, { shouldValidate: true });
+            }
+            if (result.data.publicationYear) {
+              form.setValue('publicationYear', result.data.publicationYear, { shouldValidate: true });
+            }
             
             toast({ title: 'Success', description: 'Form fields have been pre-filled from Scopus.' });
         } else {

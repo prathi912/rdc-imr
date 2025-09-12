@@ -11,6 +11,8 @@ export async function fetchAdvancedScopusData(
   data?: {
     paperTitle: string;
     journalName: string;
+    publicationMonth: string;
+    publicationYear: string;
   }
   error?: string
 }> {
@@ -52,12 +54,24 @@ export async function fetchAdvancedScopusData(
 
     const paperTitle = coredata["dc:title"] || "";
     const journalName = coredata["prism:publicationName"] || "";
+    const coverDate = coredata["prism:coverDate"];
+
+    let publicationMonth = '';
+    let publicationYear = '';
+
+    if (coverDate) {
+        const date = new Date(coverDate);
+        publicationYear = date.getFullYear().toString();
+        publicationMonth = date.toLocaleString('en-US', { month: 'long' });
+    }
 
     return {
       success: true,
       data: {
         paperTitle,
         journalName,
+        publicationMonth,
+        publicationYear,
       },
     }
   } catch (error: any) {
