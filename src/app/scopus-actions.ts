@@ -38,37 +38,25 @@ export async function fetchAdvancedScopusData(
     return { success: false, error: "Scopus integration is not configured on the server." }
   }
 
-  let eid: string | null = null;
   let doi: string | null = null;
-  let searchApiUrl = '';
-
-  const eidMatch = url.match(/eid=([^&]+)/);
-  if (eidMatch && eidMatch[1]) {
-    eid = eidMatch[1];
-    searchApiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}?view=STANDARD`;
-  } else {
-    // Fallback to DOI if EID is not found
-    const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
-    if (doiMatch && doiMatch[1]) {
-        doi = doiMatch[1];
-        searchApiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}?view=STANDARD`;
-    }
+  const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+  if (doiMatch && doiMatch[1]) {
+    doi = doiMatch[1];
   }
 
-  if (!searchApiUrl) {
-    return { success: false, error: "Could not find a valid Scopus EID or DOI in the provided link. Please use the full article link." }
+  if (!doi) {
+    return { success: false, error: "Could not find a valid DOI in the provided link." }
   }
 
+  const abstractApiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}?view=STANDARD`
   const serialApiUrl = `https://api.elsevier.com/content/serial/title`;
 
   try {
-    const abstractResponse = await fetch(searchApiUrl, {
+    const abstractResponse = await fetch(abstractApiUrl, {
       headers: { "X-ELS-APIKey": apiKey, Accept: "application/json" },
     });
     if (!abstractResponse.ok) {
-        const errorData = await abstractResponse.json();
-        const errorMessage = errorData?.['service-error']?.status?.statusText || "Failed to fetch data from Scopus.";
-        throw new Error(`Scopus Abstract API Error: ${errorMessage}`);
+        throw new Error(`Scopus Abstract API Error: ${abstractResponse.statusText}`);
     }
     const abstractData = await abstractResponse.json();
     const coredata = abstractData?.["abstracts-retrieval-response"]?.coredata;

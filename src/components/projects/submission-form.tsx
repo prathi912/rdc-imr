@@ -19,7 +19,8 @@ import type { User, Project, CoPiDetails } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
-import { uploadFileToServer, findUserByMisId, saveProjectSubmission } from '@/app/actions';
+import { uploadFileToServer, saveProjectSubmission } from '@/app/actions';
+import { findUserByMisId } from '@/app/userfinding';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
 import {
@@ -204,8 +205,9 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     setFoundCoPi(null);
     try {
         const result = await findUserByMisId(coPiSearchTerm);
-        if (result.success && result.user) {
-                setFoundCoPi({ ...result.user });
+        if (result.success && result.users && result.users.length > 0) {
+            const user = result.users[0];
+            setFoundCoPi({ ...user });
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
         }
