@@ -194,7 +194,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
     
     const claimsToShow = claims.filter(claim => {
         const myDetails = claim.authors?.find(a => a.uid === currentUser?.uid);
-        return myDetails && myDetails.status === 'pending';
+        return !!myDetails;
     });
     
     if (claimsToShow.length === 0) {
