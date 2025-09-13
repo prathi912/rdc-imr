@@ -98,7 +98,15 @@ function UserClaimsList({
                     <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                          <div className="flex-1 space-y-1">
                             <Badge variant="outline">{claim.claimType}</Badge>
-                            <p className="font-semibold">{getClaimTitle(claim)}</p>
+                            <p className="font-semibold">
+                              {claim.claimType === 'Research Papers' && claim.relevantLink ? (
+                                <a href={claim.relevantLink} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                  {getClaimTitle(claim)}
+                                </a>
+                              ) : (
+                                getClaimTitle(claim)
+                              )}
+                            </p>
                             <p className="text-xs text-muted-foreground">{claim.claimId || 'N/A'}</p>
                             {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
                             {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
@@ -263,7 +271,15 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                  <Card key={claim.id}>
                     <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                          <div className="flex-1 space-y-2">
-                            <p className="font-semibold">{getClaimTitle(claim)}</p>
+                            <p className="font-semibold">
+                              {claim.claimType === 'Research Papers' && claim.relevantLink ? (
+                                <a href={claim.relevantLink} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                  {getClaimTitle(claim)}
+                                </a>
+                              ) : (
+                                getClaimTitle(claim)
+                              )}
+                            </p>
                             <p className="text-sm text-muted-foreground">Primary Author: <span className="font-medium text-foreground">{claim.userName}</span></p>
                              <div className="flex items-center gap-2">
                                 <Badge variant="outline">{claim.claimType}</Badge>
