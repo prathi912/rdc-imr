@@ -138,9 +138,7 @@ function UserClaimsList({
 }
 
 const coAuthorApplySchema = z.object({
-    publicationOrderInYear: z.enum(['First', 'Second', 'Third'], {
-        required_error: 'Please select the publication order for this year.',
-    }),
+    publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
 });
 
 type CoAuthorApplyValues = z.infer<typeof coAuthorApplySchema>;
@@ -298,33 +296,35 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                     <DialogHeader>
                         <DialogTitle>Apply for Co-Author Incentive</DialogTitle>
                         <p className="text-sm text-muted-foreground pt-2">
-                           You are applying for an incentive for the publication: "{getClaimTitle(claimToApply)}". Please confirm the publication order for your records.
+                           You are applying for an incentive for the publication: "{getClaimTitle(claimToApply)}".
                         </p>
                     </DialogHeader>
                     <Form {...form}>
                          <form id="co-author-apply-form" onSubmit={form.handleSubmit(handleApply)} className="space-y-4 py-4">
-                            <FormField
-                                control={form.control}
-                                name="publicationOrderInYear"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select publication order" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="First">First</SelectItem>
-                                                <SelectItem value="Second">Second</SelectItem>
-                                                <SelectItem value="Third">Third</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                             {claimToApply.claimType === 'Books' && (
+                                <FormField
+                                    control={form.control}
+                                    name="publicationOrderInYear"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select publication order" />
+                                                    </SelectTrigger>
+                                                </FormControl>
+                                                <SelectContent>
+                                                    <SelectItem value="First">First</SelectItem>
+                                                    <SelectItem value="Second">Second</SelectItem>
+                                                    <SelectItem value="Third">Third</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                             )}
                              <div className="p-4 bg-secondary rounded-md text-center">
                                 {isCalculating ? (
                                     <div className="flex items-center justify-center">
