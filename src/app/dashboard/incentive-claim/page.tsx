@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,6 +35,7 @@ import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { calculateBookIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
 
 
 function UserClaimsList({ 
@@ -140,11 +141,46 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
     const { toast } = useToast();
     const [claimToApply, setClaimToApply] = useState<IncentiveClaim | null>(null);
     const [isApplying, setIsApplying] = useState(false);
+    const [calculatedAmount, setCalculatedAmount] = useState<number | null>(null);
+    const [isCalculating, setIsCalculating] = useState(false);
 
     const form = useForm<CoAuthorApplyValues>({
         resolver: zodResolver(coAuthorApplySchema),
     });
     
+    const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
+        if (!currentUser) return;
+        setClaimToApply(claim);
+        setIsCalculating(true);
+        setCalculatedAmount(null);
+        
+        try {
+            let result;
+            if (claim.claimType === 'Research Papers') {
+                // To calculate, we need to pass the claim data as if the current user is the claimant
+                const claimDataForCalc = { ...claim, userEmail: currentUser.email };
+                result = await calculateResearchPaperIncentive(claimDataForCalc, currentUser.faculty || '');
+            } else if (claim.claimType === 'Books') {
+                 // For books, the calculation depends on the co-author's role and other factors
+                result = await calculateBookIncentive(claim);
+            } else {
+                result = { success: true, amount: 0 }; // Default for other types for now
+            }
+            
+            if (result.success) {
+                setCalculatedAmount(result.amount ?? 0);
+            } else {
+                toast({ variant: 'destructive', title: 'Calculation Error', description: result.error });
+            }
+        } catch (e: any) {
+             toast({ variant: 'destructive', title: 'Error', description: e.message || 'Could not calculate incentive amount.' });
+        } finally {
+            setIsCalculating(false);
+        }
+
+    }, [currentUser, toast]);
+
+
     const handleApply = async (values: CoAuthorApplyValues) => {
         if (!claimToApply || !currentUser) {
             toast({ variant: 'destructive', title: 'Action Required', description: 'Cannot process claim application.' });
@@ -171,6 +207,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                 misId: currentUser.misId,
                 orcidId: currentUser.orcidId,
                 faculty: currentUser.faculty || '',
+                calculatedIncentive: calculatedAmount, // Store the calculated amount
             };
             
             await submitIncentiveClaim(newClaim);
@@ -232,7 +269,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                 <Badge variant="outline">{claim.claimType}</Badge>
                              </div>
                         </div>
-                        <Button onClick={() => setClaimToApply(claim)} disabled={!canApply}>
+                        <Button onClick={() => handleOpenDialog(claim)} disabled={!canApply}>
                             {canApply ? 'View & Apply' : 'Applied'}
                         </Button>
                     </CardContent>
@@ -272,12 +309,25 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                     </FormItem>
                                 )}
                             />
+                             <div className="p-4 bg-secondary rounded-md text-center">
+                                {isCalculating ? (
+                                    <div className="flex items-center justify-center">
+                                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                                        <span>Calculating your incentive...</span>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <p className="text-sm font-medium">Your Tentative Eligible Incentive Amount:</p>
+                                        <p className="font-bold text-2xl text-primary mt-1">₹{calculatedAmount?.toLocaleString('en-IN') ?? 'N/A'}</p>
+                                    </>
+                                )}
+                            </div>
                          </form>
                     </Form>
                     <p className="text-xs text-muted-foreground">This action will create a new incentive claim under your name using the publication details from the original author's submission.</p>
                     <DialogFooter>
                         <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                        <Button type="submit" form="co-author-apply-form" disabled={isApplying}>
+                        <Button type="submit" form="co-author-apply-form" disabled={isApplying || isCalculating}>
                            {isApplying ? <><Loader2 className="h-4 w-4 animate-spin mr-2"/> Submitting...</> : 'Confirm & Apply'}
                         </Button>
                     </DialogFooter>
