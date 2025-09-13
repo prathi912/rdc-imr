@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
@@ -36,6 +36,7 @@ import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateBookIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
+import { Separator } from '@/components/ui/separator';
 
 
 function UserClaimsList({ 
@@ -240,16 +241,6 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         return !!myDetails;
     });
     
-    if (claimsToShow.length === 0) {
-        return (
-            <Card>
-                <CardContent className="pt-6">
-                    <p className="text-center text-muted-foreground">You have no pending co-author claims that require your action.</p>
-                </CardContent>
-            </Card>
-        );
-    }
-    
     const getMyCoAuthorDetails = (claim: IncentiveClaim) => {
         return claim.authors?.find(a => a.uid === currentUser?.uid);
     }
@@ -257,6 +248,9 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
     const getClaimTitle = (claim: IncentiveClaim): string => {
         return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
     };
+
+    const myDetailsInDialog = claimToApply ? getMyCoAuthorDetails(claimToApply) : null;
+    const myRole = myDetailsInDialog?.role;
 
     return (
       <>
@@ -295,12 +289,46 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Apply for Co-Author Incentive</DialogTitle>
-                        <p className="text-sm text-muted-foreground pt-2">
+                        <DialogDescription>
                            You are applying for an incentive for the publication: "{getClaimTitle(claimToApply)}".
-                        </p>
+                        </DialogDescription>
                     </DialogHeader>
+
+                     <div className="space-y-3 py-4">
+                        {myRole && (
+                             <p className="text-sm"><strong>Your Role:</strong> <Badge variant="secondary">{myRole}</Badge></p>
+                        )}
+                        {claimToApply.claimType === 'Research Papers' && (
+                            <>
+                                <p className="text-sm"><strong>Journal:</strong> {claimToApply.journalName}</p>
+                                <p className="text-sm"><strong>Indexing:</strong> {claimToApply.indexType?.toUpperCase()}</p>
+                                <p className="text-sm"><strong>Q-Rating:</strong> {claimToApply.journalClassification}</p>
+                            </>
+                        )}
+                         {claimToApply.claimType === 'Books' && (
+                             <>
+                                <p className="text-sm"><strong>Publisher:</strong> {claimToApply.publisherName}</p>
+                                <p className="text-sm"><strong>Book Type:</strong> {claimToApply.bookType}</p>
+                            </>
+                         )}
+                        <Separator />
+                        <div className="p-4 bg-secondary rounded-md text-center">
+                            {isCalculating ? (
+                                <div className="flex items-center justify-center">
+                                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                                    <span>Calculating your incentive...</span>
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="text-sm font-medium">Your Tentative Eligible Incentive Amount:</p>
+                                    <p className="font-bold text-2xl text-primary mt-1">₹{calculatedAmount?.toLocaleString('en-IN') ?? 'N/A'}</p>
+                                </>
+                            )}
+                        </div>
+                     </div>
+
                     <Form {...form}>
-                         <form id="co-author-apply-form" onSubmit={form.handleSubmit(handleApply)} className="space-y-4 py-4">
+                         <form id="co-author-apply-form" onSubmit={form.handleSubmit(handleApply)} className="space-y-4">
                              {claimToApply.claimType === 'Books' && (
                                 <FormField
                                     control={form.control}
@@ -325,19 +353,6 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                                     )}
                                 />
                              )}
-                             <div className="p-4 bg-secondary rounded-md text-center">
-                                {isCalculating ? (
-                                    <div className="flex items-center justify-center">
-                                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                                        <span>Calculating your incentive...</span>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <p className="text-sm font-medium">Your Tentative Eligible Incentive Amount:</p>
-                                        <p className="font-bold text-2xl text-primary mt-1">₹{calculatedAmount?.toLocaleString('en-IN') ?? 'N/A'}</p>
-                                    </>
-                                )}
-                            </div>
                          </form>
                     </Form>
                     <p className="text-xs text-muted-foreground">This action will create a new incentive claim under your name using the publication details from the original author's submission.</p>
