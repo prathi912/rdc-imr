@@ -162,7 +162,7 @@ function AttendanceDialog({ isOpen, onOpenChange, project, allUsers, onUpdate }:
         resolver: zodResolver(attendanceSchema),
         defaultValues: {
             absentPiUids: [],
-            absentEvaluatorUids: [],
+            absentEvaluatorUids: project.meetingDetails?.absentEvaluators || [],
         },
     });
 
@@ -421,9 +421,13 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const showEvaluationForm = user && project.status === "Under Review" && isAssignedEvaluator && isEvaluationPeriodActive;
 
 
+  const assignedEvaluatorsCount = project.meetingDetails?.assignedEvaluators?.length ?? 0;
+  const absentEvaluatorsCount = project.meetingDetails?.absentEvaluators?.length ?? 0;
+  const presentEvaluatorsCount = assignedEvaluatorsCount - absentEvaluatorsCount;
+
   const allEvaluationsIn =
-    (project.meetingDetails?.assignedEvaluators?.length ?? 0) > 0 &&
-    evaluations.length >= (project.meetingDetails?.assignedEvaluators?.length ?? 0)
+    assignedEvaluatorsCount > 0 &&
+    evaluations.length >= presentEvaluatorsCount;
 
   const canManageGrants =
     user &&
