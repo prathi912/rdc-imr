@@ -14,7 +14,7 @@ import type { Project, User, EmrInterest, FundingCall, CoPiDetails } from '@/typ
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2, Edit, Search } from 'lucide-react';
+import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2, Edit, Search, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -36,9 +36,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { updateEmrFinalStatus, updateEmrInterestCoPis } from '@/app/emr-actions';
 import { findUserByMisId } from '@/app/userfinding';
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
-const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval'];
+const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval', 'Sanctioned'];
 
 const IMR_EXPORT_COLUMNS = [
   { id: 'title', label: 'Project Title' },
@@ -255,7 +256,7 @@ export default function AllProjectsPage() {
   
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
-  const [facultyFilter, setFacultyFilter] = useState(searchParams.get('faculty') || 'all');
+  const [facultyFilter, setFacultyFilter] = useState<string[]>(searchParams.get('faculty')?.split(',') || []);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'imr');
 
   const isMobile = useIsMobile();
@@ -342,9 +343,9 @@ export default function AllProjectsPage() {
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
-      if (parsedUser.role === 'CRO') {
-        setFacultyFilter(searchParams.get('faculty') || 'all');
-      }
+       if (parsedUser.role === 'CRO' || parsedUser.role === 'Super-admin' || parsedUser.role === 'admin') {
+         setFacultyFilter(searchParams.get('faculty')?.split(',') || []);
+       }
     } else {
       setLoading(false);
     }
@@ -365,28 +366,31 @@ export default function AllProjectsPage() {
   const filteredImrProjects = useMemo(() => {
     return allImrProjects.filter(project => {
       if (statusFilter !== 'all' && project.status !== statusFilter) return false;
-      if (user?.role === 'CRO' && facultyFilter !== 'all' && project.faculty !== facultyFilter) return false;
+      if (facultyFilter.length > 0 && !facultyFilter.includes(project.faculty)) return false;
       if (!searchTerm) return true;
       const lowerCaseSearch = searchTerm.toLowerCase();
       return project.title.toLowerCase().includes(lowerCaseSearch) || project.pi.toLowerCase().includes(lowerCaseSearch);
     });
-  }, [allImrProjects, searchTerm, statusFilter, facultyFilter, user]);
+  }, [allImrProjects, searchTerm, statusFilter, facultyFilter]);
   
   const filteredEmrProjects = useMemo(() => {
       return allEmrProjects.filter(project => {
+          if (facultyFilter.length > 0 && project.faculty && !facultyFilter.includes(project.faculty)) return false;
           if (!searchTerm) return true;
           const lowerCaseSearch = searchTerm.toLowerCase();
           const title = project.callTitle || '';
           return title.toLowerCase().includes(lowerCaseSearch) || project.userName.toLowerCase().includes(lowerCaseSearch) || (project.agency || '').toLowerCase().includes(lowerCaseSearch);
       })
-  }, [allEmrProjects, searchTerm]);
+  }, [allEmrProjects, searchTerm, facultyFilter]);
 
   let pageTitle = "All Projects";
   let pageDescription = "Browse and manage all projects in the system.";
   
   if (user?.designation === 'Principal' && user?.institute) pageTitle = `Projects from ${user.institute}`;
   if (user?.designation === 'HOD' && user?.department) pageTitle = `Projects from ${user.department}`;
-  if (user?.role === 'CRO' && facultyFilter !== 'all') pageTitle = `Projects from ${facultyFilter}`;
+  if (user?.role === 'CRO' && facultyFilter.length === 1) pageTitle = `Projects from ${facultyFilter[0]}`;
+  if (user?.role === 'CRO' && facultyFilter.length > 1) pageTitle = `Projects from multiple faculties`;
+
 
   const EXPORT_COLUMNS = activeTab === 'imr' ? IMR_EXPORT_COLUMNS : EMR_EXPORT_COLUMNS;
 
@@ -513,13 +517,35 @@ export default function AllProjectsPage() {
                 <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
                 <SelectContent><SelectItem value="all">All Statuses</SelectItem>{STATUSES.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
             </Select>
-            {user?.role === 'CRO' && user.faculties && user.faculties.length > 1 && (
-                 <Select value={facultyFilter} onValueChange={(value) => { setFacultyFilter(value); updateUrlParams({ faculty: value === 'all' ? undefined : value }); }}>
-                    <SelectTrigger className="w-full sm:w-[280px]"><SelectValue placeholder="Filter by faculty" /></SelectTrigger>
-                    <SelectContent><SelectItem value="all">All Assigned Faculties</SelectItem>{user.faculties.map(faculty => (<SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>))}</SelectContent>
-                </Select>
+            {user?.role === 'CRO' && user.faculties && user.faculties.length > 0 && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full sm:w-[280px] justify-between">
+                            {facultyFilter.length === 0 ? "Filter by faculty" : facultyFilter.length === 1 ? facultyFilter[0] : `${facultyFilter.length} faculties selected`}
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                        {user.faculties.map(faculty => (
+                            <DropdownMenuCheckboxItem
+                                key={faculty}
+                                checked={facultyFilter.includes(faculty)}
+                                onCheckedChange={checked => {
+                                    const newFilter = checked ? [...facultyFilter, faculty] : facultyFilter.filter(f => f !== faculty);
+                                    setFacultyFilter(newFilter);
+                                    updateUrlParams({ faculty: newFilter.length > 0 ? newFilter.join(',') : undefined });
+                                }}
+                            >
+                                {faculty}
+                            </DropdownMenuCheckboxItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             )}
         </div>
+      </div>
+      <div className="text-sm text-muted-foreground mb-4">
+        Showing {activeTab === 'imr' ? filteredImrProjects.length : filteredEmrProjects.length} projects.
       </div>
 
         {hasAdminView ? (
