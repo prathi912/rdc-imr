@@ -327,3 +327,35 @@ export async function calculateMembershipIncentive(claimData: Partial<IncentiveC
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
+
+// --- Patent Calculation ---
+
+export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim>): Promise<{ success: boolean; amount?: number; error?: string }> {
+    try {
+        const { currentStatus, patentInventors } = claimData;
+        
+        const internalInventorCount = patentInventors?.length || 1;
+        if (internalInventorCount === 0) {
+            return { success: true, amount: 0 };
+        }
+        
+        let baseAmount = 0;
+        switch (currentStatus) {
+            case 'Published':
+                baseAmount = 7500;
+                break;
+            case 'Granted':
+                baseAmount = 15000;
+                break;
+            default:
+                baseAmount = 0;
+        }
+        
+        const individualShare = baseAmount > 0 ? baseAmount / internalInventorCount : 0;
+
+        return { success: true, amount: Math.round(individualShare) };
+    } catch (error: any) {
+        console.error("Error calculating patent incentive:", error);
+        return { success: false, error: error.message || "An unknown error occurred during calculation." };
+    }
+}

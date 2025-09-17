@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { calculatePatentIncentive } from '@/app/incentive-calculation';
 
 const sdgGoalsList = [
   "Goal 1: No Poverty", "Goal 2: Zero Hunger", "Goal 3: Good Health and Well-being", "Goal 4: Quality Education",
@@ -99,6 +100,7 @@ export function PatentForm() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [foundUser, setFoundUser] = useState<PatentInventor | null>(null);
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   
   const form = useForm<PatentFormValues>({
     resolver: zodResolver(patentSchema),
@@ -118,6 +120,22 @@ export function PatentForm() {
     control: form.control,
     name: "patentCoApplicants"
   });
+
+  const formValues = form.watch();
+
+  const calculate = useCallback(async () => {
+    const result = await calculatePatentIncentive(formValues);
+    if (result.success) {
+        setCalculatedIncentive(result.amount ?? null);
+    } else {
+        console.error("Incentive calculation failed:", result.error);
+        setCalculatedIncentive(null);
+    }
+  }, [formValues]);
+
+  useEffect(() => {
+    calculate();
+  }, [calculate]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -218,6 +236,7 @@ export function PatentForm() {
         
         const claimData: Partial<IncentiveClaim> = {
             ...restOfData,
+            calculatedIncentive,
             filingDate: data.filingDate?.toISOString(),
             publicationDate: data.publicationDate?.toISOString(),
             grantDate: data.grantDate?.toISOString(),
@@ -370,6 +389,13 @@ export function PatentForm() {
                   {(currentStatus === 'Published' || currentStatus === 'Granted') && <FormField name="publicationDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Date of Publication</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />}
                   {currentStatus === 'Granted' && <FormField name="grantDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Date of Grant</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />}
                 </div>
+
+                 {calculatedIncentive !== null && (
+                    <div className="p-4 bg-secondary rounded-md">
+                        <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                        <p className="text-xs text-muted-foreground">This is your individual share based on the policy and number of inventors.</p>
+                    </div>
+                )}
 
                 <FormField name="patentForm1" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof (Form 1) (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} /></FormControl><FormMessage /></FormItem> )} />
             </div>
