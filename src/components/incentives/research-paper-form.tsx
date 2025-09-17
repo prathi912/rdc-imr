@@ -812,10 +812,10 @@ export function ResearchPaperForm() {
                       name="scopusLink"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Scopus Article Link</FormLabel>
+                          <FormLabel>DOI</FormLabel>
                           <div className="flex items-center gap-2">
                               <FormControl>
-                                  <Input placeholder="https://www.scopus.com/record/..." {...field} disabled={isSubmitting} />
+                                  <Input placeholder="DOI" {...field} disabled={isSubmitting} />
                               </FormControl>
                               <Button
                                   type="button"
@@ -840,10 +840,10 @@ export function ResearchPaperForm() {
                       name="relevantLink"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>WoS Article Link (DOI)</FormLabel>
+                          <FormLabel>WoS Article Link</FormLabel>
                           <div className="flex items-center gap-2">
                             <FormControl>
-                              <Input placeholder="https://doi.org/..." {...field} disabled={isSubmitting} />
+                              <Input disabled={isSubmitting} />
                             </FormControl>
                             <Button
                                 type="button"
@@ -938,19 +938,6 @@ export function ResearchPaperForm() {
                       <FormLabel>Title of the Paper published</FormLabel>
                       <FormControl>
                         <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="relevantLink"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>DOI Link</FormLabel>
-                      <FormControl>
-                        <Input placeholder="https://doi.org/..." {...field} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

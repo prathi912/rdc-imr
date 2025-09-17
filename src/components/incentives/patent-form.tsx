@@ -67,7 +67,7 @@ const patentSchema = z
     filingDate: z.date({ required_error: 'Filing date is required.' }),
     publicationDate: z.date().optional(),
     grantDate: z.date().optional(),
-    currentStatus: z.enum(['Awarded', 'Published', 'Under Examination', 'FER Responded', 'Amended Examination'], { required_error: 'Please select the current status.' }),
+    currentStatus: z.enum(['Published', 'Granted'], { required_error: 'Please select the current status.' }),
     patentForm1: z.any().refine((files) => files?.length > 0, 'Proof (Form 1) is required.'),
   })
   .refine(data => !(data.patentLocale === 'International') || (!!data.patentCountry && data.patentCountry.length > 0), { message: 'Country is required for international patents.', path: ['patentCountry'] })
@@ -363,7 +363,7 @@ export function PatentForm() {
                 <Separator />
                 <h3 className="font-semibold text-sm">Dates & Status</h3>
                 
-                <FormField name="currentStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Current Status of Application</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select status"/></SelectTrigger></FormControl><SelectContent><SelectItem value="Awarded">Awarded</SelectItem><SelectItem value="Published">Published</SelectItem><SelectItem value="Under Examination">Under Examination</SelectItem><SelectItem value="FER Responded">FER Responded</SelectItem><SelectItem value="Amended Examination">Amended Examination</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+                <FormField name="currentStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Current Status of Application</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select status"/></SelectTrigger></FormControl><SelectContent><SelectItem value="Published">Published</SelectItem><SelectItem value="Granted">Granted</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField name="filingDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Date of Filing</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
