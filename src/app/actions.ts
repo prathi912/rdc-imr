@@ -1965,12 +1965,12 @@ export async function markImrAttendance(
 
     // If triggered from a single project detail page, find all other projects in the same meeting
     if (meetingIdentifier) {
-        const q = query(projectsRef, 
-            where('meetingDetails.date', '==', meetingIdentifier.date),
-            where('meetingDetails.time', '==', meetingIdentifier.time),
-            where('meetingDetails.venue', '==', meetingIdentifier.venue)
-        );
-        const meetingSnapshot = await getDocs(q);
+        const q = projectsRef
+            .where('meetingDetails.date', '==', meetingIdentifier.date)
+            .where('meetingDetails.time', '==', meetingIdentifier.time)
+            .where('meetingDetails.venue', '==', meetingIdentifier.venue);
+        
+        const meetingSnapshot = await q.get();
         allMeetingProjects = meetingSnapshot.docs.map(doc => ({
             projectId: doc.id,
             piUid: doc.data().pi_uid,
@@ -2021,6 +2021,7 @@ export async function markImrAttendance(
     
 
     
+
 
 
 
