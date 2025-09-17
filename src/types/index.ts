@@ -260,6 +260,7 @@ export type IncentiveClaim = {
   patentTotalStudents?: number
   patentStudentNames?: string
   patentFiledInPuName?: boolean
+  isPuSoleApplicant?: boolean;
   patentFiledFromIprCell?: boolean
   patentPermissionTaken?: boolean
   patentApprovalProofUrl?: string

@@ -331,27 +331,29 @@ export async function calculateMembershipIncentive(claimData: Partial<IncentiveC
 
 export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim>): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { currentStatus, patentCoApplicants, patentInventors, patentFiledInPuName } = claimData;
-        const isSoleApplicant = !patentFiledInPuName; // Assuming if not filed in PU name, PU is a joint applicant
+        const { currentStatus, patentFiledInPuName, isPuSoleApplicant, patentInventors } = claimData;
         
         const inventorCount = patentInventors?.length || 1;
         if (inventorCount === 0) {
             return { success: true, amount: 0 };
         }
         
+        let baseAmount = 0;
+        if (currentStatus === 'Published') {
+            baseAmount = 3000;
+        } else if (currentStatus === 'Granted') {
+            baseAmount = 15000;
+        } else {
+             return { success: true, amount: 0 };
+        }
+
         let totalIncentive = 0;
-        switch (currentStatus) {
-            case 'Filed':
-                totalIncentive = 0; // No incentive for just filing
-                break;
-            case 'Published':
-                totalIncentive = isSoleApplicant ? 3000 : 3000 * 0.8;
-                break;
-            case 'Granted':
-                totalIncentive = isSoleApplicant ? 15000 : 15000 * 0.8;
-                break;
-            default:
-                totalIncentive = 0;
+        if (patentFiledInPuName) {
+            if (isPuSoleApplicant) {
+                totalIncentive = baseAmount; // 100% for sole applicant
+            } else {
+                totalIncentive = baseAmount * 0.8; // 80% for joint applicant
+            }
         }
         
         const individualShare = totalIncentive > 0 ? totalIncentive / inventorCount : 0;

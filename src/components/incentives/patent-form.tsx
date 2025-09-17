@@ -76,6 +76,7 @@ const patentSchema = z
     patentGovtReceipt: z.any().refine((files) => files?.length > 0, 'Proof (Govt. Receipt) is required.'),
     patentSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
     patentFiledInPuName: z.boolean({ required_error: 'This field is required.' }),
+    isPuSoleApplicant: z.boolean().optional(),
     patentSpecificationType: z.enum(['Full', 'Provisional'], { required_error: 'Specification type is required.' }),
   })
   .refine(data => !(data.patentLocale === 'International') || (!!data.patentCountry && data.patentCountry.length > 0), { message: 'Country is required for international patents.', path: ['patentCountry'] })
@@ -84,7 +85,9 @@ const patentSchema = z
   .refine(data => !(data.isIprDisciplinary === 'Yes') || !!data.disciplinaryType, { message: 'Please select the disciplinary type.', path: ['disciplinaryType'] })
   .refine(data => !(data.currentStatus === 'Published' || data.currentStatus === 'Granted') || !!data.publicationDate, { message: 'Publication date is required for this status.', path: ['publicationDate'] })
   .refine(data => !(data.currentStatus === 'Granted') || !!data.grantDate, { message: 'Grant date is required for this status.', path: ['grantDate'] })
-  .refine(data => data.patentFiledFromIprCell || data.patentPermissionTaken !== undefined, { message: 'Permission status is required if not filed from IPR Cell.', path: ['patentPermissionTaken']});
+  .refine(data => data.patentFiledFromIprCell || data.patentPermissionTaken !== undefined, { message: 'Permission status is required if not filed from IPR Cell.', path: ['patentPermissionTaken']})
+  .refine(data => !data.patentFiledInPuName || data.isPuSoleApplicant !== undefined, { message: 'Please specify if PU is the sole applicant.', path: ['isPuSoleApplicant']});
+
 
 type PatentFormValues = z.infer<typeof patentSchema>;
 
@@ -202,6 +205,7 @@ export function PatentForm() {
   const isIprSdg = form.watch('isIprSdg');
   const isIprDisciplinary = form.watch('isIprDisciplinary');
   const patentFiledFromIprCell = form.watch('patentFiledFromIprCell');
+  const patentFiledInPuName = form.watch('patentFiledInPuName');
   
 
   async function handleSave(status: 'Draft' | 'Pending') {
@@ -413,6 +417,7 @@ export function PatentForm() {
 
                 <FormField name="patentSpecificationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Specification Type</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Full" /></FormControl><FormLabel className="font-normal">Full</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Provisional" /></FormControl><FormLabel className="font-normal">Provisional</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="patentFiledInPuName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Was the patent filed in the name of PU as an Applicant?</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+                {patentFiledInPuName && <FormField name="isPuSoleApplicant" control={form.control} render={({ field }) => ( <FormItem><FormLabel>If Yes, was PU the Sole-Applicant?</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No (Joint Applicant)</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />}
                 <FormField name="patentFiledFromIprCell" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Was the patent filed from IPR Cell, PU?</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 {patentFiledFromIprCell === false && (
                     <FormField name="patentPermissionTaken" control={form.control} render={({ field }) => ( <FormItem><FormLabel>If No, was permission from PU taken?</FormLabel><FormControl><RadioGroup onValueChange={(val) => field.onChange(val === 'true')} value={String(field.value)} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="true" /></FormControl><FormLabel className="font-normal">Yes</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="false" /></FormControl><FormLabel className="font-normal">No</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
