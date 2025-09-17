@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -341,6 +340,9 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         
         let baseAmount = 0;
         switch (currentStatus) {
+            case 'Filed':
+                baseAmount = 0; // No incentive for just filing
+                break;
             case 'Published':
                 baseAmount = 7500;
                 break;

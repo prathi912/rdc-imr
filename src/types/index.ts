@@ -279,7 +279,7 @@ export type IncentiveClaim = {
   filingDate?: string; // ISO
   publicationDate?: string; // ISO
   grantDate?: string; // ISO
-  currentStatus?: 'Awarded' | 'Published' | 'Under Examination' | 'FER Responded' | 'Amended Examination';
+  currentStatus?: 'Filed' | 'Published' | 'Granted';
 
 
   // Conference Fields
