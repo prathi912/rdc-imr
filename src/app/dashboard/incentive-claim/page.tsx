@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -32,7 +31,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
-import { submitIncentiveClaim, getSystemSettings } from '@/app/actions';
+import { getSystemSettings } from '@/app/actions';
+import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateBookIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
@@ -581,3 +581,5 @@ export default function IncentiveClaimPage() {
     </>
   );
 }
+
+    
