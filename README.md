@@ -1,6 +1,5 @@
 
 
-
 # Research & Development Portal - Parul University
 
 This is a comprehensive, full-stack web application designed to streamline and manage the entire research lifecycle at Parul University. It serves as a central hub for faculty, evaluators, and administrators to handle Intramural (IMR) and Extramural (EMR) research projects, user management, and grant tracking.
@@ -98,7 +97,7 @@ This is the most critical step. The application will not run without the correct
 
 ```env
 # .env.local
-NEXT_PUBLIC_FIREBASE_API="[API_KEY]"
+NEXT_PUBLIC_FIREBASE_API_KEY="[API_KEY]"
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="[AUTH_DOMAIN]"
 NEXT_PUBLIC_FIREBASE_PROJECT_ID="[PROJECT_ID]"
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="[STORAGE_BUCKET]"
@@ -151,15 +150,14 @@ The application should now be running at [http://localhost:9002](http://localhos
 ## 📁 Project Structure
 
 -   `src/app/`: Next.js App Router pages, layouts, and route handlers.
--   `src/components/`: Reusable React components, organized by feature (e.g., `projects`, `emr`) and UI primitives (`ui`).
+-   `src/components/`: Reusable React components, organized by feature (e.g., `projects`, `emr`) and UI primitives from ShadCN UI (`ui`).
 -   `src/lib/`: Core logic, including Firebase configuration (`config.ts`, `admin.ts`), security modules (`modules.ts`), and utility functions.
 -   `src/ai/`: Contains all Genkit flows for AI-powered features.
 -   `public/`: Static assets like images and logos.
 -   `firestore.rules`: Security rules for the Firestore database.
 -   `apphosting.yaml`: Configuration for deployment to Firebase App Hosting.
--   `format.xlsx`: file for Excel exports.
+-   `staffdata.xlsx`, `goastaffdata.xlsx`: These files in the root directory contain historical user and academic data used to pre-fill profiles.
 
 ## ☁️ Deployment
 
 This project is configured for one-click deployment to **Firebase App Hosting**. Simply connect your GitHub repository to your Firebase project, and it will build and deploy automatically. The `apphosting.yaml` file controls the build and runtime settings.
-```
