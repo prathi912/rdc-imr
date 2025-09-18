@@ -219,6 +219,7 @@ export type IncentiveClaim = {
   calculatedIncentive?: number
   finalApprovedAmount?: number;
   approvals?: ApprovalStage[];
+  autoFetchedFields?: (keyof IncentiveClaim)[];
 
   // Main selector
   claimType: string

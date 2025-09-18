@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { User, IncentiveClaim, Author, ApprovalStage } from '@/types';
-import { Loader2, Printer, Check, X, Download } from 'lucide-react';
+import { Loader2, Printer, Check, X, Download, Bot } from 'lucide-react';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { generateOfficeNotingForClaim, generateResearchPaperIncentiveForm } from '@/app/document-actions';
@@ -86,7 +86,7 @@ a.href = url;
         }
     };
 
-    const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[] | React.ReactNode) => {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[] | React.ReactNode, fieldId?: keyof IncentiveClaim) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         
         let displayValue: React.ReactNode;
@@ -110,11 +110,27 @@ a.href = url;
         else if (typeof value !== 'object') {
             displayValue = String(value);
         }
+        
+        const isAutoFetched = fieldId && claim.autoFetchedFields?.includes(fieldId);
 
         return (
             <div className="grid grid-cols-3 gap-2 py-1">
                 <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
-                <dd className="col-span-2">{displayValue}</dd>
+                <dd className="col-span-2 flex items-center gap-2">
+                    {displayValue}
+                    {isAutoFetched && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <Bot className="h-4 w-4 text-primary" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    <p>This field was auto-fetched from Scopus/WoS.</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
+                </dd>
             </div>
         );
     };
@@ -171,20 +187,20 @@ a.href = url;
                         <>
                            <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
-                            {renderDetail("Paper Title", claim.paperTitle)}
+                            {renderDetail("Paper Title", claim.paperTitle, "paperTitle")}
                             {renderLinkDetail("DOI Link", claim.relevantLink)}
                             {renderLinkDetail("Scopus Link", claim.scopusLink)}
-                            {renderDetail("Publication Type", claim.publicationType)}
-                            {renderDetail("Index Type", claim.indexType?.toUpperCase())}
-                            {renderDetail("WoS Type", claim.wosType)}
-                            {renderDetail("Journal Classification", claim.journalClassification)}
-                            {renderDetail("Journal Name", claim.journalName)}
+                            {renderDetail("Publication Type", claim.publicationType, "publicationType")}
+                            {renderDetail("Index Type", claim.indexType?.toUpperCase(), "indexType")}
+                            {renderDetail("WoS Type", claim.wosType, "wosType")}
+                            {renderDetail("Journal Classification", claim.journalClassification, "journalClassification")}
+                            {renderDetail("Journal Name", claim.journalName, "journalName")}
                             {renderLinkDetail("Journal Website", claim.journalWebsite)}
-                            {renderDetail("Locale", claim.locale)}
-                            {renderDetail("Print ISSN", claim.printIssn)}
-                            {renderDetail("Electronic ISSN", claim.electronicIssn)}
-                            {renderDetail("Publication Month", claim.publicationMonth)}
-                            {renderDetail("Publication Year", claim.publicationYear)}
+                            {renderDetail("Locale", claim.locale, "locale")}
+                            {renderDetail("Print ISSN", claim.printIssn, "printIssn")}
+                            {renderDetail("Electronic ISSN", claim.electronicIssn, "electronicIssn")}
+                            {renderDetail("Publication Month", claim.publicationMonth, "publicationMonth")}
+                            {renderDetail("Publication Year", claim.publicationYear, "publicationYear")}
                             {renderDetail("Author Position", claim.authorPosition)}
                             {renderDetail("PU Name in Publication", claim.isPuNameInPublication)}
                             {renderDetail("Authors", claim.authors)}
