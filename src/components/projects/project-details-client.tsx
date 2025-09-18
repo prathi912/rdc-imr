@@ -412,11 +412,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     if (!project.meetingDetails?.date) return false;
     const meetingDate = parseISO(project.meetingDetails.date);
     const today = startOfToday();
-    const sevenDaysAfterMeeting = addDays(meetingDate, 7);
+    const fifteenDaysAfterMeeting = addDays(meetingDate, 15);
 
     // The evaluation is active if today is on or after the meeting date,
-    // and on or before 7 days after the meeting date.
-    return !isBefore(today, meetingDate) && !isAfter(today, sevenDaysAfterMeeting);
+    // and on or before 15 days after the meeting date.
+    return !isBefore(today, meetingDate) && !isAfter(today, fifteenDaysAfterMeeting);
   }, [project.meetingDetails?.date]);
   
   const showEvaluationForm = user && project.status === "Under Review" && isAssignedEvaluator && isEvaluationPeriodActive;
