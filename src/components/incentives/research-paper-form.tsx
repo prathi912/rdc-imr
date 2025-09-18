@@ -15,10 +15,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
-import { collection, doc, setDoc } from "firebase/firestore"
+import { doc, getDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import { uploadFileToServer } from "@/app/actions"
 import { findUserByMisId } from '@/app/userfinding';
@@ -61,18 +61,7 @@ const researchPaperSchema = z
     publicationMonth: z.string({ required_error: "Publication month is required." }),
     publicationYear: z.string({ required_error: "Publication year is required." }),
     sdgGoals: z.array(z.string()).refine((value) => value.length > 0, { message: "Please select at least one SDG." }),
-    publicationProof: z
-      .any()
-      .refine((files) => files?.length > 0, "Proof of publication is required.")
-      .refine((files) => !files || files?.length <= MAX_FILES, `You can upload a maximum of ${MAX_FILES} files.`)
-      .refine(
-        (files) => !files || Array.from(files as FileList).every((file: any) => file.size <= MAX_FILE_SIZE),
-        `Each file must be less than 5MB.`,
-      )
-      .refine(
-        (files) => !files || Array.from(files as FileList).every((file: any) => ACCEPTED_FILE_TYPES.includes(file.type)),
-        "Only PDF files are allowed.",
-      ),
+    publicationProof: z.any().optional(),
     isPuNameInPublication: z
       .boolean()
       .refine((val) => val === true, { message: "PU name must be present in the publication for an incentive." }),
@@ -305,6 +294,7 @@ const SPECIAL_POLICY_FACULTIES = [
 export function ResearchPaperForm() {
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isFetching, setIsFetching] = useState(false);
@@ -318,6 +308,7 @@ export function ResearchPaperForm() {
   const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
   const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
   const [currentStep, setCurrentStep] = useState(1);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
 
 
   const form = useForm<ResearchPaperFormValues>({
@@ -389,8 +380,39 @@ export function ResearchPaperForm() {
         })
       }
     }
+    const claimId = searchParams.get('claimId');
+    if (!claimId) {
+        setIsLoadingDraft(false);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    const claimId = searchParams.get('claimId');
+    if (claimId && user) {
+        const fetchDraft = async () => {
+            setIsLoadingDraft(true);
+            try {
+                const claimRef = doc(db, 'incentiveClaims', claimId);
+                const claimSnap = await getDoc(claimRef);
+                if (claimSnap.exists()) {
+                    const draftData = claimSnap.data() as IncentiveClaim;
+                    form.reset({
+                        ...draftData,
+                        publicationProof: undefined, // Files can't be pre-filled
+                    });
+                } else {
+                    toast({ variant: 'destructive', title: 'Draft Not Found' });
+                }
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Error Loading Draft' });
+            } finally {
+                setIsLoadingDraft(false);
+            }
+        };
+        fetchDraft();
+    }
+  }, [searchParams, user, form, toast]);
 
   const indexType = form.watch("indexType")
 
@@ -595,6 +617,21 @@ export function ResearchPaperForm() {
   };
 
   async function handleSave(status: "Draft" | "Pending") {
+    const claimId = searchParams.get('claimId');
+    if (status === 'Draft') {
+        // For draft, we don't need full validation
+    } else {
+        const isValid = await form.trigger();
+        if (!isValid) {
+            toast({
+                variant: 'destructive',
+                title: 'Validation Error',
+                description: 'Please correct the errors before submitting.',
+            });
+            return;
+        }
+    }
+
     if (!user || !user.faculty) {
       toast({ variant: "destructive", title: "Error", description: "User information not found. Please log in again." })
       return
@@ -658,11 +695,13 @@ export function ResearchPaperForm() {
         throw new Error(result.error)
       }
 
-      const claimId = result.claimId;
+      const newClaimId = result.claimId;
 
       if (status === "Draft") {
         toast({ title: "Draft Saved!", description: "You can continue editing from the 'Incentive Claim' page." })
-        router.push(`/dashboard/incentive-claim/research-paper?claimId=${claimId}`)
+        if (!claimId) { // Only redirect if it's a new draft
+            router.push(`/dashboard/incentive-claim/research-paper?claimId=${newClaimId}`);
+        }
       } else {
         toast({ title: "Success", description: "Your incentive claim has been submitted." })
         router.push("/dashboard/incentive-claim")
@@ -693,6 +732,10 @@ export function ResearchPaperForm() {
   };
 
   const onFinalSubmit = () => handleSave('Pending');
+
+  if (isLoadingDraft) {
+    return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
+  }
 
   if (currentStep === 2) {
     return (
@@ -1271,12 +1314,12 @@ export function ResearchPaperForm() {
                 type="button"
                 variant="outline"
                 onClick={() => handleSave("Draft")}
-                disabled={isSubmitting || orcidOrMisIdMissing || bankDetailsMissing}
+                disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}
               >
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save as Draft
               </Button>
-               <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || orcidOrMisIdMissing || bankDetailsMissing}>
+               <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
                 Proceed to Review
               </Button>
             </CardFooter>
