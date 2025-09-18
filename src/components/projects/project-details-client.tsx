@@ -1305,7 +1305,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       <Users className="h-5 w-5" />
                       Team Information
                   </h3>
-                  {isPI && (
+                  {isPI && project.status !== 'Not Recommended' && (
                       <Card className="bg-muted/50">
                           <CardHeader>
                               <CardTitle className="text-base">Manage Co-Investigators</CardTitle>
