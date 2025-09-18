@@ -257,7 +257,7 @@ export default function AllProjectsPage() {
   
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
-  const [facultyFilter, setFacultyFilter] = useState<string[]>(searchParams.get('faculty')?.split(',') || []);
+  const [facultyFilter, setFacultyFilter] = useState<string[]>(searchParams.get('faculty')?.split(',').filter(Boolean) || []);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'imr');
 
   const isMobile = useIsMobile();
@@ -345,7 +345,7 @@ export default function AllProjectsPage() {
       const parsedUser = JSON.parse(storedUser);
       setUser(parsedUser);
        if (parsedUser.role === 'CRO' || parsedUser.role === 'Super-admin' || parsedUser.role === 'admin') {
-         setFacultyFilter(searchParams.get('faculty')?.split(',') || []);
+         setFacultyFilter(searchParams.get('faculty')?.split(',').filter(Boolean) || []);
        }
     } else {
       setLoading(false);
@@ -363,6 +363,13 @@ export default function AllProjectsPage() {
   
   const hasAdminView = ['Super-admin', 'admin', 'CRO', 'IQAC'].includes(user?.role || '') || user?.designation === 'Principal' || user?.designation === 'HOD';
   const canEditCoPis = user?.role === 'Super-admin';
+
+  const allFaculties = useMemo(() => {
+    const facultySet = new Set<string>();
+    allImrProjects.forEach(p => p.faculty && facultySet.add(p.faculty));
+    allEmrProjects.forEach(p => p.faculty && facultySet.add(p.faculty));
+    return Array.from(facultySet).sort();
+  }, [allImrProjects, allEmrProjects]);
 
   const filteredImrProjects = useMemo(() => {
     return allImrProjects.filter(project => {
@@ -518,7 +525,7 @@ export default function AllProjectsPage() {
                 <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
                 <SelectContent><SelectItem value="all">All Statuses</SelectItem>{STATUSES.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
             </Select>
-            {user?.role === 'CRO' && user.faculties && user.faculties.length > 0 && (
+            {(user?.role === 'CRO' || user?.role === 'Super-admin' || user?.role === 'admin') && (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full sm:w-[280px] justify-between">
@@ -527,7 +534,7 @@ export default function AllProjectsPage() {
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
-                        {user.faculties.map(faculty => (
+                        {(user?.role === 'CRO' ? user.faculties : allFaculties)?.map(faculty => (
                             <DropdownMenuCheckboxItem
                                 key={faculty}
                                 checked={facultyFilter.includes(faculty)}
@@ -632,5 +639,3 @@ export default function AllProjectsPage() {
     </>
   );
 }
-
-    
