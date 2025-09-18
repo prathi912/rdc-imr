@@ -901,7 +901,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
                 {project.status}
               </Badge>
-              {showAdminActions && (
+              {isSuperAdmin && project.status !== 'Draft' && (
                 <>
                   {project.status === "Under Review" ? (
                      <TooltipProvider>
@@ -920,7 +920,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         </Tooltip>
                         <DropdownMenuContent align="end">
                            <DropdownMenuItem 
-                              onClick={() => handleApprovalClick("Sanctioned")} 
+                              onClick={() => handleStatusUpdate("Sanctioned")}
                               disabled={!project.projectStartDate || !project.projectEndDate}
                            >
                               <Check className="mr-2 h-4 w-4" /> Sanction
@@ -948,7 +948,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                           <DropdownMenuItem onClick={() => handleApprovalClick("Sanctioned")} disabled={!project.projectStartDate || !project.projectEndDate}>
+                           <DropdownMenuItem onClick={() => handleStatusUpdate("Sanctioned")} disabled={!project.projectStartDate || !project.projectEndDate}>
                              <Check className="mr-2 h-4 w-4" /> Sanction
                            </DropdownMenuItem>
                            <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
