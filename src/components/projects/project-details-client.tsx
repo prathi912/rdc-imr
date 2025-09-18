@@ -116,6 +116,7 @@ type EvaluatorFormData = z.infer<typeof evaluatorSchema>
 
 const revisionCommentSchema = z.object({
   comments: z.string().min(10, "Please provide detailed comments for the revision."),
+  statusToSet: z.enum(["Revision Needed", "Not Recommended"]),
 })
 type RevisionCommentFormData = z.infer<typeof revisionCommentSchema>
 
@@ -458,9 +459,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setIsUpdating(false)
 
     if (result.success) {
-      setProject({ ...project, status: newStatus, ...(comments && { revisionComments: comments }) })
+      const updatedProjectData = { ...project, status: newStatus };
+      if (comments) {
+        if (newStatus === 'Revision Needed') updatedProjectData.revisionComments = comments;
+        if (newStatus === 'Not Recommended') updatedProjectData.rejectionComments = comments;
+      }
+      setProject(updatedProjectData);
+      onProjectUpdate(updatedProjectData); // Notify parent component
       toast({ title: "Success", description: `Project status updated to ${newStatus}` })
-      router.refresh()
       if (newStatus === "Revision Needed" || newStatus === "Not Recommended") {
         setIsRevisionCommentDialogOpen(false)
         revisionCommentForm.reset()
@@ -791,6 +797,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         return;
     }
     if (status === "Revision Needed" || status === "Not Recommended") {
+        revisionCommentForm.setValue("statusToSet", status);
         setIsRevisionCommentDialogOpen(true);
     } else {
         handleStatusUpdate(status);
@@ -798,10 +805,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   };
 
   const handleRevisionCommentSubmit = (data: RevisionCommentFormData) => {
-    // This function will now be called by a separate dialog,
-    // which will also determine the status ("Revision Needed" or "Not Recommended").
-    const statusToSet = revisionCommentForm.getValues('statusToSet'); // We need to store this temporarily
-    handleStatusUpdate(statusToSet, data.comments);
+    handleStatusUpdate(data.statusToSet, data.comments);
   };
 
   const handleOpenNotingDialog = () => {
@@ -859,6 +863,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   };
 
   const canViewEvaluations = isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive);
+  const showAdminActions = isSuperAdmin && project.status !== 'Draft';
 
   return (
     <>
@@ -896,9 +901,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
                 {project.status}
               </Badge>
-              {isSuperAdmin && (
+              {showAdminActions && (
                 <>
-                  {project.status === "Under Review" && (
+                  {project.status === "Under Review" ? (
                      <TooltipProvider>
                       <DropdownMenu>
                         <Tooltip>
@@ -931,11 +936,34 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TooltipProvider>
-                  )}
-                  {project.status === "Pending Completion Approval" && (
+                  ) : project.status === "Pending Completion Approval" ? (
                     <Button onClick={() => handleStatusUpdate("Completed")} disabled={isUpdating}>
                       <FileCheck2 className="mr-2 h-4 w-4" /> Approve Completion
                     </Button>
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" disabled={isUpdating}>
+                           <Edit className="mr-2 h-4 w-4" /> Revise Decision <ChevronDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                           <DropdownMenuItem onClick={() => handleApprovalClick("Sanctioned")} disabled={!project.projectStartDate || !project.projectEndDate}>
+                             <Check className="mr-2 h-4 w-4" /> Sanction
+                           </DropdownMenuItem>
+                           <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
+                             <X className="mr-2 h-4 w-4 text-destructive" />{" "}
+                             <span className="text-destructive">Not Recommend</span>
+                           </DropdownMenuItem>
+                           <DropdownMenuSeparator />
+                           <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
+                             <Edit className="mr-2 h-4 w-4" /> Request Revision
+                           </DropdownMenuItem>
+                           <DropdownMenuItem onSelect={() => handleStatusUpdate("Completed")}>
+                             <FileCheck2 className="mr-2 h-4 w-4" /> Mark as Completed
+                           </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </>
               )}
@@ -1528,7 +1556,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
             <AlertDialogDescription>
               This project cannot be Sanctioned or Not Recommended until all assigned evaluations have been submitted.
-              There are currently {evaluations.length || 0} of {project.meetingDetails?.assignedEvaluators?.length || 0}{" "}
+              There are currently {evaluations.length || 0} of {presentEvaluatorsCount || 0}{" "}
               required evaluations complete.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1549,7 +1577,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           <Form {...revisionCommentForm}>
             <form
               id="revision-comment-form"
-              onSubmit={revisionCommentForm.handleSubmit((data) => handleStatusUpdate(revisionCommentForm.getValues('statusToSet'), data.comments))}
+              onSubmit={revisionCommentForm.handleSubmit(handleRevisionCommentSubmit)}
               className="py-4"
             >
               <FormField
