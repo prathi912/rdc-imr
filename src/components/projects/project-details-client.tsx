@@ -65,7 +65,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText, Trash2, UserCheck } from 'lucide-react'
@@ -89,7 +89,7 @@ interface ProjectDetailsClientProps {
 
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
   Submitted: "secondary",
-  Sanctioned: "default",
+  Recommended: "default",
   "In Progress": "default",
   "Under Review": "secondary",
   "Revision Needed": "secondary",
@@ -321,8 +321,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     const notingForm = useForm<NotingFormData>({
         resolver: zodResolver(notingFormSchema),
         defaultValues: {
-            projectDuration: '',
-            phases: [{ name: 'Phase 1', amount: 0 }],
+            projectDuration: project.projectDuration || '',
+            phases: project.phases || [{ name: 'Phase 1', amount: 0 }],
         }
     });
 
@@ -439,7 +439,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const canRequestClosure = useMemo(() => {
     if (!isPI) return false
     const normalizedStatus = project.status.toLowerCase()
-    const allowedStatuses = ["sanctioned", "in progress", "completed", "pending completion approval"]
+    const allowedStatuses = ["recommended", "in progress", "completed", "pending completion approval"]
     return allowedStatuses.includes(normalizedStatus) && normalizedStatus !== "pending completion approval"
   }, [isPI, project.status])
 
@@ -783,19 +783,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setProject(updatedProject)
   }
 
-  const handleApprovalClick = (status: "Sanctioned" | "Not Recommended" | "Revision Needed") => {
+  const handleApprovalClick = (status: "Recommended" | "Not Recommended" | "Revision Needed") => {
     if (!allEvaluationsIn) {
       setShowApprovalAlert(true);
       return;
     }
-    if (status === "Sanctioned" && (!project.projectStartDate || !project.projectEndDate)) {
-        toast({
-            variant: "destructive",
-            title: "Action Required",
-            description: "Please set the project duration before sanctioning the project.",
-        });
-        return;
-    }
+    
     if (status === "Revision Needed" || status === "Not Recommended") {
         revisionCommentForm.setValue("statusToSet", status);
         setIsRevisionCommentDialogOpen(true);
@@ -895,7 +888,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Under Review" && <Clock className="mr-2 h-4 w-4" />}
                 {project.status === "Revision Needed" && <Edit className="mr-2 h-4 w-4" />}
                 {project.status === "Pending Completion Approval" && <Clock className="mr-2 h-4 w-4" />}
-                {(project.status === "Sanctioned" || project.status === "Completed") && (
+                {(project.status === "Recommended" || project.status === "Completed") && (
                   <Check className="mr-2 h-4 w-4" />
                 )}
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
@@ -914,16 +907,16 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                               </Button>
                             </DropdownMenuTrigger>
                           </TooltipTrigger>
-                           {!project.projectStartDate || !project.projectEndDate ? (
-                                <TooltipContent><p>Set project duration before sanctioning.</p></TooltipContent>
+                           {!allEvaluationsIn ? (
+                                <TooltipContent><p>All evaluations must be submitted first.</p></TooltipContent>
                            ) : null}
                         </Tooltip>
                         <DropdownMenuContent align="end">
                            <DropdownMenuItem 
-                              onClick={() => handleStatusUpdate("Sanctioned")}
-                              disabled={!project.projectStartDate || !project.projectEndDate}
+                              onClick={() => handleApprovalClick("Recommended")}
+                              disabled={!allEvaluationsIn}
                            >
-                              <Check className="mr-2 h-4 w-4" /> Sanction
+                              <Check className="mr-2 h-4 w-4" /> Recommended
                           </DropdownMenuItem>
                           <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
                             <X className="mr-2 h-4 w-4 text-destructive" />{" "}
@@ -948,8 +941,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                           <DropdownMenuItem onClick={() => handleStatusUpdate("Sanctioned")} disabled={!project.projectStartDate || !project.projectEndDate}>
-                             <Check className="mr-2 h-4 w-4" /> Sanction
+                           <DropdownMenuItem onClick={() => handleApprovalClick("Recommended")}>
+                             <Check className="mr-2 h-4 w-4" /> Recommended
                            </DropdownMenuItem>
                            <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
                              <X className="mr-2 h-4 w-4 text-destructive" />{" "}
@@ -1050,7 +1043,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DialogContent>
                 </Dialog>
               )}
-              {isAdmin && project.status === "Sanctioned" && !project.grant && (
+              {isAdmin && project.status === "Recommended" && !project.grant && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -1474,7 +1467,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       </Card>
 
       {isAdmin &&
-        ["Sanctioned", "In Progress", "Completed", "Pending Completion Approval"].includes(project.status) && (
+        ["Recommended", "In Progress", "Completed", "Pending Completion Approval"].includes(project.status) && (
           <Card className="mt-8">
             <CardHeader>
               <div className="flex items-center gap-2">
@@ -1555,7 +1548,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           <AlertDialogHeader>
             <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
             <AlertDialogDescription>
-              This project cannot be Sanctioned or Not Recommended until all assigned evaluations have been submitted.
+              This project cannot be Recommended or Not Recommended until all assigned evaluations have been submitted.
               There are currently {evaluations.length || 0} of {presentEvaluatorsCount || 0}{" "}
               required evaluations complete.
             </AlertDialogDescription>
