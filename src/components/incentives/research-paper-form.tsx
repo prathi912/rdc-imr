@@ -48,8 +48,8 @@ const researchPaperSchema = z
   .object({
     publicationType: z.string({ required_error: "Please select a publication type." }),
     indexType: z.enum(["wos", "scopus", "both", "esci"]).optional(),
-    relevantLink: z.string().url("A valid DOI link is required."),
-    scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
+    relevantLink: z.string().min(1, "A valid DOI link is required."),
+    scopusLink: z.string().optional().or(z.literal("")),
     journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"]).optional(),
     wosType: z.enum(["SCIE", "SSCI", "A&HCI"]).optional(),
     journalName: z.string().min(3, "Journal name is required."),
@@ -94,6 +94,7 @@ const researchPaperSchema = z
     }, { message: 'Only one author can be designated as the First Author.', path: ["authors"] }),
     totalPuStudentAuthors: z.coerce.number().nonnegative("Number of students cannot be negative.").optional(),
     puStudentNames: z.string().optional(),
+    autoFetchedFields: z.array(z.string()).optional(),
   })
   .refine(
     (data) => {
@@ -112,19 +113,7 @@ const researchPaperSchema = z
       return correspondingAuthors.length <= 1
     },
     { message: "Only one author can be designated as the Corresponding Author.", path: ["authors"] },
-  )
-  .refine(
-    (data) => {
-      if (data.indexType === "scopus" || data.indexType === "both") {
-        return !!data.scopusLink && data.scopusLink.startsWith("https://www.scopus.com/")
-      }
-      return true
-    },
-    {
-      message: "A valid Scopus link (starting with https://www.scopus.com/) is required.",
-      path: ["scopusLink"],
-    },
-  )
+  );
 
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>
 
@@ -341,6 +330,7 @@ export function ResearchPaperForm() {
       isPuNameInPublication: true,
       totalPuStudentAuthors: 0,
       puStudentNames: '',
+      autoFetchedFields: [],
     },
   })
 
@@ -455,24 +445,17 @@ export function ResearchPaperForm() {
     try {
         const result = await fetchAdvancedScopusData(link, user.name);
         if (result.success && result.data) {
-            form.setValue('paperTitle', result.data.paperTitle, { shouldValidate: true });
-            form.setValue('journalName', result.data.journalName, { shouldValidate: true });
-            if (result.data.publicationMonth) {
-              form.setValue('publicationMonth', result.data.publicationMonth, { shouldValidate: true });
-            }
-            if (result.data.publicationYear) {
-              form.setValue('publicationYear', result.data.publicationYear, { shouldValidate: true });
-            }
-            if (result.data.printIssn) {
-                form.setValue('printIssn', result.data.printIssn, { shouldValidate: true });
-            }
-            if (result.data.electronicIssn) {
-                form.setValue('electronicIssn', result.data.electronicIssn, { shouldValidate: true });
-            }
-            if (result.data.journalWebsite) {
-                form.setValue('journalWebsite', result.data.journalWebsite, { shouldValidate: true });
-            }
+            const autoFetched: (keyof ResearchPaperFormValues)[] = [];
             
+            Object.entries(result.data).forEach(([key, value]) => {
+                if (value) {
+                    form.setValue(key as keyof ResearchPaperFormValues, value, { shouldValidate: true });
+                    autoFetched.push(key as keyof ResearchPaperFormValues);
+                }
+            });
+            
+            form.setValue('autoFetchedFields', autoFetched);
+
             toast({ title: 'Success', description: 'Form fields have been pre-filled from Scopus.' });
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data from Scopus.' });
@@ -501,10 +484,15 @@ export function ResearchPaperForm() {
     try {
         const result = await fetchWosDataByUrl(link, user.name);
         if (result.success && result.data) {
-            form.setValue('paperTitle', result.data.paperTitle, { shouldValidate: true });
-            form.setValue('journalName', result.data.journalName, { shouldValidate:true });
-            form.setValue('publicationYear', result.data.publicationYear, { shouldValidate: true });
-            form.setValue('relevantLink', result.data.relevantLink, { shouldValidate: true });
+            const autoFetched: (keyof ResearchPaperFormValues)[] = [];
+            Object.entries(result.data).forEach(([key, value]) => {
+                if (value) {
+                    form.setValue(key as keyof ResearchPaperFormValues, value, { shouldValidate: true });
+                    autoFetched.push(key as keyof ResearchPaperFormValues);
+                }
+            });
+            form.setValue('autoFetchedFields', autoFetched);
+
             toast({ title: 'Success', description: 'Form fields have been pre-filled from Web of Science.' });
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
@@ -642,6 +630,7 @@ export function ResearchPaperForm() {
           status,
           submissionDate: new Date().toISOString(),
           bankDetails: user.bankDetails || null,
+          authorType: data.authors.find(a => a.email.toLowerCase() === user.email.toLowerCase())?.role || 'Co-Author',
       };
 
       const result = await submitIncentiveClaim(claimData);
@@ -812,10 +801,10 @@ export function ResearchPaperForm() {
                       name="scopusLink"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>DOI</FormLabel>
+                          <FormLabel>Scopus Link or EID</FormLabel>
                           <div className="flex items-center gap-2">
                               <FormControl>
-                                  <Input placeholder="DOI" {...field} disabled={isSubmitting} />
+                                  <Input placeholder="Enter Scopus URL or EID" {...field} disabled={isSubmitting} />
                               </FormControl>
                               <Button
                                   type="button"
@@ -840,10 +829,10 @@ export function ResearchPaperForm() {
                       name="relevantLink"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>WoS Article Link</FormLabel>
+                          <FormLabel>WoS Article Link or DOI</FormLabel>
                           <div className="flex items-center gap-2">
                             <FormControl>
-                              <Input disabled={isSubmitting} />
+                              <Input placeholder="Enter WoS URL or DOI" {...field} disabled={isSubmitting} />
                             </FormControl>
                             <Button
                                 type="button"
