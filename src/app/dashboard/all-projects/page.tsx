@@ -51,6 +51,7 @@ const IMR_EXPORT_COLUMNS = [
   { id: 'pi_phoneNumber', label: 'PI Phone' },
   { id: 'misId', label: 'MIS ID' },
   { id: 'designation', label: 'Designation' },
+  { id: 'faculty', label: 'Faculty' },
   { id: 'institute', label: 'Institute' },
   { id: 'departmentName', label: 'Department' },
   { id: 'status', label: 'Status' },
@@ -418,7 +419,7 @@ export default function AllProjectsPage() {
       const row: { [key: string]: any } = {};
       selectedExportColumns.forEach(colId => {
         const column = IMR_EXPORT_COLUMNS.find(c => c.id === colId);
-        if (column) row[column.label] = { title: p.title, type: p.type, submissionDate: new Date(p.submissionDate).toLocaleDateString(), abstract: p.abstract, pi: p.pi, pi_email: p.pi_email, pi_phoneNumber: p.pi_phoneNumber, misId: userDetails?.misId, designation: userDetails?.designation, institute: p.institute, departmentName: p.departmentName, status: p.status, coPiNames: coPiNames || 'N/A' }[colId];
+        if (column) row[column.label] = { title: p.title, type: p.type, submissionDate: new Date(p.submissionDate).toLocaleDateString(), abstract: p.abstract, pi: p.pi, pi_email: p.pi_email, pi_phoneNumber: p.pi_phoneNumber, misId: userDetails?.misId, designation: userDetails?.designation, faculty: p.faculty, institute: p.institute, departmentName: p.departmentName, status: p.status, coPiNames: coPiNames || 'N/A' }[colId];
       });
       return row;
     });
@@ -631,3 +632,5 @@ export default function AllProjectsPage() {
     </>
   );
 }
+
+    
