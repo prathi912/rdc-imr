@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import type { User, IncentiveClaim, Author } from '@/types';
+import type { User, IncentiveClaim, Author, SystemSettings } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
@@ -32,7 +32,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
-import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { submitIncentiveClaim, getSystemSettings } from '@/app/actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateBookIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
@@ -379,6 +379,7 @@ export default function IncentiveClaimPage() {
   const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [membershipClaimInfo, setMembershipClaimInfo] = useState<{ canClaim: boolean; nextAvailableDate?: string }>({ canClaim: true });
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
 
   const fetchUserClaims = async (uid: string) => {
       setLoading(true);
@@ -430,10 +431,12 @@ export default function IncentiveClaimPage() {
     }
   };
   
-  const fetchAllData = (uid: string) => {
+  const fetchAllData = useCallback(async (uid: string) => {
       fetchUserClaims(uid);
       fetchCoAuthorClaims(uid);
-  }
+      const settings = await getSystemSettings();
+      setSystemSettings(settings);
+  }, []);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -444,7 +447,7 @@ export default function IncentiveClaimPage() {
     } else {
         setLoading(false);
     }
-  }, []);
+  }, [fetchAllData]);
 
   const handleViewDetails = (claim: IncentiveClaim) => {
     setSelectedClaim(claim);
@@ -494,6 +497,13 @@ export default function IncentiveClaimPage() {
       icon: Banknote,
     },
   ];
+  
+  const enabledClaimTypes = useMemo(() => {
+    if (!systemSettings?.enabledIncentiveTypes) {
+        return claimTypes; // Default to all if not set
+    }
+    return claimTypes.filter(type => systemSettings.enabledIncentiveTypes![type.title] !== false);
+  }, [systemSettings, claimTypes]);
 
 
   return (
@@ -514,7 +524,7 @@ export default function IncentiveClaimPage() {
           </TabsList>
           <TabsContent value="apply" className="mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {claimTypes.map(claim => {
+              {enabledClaimTypes.map(claim => {
                   const cardContent = (
                     <Card className={`flex flex-col w-full transition-colors ${claim.disabled ? 'bg-muted/50' : 'hover:bg-accent/50 dark:hover:bg-accent/20'}`}>
                       <CardHeader>

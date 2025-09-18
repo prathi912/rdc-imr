@@ -165,6 +165,7 @@ export type Project = {
   revisedProposalUrl?: string
   revisionSubmissionDate?: string
   revisionComments?: string
+  rejectionComments?: string;
   isBulkUploaded?: boolean
   projectStartDate?: string
   projectEndDate?: string
@@ -248,8 +249,10 @@ export type IncentiveClaim = {
   publicationYear?: string;
   publicationProofUrls?: string[];
   isPuNameInPublication?: boolean;
+  totalCorrespondingAuthors?: number;
   totalPuStudentAuthors?: number;
   puStudentNames?: string;
+  authorType?: string;
 
 
   // Patent Fields
@@ -318,7 +321,6 @@ export type IncentiveClaim = {
   travelMode?: "Bus" | "Train" | "Air" | "Other"
   travelReceiptsUrl?: string
   conferenceSelfDeclaration?: boolean
-  authorType?: string;
   totalAuthors?: string;
 
 
@@ -332,7 +334,6 @@ export type IncentiveClaim = {
   bookTotalChapters?: number
   chaptersInSameBook?: number
   publicationYear?: number
-  authorRole?: "Author" | "Editor"
   totalPuStudents?: number
   publisherName?: string
   publisherCity?: string
@@ -489,6 +490,7 @@ export type SystemSettings = {
   croAssignments?: CroAssignment[]
   incentiveApprovers?: ApproverSetting[];
   iqacEmail?: string;
+  enabledIncentiveTypes?: Record<string, boolean>;
 }
 
 export type LoginOtp = {
