@@ -1269,8 +1269,8 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
 
 export async function updateEmrFinalStatus(interestId: string, status: 'Sanctioned' | 'Not Sanctioned', proofDataUrl: string, fileName: string): Promise<{ success: boolean, error?: string }> {
     try {
-        if (!interestId || !status || !proofDataUrl) {
-            return { success: false, error: "Interest ID, status, and proof are required." };
+        if (!interestId || !status) {
+            return { success: false, error: "Interest ID and status are required." };
         }
 
         const interestRef = adminDb.collection('emrInterests').doc(interestId);
@@ -1280,18 +1280,19 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
         }
         const interest = interestSnap.data() as EmrInterest;
 
-        // Upload proof
-        const path = `emr-final-proofs/${interest.callId}/${interest.userId}/${fileName}`;
-        const uploadResult = await uploadFileToServer(proofDataUrl, path);
-        if (!uploadResult.success || !uploadResult.url) {
-            throw new Error(uploadResult.error || "Failed to upload final proof.");
+        const updateData: Partial<EmrInterest> = { status };
+
+        // Only upload file if a new one is provided
+        if (proofDataUrl && !proofDataUrl.startsWith('https://')) {
+            const path = `emr-final-proofs/${interest.callId}/${interest.userId}/${fileName}`;
+            const uploadResult = await uploadFileToServer(proofDataUrl, path);
+            if (!uploadResult.success || !uploadResult.url) {
+                throw new Error(uploadResult.error || "Failed to upload final proof.");
+            }
+            updateData.finalProofUrl = uploadResult.url;
         }
 
-        // Update interest document
-        await interestRef.update({
-            status,
-            finalProofUrl: uploadResult.url,
-        });
+        await interestRef.update(updateData);
 
         // Notify Super Admins
         const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();

@@ -34,7 +34,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { updateEmrFinalStatus, updateEmrInterestCoPis } from '@/app/emr-actions';
+import { updateEmrFinalStatus, updateEmrInterestCoPis, updateEmrInterestDetails } from '@/app/emr-actions';
 import { findUserByMisId } from '@/app/userfinding';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -74,6 +74,7 @@ const EMR_EXPORT_COLUMNS = [
 const editEmrSchema = z.object({
     status: z.enum(['Sanctioned', 'Not Sanctioned'], { required_error: 'Please select a final status.' }),
     finalProof: z.any().optional(),
+    sanctionDate: z.date().optional(),
 });
 
 function EditEmrProjectDialog({ interest, isOpen, onOpenChange, onActionComplete }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onActionComplete: () => void; }) {
@@ -89,6 +90,7 @@ function EditEmrProjectDialog({ interest, isOpen, onOpenChange, onActionComplete
         resolver: zodResolver(editEmrSchema),
         defaultValues: {
             status: interest.status === 'Sanctioned' || interest.status === 'Not Sanctioned' ? interest.status : undefined,
+            sanctionDate: interest.sanctionDate ? parseISO(interest.sanctionDate) : undefined,
         }
     });
 
@@ -135,25 +137,29 @@ function EditEmrProjectDialog({ interest, isOpen, onOpenChange, onActionComplete
     const handleSave = async (values: z.infer<typeof editEmrSchema>) => {
         setIsSubmitting(true);
         try {
+            // First, update Co-PIs
             const coPiResult = await updateEmrInterestCoPis(interest.id, coPiList);
-            if (!coPiResult.success) {
-                throw new Error(coPiResult.error);
-            }
+            if (!coPiResult.success) throw new Error(coPiResult.error);
 
+            // Then, update status, proof, and sanction date
             const proofFile = values.finalProof?.[0];
+            let proofDataUrl: string | undefined = interest.finalProofUrl;
+            let fileName: string = 'existing_proof.pdf';
+
             if (proofFile) {
-                const dataUrl = await fileToDataUrl(proofFile);
-                const statusResult = await updateEmrFinalStatus(interest.id, values.status, dataUrl, proofFile.name);
-                if (!statusResult.success) {
-                    throw new Error(statusResult.error);
-                }
-            } else if (values.status !== interest.status && interest.finalProofUrl) {
-                // If status is changed but no new file, it implies proof is already there or not needed.
-                // We should probably have a separate action just for status, but for now this is a simple path.
-                // For safety, let's just assume this means "update status".
-                // A better implementation would separate these concerns.
-                 const statusResult = await updateEmrFinalStatus(interest.id, values.status, interest.finalProofUrl, 'existing_proof.pdf');
-                 if (!statusResult.success) throw new Error(statusResult.error);
+                proofDataUrl = await fileToDataUrl(proofFile);
+                fileName = proofFile.name;
+            }
+            
+            if (proofDataUrl) {
+                const statusResult = await updateEmrFinalStatus(interest.id, values.status, proofDataUrl, fileName);
+                if (!statusResult.success) throw new Error(statusResult.error);
+            }
+            
+            // Finally, update other details like sanction date
+            if (values.sanctionDate) {
+                const detailsResult = await updateEmrInterestDetails(interest.id, { sanctionDate: values.sanctionDate.toISOString() });
+                 if (!detailsResult.success) throw new Error(detailsResult.error);
             }
 
             toast({ title: 'Success', description: 'EMR project details updated.' });
@@ -201,6 +207,16 @@ function EditEmrProjectDialog({ interest, isOpen, onOpenChange, onActionComplete
                                     </FormItem>
                                 )}
                             />
+                             <FormField
+                                name="sanctionDate"
+                                control={form.control}
+                                render={({ field }) => ( 
+                                <FormItem className="flex flex-col">
+                                    <FormLabel>Date of Sanction</FormLabel>
+                                    <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
+                                    <FormMessage />
+                                </FormItem> 
+                            )} />
                              <FormField
                                 name="finalProof"
                                 control={form.control}
@@ -568,7 +584,7 @@ export default function AllProjectsPage() {
                          <Card>
                             <CardContent className="pt-6">
                                 <Table>
-                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Sanction Date</TableHead><TableHead>Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                                     <TableBody>{filteredEmrProjects.map(p => {
                                         const pi = users.find(u => u.uid === p.userId);
                                         const proofLink = p.finalProofUrl || p.proofUrl;
@@ -607,6 +623,7 @@ export default function AllProjectsPage() {
                                                 </div>
                                             </TableCell>
                                             <TableCell>{p.agency || 'N/A'}</TableCell>
+                                            <TableCell>{p.sanctionDate ? format(parseISO(p.sanctionDate), 'PPP') : 'N/A'}</TableCell>
                                             <TableCell>{p.durationAmount || 'N/A'}</TableCell>
                                             <TableCell className="flex items-center gap-2">
                                                 {canEditCoPis && p.isBulkUploaded && (
