@@ -389,7 +389,13 @@ export default function AllProjectsPage() {
 
   const filteredImrProjects = useMemo(() => {
     return allImrProjects.filter(project => {
-      if (statusFilter !== 'all' && project.status !== statusFilter) return false;
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'Recommended') {
+          if (!['Recommended', 'Sanctioned', 'SANCTIONED'].includes(project.status)) return false;
+        } else if (project.status !== statusFilter) {
+          return false;
+        }
+      }
       if (facultyFilter.length > 0 && !facultyFilter.includes(project.faculty)) return false;
       if (!searchTerm) return true;
       const lowerCaseSearch = searchTerm.toLowerCase();
