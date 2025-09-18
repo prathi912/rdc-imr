@@ -535,9 +535,13 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     }
     const project = projectSnap.data() as Project
 
-    const updateData: { status: Project["status"]; revisionComments?: string } = { status: newStatus }
-    if (newStatus === "Revision Needed" && comments) {
-      updateData.revisionComments = comments
+    const updateData: { [key: string]: any } = { status: newStatus }
+    if (comments) {
+      if (newStatus === "Revision Needed") {
+        updateData.revisionComments = comments
+      } else if (newStatus === "Not Recommended") {
+        updateData.rejectionComments = comments
+      }
     }
 
     await projectRef.update(updateData)
@@ -562,16 +566,17 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
         </p>
     `
 
-    if (newStatus === "Revision Needed" && comments) {
+    if (comments) {
+      const reasonTitle = newStatus === 'Revision Needed' ? "Evaluator's Comments for Revision:" : "Reason for Decision:";
       emailHtml += `
           <div style="margin-top:20px; padding:15px; border:1px solid #4f5b62; border-radius:6px; background-color:#2c3e50;">
-            <h4 style="color:#ffffff; margin-top:0;">Evaluator's Comments for Revision:</h4>
+            <h4 style="color:#ffffff; margin-top:0;">${reasonTitle}</h4>
             <p style="color:#e0e0e0; white-space: pre-wrap;">${comments}</p>
           </div>
-          <p style="color:#e0e0e0; margin-top:20px;">
-            Please submit the revised proposal from your project details page on the portal.
-          </p>
         `
+      if (newStatus === 'Revision Needed') {
+         emailHtml += `<p style="color:#e0e0e0; margin-top:20px;">Please submit the revised proposal from your project details page on the portal.</p>`
+      }
     }
 
     emailHtml += `
@@ -605,6 +610,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     return { success: false, error: error.message || "Failed to update status." }
   }
 }
+
 
 export async function updateIncentiveClaimStatus(claimId: string, newStatus: IncentiveClaim["status"]) {
   try {
@@ -2021,6 +2027,7 @@ export async function markImrAttendance(
     
 
     
+
 
 
 

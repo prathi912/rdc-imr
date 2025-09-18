@@ -458,10 +458,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setIsUpdating(false)
 
     if (result.success) {
-      setProject({ ...project, status: newStatus })
+      setProject({ ...project, status: newStatus, ...(comments && { revisionComments: comments }) })
       toast({ title: "Success", description: `Project status updated to ${newStatus}` })
       router.refresh()
-      if (newStatus === "Revision Needed") {
+      if (newStatus === "Revision Needed" || newStatus === "Not Recommended") {
         setIsRevisionCommentDialogOpen(false)
         revisionCommentForm.reset()
       }
@@ -777,12 +777,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setProject(updatedProject)
   }
 
-  const handleApprovalClick = (status: "Sanctioned" | "Not Recommended") => {
+  const handleApprovalClick = (status: "Sanctioned" | "Not Recommended" | "Revision Needed") => {
     if (!allEvaluationsIn) {
-      setShowApprovalAlert(true)
-      return
+      setShowApprovalAlert(true);
+      return;
     }
-     if (status === "Sanctioned" && (!project.projectStartDate || !project.projectEndDate)) {
+    if (status === "Sanctioned" && (!project.projectStartDate || !project.projectEndDate)) {
         toast({
             variant: "destructive",
             title: "Action Required",
@@ -790,12 +790,19 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         });
         return;
     }
-    handleStatusUpdate(status)
-  }
+    if (status === "Revision Needed" || status === "Not Recommended") {
+        setIsRevisionCommentDialogOpen(true);
+    } else {
+        handleStatusUpdate(status);
+    }
+  };
 
   const handleRevisionCommentSubmit = (data: RevisionCommentFormData) => {
-    handleStatusUpdate("Revision Needed", data.comments)
-  }
+    // This function will now be called by a separate dialog,
+    // which will also determine the status ("Revision Needed" or "Not Recommended").
+    const statusToSet = revisionCommentForm.getValues('statusToSet'); // We need to store this temporarily
+    handleStatusUpdate(statusToSet, data.comments);
+  };
 
   const handleOpenNotingDialog = () => {
     notingForm.reset({
@@ -913,12 +920,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                            >
                               <Check className="mr-2 h-4 w-4" /> Sanction
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleApprovalClick("Not Recommended")}>
+                          <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
                             <X className="mr-2 h-4 w-4 text-destructive" />{" "}
                             <span className="text-destructive">Not Recommend</span>
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onSelect={() => setIsRevisionCommentDialogOpen(true)}>
+                          <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
                             <Edit className="mr-2 h-4 w-4" /> Request Revision
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -1186,14 +1193,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               <Separator />
             </>
           )}
-          {project.status === "Revision Needed" && project.revisionComments && (
+          {(project.status === "Revision Needed" || project.status === "Not Recommended") && (project.revisionComments || project.rejectionComments) && (
             <>
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Revision Requested</AlertTitle>
+                <AlertTitle>{project.status === "Revision Needed" ? "Revision Requested" : "Decision Feedback"}</AlertTitle>
                 <AlertDescription>
                   <p className="font-semibold mt-2">Evaluator's Comments:</p>
-                  <p className="whitespace-pre-wrap">{project.revisionComments}</p>
+                  <p className="whitespace-pre-wrap">{project.revisionComments || project.rejectionComments}</p>
                 </AlertDescription>
               </Alert>
               <Separator />
@@ -1534,16 +1541,15 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       <Dialog open={isRevisionCommentDialogOpen} onOpenChange={setIsRevisionCommentDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Revision Comments</DialogTitle>
+            <DialogTitle>Provide Comments</DialogTitle>
             <DialogDescription>
-              Please provide comments for the PI to understand what needs to be revised. This will be included in the
-              email notification.
+              Please provide comments for the PI. This will be included in the email notification.
             </DialogDescription>
           </DialogHeader>
           <Form {...revisionCommentForm}>
             <form
               id="revision-comment-form"
-              onSubmit={revisionCommentForm.handleSubmit(handleRevisionCommentSubmit)}
+              onSubmit={revisionCommentForm.handleSubmit((data) => handleStatusUpdate(revisionCommentForm.getValues('statusToSet'), data.comments))}
               className="py-4"
             >
               <FormField
@@ -1567,7 +1573,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             </Button>
             <Button type="submit" form="revision-comment-form" disabled={isUpdating}>
               {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit and Request Revision
+              Submit
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1648,7 +1654,7 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
                         <div>
                             <Label>Phase-wise Grant Amount</Label>
                             <div className="space-y-2 mt-2">
-                                {fields.map((field, index) => (
+                                {fields.map((field: any, index: number) => (
                                     <div key={field.id} className="flex items-center gap-2">
                                         <FormField control={form.control} name={`phases.${index}.name`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input {...field} placeholder={`Phase ${index + 1} Name`} /></FormControl><FormMessage /></FormItem> )} />
                                         <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input type="number" {...field} placeholder="Amount" /></FormControl><FormMessage /></FormItem> )} />
