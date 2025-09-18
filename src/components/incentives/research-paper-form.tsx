@@ -48,7 +48,7 @@ const researchPaperSchema = z
   .object({
     publicationType: z.string({ required_error: "Please select a publication type." }),
     indexType: z.enum(["wos", "scopus", "both", "esci"]).optional(),
-    relevantLink: z.string().min(1, "A valid DOI link is required."),
+    relevantLink: z.string().optional().or(z.literal("")),
     scopusLink: z.string().optional().or(z.literal("")),
     journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"]).optional(),
     wosType: z.enum(["SCIE", "SSCI", "A&HCI"]).optional(),
@@ -96,6 +96,18 @@ const researchPaperSchema = z
     puStudentNames: z.string().optional(),
     autoFetchedFields: z.array(z.string()).optional(),
   })
+  .refine(data => {
+      if (data.indexType === 'wos' || data.indexType === 'both') {
+          return !!data.relevantLink && data.relevantLink.length > 0;
+      }
+      return true;
+  }, { message: 'WoS Article Link or DOI is required for this index type.', path: ['relevantLink'] })
+  .refine(data => {
+      if (data.indexType === 'scopus' || data.indexType === 'both') {
+          return !!data.scopusLink && data.scopusLink.length > 0;
+      }
+      return true;
+  }, { message: 'Scopus Link or EID is required for this index type.', path: ['scopusLink'] })
   .refine(
     (data) => {
       if (data.indexType === "wos" || data.indexType === "both") {
