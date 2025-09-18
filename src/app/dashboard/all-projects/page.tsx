@@ -438,11 +438,12 @@ export default function AllProjectsPage() {
   };
   
   const exportEmrProjects = () => {
-      if (filteredEmrProjects.length === 0) {
+      let projectsToExport = [...filteredEmrProjects];
+      if (projectsToExport.length === 0) {
           toast({ variant: 'destructive', title: "No Data", description: "No EMR projects to export." }); return;
       }
       const usersMap = new Map(users.map(u => [u.uid, u]));
-      const dataToExport = filteredEmrProjects.map(p => {
+      const dataToExport = projectsToExport.map(p => {
           const userDetails = usersMap.get(p.userId);
           const row: { [key: string]: any } = {};
           selectedExportColumns.forEach(colId => {
@@ -455,7 +456,7 @@ export default function AllProjectsPage() {
        const workbook = XLSX.utils.book_new();
        XLSX.utils.book_append_sheet(workbook, worksheet, "EMR_Projects");
        XLSX.writeFile(workbook, `EMR_Projects_${new Date().toISOString().split('T')[0]}.xlsx`);
-       toast({ title: "Export Started", description: `Downloading ${filteredEmrProjects.length} EMR projects.` });
+       toast({ title: "Export Started", description: `Downloading ${projectsToExport.length} EMR projects.` });
   };
 
   const handleColumnSelectionChange = (columnId: string, checked: boolean) => {
