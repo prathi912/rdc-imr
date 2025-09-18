@@ -21,13 +21,14 @@ import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 
 const membershipSchema = z.object({
     professionalBodyName: z.string().min(3, 'Name of the professional body is required.'),
     membershipType: z.enum(['Lifetime', 'Yearly', 'Other'], { required_error: 'Please select a membership type.'}),
     membershipLocale: z.enum(['National', 'International'], { required_error: 'Please select the locale.'}),
     membershipNumber: z.string().min(1, 'Membership number is required.'),
-    membershipAmountPaid: z.coerce.number().positive('A valid amount is required.'),
+    membershipAmountPaid: z.coerce.number().positive('A valid positive amount is required.'),
     membershipPaymentDate: z.string().min(1, 'Payment date is required.'),
     membershipProof: z.any().refine((files) => files?.length > 0, 'Proof of membership/payment is required.'),
     membershipSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
@@ -106,8 +107,7 @@ export function MembershipForm() {
     setIsSubmitting(true);
     try {
         const data = form.getValues();
-        const claimId = doc(collection(db, 'incentiveClaims')).id;
-
+        
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
             if (!file || !user) return undefined;
             const dataUrl = await fileToDataUrl(file);
@@ -124,7 +124,7 @@ export function MembershipForm() {
         // This is the fix: create a new object without the FileList
         const { membershipProof, ...restOfData } = data;
 
-        const claimData: Omit<IncentiveClaim, 'id'> = {
+        const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
             ...restOfData,
             calculatedIncentive,
             misId: user.misId || null,
@@ -142,11 +142,14 @@ export function MembershipForm() {
 
         if (membershipProofUrl) claimData.membershipProofUrl = membershipProofUrl;
 
-        await setDoc(doc(db, 'incentiveClaims', claimId), claimData);
+        const result = await submitIncentiveClaim(claimData);
+        if (!result.success || !result.claimId) {
+            throw new Error(result.error);
+        }
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/membership?claimId=${claimId}`);
+          router.push(`/dashboard/incentive-claim/membership?claimId=${result.claimId}`);
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for membership has been submitted.' });
           router.push('/dashboard/incentive-claim');
@@ -183,7 +186,7 @@ export function MembershipForm() {
                 <FormField control={form.control} name="membershipLocale" render={({ field }) => ( <FormItem><FormLabel>Locale of Professional Body</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="National" /></FormControl><FormLabel className="font-normal">National</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="International" /></FormControl><FormLabel className="font-normal">International</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="membershipNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Membership Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField name="membershipAmountPaid" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount Paid (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10000" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    <FormField name="membershipAmountPaid" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount Paid (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10000" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
                     <FormField name="membershipPaymentDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Payment Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 </div>
                 {calculatedIncentive !== null && (

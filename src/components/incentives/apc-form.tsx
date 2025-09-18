@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
@@ -25,6 +25,7 @@ import { findUserByMisId } from '@/app/userfinding';
 import { Loader2, AlertCircle, Info, Plus, Trash2, Search } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { calculateApcIncentive } from '@/app/incentive-calculation';
 
 const authorSchema = z.object({
     name: z.string().min(2, 'Author name is required.'),
@@ -147,37 +148,20 @@ export function ApcForm() {
 
   const formValues = form.watch();
 
+   const calculate = useCallback(async () => {
+        if (!user || !user.faculty) return;
+        const result = await calculateApcIncentive(formValues, isSpecialFaculty);
+        if (result.success) {
+            setCalculatedIncentive(result.amount ?? null);
+        } else {
+            console.error("Incentive calculation failed:", result.error);
+            setCalculatedIncentive(null);
+        }
+   }, [formValues, user, isSpecialFaculty]);
+
    useEffect(() => {
-    const { apcIndexingStatus, apcQRating, apcTotalAmount, authors } = formValues;
-    
-    const internalAuthorCount = authors ? authors.filter(author => !author.isExternal).length : 0;
-    if (internalAuthorCount === 0) {
-      setCalculatedIncentive(0);
-      return;
-    }
-    
-    let maxTotalIncentive = 0;
-
-    if (apcIndexingStatus?.includes('Scopus') || apcIndexingStatus?.includes('Web of science')) {
-        switch (apcQRating) {
-            case 'Q1': maxTotalIncentive = 40000; break;
-            case 'Q2': maxTotalIncentive = 30000; break;
-            case 'Q3': maxTotalIncentive = 20000; break;
-            case 'Q4': maxTotalIncentive = 15000; break;
-        }
-    } else if (!isSpecialFaculty) {
-        if (apcIndexingStatus?.includes('UGC-CARE Group-I')) {
-            maxTotalIncentive = 5000;
-        } else if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
-            maxTotalIncentive = 8000;
-        }
-    }
-    
-    const individualIncentive = maxTotalIncentive > 0 ? maxTotalIncentive / internalAuthorCount : 0;
-    
-    setCalculatedIncentive(individualIncentive > 0 ? individualIncentive : 0);
-
-  }, [formValues, isSpecialFaculty]);
+     calculate();
+   }, [calculate]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
