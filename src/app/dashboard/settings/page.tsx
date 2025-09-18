@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import type React from "react"
@@ -35,7 +36,7 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Banknote, Bot, Loader2, ShieldCheck, Plus, X } from "lucide-react"
+import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award } from "lucide-react"
 import { Combobox } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -191,6 +192,15 @@ const goaInstitutes = [
 
 
 const salaryBanks = ["AU Bank", "HDFC Bank", "Central Bank of India"]
+
+const incentiveClaimTypes = [
+    'Research Papers',
+    'Patents',
+    'Conference Presentations',
+    'Books',
+    'Membership of Professional Bodies',
+    'Seed Money for APC'
+];
 
 const fileToDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -618,6 +628,13 @@ export default function SettingsPage() {
     }
   };
 
+  const handleIncentiveTypeToggle = async (type: string, enabled: boolean) => {
+    if (!systemSettings) return;
+    const currentSettings = systemSettings.enabledIncentiveTypes || {};
+    const newSettings = { ...currentSettings, [type]: enabled };
+    await handleSystemSettingsSave({ ...systemSettings, enabledIncentiveTypes: newSettings });
+  };
+
   const isAcademicInfoLocked = isCro || isPrincipal
 
   if (loading) {
@@ -687,6 +704,29 @@ export default function SettingsPage() {
                   disabled={isSavingSettings}
                 />
               </div>
+
+               <div className="space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center gap-2">
+                        <Award className="h-5 w-5" />
+                        <Label className="text-base">Incentive Claim Management</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                       Enable or disable specific types of incentive claims for all users.
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {incentiveClaimTypes.map(type => (
+                            <div key={type} className="flex items-center space-x-2">
+                                <Switch
+                                    id={`incentive-${type.replace(/\s+/g, '-')}`}
+                                    checked={systemSettings.enabledIncentiveTypes?.[type] !== false} // Default to true if not set
+                                    onCheckedChange={(checked) => handleIncentiveTypeToggle(type, checked)}
+                                    disabled={isSavingSettings}
+                                />
+                                <Label htmlFor={`incentive-${type.replace(/\s+/g, '-')}`}>{type}</Label>
+                            </div>
+                        ))}
+                    </div>
+                </div>
 
               <div className="space-y-4">
                 <Label className="text-base">Allowed Email Domains</Label>
@@ -1214,5 +1254,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
-    

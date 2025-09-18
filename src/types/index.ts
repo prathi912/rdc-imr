@@ -334,6 +334,7 @@ export type IncentiveClaim = {
   bookTotalChapters?: number
   chaptersInSameBook?: number
   publicationYear?: number
+  authorRole?: "Author" | "Editor"
   totalPuStudents?: number
   publisherName?: string
   publisherCity?: string

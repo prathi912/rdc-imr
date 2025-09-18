@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -457,7 +457,7 @@ export default function IncentiveClaimPage() {
   const draftClaims = userClaims.filter(c => c.status === 'Draft');
   const otherClaims = userClaims.filter(c => c.status !== 'Draft');
 
-  const claimTypes = [
+  const claimTypes = useMemo(() => [
     {
       title: 'Research Papers',
       description: 'Claim incentives for papers published in WoS/Scopus indexed journals.',
@@ -477,13 +477,13 @@ export default function IncentiveClaimPage() {
       icon: Presentation,
     },
     {
-      title: 'Books & Chapters',
+      title: 'Books',
       description: 'Claim incentives for publishing books or book chapters.',
       href: '/dashboard/incentive-claim/book',
       icon: Book,
     },
     {
-      title: 'Professional Body Memberships',
+      title: 'Membership of Professional Bodies',
       description: 'Claim 50% of the fee for one membership per year.',
       href: '/dashboard/incentive-claim/membership',
       icon: UserPlus,
@@ -496,7 +496,7 @@ export default function IncentiveClaimPage() {
       href: '/dashboard/incentive-claim/apc',
       icon: Banknote,
     },
-  ];
+  ], [membershipClaimInfo]);
   
   const enabledClaimTypes = useMemo(() => {
     if (!systemSettings?.enabledIncentiveTypes) {
