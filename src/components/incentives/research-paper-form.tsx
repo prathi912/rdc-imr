@@ -613,6 +613,13 @@ export function ResearchPaperForm() {
       const data = form.getValues()
       
       const publicationProofFiles = data.publicationProof ? Array.from(data.publicationProof as FileList) : [];
+      
+      if (status === 'Pending' && publicationProofFiles.length === 0) {
+        form.setError('publicationProof', { type: 'manual', message: 'Proof of publication is required for submission.' });
+        setIsSubmitting(false);
+        return;
+      }
+      
       const publicationProofUrls = await Promise.all(
           publicationProofFiles.map(async (file, index) => {
               const dataUrl = await fileToDataUrl(file);
