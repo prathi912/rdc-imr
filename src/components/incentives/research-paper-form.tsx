@@ -21,7 +21,7 @@ import { db } from "@/lib/config"
 import { collection, doc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import { uploadFileToServer } from "@/app/actions"
-import { findUserByMisId } from "@/app/userfinding";
+import { findUserByMisId } from '@/app/userfinding';
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit } from "lucide-react"
@@ -92,7 +92,7 @@ const researchPaperSchema = z
       const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
       return firstAuthors.length <= 1;
     }, { message: 'Only one author can be designated as the First Author.', path: ["authors"] }),
-    totalPuStudentAuthors: z.coerce.number().optional(),
+    totalPuStudentAuthors: z.coerce.number().nonnegative("Number of students cannot be negative.").optional(),
     puStudentNames: z.string().optional(),
   })
   .refine(
@@ -1154,7 +1154,7 @@ export function ResearchPaperForm() {
                       <FormItem>
                         <FormLabel>Total No. of Student Authors from PU</FormLabel>
                         <FormControl>
-                          <Input type="number" {...field} />
+                          <Input type="number" {...field} min="0" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

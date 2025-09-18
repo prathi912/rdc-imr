@@ -44,7 +44,7 @@ const apcSchema = z.object({
       const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
       return firstAuthors.length <= 1;
   }, { message: 'Only one author can be designated as the First Author.', path: ['authors'] }),
-  apcTotalStudentAuthors: z.coerce.number().optional(),
+  apcTotalStudentAuthors: z.coerce.number().nonnegative("Number of students cannot be negative.").optional(),
   apcStudentNames: z.string().optional(),
   apcJournalDetails: z.string().min(5, 'Journal details are required.'),
   apcQRating: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
@@ -452,14 +452,14 @@ export function ApcForm() {
                      <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
                 </div>
 
-                <FormField name="apcTotalStudentAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Number of Student authors</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="apcTotalStudentAuthors" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Number of Student authors</FormLabel><FormControl><Input type="number" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcStudentNames" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Names of Student Authors</FormLabel><FormControl><Textarea placeholder="Comma-separated list of student names" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcJournalDetails" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Details of the Journal</FormLabel><FormControl><Textarea placeholder="Name, Vol, Page No., Year, DOI" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcJournalWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Journal Website</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcIssnNo" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISSN No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcIndexingStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Indexing/Listing status of the Journal</FormLabel>{availableIndexingStatuses.map(item => (<FormField key={item} control={form.control} name="apcIndexingStatus" render={({ field }) => ( <FormItem key={item} className="flex flex-row items-start space-x-3 space-y-0"><FormControl><Checkbox checked={field.value?.includes(item)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), item]) : field.onChange(field.value?.filter(value => value !== item)); }} /></FormControl><FormLabel className="font-normal">{item}</FormLabel></FormItem> )} />))}<FormMessage /></FormItem> )} />
                 <FormField name="apcQRating" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Q Rating of the Journal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Q Rating" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Q1">Q1</SelectItem><SelectItem value="Q2">Q2</SelectItem><SelectItem value="Q3">Q3</SelectItem><SelectItem value="Q4">Q4</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
-                <FormField name="apcSciImpactFactor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>SCI Impact Factor</FormLabel><FormControl><Input type="number" step="any" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="apcSciImpactFactor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>SCI Impact Factor</FormLabel><FormControl><Input type="number" step="any" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcPuNameInPublication" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Is "PU" name present in the publication?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
                 <FormField name="apcPublicationProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Publication Attached</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
             </div>
@@ -470,8 +470,8 @@ export function ApcForm() {
                 <FormField name="apcApcWaiverRequested" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Whether APC waiver was requested</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
                 {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>If yes, give proof</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField name="apcTotalAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total amount of APC (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                  <FormField name="apcAmountClaimed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount claimed (INR)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField name="apcTotalAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total amount of APC (INR)</FormLabel><FormControl><Input type="number" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
+                  <FormField name="apcAmountClaimed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount claimed (INR)</FormLabel><FormControl><Input type="number" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
                 </div>
                  {calculatedIncentive !== null && (
                     <div className="p-4 bg-secondary rounded-md">
