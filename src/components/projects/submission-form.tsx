@@ -301,10 +301,19 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         return;
       }
     }
+    
+    const data = form.getValues();
+    if (status === 'Draft' && (!data.title || data.title.trim() === '')) {
+        toast({
+            variant: 'destructive',
+            title: 'Title Required',
+            description: 'Please enter a project title before saving a draft.',
+        });
+        return;
+    }
 
     setIsSaving(true);
     setProgress(5);
-    const data = form.getValues();
 
     try {
       let projectId = project?.id || doc(collection(db, 'projects')).id;
