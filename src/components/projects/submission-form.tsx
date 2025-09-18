@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle, ChevronDown, Upload, X } from 'lucide-react';
+import { GanttChartSquare, Microscope, Users, FileText, Loader2, AlertCircle, ChevronDown, Upload, X, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { User, Project, CoPiDetails } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -595,7 +595,15 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
                   control={form.control}
                   render={({ field: { value, onChange, ...fieldProps } }) => (
                     <FormItem>
-                      <FormLabel>Project Proposal (PDF)<span className="text-destructive"> *</span></FormLabel>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Project Proposal (PDF)<span className="text-destructive"> *</span></FormLabel>
+                        <Button asChild variant="outline" size="sm">
+                          <a href="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Sample%20Template%20IMR%20PPT.pptx" download>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download Template
+                          </a>
+                        </Button>
+                      </div>
                        {project?.proposalUrl && <p className="text-xs text-muted-foreground">Existing file: <a href={project.proposalUrl} target="_blank" className="underline" rel="noreferrer">View Uploaded Proposal</a>. Uploading a new file will replace it.</p>}
                       <FormControl>
                         <Input {...fieldProps} type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} />
