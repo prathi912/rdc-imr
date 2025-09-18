@@ -941,20 +941,25 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                           <DropdownMenuItem onClick={() => handleApprovalClick("Recommended")}>
-                             <Check className="mr-2 h-4 w-4" /> Recommended
-                           </DropdownMenuItem>
-                           <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
-                             <X className="mr-2 h-4 w-4 text-destructive" />{" "}
-                             <span className="text-destructive">Not Recommend</span>
-                           </DropdownMenuItem>
-                           <DropdownMenuSeparator />
-                           <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
-                             <Edit className="mr-2 h-4 w-4" /> Request Revision
-                           </DropdownMenuItem>
-                           <DropdownMenuItem onSelect={() => handleStatusUpdate("Completed")}>
-                             <FileCheck2 className="mr-2 h-4 w-4" /> Mark as Completed
-                           </DropdownMenuItem>
+                           {project.status !== "Recommended" && (
+                             <DropdownMenuItem onClick={() => handleApprovalClick("Recommended")}>
+                               <Check className="mr-2 h-4 w-4" /> Recommended
+                             </DropdownMenuItem>
+                           )}
+                           {project.status !== "Not Recommended" && (
+                             <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
+                               <X className="mr-2 h-4 w-4 text-destructive" />{" "}
+                               <span className="text-destructive">Not Recommend</span>
+                             </DropdownMenuItem>
+                           )}
+                           {project.status !== "Revision Needed" && (
+                             <>
+                               <DropdownMenuSeparator />
+                               <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
+                                 <Edit className="mr-2 h-4 w-4" /> Request Revision
+                               </DropdownMenuItem>
+                             </>
+                           )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
