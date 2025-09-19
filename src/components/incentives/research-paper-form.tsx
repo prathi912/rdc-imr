@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
@@ -709,19 +708,19 @@ export function ResearchPaperForm() {
 
   if (currentStep === 2) {
     return (
-      <Card>
-        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
-          <CardContent className="pt-6">
-            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
-          </CardContent>
-          <CardFooter>
-            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
-            </Button>
-          </CardFooter>
-        </form>
-      </Card>
+        <Card>
+            <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+                <CardContent className="pt-6">
+                    <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+                    </Button>
+                </CardFooter>
+            </form>
+        </Card>
     );
   }
 
@@ -1096,7 +1095,7 @@ export function ResearchPaperForm() {
                       </div>
                       <div className="flex items-center gap-2 w-full md:w-auto">
                         <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
-                            <SelectTrigger className="w-full md:w-[180px] h-9"><SelectValue placeholder="Select role" /></SelectTrigger>
+                            <SelectTrigger className="w-full md:w-[180px] h-9 text-xs"><SelectValue placeholder="Select role" /></SelectTrigger>
                             <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                         </Select>
                         {field.email.toLowerCase() !== user?.email.toLowerCase() && (
