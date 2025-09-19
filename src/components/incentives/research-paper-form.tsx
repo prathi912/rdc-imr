@@ -324,6 +324,7 @@ export function ResearchPaperForm() {
       totalPuStudentAuthors: 0,
       puStudentNames: '',
       autoFetchedFields: [],
+      authorPosition: '1st',
     },
   })
 
@@ -928,6 +929,8 @@ export function ResearchPaperForm() {
                     )}
                   />
                 )}
+                
+                <Separator />
                 <FormField
                   control={form.control}
                   name="publicationType"
@@ -952,7 +955,6 @@ export function ResearchPaperForm() {
                     </FormItem>
                   )}
                 />
-                <Separator />
                 <FormField
                   control={form.control}
                   name="journalName"
