@@ -90,13 +90,13 @@ const researchPaperSchema = z
           return !!data.relevantLink && data.relevantLink.length > 0;
       }
       return true;
-  }, { message: 'WoS Article Link or DOI is required for this index type.', path: ['relevantLink'] })
+  }, { message: 'WoS Link or DOI is required for this index type.', path: ['relevantLink'] })
  .refine(data => {
       if (data.indexType === 'scopus' || data.indexType === 'both') {
           return !!data.scopusLink && data.scopusLink.length > 0;
       }
       return true;
-  }, { message: 'Scopus Link or EID is required for this index type.', path: ['scopusLink'] })
+  }, { message: 'Scopus Link or DOI is required for this index type.', path: ['scopusLink'] })
   .refine(
     (data) => {
       if (data.indexType === "wos" || data.indexType === "both") {
@@ -465,7 +465,7 @@ export function ResearchPaperForm() {
   const handleFetchScopusData = async () => {
     const link = form.getValues('scopusLink');
     if (!link) {
-      toast({ variant: 'destructive', title: 'No Scopus Link', description: 'Please enter a Scopus article link to fetch data.' });
+      toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a Scopus article link or DOI to fetch data.' });
       return;
     }
     if (!user) {
@@ -504,7 +504,7 @@ export function ResearchPaperForm() {
   const handleFetchWosData = async () => {
     const link = form.getValues('relevantLink');
     if (!link) {
-      toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a WoS article link to fetch data.' });
+      toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a WoS article link or DOI to fetch data.' });
       return;
     }
     if (!user) {
@@ -846,10 +846,10 @@ export function ResearchPaperForm() {
                       name="scopusLink"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Scopus Link or EID</FormLabel>
+                          <FormLabel>Scopus Link or DOI</FormLabel>
                           <div className="flex items-center gap-2">
                               <FormControl>
-                                  <Input placeholder="Enter Scopus URL or EID" {...field} disabled={isSubmitting} />
+                                  <Input placeholder="Enter Scopus URL or DOI" {...field} disabled={isSubmitting} />
                               </FormControl>
                               <Button
                                   type="button"
@@ -874,7 +874,7 @@ export function ResearchPaperForm() {
                       name="relevantLink"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>WoS Article Link or DOI</FormLabel>
+                          <FormLabel>WoS Link or DOI</FormLabel>
                           <div className="flex items-center gap-2">
                             <FormControl>
                               <Input placeholder="Enter WoS URL or DOI" {...field} disabled={isSubmitting} />
@@ -895,30 +895,6 @@ export function ResearchPaperForm() {
                       )}
                     />
                 )}
-                 <FormField
-                  control={form.control}
-                  name="publicationType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type of Publication</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select publication type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {publicationTypes.map((o) => (
-                            <SelectItem key={o} value={o}>
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 {(indexType === "wos" || indexType === "both") && (
                   <FormField
                     control={form.control}
@@ -957,6 +933,30 @@ export function ResearchPaperForm() {
                     )}
                   />
                 )}
+                 <FormField
+                  control={form.control}
+                  name="publicationType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type of Publication</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select publication type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {publicationTypes.map((o) => (
+                            <SelectItem key={o} value={o}>
+                              {o}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Separator />
                 <FormField
                   control={form.control}
