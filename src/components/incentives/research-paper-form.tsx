@@ -85,18 +85,8 @@ const researchPaperSchema = z
     puStudentNames: z.string().optional(),
     autoFetchedFields: z.array(z.string()).optional(),
   })
- .refine(data => {
-      if (data.indexType === 'wos' || data.indexType === 'both') {
-          return !!data.relevantLink && data.relevantLink.length > 0;
-      }
-      return true;
-  }, { message: 'WoS Link or DOI is required for this index type.', path: ['relevantLink'] })
- .refine(data => {
-      if (data.indexType === 'scopus' || data.indexType === 'both') {
-          return !!data.scopusLink && data.scopusLink.length > 0;
-      }
-      return true;
-  }, { message: 'Scopus Link or DOI is required for this index type.', path: ['scopusLink'] })
+ .refine(data => !(data.indexType === 'wos' || data.indexType === 'both') || (!!data.relevantLink && data.relevantLink.length > 0), { message: 'WoS Link or DOI is required for this index type.', path: ['relevantLink'] })
+ .refine(data => !(data.indexType === 'scopus' || data.indexType === 'both') || (!!data.scopusLink && data.scopusLink.length > 0), { message: 'Scopus Link or DOI is required for this index type.', path: ['scopusLink'] })
   .refine(
     (data) => {
       if (data.indexType === "wos" || data.indexType === "both") {
@@ -1321,7 +1311,7 @@ export function ResearchPaperForm() {
                 type="button"
                 variant="outline"
                 onClick={() => handleSave("Draft")}
-                disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}
+                disabled={isSubmitting}
               >
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Save as Draft
