@@ -21,7 +21,6 @@ import { db } from "@/lib/config"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import { uploadFileToServer } from "@/app/actions"
-import { findUserByMisId } from '@/app/userfinding';
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit } from "lucide-react"
@@ -291,7 +290,7 @@ export function ResearchPaperForm() {
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false)
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false)
   const [coPiSearchTerm, setCoPiSearchTerm] = useState("")
-  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string } | null>(null)
+  const [foundCoPis, setFoundCoPis] = useState<{ uid: string; name: string; email: string; misId: string }[]>([]);
   const [isSearching, setIsSearching] = useState(false)
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [externalAuthorName, setExternalAuthorName] = useState('');
@@ -496,41 +495,43 @@ export function ResearchPaperForm() {
   };
 
 
-  const handleSearchCoPi = async () => {
-    if (!coPiSearchTerm) return
-    setIsSearching(true)
-    setFoundCoPi(null)
-    try {
-      const result = await findUserByMisId(coPiSearchTerm)
-      if (result.success && result.users && result.users.length > 0) {
-        const user = result.users[0]
-        setFoundCoPi({ ...user })
-      } else {
-        toast({ variant: "destructive", title: "User Not Found", description: result.error })
-      }
-    } catch (error) {
-      toast({ variant: "destructive", title: "Search Failed", description: "An error occurred while searching." })
-    } finally {
-      setIsSearching(false)
+  const handleSearchCoPi = async (name: string) => {
+    if (name.length < 3) {
+      setFoundCoPis([]);
+      return;
     }
-  }
+    setIsSearching(true);
+    try {
+        const res = await fetch(`/api/find-users-by-name?name=${encodeURIComponent(name)}`);
+        const result = await res.json();
+        if (result.success && result.users) {
+            setFoundCoPis(result.users);
+        } else {
+            setFoundCoPis([]);
+        }
+    } catch (error) {
+        toast({ variant: "destructive", title: "Search Failed", description: "An error occurred while searching." });
+    } finally {
+        setIsSearching(false);
+    }
+  };
 
-  const handleAddCoPi = () => {
-    if (foundCoPi && !fields.some((field) => field.email.toLowerCase() === foundCoPi.email.toLowerCase())) {
-      if (user && foundCoPi.email.toLowerCase() === user.email.toLowerCase()) {
+  const handleAddCoPi = (coPi: { uid: string; name: string; email: string; misId: string; }) => {
+    if (coPi && !fields.some((field) => field.email.toLowerCase() === coPi.email.toLowerCase())) {
+      if (user && coPi.email.toLowerCase() === user.email.toLowerCase()) {
         toast({ variant: "destructive", title: "Cannot Add Self", description: "You cannot add yourself again." })
         return
       }
       append({
-        name: foundCoPi.name,
-        email: foundCoPi.email,
-        uid: foundCoPi.uid,
+        name: coPi.name,
+        email: coPi.email,
+        uid: coPi.uid,
         role: "Co-Author",
         isExternal: false,
         status: 'pending'
       })
     }
-    setFoundCoPi(null)
+    setFoundCoPis([])
     setCoPiSearchTerm("")
   }
 
@@ -1110,30 +1111,32 @@ export function ResearchPaperForm() {
                     </div>
                   ))}
                   <div className="space-y-4">
-                    <div className="space-y-2">
+                    <div className="space-y-2 p-3">
                         <FormLabel className="text-sm">Add Internal Co-Author</FormLabel>
                         <div className="flex items-center gap-2">
-                          <Input
-                            placeholder="Search by Co-PI's MIS ID"
-                            value={coPiSearchTerm}
-                            onChange={(e) => setCoPiSearchTerm(e.target.value)}
-                          />
-                          <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
-                            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-                          </Button>
+                            <Input
+                                placeholder="Search by Co-Author's Name"
+                                value={coPiSearchTerm}
+                                onChange={(e) => {
+                                    setCoPiSearchTerm(e.target.value);
+                                    handleSearchCoPi(e.target.value);
+                                }}
+                            />
                         </div>
-                        {foundCoPi && (
-                          <div className="flex items-center justify-between p-2 border rounded-md mt-2">
-                            <div>
-                              <p className="text-sm">{foundCoPi.name}</p>
+                        {isSearching && <div className="text-sm text-muted-foreground">Searching...</div>}
+                        {foundCoPis.length > 0 && (
+                            <div className="relative">
+                                <div className="absolute w-full bg-card border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                                    {foundCoPis.map(coPi => (
+                                        <div key={coPi.uid} className="p-2 hover:bg-muted cursor-pointer" onClick={() => handleAddCoPi(coPi)}>
+                                            {coPi.name} ({coPi.misId})
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                            <Button type="button" size="sm" onClick={handleAddCoPi}>
-                              Add
-                            </Button>
-                          </div>
                         )}
                     </div>
-                     <div className="space-y-2">
+                     <div className="space-y-2 p-3">
                         <FormLabel className="text-sm">Add External Co-Author</FormLabel>
                          <div className="flex flex-col md:flex-row gap-2 mt-1">
                             <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
