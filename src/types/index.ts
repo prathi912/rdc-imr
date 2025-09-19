@@ -221,6 +221,7 @@ export type IncentiveClaim = {
   finalApprovedAmount?: number;
   approvals?: ApprovalStage[];
   autoFetchedFields?: (keyof IncentiveClaim)[];
+  paperId?: string; // Link to the entry in the 'papers' collection
 
   // Main selector
   claimType: string

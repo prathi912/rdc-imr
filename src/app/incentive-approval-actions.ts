@@ -74,6 +74,16 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
             authorUids: (claimData.authors || []).map(a => a.uid).filter(Boolean) as string[],
         };
 
+        // If it's a research paper, try to find the corresponding paper in the `papers` collection
+        if (claimData.claimType === 'Research Papers' && claimData.paperTitle && claimData.relevantLink) {
+            const papersRef = adminDb.collection('papers');
+            const q = papersRef.where('url', '==', claimData.relevantLink).limit(1);
+            const paperSnap = await q.get();
+            if (!paperSnap.empty) {
+                finalClaimData.paperId = paperSnap.docs[0].id;
+            }
+        }
+
         await newClaimRef.set(finalClaimData);
 
         // Send notifications to co-authors if it's not a draft

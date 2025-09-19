@@ -2,7 +2,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import type { ResearchPaper, Author, User, Notification } from '@/types';
+import type { ResearchPaper, Author, User, Notification, IncentiveClaim } from '@/types';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getResearchDomainSuggestion } from '@/ai/flows/research-domain-suggestion';
 import admin from 'firebase-admin';
@@ -234,6 +234,15 @@ export async function deleteResearchPaper(paperId: string, userId: string): Prom
 
     if (paperData.mainAuthorUid !== userId) {
       return { success: false, error: "You do not have permission to delete this paper." };
+    }
+
+    // Check for associated incentive claims
+    const claimsRef = adminDb.collection('incentiveClaims');
+    const claimsQuery = claimsRef.where('paperId', '==', paperId).limit(1);
+    const claimsSnapshot = await claimsQuery.get();
+
+    if (!claimsSnapshot.empty) {
+        return { success: false, error: "This paper cannot be deleted because it is linked to an incentive claim." };
     }
 
     await paperRef.delete();
