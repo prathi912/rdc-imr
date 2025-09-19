@@ -235,13 +235,15 @@ export type IncentiveClaim = {
   // Research Paper Fields
   publicationType?: string;
   indexType?: "wos" | "scopus" | "both" | "esci";
+  doi?: string;
+  scopusLink?: string;
+  wosLink?: string;
   journalClassification?: "Q1" | "Q2" | "Q3" | "Q4" | "Nature/Science/Lancet" | "Top 1% Journals";
   wosType?: "SCIE" | "SSCI" | "A&HCI";
   journalName?: string;
   journalWebsite?: string;
   paperTitle?: string;
   relevantLink?: string;
-  scopusLink?: string;
   authorPosition?: '1st' | '2nd' | '3rd' | '4th' | '5th' | '6th';
   locale?: 'National' | 'International';
   printIssn?: string;

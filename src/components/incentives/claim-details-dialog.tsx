@@ -188,8 +188,9 @@ a.href = url;
                            <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle, "paperTitle")}
-                            {renderLinkDetail("DOI Link", claim.relevantLink)}
+                            {renderDetail("DOI", claim.doi)}
                             {renderLinkDetail("Scopus Link", claim.scopusLink)}
+                            {renderLinkDetail("WoS Link", claim.wosLink)}
                             {renderDetail("Publication Type", claim.publicationType, "publicationType")}
                             {renderDetail("Index Type", claim.indexType?.toUpperCase(), "indexType")}
                             {renderDetail("WoS Type", claim.wosType, "wosType")}
