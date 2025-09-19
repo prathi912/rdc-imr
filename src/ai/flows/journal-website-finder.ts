@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview This file defines a Genkit flow for finding a journal's official website.
- * It first attempts to find the journal on Springer Nature, and if not found, falls back to a general AI search.
+ * It first attempts to find the journal on Springer Nature, then ScienceDirect, and if not found, falls back to a general AI search.
  * - findJournalWebsite - A function that takes a journal name and returns its likely official website URL.
  * - JournalWebsiteInput - The input type for the function.
  * - JournalWebsiteOutput - The return type for the function.
@@ -25,7 +25,7 @@ export async function findJournalWebsite(input: JournalWebsiteInput): Promise<Jo
   return journalWebsiteFlow(input);
 }
 
-// This prompt is a fallback if the Springer Nature API doesn't yield a result.
+// This prompt is a fallback if the APIs don't yield a result.
 const prompt = ai.definePrompt({
   name: 'journalWebsitePrompt',
   input: {schema: JournalWebsiteInputSchema},
@@ -44,8 +44,8 @@ const journalWebsiteFlow = ai.defineFlow(
     outputSchema: JournalWebsiteOutputSchema,
   },
   async (input) => {
+    // --- 1. Try Springer Nature API ---
     const springerApiKey = process.env.SPRINGER_API_KEY;
-
     if (springerApiKey) {
       try {
         const url = `https://api.springernature.com/meta/v2/json?q=journal:"${encodeURIComponent(
@@ -55,9 +55,7 @@ const journalWebsiteFlow = ai.defineFlow(
         
         if (response.ok) {
           const data = await response.json();
-          // Check for records and a valid URL in the first record
           if (data.records && data.records.length > 0 && data.records[0].url && data.records[0].url.length > 0) {
-            // Find the URL for the 'springerlink' platform. This is more reliable than checking the 'format' field, which can be inconsistent.
             const springerUrl = data.records[0].url.find((u: { platform: string; value: string; }) => u.platform === 'springerlink');
             if (springerUrl && springerUrl.value) {
                 return { websiteUrl: springerUrl.value };
@@ -65,12 +63,36 @@ const journalWebsiteFlow = ai.defineFlow(
           }
         }
       } catch (e) {
-        console.error("Error fetching from Springer Nature API, falling back to general AI search.", e);
-        // Fallthrough to the generic AI search
+        console.error("Error fetching from Springer Nature API, falling back.", e);
       }
     }
     
-    // Fallback to generic AI search if Springer API key is missing, call fails, or no result found
+    // --- 2. Try ScienceDirect (Elsevier) API ---
+    const scopusApiKey = process.env.SCOPUS_API_KEY;
+    if (scopusApiKey) {
+        try {
+            const url = `https://api.elsevier.com/content/metadata/article?query=src-title(${encodeURIComponent(input.journalName)})&count=1&httpAccept=application/json&apiKey=${scopusApiKey}`;
+            const response = await fetch(url);
+
+            if (response.ok) {
+                const data = await response.json();
+                const firstResult = data?.['search-results']?.entry?.[0];
+                if (firstResult && firstResult['prism:url']) {
+                    // The URL points to the article, but we can derive the journal from it.
+                    // A typical URL is like: https://api.elsevier.com/content/article/pii/S000287032400192X
+                    // We will return the ScienceDirect page for the journal by linking to its publication name.
+                    const pubName = firstResult['prism:publicationName'];
+                    if (pubName) {
+                        return { websiteUrl: `https://www.sciencedirect.com/journal/${pubName.replace(/\s+/g, '-')}` };
+                    }
+                }
+            }
+        } catch(e) {
+            console.error("Error fetching from ScienceDirect API, falling back.", e);
+        }
+    }
+
+    // --- 3. Fallback to generic AI search ---
     const {output} = await prompt(input);
     return output!;
   }
