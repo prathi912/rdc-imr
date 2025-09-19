@@ -43,6 +43,7 @@ import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle, Info } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
+import { calculateConferenceIncentive } from '@/app/incentive-calculation';
 
 const conferenceSchema = z
   .object({
@@ -150,61 +151,26 @@ export function ConferenceForm() {
       travelPlaceVisited: '',
       travelMode: undefined,
       travelReceipts: undefined,
+      flightTickets: undefined,
       conferenceSelfDeclaration: false,
     },
   });
   
   const formValues = form.watch();
 
-  useEffect(() => {
-    const {
-      conferenceType,
-      conferenceVenue,
-      presentationType,
-      conferenceMode,
-      registrationFee,
-      travelFare,
-      onlinePresentationOrder,
-      organizerName,
-    } = formValues;
-
-    const totalExpenses = (registrationFee || 0) + (travelFare || 0);
-    let maxReimbursement = 0;
-
-    if (organizerName?.toLowerCase().includes('parul university')) {
-      maxReimbursement = (registrationFee || 0) * 0.75;
-    } else if (conferenceMode === 'Online') {
-      const regFee = registrationFee || 0;
-      switch (onlinePresentationOrder) {
-        case 'First': maxReimbursement = Math.min(regFee * 0.75, 15000); break;
-        case 'Second': maxReimbursement = Math.min(regFee * 0.60, 10000); break;
-        case 'Third': maxReimbursement = Math.min(regFee * 0.50, 7000); break;
-        case 'Additional': maxReimbursement = Math.min(regFee * 0.30, 2000); break;
-      }
-    } else if (conferenceMode === 'Offline') {
-      if (conferenceType === 'International') {
-        switch (conferenceVenue) {
-          case 'Indian Subcontinent': maxReimbursement = 30000; break;
-          case 'South Korea, Japan, Australia and Middle East': maxReimbursement = 45000; break;
-          case 'Europe': maxReimbursement = 60000; break;
-          case 'African/South American/North American': maxReimbursement = 75000; break;
-          case 'India':
-            maxReimbursement = presentationType === 'Oral' ? 20000 : 15000;
-            break;
-          case 'Other':
-            maxReimbursement = 75000; // Defaulting to max for "Other" international
-            break;
+   const calculate = useCallback(async () => {
+        const result = await calculateConferenceIncentive(formValues);
+        if (result.success) {
+            setCalculatedIncentive(result.amount ?? null);
+        } else {
+            console.error("Incentive calculation failed:", result.error);
+            setCalculatedIncentive(null);
         }
-      } else if (conferenceType === 'National') {
-        maxReimbursement = presentationType === 'Oral' ? 12000 : 10000;
-      } else if (conferenceType === 'Regional/State') {
-        maxReimbursement = 7500;
-      }
-    }
-    
-    setCalculatedIncentive(Math.min(totalExpenses, maxReimbursement));
+    }, [formValues]);
 
-  }, [formValues]);
+  useEffect(() => {
+    calculate();
+  }, [calculate]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -221,22 +187,26 @@ export function ConferenceForm() {
               claimsRef, 
               where('uid', '==', parsedUser.uid), 
               where('claimType', '==', 'Conference Presentations'),
-              where('conferenceMode', '==', 'Offline'),
               where('status', 'in', ['Accepted', 'Submitted to Accounts', 'Payment Completed']),
               orderBy('submissionDate', 'desc')
           );
           const snapshot = await getDocs(q);
           if (!snapshot.empty) {
-              const lastClaim = snapshot.docs[0].data() as IncentiveClaim;
-              const lastClaimDate = parseISO(lastClaim.submissionDate);
-              const twoYearsAgo = addYears(new Date(), -2);
+              const lastPuConferenceClaim = snapshot.docs
+                  .map(doc => doc.data() as IncentiveClaim)
+                  .find(claim => claim.organizerName?.toLowerCase().includes('parul university') || claim.conferenceName?.toLowerCase().includes('picet'));
 
-              if (lastClaimDate > twoYearsAgo) {
-                  const nextDate = addYears(lastClaimDate, 2);
-                  setEligibility({
-                      eligible: false,
-                      nextAvailableDate: format(nextDate, 'PPP'),
-                  });
+              if (lastPuConferenceClaim) {
+                  const lastClaimDate = parseISO(lastPuConferenceClaim.submissionDate);
+                  const oneYearAgo = addYears(new Date(), -1);
+
+                  if (lastClaimDate > oneYearAgo) {
+                      const nextDate = addYears(lastClaimDate, 1);
+                      setEligibility({
+                          eligible: false,
+                          nextAvailableDate: format(nextDate, 'PPP'),
+                      });
+                  }
               }
           }
       };
@@ -249,6 +219,9 @@ export function ConferenceForm() {
   const conferenceMode = form.watch('conferenceMode');
   const travelMode = form.watch('travelMode');
   const wonPrize = form.watch('wonPrize');
+  const organizerName = form.watch('organizerName');
+  const conferenceName = form.watch('conferenceName');
+  const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -331,7 +304,7 @@ export function ConferenceForm() {
     }
   }
 
-  const isFormDisabled = (!eligibility.eligible && form.watch('conferenceMode') === 'Offline') || isSubmitting;
+  const isFormDisabled = (!eligibility.eligible && isPuConference) || isSubmitting;
 
 
   return (
@@ -350,12 +323,12 @@ export function ConferenceForm() {
                 </Alert>
             )}
 
-            {!eligibility.eligible && (
+            {!eligibility.eligible && isPuConference && (
                  <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Not Eligible for Offline Conference</AlertTitle>
+                    <AlertTitle>Not Eligible for PU Conference Reimbursement</AlertTitle>
                     <AlertDescription>
-                        As per policy, a faculty member is eligible for <strong>offline</strong> conference assistance once every two years. You will be eligible to apply again on <strong>{eligibility.nextAvailableDate}</strong>. You may still apply for online conferences.
+                        As per policy, a faculty member is eligible for PU conference assistance ONCE per year. You will be eligible to apply again on <strong>{eligibility.nextAvailableDate}</strong>.
                     </AlertDescription>
                 </Alert>
             )}
@@ -365,7 +338,8 @@ export function ConferenceForm() {
               <AlertTitle>Conference Reimbursement Policy</AlertTitle>
               <AlertDescription>
                 <ul className="list-disc list-inside space-y-1 mt-2 text-xs">
-                    <li>Only the presenting author is entitled for reimbursement.</li>
+                    <li>For conferences organized by Parul University, 75% of the registration fee is reimbursed. This can be claimed once a year.</li>
+                    <li>Only the presenting author is entitled for reimbursement for other conferences.</li>
                     <li>For <strong>offline conferences outside India</strong>, proof of application for government travel grants is mandatory.</li>
                     <li>A faculty member is eligible for assistance for <strong>offline</strong> conferences ONCE in TWO years. There is no limit for online presentations.</li>
                     <li>Airfare for International travel and II-AC train fare (or actual, whichever is lesser) for travel within India shall be reimbursed within policy limits.</li>
@@ -439,3 +413,5 @@ export function ConferenceForm() {
     </Card>
   );
 }
+
+    

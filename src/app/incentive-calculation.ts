@@ -292,12 +292,15 @@ export async function calculateConferenceIncentive(claimData: Partial<IncentiveC
           travelFare,
           onlinePresentationOrder,
           organizerName,
+          conferenceName
         } = claimData;
     
         const totalExpenses = (registrationFee || 0) + (travelFare || 0);
         let maxReimbursement = 0;
+        
+        const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
     
-        if (organizerName?.toLowerCase().includes('parul university')) {
+        if (isPuConference) {
           maxReimbursement = (registrationFee || 0) * 0.75;
         } else if (conferenceMode === 'Online') {
           const regFee = registrationFee || 0;
@@ -388,3 +391,5 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
+
+    
