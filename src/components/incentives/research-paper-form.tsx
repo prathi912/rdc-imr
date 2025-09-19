@@ -1126,7 +1126,7 @@ export function ResearchPaperForm() {
                         {isSearching && <div className="text-sm text-muted-foreground">Searching...</div>}
                         {foundCoPis.length > 0 && (
                             <div className="relative">
-                                <div className="absolute w-full bg-card border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                                <div className="absolute w-full bg-popover border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
                                     {foundCoPis.map(coPi => (
                                         <div key={coPi.uid} className="p-2 hover:bg-muted cursor-pointer" onClick={() => handleAddCoPi(coPi)}>
                                             {coPi.name} ({coPi.misId})
