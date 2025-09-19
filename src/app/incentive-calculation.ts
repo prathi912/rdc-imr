@@ -33,39 +33,37 @@ function getBaseIncentiveForPaper(claimData: Partial<IncentiveClaim>, faculty: s
         return 3000;
     }
 
-    if (isSpecialFaculty) {
-        // Category A rules
+    // Common rules for Scopus (Q1-Q4) and high-tier WoS (Q1-Q2) for ALL faculties
+    if (journalClassification && ['Q1', 'Q2', 'Q3', 'Q4', 'Top 1% Journals', 'Nature/Science/Lancet'].includes(journalClassification)) {
         switch (journalClassification) {
-            case 'Nature/Science/Lancet': return 50000;
-            case 'Top 1% Journals': return 25000;
-            case 'Q1': return 15000;
-            case 'Q2': return 10000;
-            case 'Q3': return 6000;
-            case 'Q4': return 4000;
-            default: return 0;
-        }
+           case 'Nature/Science/Lancet': return 50000;
+           case 'Top 1% Journals': return 25000;
+           case 'Q1': return 15000;
+           case 'Q2': return 10000;
+           case 'Q3': return 6000; 
+           case 'Q4': return 4000;
+           default: return 0;
+       }
+   }
+
+    if (isSpecialFaculty) {
+        // For Category A, only the Quartile-based incentives apply, which are handled above.
+        // No other incentives like ESCI or UGC are applicable for them.
+        return 0;
     } else {
-        // Category B rules
-        if (journalClassification && ['Q1', 'Q2', 'Q3', 'Q4', 'Top 1% Journals', 'Nature/Science/Lancet'].includes(journalClassification)) {
-             switch (journalClassification) {
-                case 'Nature/Science/Lancet': return 50000;
-                case 'Top 1% Journals': return 25000;
-                case 'Q1': return 15000;
-                case 'Q2': return 10000;
-                case 'Q3': return 6000; 
-                case 'Q4': return 4000;
-                default: return 0;
-            }
+        // Rules for faculties NOT in Category A
+        if (wosType === 'SCIE' || wosType === 'SSCI' || wosType === 'A&HCI') {
+             // Assuming Q3/Q4 might be derived elsewhere, but based on text it's a flat rate
+             return 3000;
         }
         if (indexType === 'esci') return 2000;
-        if (wosType === 'Q3' || wosType === 'Q4') return 3000;
         if (publicationType === 'UGC listed journals (Journals found qualified through UGC-CARE Protocol, Group-I)') return 1000;
 
         return 0;
     }
 }
 
-function adjustForPublicationType(baseAmount: number, publicationType: string | undefined): number {
+function adjustForPublicationType(baseAmount: number, publicationType: string | undefined, journalClassification: string | undefined): number {
     if (!publicationType) return baseAmount;
     switch (publicationType) {
         case 'Research Articles/Short Communications':
@@ -74,6 +72,9 @@ function adjustForPublicationType(baseAmount: number, publicationType: string | 
         case 'Case Reports/Short Surveys':
             return baseAmount * 0.9;
         case 'Review Articles':
+             if (journalClassification === 'Q1' || journalClassification === 'Q2') {
+                return baseAmount; // 100% for Q1/Q2 review articles
+            }
             return baseAmount * 0.8;
         case 'Letter to the Editor/Editorial':
              return 2500; // Total amount to be distributed
@@ -92,7 +93,7 @@ export async function calculateResearchPaperIncentive(
             return { success: true, amount: 0 };
         }
         
-        const { authors = [], userEmail, publicationType } = claimData;
+        const { authors = [], userEmail, publicationType, journalClassification } = claimData;
         const totalAuthors = authors.length || 1;
         
         // Find the claimant in the author list
@@ -102,7 +103,7 @@ export async function calculateResearchPaperIncentive(
         }
         
         const baseIncentive = getBaseIncentiveForPaper(claimData, faculty, designation);
-        const totalSpecifiedIncentive = adjustForPublicationType(baseIncentive, publicationType);
+        const totalSpecifiedIncentive = adjustForPublicationType(baseIncentive, publicationType, journalClassification);
 
         // Special case for Letter to Editor/Editorial
         if (publicationType === 'Letter to the Editor/Editorial') {
