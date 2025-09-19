@@ -895,6 +895,30 @@ export function ResearchPaperForm() {
                       )}
                     />
                 )}
+                 <FormField
+                  control={form.control}
+                  name="publicationType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type of Publication</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select publication type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {publicationTypes.map((o) => (
+                            <SelectItem key={o} value={o}>
+                              {o}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 {(indexType === "wos" || indexType === "both") && (
                   <FormField
                     control={form.control}
@@ -933,30 +957,6 @@ export function ResearchPaperForm() {
                     )}
                   />
                 )}
-                <FormField
-                  control={form.control}
-                  name="publicationType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type of Publication</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select publication type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {publicationTypes.map((o) => (
-                            <SelectItem key={o} value={o}>
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 <Separator />
                 <FormField
                   control={form.control}

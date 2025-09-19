@@ -21,6 +21,10 @@ function getBaseIncentiveForPaper(claimData: Partial<IncentiveClaim>, faculty: s
     const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(faculty);
     const { journalClassification, indexType, wosType, publicationType } = claimData;
 
+    if (publicationType === 'Scopus Indexed Conference Proceedings') {
+        return 3000;
+    }
+
     if (isSpecialFaculty) {
         // Category A rules
         switch (journalClassification) {
@@ -57,6 +61,7 @@ function adjustForPublicationType(baseAmount: number, publicationType: string | 
     if (!publicationType) return baseAmount;
     switch (publicationType) {
         case 'Research Articles/Short Communications':
+        case 'Scopus Indexed Conference Proceedings':
             return baseAmount;
         case 'Case Reports/Short Surveys':
             return baseAmount * 0.9;
@@ -105,6 +110,16 @@ export async function calculateResearchPaperIncentive(
         const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
 
         let finalAmount = 0;
+
+        // Rule for Scopus Conference Proceedings: Only First/Presenting Author
+        if (publicationType === 'Scopus Indexed Conference Proceedings') {
+            if (claimant.role === 'First Author' || claimant.role === 'First & Corresponding Author') {
+                finalAmount = totalSpecifiedIncentive / (mainAuthors.length || 1);
+            } else {
+                finalAmount = 0; // Not a first/presenting author
+            }
+            return { success: true, amount: Math.round(finalAmount) };
+        }
 
         // Rule 1: First or Corresponding author from PU is the sole internal author
         if (mainAuthors.length === 1 && coAuthors.length === 0 && internalAuthors.length === 1) {
