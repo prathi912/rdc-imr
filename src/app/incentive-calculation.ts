@@ -17,9 +17,17 @@ const SPECIAL_POLICY_FACULTIES = [
     "Faculty of Engineering & Technology"
 ];
 
-function getBaseIncentiveForPaper(claimData: Partial<IncentiveClaim>, faculty: string): number {
+function getBaseIncentiveForPaper(claimData: Partial<IncentiveClaim>, faculty: string, designation?: string): number {
     const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(faculty);
     const { journalClassification, indexType, wosType, publicationType } = claimData;
+    
+    if (designation === 'Ph.D Scholar') {
+        switch (journalClassification) {
+            case 'Q1': return 6000;
+            case 'Q2': return 4000;
+            default: return 0; // PhD Scholars only get incentive for Q1/Q2
+        }
+    }
 
     if (publicationType === 'Scopus Indexed Conference Proceedings') {
         return 3000;
@@ -76,7 +84,8 @@ function adjustForPublicationType(baseAmount: number, publicationType: string | 
 
 export async function calculateResearchPaperIncentive(
     claimData: Partial<IncentiveClaim>,
-    faculty: string
+    faculty: string,
+    designation?: string,
 ): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
         if (claimData.isPuNameInPublication === false) {
@@ -92,7 +101,7 @@ export async function calculateResearchPaperIncentive(
             return { success: false, error: "Claimant not found in the author list." };
         }
         
-        const baseIncentive = getBaseIncentiveForPaper(claimData, faculty);
+        const baseIncentive = getBaseIncentiveForPaper(claimData, faculty, designation);
         const totalSpecifiedIncentive = adjustForPublicationType(baseIncentive, publicationType);
 
         // Special case for Letter to Editor/Editorial

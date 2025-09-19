@@ -337,7 +337,7 @@ export function ResearchPaperForm() {
 
   const calculate = useCallback(async () => {
     if (!user || !user.faculty) return;
-    const result = await calculateResearchPaperIncentive({ ...formValues, userEmail: user.email }, user.faculty);
+    const result = await calculateResearchPaperIncentive({ ...formValues, userEmail: user.email }, user.faculty, user.designation);
     if (result.success) {
         setCalculatedIncentive(result.amount ?? null);
     } else {
@@ -1129,40 +1129,42 @@ export function ResearchPaperForm() {
                       </div>
                     </div>
                   ))}
-                  <div className="space-y-2 pt-2">
-                    <FormLabel className="text-sm">Add Internal Co-Author</FormLabel>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="Search by Co-PI's MIS ID"
-                        value={coPiSearchTerm}
-                        onChange={(e) => setCoPiSearchTerm(e.target.value)}
-                      />
-                      <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
-                        {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
-                      </Button>
-                    </div>
-                    {foundCoPi && (
-                      <div className="flex items-center justify-between p-2 border rounded-md mt-2">
-                        <div>
-                          <p className="text-sm">{foundCoPi.name}</p>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                        <FormLabel className="text-sm">Add Internal Co-Author</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Search by Co-PI's MIS ID"
+                            value={coPiSearchTerm}
+                            onChange={(e) => setCoPiSearchTerm(e.target.value)}
+                          />
+                          <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
+                            {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+                          </Button>
                         </div>
-                        <Button type="button" size="sm" onClick={handleAddCoPi}>
-                          Add
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-2 pt-2">
-                      <FormLabel className="text-sm">Add External Co-Author</FormLabel>
-                      <div className="flex flex-col md:flex-row gap-2 mt-1">
-                          <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
-                          <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
-                          <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
-                              <SelectTrigger><SelectValue/></SelectTrigger>
-                              <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
-                          </Select>
-                          <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button>
-                      </div>
+                        {foundCoPi && (
+                          <div className="flex items-center justify-between p-2 border rounded-md mt-2">
+                            <div>
+                              <p className="text-sm">{foundCoPi.name}</p>
+                            </div>
+                            <Button type="button" size="sm" onClick={handleAddCoPi}>
+                              Add
+                            </Button>
+                          </div>
+                        )}
+                    </div>
+                     <div className="space-y-2">
+                        <FormLabel className="text-sm">Add External Co-Author</FormLabel>
+                         <div className="flex flex-col md:flex-row gap-2 mt-1">
+                            <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
+                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                            <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
+                                <SelectTrigger><SelectValue/></SelectTrigger>
+                                <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                            </Select>
+                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button>
+                        </div>
+                    </div>
                   </div>
                   <FormMessage>
                     {form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}
