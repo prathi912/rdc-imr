@@ -603,6 +603,11 @@ export function ResearchPaperForm() {
         return;
     }
     
+    // Auto-fill author position if applicant is made First Author
+    if (author.email === user?.email && isTryingToBeFirst) {
+        form.setValue('authorPosition', '1st');
+    }
+
     update(index, { ...author, role });
   };
 
@@ -923,7 +928,7 @@ export function ResearchPaperForm() {
                     )}
                   />
                 )}
-                 <FormField
+                <FormField
                   control={form.control}
                   name="publicationType"
                   render={({ field }) => (
