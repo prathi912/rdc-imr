@@ -16,6 +16,7 @@ export async function fetchAdvancedScopusData(
     printIssn?: string;
     electronicIssn?: string;
     journalWebsite?: string;
+    publicationType?: string;
   }
   error?: string
 }> {
@@ -60,16 +61,32 @@ export async function fetchAdvancedScopusData(
     const coverDate = coredata["prism:coverDate"];
     const printIssn = coredata["prism:issn"];
     const electronicIssn = coredata["prism:eIssn"];
+    const subtypeDescription = coredata["subtypeDescription"] || "";
 
     let publicationMonth = '';
     let publicationYear = '';
     let journalWebsite: string | undefined = undefined;
+    let publicationType: string | undefined = undefined;
 
     if (coverDate) {
         const date = new Date(coverDate);
         publicationYear = date.getFullYear().toString();
         publicationMonth = date.toLocaleString('en-US', { month: 'long' });
     }
+
+    if (subtypeDescription) {
+        const subtype = subtypeDescription.toLowerCase();
+        if (subtype.includes('article')) {
+            publicationType = 'Research Articles/Short Communications';
+        } else if (subtype.includes('review')) {
+            publicationType = 'Review Articles';
+        } else if (subtype.includes('letter')) {
+            publicationType = 'Letter to the Editor/Editorial';
+        } else if (subtype.includes('conference paper')) {
+            publicationType = 'Scopus Indexed Conference Proceedings';
+        }
+    }
+
 
     // After getting journalName, try to find its website via Springer Nature API
     if (journalName) {
@@ -105,6 +122,7 @@ export async function fetchAdvancedScopusData(
         printIssn,
         electronicIssn,
         journalWebsite,
+        publicationType,
       },
     }
   } catch (error: any) {

@@ -618,9 +618,16 @@ export function ResearchPaperForm() {
 
   async function handleSave(status: "Draft" | "Pending") {
     const claimId = searchParams.get('claimId');
-    if (status === 'Draft') {
-        // For draft, we don't need full validation
-    } else {
+    if (status === 'Draft' && !form.getValues('paperTitle')) {
+        toast({
+            variant: 'destructive',
+            title: 'Title Required',
+            description: 'Please enter a paper title before saving a draft.',
+        });
+        return;
+    }
+
+    if (status === 'Pending') {
         const isValid = await form.trigger();
         if (!isValid) {
             toast({
@@ -651,7 +658,7 @@ export function ResearchPaperForm() {
       
       const publicationProofFiles = data.publicationProof ? Array.from(data.publicationProof as FileList) : [];
       
-      if (status === 'Pending' && publicationProofFiles.length === 0) {
+      if (status === 'Pending' && publicationProofFiles.length === 0 && !claimId) {
         form.setError('publicationProof', { type: 'manual', message: 'Proof of publication is required for submission.' });
         setIsSubmitting(false);
         return;
