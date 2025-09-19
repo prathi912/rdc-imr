@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -837,33 +838,37 @@ export function ResearchPaperForm() {
                   )}
                 />
                 
-                <FormField
-                  control={form.control}
-                  name="scopusLink"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Scopus URL (Optional)</FormLabel>
-                      <FormControl>
-                          <Input placeholder="Enter full Scopus URL if DOI fetch fails" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {(indexType === 'scopus' || indexType === 'both') && (
+                  <FormField
+                    control={form.control}
+                    name="scopusLink"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Scopus URL (Optional)</FormLabel>
+                        <FormControl>
+                            <Input placeholder="Enter full Scopus URL if DOI fetch fails" {...field} disabled={isSubmitting} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                 
-                 <FormField
-                  control={form.control}
-                  name="wosLink"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>WoS URL (Optional)</FormLabel>
-                       <FormControl>
-                          <Input placeholder="Enter full WoS URL if DOI fetch fails" {...field} disabled={isSubmitting} />
-                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {(indexType === 'wos' || indexType === 'both') && (
+                   <FormField
+                    control={form.control}
+                    name="wosLink"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>WoS URL (Optional)</FormLabel>
+                         <FormControl>
+                            <Input placeholder="Enter full WoS URL if DOI fetch fails" {...field} disabled={isSubmitting} />
+                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 {(indexType === "wos" || indexType === "both") && (
                   <FormField
