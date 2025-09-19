@@ -188,9 +188,9 @@ a.href = url;
                            <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle, "paperTitle")}
-                            {renderDetail("DOI", claim.doi)}
-                            {renderLinkDetail("Scopus Link", claim.scopusLink)}
-                            {renderLinkDetail("WoS Link", claim.wosLink)}
+                            {renderDetail("DOI", claim.doi, "doi")}
+                            {renderDetail("Scopus Link", claim.scopusLink)}
+                            {renderDetail("WoS Link", claim.wosLink)}
                             {renderDetail("Publication Type", claim.publicationType, "publicationType")}
                             {renderDetail("Index Type", claim.indexType?.toUpperCase(), "indexType")}
                             {renderDetail("WoS Type", claim.wosType, "wosType")}
@@ -203,7 +203,7 @@ a.href = url;
                             {renderDetail("Publication Month", claim.publicationMonth, "publicationMonth")}
                             {renderDetail("Publication Year", claim.publicationYear, "publicationYear")}
                             {renderDetail("Author Position", claim.authorPosition)}
-                            {renderDetail("PU Name in Publication", claim.isPuNameInPublication)}
+                            {renderDetail("PU Name in Publication", claim.isPuNameInPublication, "isPuNameInPublication")}
                             {renderDetail("Authors", claim.authors)}
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
