@@ -475,7 +475,7 @@ export function ResearchPaperForm() {
             const autoFetched: (keyof ResearchPaperFormValues)[] = [];
             
             Object.entries(result.data).forEach(([key, value]) => {
-                if (value) {
+                if (value !== undefined) {
                     form.setValue(key as keyof ResearchPaperFormValues, value, { shouldValidate: true });
                     autoFetched.push(key as keyof ResearchPaperFormValues);
                 }
@@ -1113,7 +1113,7 @@ export function ResearchPaperForm() {
                   <div className="space-y-4">
                     <div className="space-y-2 p-3">
                         <FormLabel className="text-sm">Add Internal Co-Author</FormLabel>
-                        <div className="flex items-center gap-2">
+                         <div className="relative">
                             <Input
                                 placeholder="Search by Co-Author's Name"
                                 value={coPiSearchTerm}
@@ -1122,8 +1122,8 @@ export function ResearchPaperForm() {
                                     handleSearchCoPi(e.target.value);
                                 }}
                             />
+                            {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />}
                         </div>
-                        {isSearching && <div className="text-sm text-muted-foreground">Searching...</div>}
                         {foundCoPis.length > 0 && (
                             <div className="relative">
                                 <div className="absolute w-full bg-background border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">

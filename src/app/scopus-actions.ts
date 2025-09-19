@@ -13,6 +13,7 @@ export async function fetchAdvancedScopusData(
     journalName: string;
     publicationMonth: string;
     publicationYear: string;
+    isPuNameInPublication?: boolean;
     printIssn?: string;
     electronicIssn?: string;
     journalWebsite?: string;
@@ -54,7 +55,8 @@ export async function fetchAdvancedScopusData(
         throw new Error(`Scopus Abstract API Error: ${errorMessage}`);
     }
     const abstractData = await response.json();
-    const coredata = abstractData?.["abstracts-retrieval-response"]?.coredata;
+    const retrievalResponse = abstractData?.["abstracts-retrieval-response"];
+    const coredata = retrievalResponse?.coredata;
 
     if (!coredata) {
       return { success: false, error: "Invalid response structure from Scopus Abstract API." }
@@ -66,6 +68,12 @@ export async function fetchAdvancedScopusData(
     const printIssn = coredata["prism:issn"];
     const electronicIssn = coredata["prism:eIssn"];
     const subtypeDescription = coredata["subtypeDescription"] || "";
+    
+    // Check for PU affiliation
+    const affiliations = retrievalResponse.affiliation || [];
+    const isPuNameInPublication = affiliations.some((affil: any) => 
+        affil['affilname'] && affil['affilname'].toLowerCase().includes('parul')
+    );
 
     let publicationMonth = '';
     let publicationYear = '';
@@ -151,6 +159,7 @@ export async function fetchAdvancedScopusData(
         journalName,
         publicationMonth,
         publicationYear,
+        isPuNameInPublication,
         printIssn,
         electronicIssn,
         journalWebsite,
