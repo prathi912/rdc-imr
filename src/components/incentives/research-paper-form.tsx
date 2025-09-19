@@ -18,7 +18,7 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/config"
-import { doc, getDoc } from "firebase/firestore"
+import { doc, getDoc, setDoc } from "firebase/firestore"
 import type { User, IncentiveClaim, Author } from "@/types"
 import { uploadFileToServer } from "@/app/actions"
 import { findUserByMisId } from '@/app/userfinding';
@@ -85,13 +85,13 @@ const researchPaperSchema = z
     puStudentNames: z.string().optional(),
     autoFetchedFields: z.array(z.string()).optional(),
   })
-  .refine(data => {
+ .refine(data => {
       if (data.indexType === 'wos' || data.indexType === 'both') {
           return !!data.relevantLink && data.relevantLink.length > 0;
       }
       return true;
   }, { message: 'WoS Article Link or DOI is required for this index type.', path: ['relevantLink'] })
-  .refine(data => {
+ .refine(data => {
       if (data.indexType === 'scopus' || data.indexType === 'both') {
           return !!data.scopusLink && data.scopusLink.length > 0;
       }
@@ -787,30 +787,6 @@ export function ResearchPaperForm() {
                 
                 <FormField
                   control={form.control}
-                  name="publicationType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Type of Publication</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select publication type" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {publicationTypes.map((o) => (
-                            <SelectItem key={o} value={o}>
-                              {o}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="indexType"
                   render={({ field }) => (
                     <FormItem className="space-y-3">
@@ -957,6 +933,30 @@ export function ResearchPaperForm() {
                     )}
                   />
                 )}
+                <FormField
+                  control={form.control}
+                  name="publicationType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Type of Publication</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select publication type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {publicationTypes.map((o) => (
+                            <SelectItem key={o} value={o}>
+                              {o}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Separator />
                 <FormField
                   control={form.control}
