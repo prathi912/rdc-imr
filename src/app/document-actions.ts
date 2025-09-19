@@ -7,13 +7,15 @@ import path from 'path';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
-import type { Project, User, Evaluation, IncentiveClaim } from '@/types';
+import type { Project, User, Evaluation, IncentiveClaim, SystemSettings } from '@/types';
 import admin from 'firebase-admin';
 import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
 import JSZip from 'jszip';
 import { getTemplateContent } from '@/lib/template-manager';
+import { getSystemSettings } from './actions';
+import ImageModule from 'docxtemplater-image-module-free';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -376,6 +378,20 @@ export async function exportClaimToExcel(
   }
 }
 
+async function getImageAsBuffer(url: string) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+    } catch (error) {
+        console.error(`Error fetching image from ${url}:`, error);
+        return null; // Return null if the image can't be fetched
+    }
+}
+
 export async function generateResearchPaperIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
     try {
       const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
@@ -398,37 +414,80 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       }
   
       const zip = new PizZip(content);
+      
+      const settings = await getSystemSettings();
+      const approvers = settings.incentiveApprovers || [];
+      const data: any = {};
+      
+      const imageModule = new ImageModule({
+          centered: false,
+          getImage: (tag: string) => {
+              // tag is the value from the template, e.g., 'data.approver2_sign'
+              const buffer = tag;
+              return buffer;
+          },
+          getSize: () => [150, 50], // width, height in pixels
+      });
+
       const doc = new Docxtemplater(zip, {
           paragraphLoop: true,
           linebreaks: true,
-          nullGetter: () => ""
+          nullGetter: () => "",
+          modules: [imageModule],
       });
       
       const approval1 = claim.approvals?.find(a => a?.stage === 1);
       const approval2 = claim.approvals?.find(a => a?.stage === 2);
-  
-      const data = {
-          name: user.name,
-          designation: user.designation || 'N/A',
-          department: user.department || 'N/A',
-          publication_type: claim.publicationType || 'N/A',
-          journal_name: claim.journalName || 'N/A',
-          locale: claim.locale || 'N/A',
-          index_type: claim.indexType?.toUpperCase() || 'N/A',
-          wos_type: claim.wosType || 'N/A',
-          q_rating: claim.journalClassification || 'N/A',
-          author_role: claim.authorType || 'N/A',
-          author_position: claim.authorPosition || 'N/A',
-          total_pu_authors: claim.bookCoAuthors?.filter(a => !a.isExternal).length || 0,
-          issn: `${claim.printIssn || ''} (Print) / ${claim.electronicIssn || ''} (Electronic)`,
-          pu_name_exists: claim.isPuNameInPublication ? 'Yes' : 'No',
-          published_month_year: `${claim.publicationMonth || ''}, ${claim.publicationYear || ''}`,
-          approver1_comments: approval1?.comments || 'N/A',
-          approver1_amount: approval1?.approvedAmount?.toLocaleString('en-IN') || 'N/A',
-          approver2_comments: approval2?.comments || 'N/A',
-          approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || 'N/A',
-          final_approved_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A'
+      const approval3 = claim.approvals?.find(a => a?.stage === 3);
+      const approval4 = claim.approvals?.find(a => a?.stage === 4);
+      
+      // Fetch signature images in parallel
+      const signatureUrls = {
+        approver2_sign: approvers.find(a => a.stage === 2)?.signatureUrl,
+        approver3_sign: approvers.find(a => a.stage === 3)?.signatureUrl,
+        approver4_sign: approvers.find(a => a.stage === 4)?.signatureUrl,
       };
+
+      const imagePromises = Object.entries(signatureUrls)
+        .filter(([, url]) => !!url)
+        .map(async ([key, url]) => {
+          const buffer = await getImageAsBuffer(url!);
+          return { key, buffer };
+        });
+
+      const resolvedImages = await Promise.all(imagePromises);
+      const imageBuffers = resolvedImages.reduce((acc, { key, buffer }) => {
+          if (buffer) acc[key] = buffer;
+          return acc;
+      }, {} as Record<string, Buffer>);
+  
+      data.name = user.name;
+      data.designation = user.designation || 'N/A';
+      data.department = user.department || 'N/A';
+      data.publication_type = claim.publicationType || 'N/A';
+      data.journal_name = claim.journalName || 'N/A';
+      data.locale = claim.locale || 'N/A';
+      data.index_type = claim.indexType?.toUpperCase() || 'N/A';
+      data.wos_type = claim.wosType || 'N/A';
+      data.q_rating = claim.journalClassification || 'N/A';
+      data.author_role = claim.authorType || 'N/A';
+      data.author_position = claim.authorPosition || 'N/A';
+      data.total_pu_authors = claim.authors?.filter(a => !a.isExternal).length || 0;
+      data.issn = `${claim.printIssn || ''} (Print) / ${claim.electronicIssn || ''} (Electronic)`;
+      data.pu_name_exists = claim.isPuNameInPublication ? 'Yes' : 'No';
+      data.published_month_year = `${claim.publicationMonth || ''}, ${claim.publicationYear || ''}`;
+      data.approver1_comments = approval1?.comments || 'N/A';
+      data.approver1_amount = approval1?.approvedAmount?.toLocaleString('en-IN') || 'N/A';
+      data.approver2_comments = approval2?.comments || 'N/A';
+      data.approver2_amount = approval2?.approvedAmount?.toLocaleString('en-IN') || 'N/A';
+      data.approver3_comments = approval3?.comments || 'N/A';
+      data.approver3_amount = approval3?.approvedAmount?.toLocaleString('en-IN') || 'N/A';
+      data.final_approved_amount = claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A';
+      
+      // Add image buffers to the data object for the template
+      data.approver2_sign = imageBuffers.approver2_sign;
+      data.approver3_sign = imageBuffers.approver3_sign;
+      data.approver4_sign = imageBuffers.approver4_sign;
       
       doc.setData(data);
   
