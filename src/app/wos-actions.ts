@@ -4,7 +4,7 @@
 import type { IncentiveClaim } from '@/types';
 
 export async function fetchWosDataByUrl(
-  url: string,
+  identifier: string, // Can be a URL or just a DOI
   claimantName: string,
 ): Promise<{
   success: boolean
@@ -24,12 +24,14 @@ export async function fetchWosDataByUrl(
     return { success: false, error: "Web of Science integration is not configured on the server." }
   }
 
-  const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i)
-  if (!doiMatch || !doiMatch[1]) {
-    return { success: false, error: "Could not find a valid DOI in the provided link." }
-  }
-  const doi = doiMatch[1]
+  // Extract DOI from URL or use the identifier directly if it's a DOI
+  const doiMatch = identifier.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i)
+  const doi = doiMatch ? doiMatch[1] : identifier;
 
+  if (!doi) {
+    return { success: false, error: "Could not find a valid DOI in the provided link or input." }
+  }
+  
   const wosApiUrl = `https://api.clarivate.com/apis/wos-starter/v1/documents?q=DO=${encodeURIComponent(doi)}`
 
   try {

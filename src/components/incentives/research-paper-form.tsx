@@ -48,8 +48,9 @@ const researchPaperSchema = z
   .object({
     publicationType: z.string({ required_error: "Please select a publication type." }),
     indexType: z.enum(["wos", "scopus", "both", "esci"]).optional(),
-    relevantLink: z.string().optional().or(z.literal("")),
-    scopusLink: z.string().optional().or(z.literal("")),
+    doi: z.string().min(5, 'A valid DOI is required to fetch data.').optional().or(z.literal('')),
+    scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
+    wosLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"]).optional(),
     wosType: z.enum(["SCIE", "SSCI", "A&HCI"]).optional(),
     journalName: z.string().min(3, "Journal name is required."),
@@ -85,8 +86,6 @@ const researchPaperSchema = z
     puStudentNames: z.string().optional(),
     autoFetchedFields: z.array(z.string()).optional(),
   })
- .refine(data => !(data.indexType === 'wos' || data.indexType === 'both') || (!!data.relevantLink && data.relevantLink.length > 0), { message: 'WoS Link or DOI is required for this index type.', path: ['relevantLink'] })
- .refine(data => !(data.indexType === 'scopus' || data.indexType === 'both') || (!!data.scopusLink && data.scopusLink.length > 0), { message: 'Scopus Link or DOI is required for this index type.', path: ['scopusLink'] })
   .refine(
     (data) => {
       if (data.indexType === "wos" || data.indexType === "both") {
@@ -250,8 +249,9 @@ function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit
                 {renderDetail("Authors", data.authors)}
                 {renderDetail("Journal Name", data.journalName)}
                 {renderDetail("Journal Website", data.journalWebsite)}
-                {renderDetail("DOI Link", data.relevantLink)}
-                {renderDetail("Scopus Link", data.scopusLink)}
+                {renderDetail("DOI", data.doi)}
+                {renderDetail("Scopus URL", data.scopusLink)}
+                {renderDetail("WoS URL", data.wosLink)}
                 {renderDetail("Journal Classification", data.journalClassification)}
                 {renderDetail("WoS Type", data.wosType)}
                 {renderDetail("Locale", data.locale)}
@@ -306,8 +306,9 @@ export function ResearchPaperForm() {
     defaultValues: {
       publicationType: '',
       indexType: undefined,
-      relevantLink: '',
+      doi: '',
       scopusLink: '',
+      wosLink: '',
       journalClassification: undefined,
       wosType: undefined,
       journalName: '',
@@ -453,10 +454,10 @@ export function ResearchPaperForm() {
     }
   }, [availableIndexTypes, form])
 
-  const handleFetchScopusData = async () => {
-    const link = form.getValues('scopusLink');
-    if (!link) {
-      toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a Scopus article link or DOI to fetch data.' });
+  const handleFetchData = async (source: 'scopus' | 'wos') => {
+    const doi = form.getValues('doi');
+    if (!doi) {
+      toast({ variant: 'destructive', title: 'No DOI Provided', description: 'Please enter a DOI to fetch data.' });
       return;
     }
     if (!user) {
@@ -465,10 +466,12 @@ export function ResearchPaperForm() {
     }
 
     setIsFetching(true);
-    toast({ title: 'Fetching Scopus Data', description: 'Please wait, this may take a moment...' });
+    toast({ title: `Fetching ${source.toUpperCase()} Data`, description: 'Please wait, this may take a moment...' });
     
     try {
-        const result = await fetchAdvancedScopusData(link, user.name);
+        const fetcher = source === 'scopus' ? fetchAdvancedScopusData : fetchWosDataByUrl;
+        const result = await fetcher(doi, user.name);
+
         if (result.success && result.data) {
             const autoFetched: (keyof ResearchPaperFormValues)[] = [];
             
@@ -481,9 +484,9 @@ export function ResearchPaperForm() {
             
             form.setValue('autoFetchedFields', autoFetched);
 
-            toast({ title: 'Success', description: 'Form fields have been pre-filled from Scopus.' });
+            toast({ title: 'Success', description: `Form fields have been pre-filled from ${source.toUpperCase()}.` });
         } else {
-            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data from Scopus.' });
+            toast({ variant: 'destructive', title: 'Error', description: result.error || `Failed to fetch data from ${source.toUpperCase()}.` });
         }
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
@@ -492,42 +495,6 @@ export function ResearchPaperForm() {
     }
   };
 
-  const handleFetchWosData = async () => {
-    const link = form.getValues('relevantLink');
-    if (!link) {
-      toast({ variant: 'destructive', title: 'No Link Provided', description: 'Please enter a WoS article link or DOI to fetch data.' });
-      return;
-    }
-    if (!user) {
-        toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant. Please log in again.' });
-        return;
-    }
-
-    setIsFetching(true);
-    toast({ title: 'Fetching WoS Data', description: 'Please wait...' });
-
-    try {
-        const result = await fetchWosDataByUrl(link, user.name);
-        if (result.success && result.data) {
-            const autoFetched: (keyof ResearchPaperFormValues)[] = [];
-            Object.entries(result.data).forEach(([key, value]) => {
-                if (value) {
-                    form.setValue(key as keyof ResearchPaperFormValues, value, { shouldValidate: true });
-                    autoFetched.push(key as keyof ResearchPaperFormValues);
-                }
-            });
-            form.setValue('autoFetchedFields', autoFetched);
-
-            toast({ title: 'Success', description: 'Form fields have been pre-filled from Web of Science.' });
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to fetch data.' });
-        }
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
-    } finally {
-        setIsFetching(false);
-    }
-  };
 
   const handleSearchCoPi = async () => {
     if (!coPiSearchTerm) return
@@ -834,62 +801,71 @@ export function ResearchPaperForm() {
                     </FormItem>
                   )}
                 />
-
-                {(indexType === 'scopus' || indexType === 'both') && (
-                  <FormField
-                      control={form.control}
-                      name="scopusLink"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Scopus Link or DOI</FormLabel>
-                          <div className="flex items-center gap-2">
-                              <FormControl>
-                                  <Input placeholder="Enter Scopus URL or DOI" {...field} disabled={isSubmitting} />
-                              </FormControl>
-                              <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handleFetchScopusData}
-                                  disabled={isSubmitting || isFetching || !form.getValues('scopusLink')}
-                                  title="Fetch data from Scopus"
-                              >
-                                  {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                                  Fetch Data
-                              </Button>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                )}
+                 <FormField
+                  control={form.control}
+                  name="doi"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>DOI (Digital Object Identifier)</FormLabel>
+                      <div className="flex items-center gap-2">
+                          <FormControl>
+                              <Input placeholder="Enter DOI (e.g., 10.1038/nature12345)" {...field} disabled={isSubmitting} />
+                          </FormControl>
+                          <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => handleFetchData('scopus')}
+                              disabled={isSubmitting || isFetching || !form.getValues('doi')}
+                              title="Fetch data from Scopus"
+                          >
+                              {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                              Scopus
+                          </Button>
+                          <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => handleFetchData('wos')}
+                              disabled={isSubmitting || isFetching || !form.getValues('doi')}
+                              title="Fetch data from Web of Science"
+                          >
+                              {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                              WoS
+                          </Button>
+                      </div>
+                      <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
-                 {(indexType === 'wos' || indexType === 'both') && (
-                    <FormField
-                      control={form.control}
-                      name="relevantLink"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>WoS Link or DOI</FormLabel>
-                          <div className="flex items-center gap-2">
-                            <FormControl>
-                              <Input placeholder="Enter WoS URL or DOI" {...field} disabled={isSubmitting} />
-                            </FormControl>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleFetchWosData}
-                                disabled={isSubmitting || isFetching || !form.getValues('relevantLink')}
-                                title="Fetch data from Web of Science"
-                            >
-                                {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                                Fetch Data
-                            </Button>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                )}
+                <FormField
+                  control={form.control}
+                  name="scopusLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Scopus URL (Optional)</FormLabel>
+                      <FormControl>
+                          <Input placeholder="Enter full Scopus URL if DOI fetch fails" {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                 <FormField
+                  control={form.control}
+                  name="wosLink"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>WoS URL (Optional)</FormLabel>
+                       <FormControl>
+                          <Input placeholder="Enter full WoS URL if DOI fetch fails" {...field} disabled={isSubmitting} />
+                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 {(indexType === "wos" || indexType === "both") && (
                   <FormField
                     control={form.control}

@@ -4,7 +4,7 @@
 import type { IncentiveClaim } from '@/types';
 
 export async function fetchAdvancedScopusData(
-  url: string,
+  identifier: string, // Can be a URL or just a DOI
   claimantName: string,
 ): Promise<{
   success: boolean
@@ -20,6 +20,7 @@ export async function fetchAdvancedScopusData(
     journalClassification?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   }
   error?: string
+  claimantIsAuthor?: boolean
 }> {
   const apiKey = process.env.SCOPUS_API_KEY
   if (!apiKey) {
@@ -28,8 +29,9 @@ export async function fetchAdvancedScopusData(
   }
 
   let apiUrl = '';
-  const doiMatch = url.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
-  const eidMatch = url.match(/eid=([^&]+)/);
+  // Check if the identifier is a DOI
+  const doiMatch = identifier.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+  const eidMatch = identifier.match(/eid=([^&]+)/);
 
   if (doiMatch && doiMatch[1]) {
     const doi = doiMatch[1];
@@ -38,7 +40,8 @@ export async function fetchAdvancedScopusData(
     const eid = eidMatch[1];
     apiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}`;
   } else {
-    apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(url)}`;
+    // Assume the identifier is a DOI if no other pattern matches
+    apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(identifier)}`;
   }
 
   try {
