@@ -15,7 +15,6 @@ import JSZip from 'jszip';
 import { getTemplateContent } from '@/lib/template-manager';
 import { getSystemSettings } from './actions';
 import ImageModule from 'docxtemplater-image-module-free';
-import { generateResearchPaperIncentiveForm } from './document-actions';
 import { generateBookIncentiveForm } from './incentive-actions';
 import { generateMembershipIncentiveForm } from './membership-actions';
 import { generatePatentIncentiveForm } from './patent-actions';
@@ -421,9 +420,20 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       const imageModule = new ImageModule({
           centered: false,
           getImage: (tag: string) => {
-              return Buffer.from(tag, 'base64');
+              if (!tag) return null;
+              try {
+                // The tag is already base64 encoded from the buffer
+                return Buffer.from(tag, 'base64');
+              } catch (e) {
+                console.error("Error decoding base64 image for docxtemplater:", e);
+                return null;
+              }
           },
           getSize: () => [150, 50],
+          // A custom error handler is a good practice to prevent crashes
+          handleError: (e) => {
+              console.error("Docxtemplater Image Module Error:", e);
+          }
       });
 
       const doc = new Docxtemplater(zip, {
