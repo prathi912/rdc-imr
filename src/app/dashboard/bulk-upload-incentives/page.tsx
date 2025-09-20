@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { FileWarning, Upload, Loader2, XCircle, CheckCircle } from 'lucide-react';
+import { FileWarning, Upload, Loader2, XCircle, CheckCircle, Clock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { bulkUploadIncentiveClaims } from '@/app/incentive-bulk-actions';
 import type { User } from '@/types';
@@ -27,7 +27,7 @@ type IncentiveUploadData = {
 };
 
 type UploadResult = {
-  successfulClaims: number;
+  successfulClaims: { title: string; userEmail: string; linked: boolean }[];
   totalRecords: number;
   errors: { title: string; reason: string }[];
 };
@@ -87,7 +87,6 @@ export default function BulkUploadIncentivesPage() {
         }
 
         const formattedData = jsonData.map((row: any) => {
-            // Find keys case-insensitively
             const findKey = (key: string) => Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
 
             const titleKey = findKey('Title of Paper');
@@ -129,13 +128,12 @@ export default function BulkUploadIncentivesPage() {
     setIsLoading(true);
     setUploadResult(null);
     try {
-      // Sanitize the data to ensure it's a plain object array before sending to the server action
       const plainData = JSON.parse(JSON.stringify(data));
       const result = await bulkUploadIncentiveClaims(plainData, claimType, currentUser.uid);
       
       if (result.success) {
         setUploadResult(result.data);
-        toast({ title: 'Upload Processed', description: `${result.data.successfulClaims} claims created from ${result.data.totalRecords} records.` });
+        toast({ title: 'Upload Processed', description: `${result.data.successfulClaims.length} claims created from ${result.data.totalRecords} records.` });
         setData([]);
         setFileName('');
       } else {
@@ -147,6 +145,10 @@ export default function BulkUploadIncentivesPage() {
       setIsLoading(false);
     }
   };
+  
+  const linkedClaims = uploadResult?.successfulClaims.filter(c => c.linked) || [];
+  const pendingClaims = uploadResult?.successfulClaims.filter(c => !c.linked) || [];
+
 
   return (
     <div className="container mx-auto py-10">
@@ -193,13 +195,33 @@ export default function BulkUploadIncentivesPage() {
               <CardDescription>Summary of the bulk upload process.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <h3 className="font-semibold flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  Successfully Created/Updated Claims: {uploadResult.successfulClaims}
-                </h3>
-                 <p className="text-sm text-muted-foreground mt-1">Processed {uploadResult.totalRecords} records from the Excel file.</p>
-              </div>
+               {linkedClaims.length > 0 && (
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                    Linked to Existing Accounts ({linkedClaims.length})
+                  </h3>
+                  <ul className="list-disc pl-5 text-sm max-h-48 overflow-y-auto">
+                    {linkedClaims.map((claim, i) => (
+                      <li key={i}><strong>{claim.title}</strong> linked to {claim.userEmail}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+               {pendingClaims.length > 0 && (
+                <div>
+                  <h3 className="font-semibold flex items-center gap-2 mb-2">
+                    <Clock className="h-5 w-5 text-amber-500" />
+                    Pending Account Linkage ({pendingClaims.length})
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-2">These claims will be automatically linked when a user signs up with the corresponding email address.</p>
+                  <ul className="list-disc pl-5 text-sm max-h-48 overflow-y-auto">
+                    {pendingClaims.map((claim, i) => (
+                      <li key={i}><strong>{claim.title}</strong> pending for {claim.userEmail}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {uploadResult.errors.length > 0 && (
                 <Alert variant="destructive">
                   <XCircle className="h-5 w-5" />

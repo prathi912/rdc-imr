@@ -27,7 +27,6 @@ async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string,
   }
 }
 
-// Function to convert Excel serial date number to JS Date
 function excelDateToJSDate(serial: number) {
   const utc_days = Math.floor(serial - 25569);
   const utc_value = utc_days * 86400;
@@ -45,13 +44,13 @@ function excelDateToJSDate(serial: number) {
 
 
 export async function bulkUploadIncentiveClaims(
-  records: any[], // Using any[] to handle different possible structures initially
+  records: any[],
   claimType: string,
   uploadedByUid: string,
 ): Promise<{ 
     success: boolean; 
     data: {
-        successfulClaims: number;
+        successfulClaims: { title: string; userEmail: string; linked: boolean }[];
         totalRecords: number;
         errors: { title: string; reason: string }[];
     };
@@ -65,7 +64,6 @@ export async function bulkUploadIncentiveClaims(
 
   const paperRecords = records as ResearchPaperUploadData[];
 
-  // Group records by paper title to handle co-authors
   const claimsByTitle = paperRecords.reduce((acc, record) => {
     const title = record['Title of Paper']?.trim();
     if (!title) {
@@ -79,7 +77,7 @@ export async function bulkUploadIncentiveClaims(
     return acc;
   }, {} as Record<string, ResearchPaperUploadData[]>);
 
-  let successfulClaims = 0;
+  const successfulClaims: { title: string; userEmail: string; linked: boolean }[] = [];
   const batch = adminDb.batch();
   const usersRef = adminDb.collection('users');
   const claimsRef = adminDb.collection('incentiveClaims');
@@ -95,9 +93,8 @@ export async function bulkUploadIncentiveClaims(
       for (const record of authorRecords) {
         const email = record['Email'].toLowerCase();
         let userUid: string | null = null;
-        let userName: string = email.split('@')[0]; // Default name
+        let userName: string = email.split('@')[0];
 
-        // Check if user exists
         const userQuery = await usersRef.where('email', '==', email).limit(1).get();
         if (!userQuery.empty) {
           const userDoc = userQuery.docs[0];
@@ -109,8 +106,8 @@ export async function bulkUploadIncentiveClaims(
           uid: userUid,
           email: email,
           name: userName,
-          role: 'Co-Author', // Default role for historical data
-          isExternal: false, // Assume internal for simplicity
+          role: 'Co-Author',
+          isExternal: false,
           status: 'approved'
         });
 
@@ -119,7 +116,6 @@ export async function bulkUploadIncentiveClaims(
         }
       }
 
-      // Designate the first listed author as the main one for the claim record
       const mainAuthorDetails = allAuthorDetails[0];
       if (mainAuthorDetails) {
           mainAuthorDetails.role = 'First Author';
@@ -131,10 +127,9 @@ export async function bulkUploadIncentiveClaims(
       } else if (typeof mainAuthorRecord['Date of proof'] === 'number') {
           submissionDate = excelDateToJSDate(mainAuthorRecord['Date of proof']);
       } else {
-          submissionDate = new Date(); // Fallback
+          submissionDate = new Date();
       }
       
-
       const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
         uid: mainAuthorDetails.uid || 'historical_import',
         userName: mainAuthorDetails.name,
@@ -142,11 +137,11 @@ export async function bulkUploadIncentiveClaims(
         claimType,
         paperTitle: title,
         journalName: mainAuthorRecord['Journal'],
-        indexType: mainAuthorRecord['Index'].toLowerCase().includes('scopus') ? 'scopus' : 'wos', // Simplified mapping
+        indexType: mainAuthorRecord['Index'].toLowerCase().includes('scopus') ? 'scopus' : 'wos',
         status: 'Payment Completed',
         submissionDate: submissionDate.toISOString(),
         benefitMode: 'incentives',
-        faculty: 'N/A', // Not available in the sheet
+        faculty: 'N/A',
         isPuNameInPublication: true,
         finalApprovedAmount: mainAuthorRecord['Amount'],
         authors: allAuthorDetails,
@@ -155,7 +150,16 @@ export async function bulkUploadIncentiveClaims(
       
       const newClaimRef = claimsRef.doc();
       batch.set(newClaimRef, claimData);
-      successfulClaims++;
+      
+      // Add to successful claims list for reporting
+      allAuthorDetails.forEach(author => {
+          successfulClaims.push({
+              title: title,
+              userEmail: author.email,
+              linked: !!author.uid
+          });
+      });
+
     } catch (error: any) {
         errors.push({ title, reason: error.message || 'An unknown error occurred.' });
     }
@@ -163,7 +167,7 @@ export async function bulkUploadIncentiveClaims(
 
   try {
       await batch.commit();
-      await logActivity('INFO', 'Bulk incentive claims processed', { successfulClaims, errors });
+      await logActivity('INFO', 'Bulk incentive claims processed', { successfulClaimsCount: successfulClaims.length, errors });
       return { 
           success: true, 
           data: {
