@@ -12,7 +12,7 @@ import admin from 'firebase-admin';
 import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
-import JSZip from 'jszip';
+import * as fflate from 'fflate';
 import { getTemplateContent } from '@/lib/template-manager';
 import { getSystemSettings } from './actions';
 import { generateBookIncentiveForm } from './incentive-actions';
@@ -268,13 +268,13 @@ export async function generateOfficeNotingsZip(claimIds: string[]): Promise<{ su
             return { success: false, error: 'Could not generate any of the requested documents.' };
         }
 
-        const zip = new JSZip();
+        const zipData: Record<string, Uint8Array> = {};
         successfulDocs.forEach(doc => {
-            zip.file(doc.fileName, doc.content);
+            zipData[doc.fileName] = new Uint8Array(doc.content);
         });
-        
-        const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
-        const base64 = zipContent.toString('base64');
+
+        const zipContent = fflate.zipSync(zipData);
+        const base64 = Buffer.from(zipContent).toString('base64');
 
         await logActivity('INFO', 'Generated office notings ZIP', { count: successfulDocs.length });
         return { success: true, fileData: base64 };
@@ -376,96 +376,96 @@ export async function exportClaimToExcel(
 }
 
 export async function generateResearchPaperIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
-    try {
-      const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
-      const claimSnap = await claimRef.get();
-      if (!claimSnap.exists) {
-        return { success: false, error: 'Incentive claim not found.' };
-      }
-      const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
-  
-      const userRef = adminDb.collection('users').doc(claim.uid);
-      const userSnap = await userRef.get();
-      if (!userSnap.exists) {
-          return { success: false, error: 'Claimant user profile not found.' };
-      }
-      const user = userSnap.data() as User;
-      
-      const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/INCENTIVE_RESEARCH_PAPER2.docx";
-      const response = await fetch(TEMPLATE_URL, { cache: 'no-store' });
-      if (!response.ok) {
-          return { success: false, error: `Template file could not be fetched from URL. Status: ${response.status}` };
-      }
-      const content = Buffer.from(await response.arrayBuffer());
-  
-      const zip = new PizZip(content);
-      
-      const doc = new Docxtemplater(zip, {
-          paragraphLoop: true,
-          linebreaks: true,
-          nullGetter: () => "",
-      });
-      
-      const approvals = claim.approvals || [];
-      const approval1 = approvals[0] || null;
-      const approval2 = approvals[1] || null;
-      const approval3 = approvals[2] || null;
-      const approval4 = approvals[3] || null;
-
-      const data: { [key: string]: any } = {
-        name: user.name || '',
-        designation: `${user.designation || 'N/A'}, ${user.department || 'N/A'}`,
-        typeofpublication: claim.publicationType || '',
-        journal_name: claim.journalName || '',
-        locale: claim.locale || '',
-        indexed: claim.indexType?.toUpperCase() || '',
-        wos_type: claim.wosType || '',
-        q_rating: claim.journalClassification || '',
-        role: claim.authorType || '',
-        author_position: claim.authorPosition || '',
-        total_authors: (claim.authors || []).length,
-        print_issn: claim.printIssn || '',
-        e_issn: claim.electronicIssn || '',
-        publish_month: claim.publicationMonth || '',
-        publish_year: claim.publicationYear || '',
-        
-        approver2_comments: approval2?.comments || '',
-        approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
-        approver3_comments: approval3?.comments || '',
-        approver3_amount: approval3?.approvedAmount?.toLocaleString('en-IN') || '',
-        approver4_comments: approval4?.comments || '',
-        approver4_amount: approval4?.approvedAmount?.toLocaleString('en-IN') || claim.finalApprovedAmount?.toLocaleString('en-IN') || '',
-        date: format(new Date(), 'dd/MM/yyyy'),
-      };
-      
-      const checklistFields = [
-        'name', 'designation', 'publicationType', 'journalName', 'locale', 'indexType', 'wosType',
-        'journalClassification', 'authorRoleAndPosition', 'totalPuAuthors', 'printIssn',
-        'publicationProofUrls', 'isPuNameInPublication', 'publicationMonth'
-      ];
-      
-      for (let i = 0; i < checklistFields.length; i++) {
-          const fieldId = checklistFields[i];
-          const c_index = i + 1;
-      
-          const a1_status = approval1?.verifiedFields?.[fieldId];
-          data[`a1_c${c_index}`] = a1_status === true ? '✓' : a1_status === false ? '✗' : '';
-      
-          const a2_status = approval2?.verifiedFields?.[fieldId];
-          data[`a2_c${c_index}`] = a2_status === true ? '✓' : a2_status === false ? '✗' : '';
-      }
-      
-      doc.render(data);
-  
-      const buf = doc.getZip().generate({ type: 'nodebuffer' });
-      const base64 = buf.toString('base64');
-  
-      return { success: true, fileData: base64 };
-    } catch (error: any) {
-      console.error('Error generating research paper incentive form:', error);
-      if (error.properties && error.properties.errors) {
-          console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
-      }
-      return { success: false, error: error.message || 'Failed to generate the form.' };
+  try {
+    const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
+    const claimSnap = await claimRef.get();
+    if (!claimSnap.exists) {
+      return { success: false, error: 'Incentive claim not found.' };
     }
+    const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
+
+    const userRef = adminDb.collection('users').doc(claim.uid);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+        return { success: false, error: 'Claimant user profile not found.' };
+    }
+    const user = userSnap.data() as User;
+    
+    const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/INCENTIVE_RESEARCH_PAPER2.docx";
+    const response = await fetch(TEMPLATE_URL, { cache: 'no-store' });
+    if (!response.ok) {
+        return { success: false, error: `Template file could not be fetched from URL. Status: ${response.status}` };
+    }
+    const content = Buffer.from(await response.arrayBuffer());
+
+    const zip = new PizZip(content);
+    
+    const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        nullGetter: () => "",
+    });
+    
+    const approvals = claim.approvals || [];
+    const approval1 = approvals[0] || null;
+    const approval2 = approvals[1] || null;
+    const approval3 = approvals[2] || null;
+    const approval4 = approvals[3] || null;
+
+    const data: { [key: string]: any } = {
+      name: user.name || '',
+      designation: `${user.designation || 'N/A'}, ${user.department || 'N/A'}`,
+      typeofpublication: claim.publicationType || '',
+      journal_name: claim.journalName || '',
+      locale: claim.locale || '',
+      indexed: claim.indexType?.toUpperCase() || '',
+      wos_type: claim.wosType || '',
+      q_rating: claim.journalClassification || '',
+      role: claim.authorType || '',
+      author_position: claim.authorPosition || '',
+      total_authors: (claim.authors || []).length,
+      print_issn: claim.printIssn || '',
+      e_issn: claim.electronicIssn || '',
+      publish_month: claim.publicationMonth || '',
+      publish_year: claim.publicationYear || '',
+      
+      approver2_comments: approval2?.comments || '',
+      approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
+      approver3_comments: approval3?.comments || '',
+      approver3_amount: approval3?.approvedAmount?.toLocaleString('en-IN') || '',
+      approver4_comments: approval4?.comments || '',
+      approver4_amount: approval4?.approvedAmount?.toLocaleString('en-IN') || claim.finalApprovedAmount?.toLocaleString('en-IN') || '',
+      date: format(new Date(), 'dd/MM/yyyy'),
+    };
+    
+    const checklistFields = [
+      'name', 'designation', 'publicationType', 'journalName', 'locale', 'indexType', 'wosType',
+      'journalClassification', 'authorRoleAndPosition', 'totalPuAuthors', 'printIssn',
+      'publicationProofUrls', 'isPuNameInPublication', 'publicationMonth'
+    ];
+    
+    for (let i = 0; i < checklistFields.length; i++) {
+        const fieldId = checklistFields[i];
+        const c_index = i + 1;
+    
+        const a1_status = approval1?.verifiedFields?.[fieldId];
+        data[`a1_c${c_index}`] = a1_status === true ? '✓' : a1_status === false ? '✗' : '';
+    
+        const a2_status = approval2?.verifiedFields?.[fieldId];
+        data[`a2_c${c_index}`] = a2_status === true ? '✓' : a2_status === false ? '✗' : '';
+    }
+    
+    doc.render(data);
+
+    const buf = doc.getZip().generate({ type: 'nodebuffer' });
+    const base64 = buf.toString('base64');
+
+    return { success: true, fileData: base64 };
+  } catch (error: any) {
+    console.error('Error generating research paper incentive form:', error);
+    if (error.properties && error.properties.errors) {
+        console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
+    }
+    return { success: false, error: error.message || 'Failed to generate the form.' };
+  }
 }
