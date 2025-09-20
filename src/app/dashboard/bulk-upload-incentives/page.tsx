@@ -86,7 +86,28 @@ export default function BulkUploadIncentivesPage() {
             return;
         }
 
-        setData(jsonData as IncentiveUploadData[]);
+        const formattedData = jsonData.map((row: any) => {
+            // Find keys case-insensitively
+            const findKey = (key: string) => Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+
+            const titleKey = findKey('Title of Paper');
+            const emailKey = findKey('Email');
+            const journalKey = findKey('Journal');
+            const amountKey = findKey('Amount');
+            const indexKey = findKey('Index');
+            const dateKey = findKey('Date of proof');
+
+            return {
+                'Title of Paper': row[titleKey!],
+                Email: row[emailKey!],
+                Journal: row[journalKey!],
+                Amount: Number(row[amountKey!]),
+                Index: row[indexKey!],
+                'Date of proof': row[dateKey!],
+            };
+        });
+
+        setData(formattedData);
       } catch (error) {
         console.error("Error parsing file:", error);
         toast({ variant: 'destructive', title: 'File Error', description: 'Could not parse the uploaded file.' });
@@ -221,7 +242,7 @@ export default function BulkUploadIncentivesPage() {
                         <TableCell>{row['Email']}</TableCell>
                         <TableCell className="font-medium">{row['Title of Paper']}</TableCell>
                         <TableCell>{row['Journal']}</TableCell>
-                        <TableCell className="text-right">{row['Amount']?.toLocaleString('en-IN')}</TableCell>
+                        <TableCell className="text-right">{row.Amount?.toLocaleString('en-IN')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
