@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import fs from 'fs';
@@ -16,6 +15,10 @@ import JSZip from 'jszip';
 import { getTemplateContent } from '@/lib/template-manager';
 import { getSystemSettings } from './actions';
 import ImageModule from 'docxtemplater-image-module-free';
+import { generateResearchPaperIncentiveForm } from './document-actions';
+import { generateBookIncentiveForm } from './incentive-actions';
+import { generateMembershipIncentiveForm } from './membership-actions';
+import { generatePatentIncentiveForm } from './patent-actions';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -216,44 +219,38 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
     try {
         const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
         const claimSnap = await claimRef.get();
-        if (!claimSnap.exists) return null;
+        if (!claimSnap.exists()) return null;
 
         const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
-        const userRef = adminDb.collection('users').doc(claim.uid);
-        const userSnap = await userRef.get();
-        if (!userSnap.exists) return null;
-
-        const user = userSnap.data() as User;
         
-        const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.conferencePaperTitle || 'N/A';
+        let result: { success: boolean; fileData?: string; error?: string };
 
-        const content = await getTemplateContent('INCENTIVE_OFFICE_NOTING.docx');
-        if (!content) {
-            console.error(`Template "INCENTIVE_OFFICE_NOTING.docx" not found.`);
-            return null;
+        switch (claim.claimType) {
+            case 'Research Papers':
+                result = await generateResearchPaperIncentiveForm(claimId);
+                break;
+            case 'Books':
+                result = await generateBookIncentiveForm(claimId);
+                break;
+            case 'Membership of Professional Bodies':
+                result = await generateMembershipIncentiveForm(claimId);
+                break;
+            case 'Patents':
+                result = await generatePatentIncentiveForm(claimId);
+                break;
+            default:
+                // Fallback to a generic noting if a specific one isn't available
+                result = await generateOfficeNotingForClaim(claimId);
+                break;
         }
 
-        const zip = new PizZip(content);
-        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
-
-        const data = {
-            name: user.name,
-            designation: user.designation || 'N/A',
-            claim_title: claimTitle,
-            claim_type: claim.claimType,
-            submission_date: new Date(claim.submissionDate).toLocaleDateString(),
-            final_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
-            date: format(new Date(), 'dd/MM/yyyy'),
-        };
-
-        doc.setData(data);
-        doc.render();
-
-        const buf = doc.getZip().generate({ type: 'nodebuffer' });
-
-        const fileName = `Office_Noting_${user.name.replace(/\s+/g, '_')}_${claim.id.substring(0, 5)}.docx`;
-
-        return { fileName, content: buf };
+        if (result.success && result.fileData) {
+            const fileName = `Office_Noting_${claim.userName.replace(/\s+/g, '_')}_${claim.claimId?.replace(/\//g, '-') || claim.id.substring(0,5)}.docx`;
+            return { fileName, content: Buffer.from(result.fileData, 'base64') };
+        } else {
+            console.error(`Failed to generate specific noting for claim ${claimId} of type ${claim.claimType}:`, result.error);
+            return null;
+        }
     } catch (error) {
         console.error(`Error generating noting for claim ${claimId}:`, error);
         return null;
@@ -383,7 +380,8 @@ async function getImageAsBuffer(url: string) {
     try {
         const response = await fetch(url);
         if (!response.ok) {
-            throw new Error(`Failed to fetch image: ${response.statusText}`);
+            console.warn(`Failed to fetch image: ${response.statusText} for URL: ${url}`);
+            return null;
         }
         const arrayBuffer = await response.arrayBuffer();
         return Buffer.from(arrayBuffer);
@@ -422,12 +420,10 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       
       const imageModule = new ImageModule({
           centered: false,
-          getImage: (tag: string, tagName: string) => {
-              // tagName is the value from the template, e.g., 'data.approver2_sign'
-              const key = tagName.replace('image_data.', ''); // Assuming your template uses {image_data.approver2_sign}
-              return data[key] || null; // Return the buffer or null
+          getImage: (tag: string) => {
+              return Buffer.from(tag, 'base64');
           },
-          getSize: () => [150, 50], // width, height in pixels
+          getSize: () => [150, 50],
       });
 
       const doc = new Docxtemplater(zip, {
@@ -458,9 +454,9 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
 
       const resolvedImages = await Promise.all(imagePromises);
       const imageBuffers = resolvedImages.reduce((acc, { key, buffer }) => {
-          if (buffer) acc[key] = buffer;
+          if (buffer) acc[key] = buffer.toString('base64');
           return acc;
-      }, {} as Record<string, Buffer>);
+      }, {} as Record<string, string>);
   
       data.name = user.name;
       data.designation = user.designation || 'N/A';
@@ -487,9 +483,9 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       data.date = format(new Date(), 'dd/MM/yyyy');
       
       // Add image buffers to the data object for the template
-      data.approver2_sign = imageBuffers.approver2_sign;
-      data.approver3_sign = imageBuffers.approver3_sign;
-      data.approver4_sign = imageBuffers.approver4_sign;
+      if (imageBuffers.approver2_sign) data.approver2_sign = imageBuffers.approver2_sign;
+      if (imageBuffers.approver3_sign) data.approver3_sign = imageBuffers.approver3_sign;
+      if (imageBuffers.approver4_sign) data.approver4_sign = imageBuffers.approver4_sign;
       
       doc.setData({ ...data });
   
