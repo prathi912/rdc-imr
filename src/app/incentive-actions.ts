@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -6,7 +7,7 @@ import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getTemplateContent } from '@/lib/template-manager';
-
+import { format } from 'date-fns';
 
 export async function generateBookIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
@@ -74,6 +75,7 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
         publisher_type: claim.publisherType,
         print_isbn: claim.isbnPrint || 'N/A',
         electronic_isbn: claim.isbnElectronic || 'N/A',
+        date: format(new Date(), 'dd/MM/yyyy'),
     };
     
     doc.setData(data);

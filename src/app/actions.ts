@@ -29,7 +29,7 @@ import type {
 import { sendEmail as sendEmailUtility } from "@/lib/email"
 import fs from "fs"
 import path from "path"
-import { addDays, setHours, setMinutes, setSeconds, isToday } from "date-fns"
+import { addDays, setHours, setMinutes, setSeconds, isToday, format } from "date-fns"
 import { formatInTimeZone } from "date-fns-tz"
 import type * as z from "zod"
 import PizZip from "pizzip"
@@ -1921,6 +1921,7 @@ export async function generateOfficeNotingForm(
         ? formatInTimeZone(`${project.meetingDetails.date}T00:00:00`, "Asia/Kolkata", "dd/MM/yyyy")
         : "N/A",
       presentation_time: project.meetingDetails?.time || "N/A",
+      date: format(new Date(), 'dd/MM/yyyy'),
     }
 
     doc.setData(data)
@@ -2066,6 +2067,7 @@ export async function markImrAttendance(
     
 
     
+
 
 
 

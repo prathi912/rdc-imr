@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -6,6 +7,7 @@ import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getTemplateContent } from '@/lib/template-manager';
+import { format } from 'date-fns';
 
 
 export async function generateMembershipIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
@@ -61,6 +63,7 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
         approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
         approver3_comments: approval3?.comments || '',
         approver3_amount: approval3?.approvedAmount?.toLocaleString('en-IN') || '',
+        date: format(new Date(), 'dd/MM/yyyy'),
     };
     
     doc.setData(data);

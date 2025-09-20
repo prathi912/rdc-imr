@@ -243,6 +243,7 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
             claim_type: claim.claimType,
             submission_date: new Date(claim.submissionDate).toLocaleDateString(),
             final_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
+            date: format(new Date(), 'dd/MM/yyyy'),
         };
 
         doc.setData(data);

@@ -6,6 +6,7 @@ import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+import { format } from 'date-fns';
 
 // This function fetches the template from a public URL.
 async function getTemplateContent(url: string): Promise<Buffer | null> {
@@ -78,6 +79,7 @@ export async function generatePatentIncentiveForm(claimId: string): Promise<{ su
         approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
         approver3_comment: approval3?.comments || '',
         approver3_amount: approval3?.approvedAmount?.toLocaleString('en-IN') || '',
+        date: format(new Date(), 'dd/MM/yyyy'),
     };
     
     doc.setData(data);
