@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import fs from 'fs';
@@ -14,7 +15,6 @@ import { toWords } from 'number-to-words';
 import JSZip from 'jszip';
 import { getTemplateContent } from '@/lib/template-manager';
 import { getSystemSettings } from './actions';
-import ImageModule from 'docxtemplater-image-module-free';
 import { generateBookIncentiveForm } from './incentive-actions';
 import { generateMembershipIncentiveForm } from './membership-actions';
 import { generatePatentIncentiveForm } from './patent-actions';
@@ -375,21 +375,6 @@ export async function exportClaimToExcel(
   }
 }
 
-async function getImageAsBuffer(url: string) {
-    try {
-        const response = await fetch(url, { cache: 'no-store' });
-        if (!response.ok) {
-            console.warn(`Failed to fetch image: ${response.statusText} for URL: ${url}`);
-            return null;
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        return Buffer.from(arrayBuffer);
-    } catch (error) {
-        console.error(`Error fetching image from ${url}:`, error);
-        return null; // Return null if the image can't be fetched
-    }
-}
-
 export async function generateResearchPaperIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
     try {
       const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
@@ -415,48 +400,17 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
   
       const zip = new PizZip(content);
       
-      const imageOptions = {
-        centered: false,
-        getImage: (tagValue: string) => {
-            return Buffer.from(tagValue, 'base64');
-        },
-        getSize: () => [120, 40],
-      };
-
-      const imageModule = new ImageModule(imageOptions);
-
       const doc = new Docxtemplater(zip, {
           paragraphLoop: true,
           linebreaks: true,
           nullGetter: () => "",
-          modules: [imageModule],
       });
       
       const approvals = claim.approvals || [];
       const approval1 = approvals[0] || null;
-      const approval2 = approvals[0] || null;
-      const approval3 = approvals[1] || null;
-      const approval4 = approvals[2] || null;
-
-      
-      const signatureUrls = {
-        approver2_sign: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/sign1.jpg",
-        approver3_sign: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/anandsirsign.PNG",
-        approver4_sign: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/GeetikaMadamSign.jpeg",
-      };
-
-      const imagePromises = Object.entries(signatureUrls).map(async ([key, url]) => {
-          const buffer = await getImageAsBuffer(url);
-          return { key, buffer };
-      });
-      
-      const resolvedImages = await Promise.all(imagePromises);
-      const imagePlaceholders = resolvedImages.reduce((acc, { key, buffer }) => {
-          if (buffer) {
-              acc[key] = buffer.toString('base64');
-          }
-          return acc;
-      }, {} as Record<string, string>);
+      const approval2 = approvals[1] || null;
+      const approval3 = approvals[2] || null;
+      const approval4 = approvals[3] || null;
 
       const data: { [key: string]: any } = {
         name: user.name || '',
@@ -482,11 +436,6 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         approver4_comments: approval4?.comments || '',
         approver4_amount: approval4?.approvedAmount?.toLocaleString('en-IN') || claim.finalApprovedAmount?.toLocaleString('en-IN') || '',
         date: format(new Date(), 'dd/MM/yyyy'),
-        
-        // Use the new syntax for images
-        approver2_sign: imagePlaceholders.approver2_sign,
-        approver3_sign: imagePlaceholders.approver3_sign,
-        approver4_sign: imagePlaceholders.approver4_sign,
       };
       
       const checklistFields = [
@@ -520,5 +469,3 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       return { success: false, error: error.message || 'Failed to generate the form.' };
     }
 }
-
-    
