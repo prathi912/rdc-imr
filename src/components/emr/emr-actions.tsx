@@ -583,5 +583,3 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
         </div>
     )
 }
-
-    

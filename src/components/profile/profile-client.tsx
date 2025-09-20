@@ -3,7 +3,9 @@
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails } from '@/types';
-import { getResearchDomain, uploadFileToServer, findUserByMisId, updateEmrInterestDetails } from '@/app/actions';
+import { getResearchDomain, uploadFileToServer } from '@/app/actions';
+import { updateEmrInterestDetails } from '@/app/emr-actions';
+import { findUserByMisId } from '@/app/userfinding';
 import { addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, manageCoAuthorRequest } from '@/app/bulkpapers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -154,7 +156,7 @@ function AddEditPaperDialog({
             toast({ title: 'Author already added', variant: 'destructive' });
             return;
         }
-        setAuthors([...authors, { name, email, role: 'Co-Author', isExternal: true, status: 'approved' }]);
+        setAuthors([...authors, { name, email, role: 'Co-Author', isExternal: true, uid: null, status: 'approved' }]);
         setExternalAuthorName('');
         setExternalAuthorEmail('');
     };
