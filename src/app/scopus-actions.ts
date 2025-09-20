@@ -101,10 +101,10 @@ export async function fetchAdvancedScopusData(
         }
     }
 
-    const issnToQuery = printIssn || electronicIssn;
-    if (issnToQuery) {
+    const sourceId = coredata['source-id'];
+    if (sourceId) {
         try {
-            const serialApiUrl = `https://api.elsevier.com/content/serial/title/issn/${issnToQuery}?apiKey=${apiKey}&view=ENHANCED`;
+            const serialApiUrl = `https://api.elsevier.com/content/serial/title/source_id/${sourceId}?apiKey=${apiKey}&view=ENHANCED`;
             const serialResponse = await fetch(serialApiUrl, { headers: { Accept: "application/json" } });
             if (serialResponse.ok) {
                 const serialData = await serialResponse.json();
@@ -117,6 +117,8 @@ export async function fetchAdvancedScopusData(
                         journalClassification = `Q${primarySubject['@quartile']}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
                     }
                 }
+            } else {
+                 console.warn(`Scopus Serial API failed with status: ${serialResponse.status}`);
             }
         } catch (serialError) {
             console.warn("Could not fetch journal Q rating from Scopus Serial API, but proceeding without it.", serialError);
