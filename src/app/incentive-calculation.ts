@@ -178,7 +178,7 @@ function getBaseIncentiveForBook(claimData: Partial<IncentiveClaim>, isChapter: 
 
     if (isChapter) {
         if (isScopus) return 6000;
-        if (pubType === 'National') {
+        if (pubType === 'National') { // Indian Publisher
             if (pages > 20) return 2500;
             if (pages >= 10) return 1500;
             if (pages >= 5) return 500;
@@ -189,15 +189,15 @@ function getBaseIncentiveForBook(claimData: Partial<IncentiveClaim>, isChapter: 
         }
     } else { // Full Book
         if (isScopus) return 18000;
-        if (pubType === 'National') {
+        if (pubType === 'National') { // Indian Publisher
             if (pages > 350) return 3000;
             if (pages >= 200) return 2500;
             if (pages >= 100) return 2000;
-            return 1000;
+            return 1000; // < 100 pages
         } else if (pubType === 'International') {
             if (pages > 350) return 6000;
             if (pages >= 200) return 3500;
-            return 2000;
+            return 2000; // < 200 pages
         }
     }
     return 0;
@@ -210,28 +210,26 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
         let baseIncentive = getBaseIncentiveForBook(claimData, isChapter);
 
         if (claimData.authorRole === 'Editor') {
-            baseIncentive /= 2;
+            baseIncentive *= 0.5;
         }
 
         let totalIncentive = baseIncentive;
         
+        // Rule for multiple chapters in the same book
         if (isChapter && claimData.chaptersInSameBook && claimData.chaptersInSameBook > 1) {
             const n = claimData.chaptersInSameBook;
+            // To get the book limit, we create a temporary object with enough pages to qualify for a full book incentive
             const fullBookData = { ...claimData, bookTotalPages: 999 };
             const baseBookIncentive = getBaseIncentiveForBook(fullBookData, false);
             
             let sum = 0;
             for (let k = 1; k <= n; k++) {
                 sum += baseIncentive / k;
-                if (sum >= baseBookIncentive) {
-                    sum = baseBookIncentive;
-                    break;
-                }
             }
             totalIncentive = Math.min(sum, baseBookIncentive);
         }
 
-        const internalAuthorsCount = claimData.authors?.filter(a => !a.isExternal).length || 0;
+        const internalAuthorsCount = (claimData.authors?.filter(a => !a.isExternal).length || 0) + (claimData.totalPuAuthors || 0);
         if (internalAuthorsCount > 1) {
             totalIncentive /= internalAuthorsCount;
         }
