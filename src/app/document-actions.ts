@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import fs from 'fs';
@@ -377,7 +378,7 @@ export async function exportClaimToExcel(
 
 async function getImageAsBuffer(url: string) {
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) {
             console.warn(`Failed to fetch image: ${response.statusText} for URL: ${url}`);
             return null;
@@ -415,17 +416,12 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
   
       const zip = new PizZip(content);
       
-      const settings = await getSystemSettings();
-      const approvers = settings.incentiveApprovers || [];
-      
-      const imageModule = new ImageModule({
-          centered: false,
-          getImage: (tag: string) => {
-              // tag will contain the base64 data
-              return Buffer.from(tag, 'base64');
-          },
-          getSize: () => [120, 40], // Adjust size as needed
-      });
+      const imageOptions = {
+        centered: false,
+        getImage: (tag: string) => Buffer.from(tag, 'base64'),
+        getSize: () => [120, 40],
+      };
+      const imageModule = new ImageModule(imageOptions);
 
       const doc = new Docxtemplater(zip, {
           paragraphLoop: true,
@@ -435,27 +431,31 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       });
       
       const approvals = claim.approvals || [];
-      const approval1 = approvals?.[0];
-      const approval2 = approvals?.[1];
-      const approval3 = approvals?.[2];
-      const approval4 = approvals?.[3];
+      const approval1 = approvals[0];
+      const approval2 = approvals[1];
+      const approval3 = approvals[2];
+      const approval4 = approvals[3];
       
       const signatureUrls = {
-        approver2_sign: approvers.find(a => a.stage === 2)?.signatureUrl,
-        approver3_sign: approvers.find(a => a.stage === 3)?.signatureUrl,
-        approver4_sign: approvers.find(a => a.stage === 4)?.signatureUrl,
+        approver2_sign_url: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/sign1.jpg",
+        approver3_sign_url: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/anandsirsign.PNG",
+        approver4_sign_url: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/GeetikaMadamSign.jpeg",
       };
 
       const imagePromises = Object.entries(signatureUrls)
-        .filter(([, url]) => !!url)
         .map(async ([key, url]) => {
-          const buffer = await getImageAsBuffer(url!);
-          return { key, buffer };
+          const buffer = await getImageAsBuffer(url);
+          // The key for the data should match the placeholder in the template without the {%}
+          // e.g., for {%approver2_sign}, the key is 'approver2_sign'
+          const dataKey = key.replace('_url', ''); 
+          return { key: dataKey, buffer };
         });
 
       const resolvedImages = await Promise.all(imagePromises);
-      const imageBuffers = resolvedImages.reduce((acc, { key, buffer }) => {
-          if (buffer) acc[key] = buffer.toString('base64');
+      const imagePlaceholders = resolvedImages.reduce((acc, { key, buffer }) => {
+          if (buffer) {
+              acc[key] = buffer.toString('base64');
+          }
           return acc;
       }, {} as Record<string, string>);
   
@@ -483,6 +483,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         approver4_comments: approval4?.comments || '',
         approver4_amount: approval4?.approvedAmount?.toLocaleString('en-IN') || claim.finalApprovedAmount?.toLocaleString('en-IN') || '',
         date: format(new Date(), 'dd/MM/yyyy'),
+        ...imagePlaceholders, // Add the base64 image data
       };
       
       const checklistFields = [
@@ -501,11 +502,6 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
           const a2_status = approval2?.verifiedFields?.[fieldId];
           data[`a2_c${c_index}`] = a2_status === true ? '✓' : a2_status === false ? '✗' : '';
       }
-      
-      // Pass base64 image data for the image module
-      if (imageBuffers.approver2_sign) data.approver2_sign = imageBuffers.approver2_sign;
-      if (imageBuffers.approver3_sign) data.approver3_sign = imageBuffers.approver3_sign;
-      if (imageBuffers.approver4_sign) data.approver4_sign = imageBuffers.approver4_sign;
       
       doc.render(data);
   
