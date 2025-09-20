@@ -5,25 +5,25 @@ import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import { Separator } from "@/components/ui/separator"
-import { useState, useEffect, useMemo, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
-import { db } from "@/lib/config"
-import { doc, getDoc, setDoc } from "firebase/firestore"
-import type { User, IncentiveClaim, Author } from "@/types"
-import { uploadFileToServer } from "@/app/actions"
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useToast } from '@/hooks/use-toast'
+import { db } from '@/lib/config'
+import { collection, doc, getDoc, setDoc } from 'firebase/firestore'
+import type { User, IncentiveClaim, Author } from '@/types'
+import { uploadFileToServer } from '@/app/actions'
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
-import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit } from "lucide-react"
+import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -93,6 +93,24 @@ const researchPaperSchema = z
       return true
     },
     { message: "For WoS or Both, you must select a WoS Type.", path: ["wosType"] },
+  )
+   .refine(
+    (data) => {
+      if (data.indexType === 'scopus' || data.indexType === 'both') {
+        return !!data.scopusLink && data.scopusLink.length > 0;
+      }
+      return true;
+    },
+    { message: 'Scopus URL is required for this index type.', path: ['scopusLink'] }
+  )
+  .refine(
+    (data) => {
+      if (data.indexType === 'wos' || data.indexType === 'both') {
+        return !!data.wosLink && data.wosLink.length > 0;
+      }
+      return true;
+    },
+    { message: 'Web of Science URL is required for this index type.', path: ['wosLink'] }
   )
   .refine(
     (data) => {
