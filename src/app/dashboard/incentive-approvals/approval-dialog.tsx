@@ -54,7 +54,7 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
     path: ['action'],
 })
 .refine(data => {
-    if (stageIndex > 0 && data.action === 'approve') {
+    if (stageIndex > 1 && data.action === 'approve') {
         return data.amount !== undefined && data.amount > 0;
     }
     return true;
@@ -232,8 +232,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
-    // Checklist is only for stage 1 (index 0) of Research Papers
-    const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0);
+    // Checklist for stage 1 (index 0) and stage 2 (index 1) of Research Papers
+    const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1));
     
     // Dynamically determine which fields need verification based on the claim's data
     const getFieldsToVerify = () => {
@@ -339,6 +339,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
+    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -356,7 +358,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                 </DialogHeader>
                 
                 <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-4">
-                    {previousApprovals.length > 0 && (
+                    {isViewerAdminOrApprover && previousApprovals.length > 0 && (
                         <div className="space-y-4">
                             <h4 className="font-semibold text-sm">Previous Approval History</h4>
                             {previousApprovals.map((approval, index) => (
@@ -401,7 +403,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {action === 'approve' && stageIndex > 0 && (
+                            {action === 'approve' && stageIndex > 1 && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
