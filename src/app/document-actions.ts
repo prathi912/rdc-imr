@@ -1,3 +1,4 @@
+
 'use server';
 
 import fs from 'fs';
@@ -420,10 +421,9 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       const imageModule = new ImageModule({
           centered: false,
           getImage: (tag: string) => {
-              // tag is the value of the placeholder, e.g., signatureBuffer
-              return tag;
+              return Buffer.from(tag, 'base64');
           },
-          getSize: () => [150, 50], // width, height
+          getSize: () => [150, 50],
       });
 
       const doc = new Docxtemplater(zip, {
@@ -434,10 +434,10 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       });
       
       const approvals = claim.approvals || [];
-      const approval1 = approvals[0] || null;
-      const approval2 = approvals[1] || null;
-      const approval3 = approvals[2] || null;
-      const approval4 = approvals[3] || null;
+      const approval1 = approvals?.[0];
+      const approval2 = approvals?.[1];
+      const approval3 = approvals?.[2];
+      const approval4 = approvals?.[3];
       
       const signatureUrls = {
         approver2_sign: approvers.find(a => a.stage === 2)?.signatureUrl,
@@ -454,9 +454,9 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
 
       const resolvedImages = await Promise.all(imagePromises);
       const imageBuffers = resolvedImages.reduce((acc, { key, buffer }) => {
-          if (buffer) acc[key] = buffer;
+          if (buffer) acc[key] = buffer.toString('base64');
           return acc;
-      }, {} as Record<string, Buffer>);
+      }, {} as Record<string, string>);
   
       const data: { [key: string]: any } = {
         name: user.name,
@@ -501,7 +501,6 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
           data[`a2_c${c_index}`] = a2_status === true ? '✓' : a2_status === false ? '✗' : '';
       }
       
-      // Pass the image buffers directly to the template data
       if (imageBuffers.approver2_sign) data.approver2_sign = imageBuffers.approver2_sign;
       if (imageBuffers.approver3_sign) data.approver3_sign = imageBuffers.approver3_sign;
       if (imageBuffers.approver4_sign) data.approver4_sign = imageBuffers.approver4_sign;
