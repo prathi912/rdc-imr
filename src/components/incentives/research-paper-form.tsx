@@ -370,6 +370,8 @@ export function ResearchPaperForm() {
   })
   
   const formValues = form.watch();
+  
+  const isPhdScholar = user?.designation === 'Ph.D Scholar';
 
   const calculate = useCallback(async () => {
     if (!user || !user.faculty) return;
@@ -453,13 +455,16 @@ export function ResearchPaperForm() {
     [isSpecialFaculty],
   )
 
-  const availableClassifications = useMemo(
-    () =>
-      isSpecialFaculty && (indexType === "wos" || indexType === "both")
-        ? journalClassificationOptions.filter((o) => o.value === "Q1" || o.value === "Q2")
-        : journalClassificationOptions,
-    [isSpecialFaculty, indexType],
-  )
+  const availableClassifications = useMemo(() => {
+      let options = journalClassificationOptions;
+      if (isPhdScholar) {
+        options = options.filter(o => o.value === 'Q1' || o.value === 'Q2');
+      }
+      if (isSpecialFaculty && (indexType === "wos" || indexType === "both")) {
+        options = options.filter((o) => o.value === "Q1" || o.value === "Q2");
+      }
+      return options;
+  }, [isSpecialFaculty, indexType, isPhdScholar]);
   
   const watchAuthors = form.watch('authors');
   const firstAuthorExists = useMemo(() => 
@@ -788,6 +793,15 @@ export function ResearchPaperForm() {
                     <Button asChild variant="link" className="p-1 h-auto">
                       <Link href="/dashboard/settings">Go to Settings</Link>
                     </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+              {isPhdScholar && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Ph.D. Scholar Policy</AlertTitle>
+                  <AlertDescription>
+                    As a Ph.D. Scholar, you are eligible for incentives only for publications in Q1 or Q2 journals.
                   </AlertDescription>
                 </Alert>
               )}
@@ -1151,7 +1165,7 @@ export function ResearchPaperForm() {
                             <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                         </Select>
                         {field.email.toLowerCase() !== user?.email.toLowerCase() && (
-                          <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeAuthor(index)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
                         )}
                       </div>
                     </div>
@@ -1356,3 +1370,5 @@ export function ResearchPaperForm() {
     </div>
   )
 }
+
+    

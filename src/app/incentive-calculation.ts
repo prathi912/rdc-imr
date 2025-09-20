@@ -18,7 +18,6 @@ const SPECIAL_POLICY_FACULTIES = [
 ];
 
 function getBaseIncentiveForPaper(claimData: Partial<IncentiveClaim>, faculty: string, designation?: string): number {
-    const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(faculty);
     const { journalClassification, indexType, wosType, publicationType } = claimData;
     
     if (designation === 'Ph.D Scholar') {
@@ -28,6 +27,8 @@ function getBaseIncentiveForPaper(claimData: Partial<IncentiveClaim>, faculty: s
             default: return 0; // PhD Scholars only get incentive for Q1/Q2
         }
     }
+
+    const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(faculty);
 
     if (publicationType === 'Scopus Indexed Conference Proceedings') {
         return 3000;
