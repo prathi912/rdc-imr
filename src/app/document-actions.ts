@@ -7,7 +7,7 @@ import path from 'path';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
-import type { Project, User, Evaluation, IncentiveClaim, SystemSettings } from '@/types';
+import type { Project, User, Evaluation, IncentiveClaim, SystemSettings, ApprovalStage } from '@/types';
 import admin from 'firebase-admin';
 import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
