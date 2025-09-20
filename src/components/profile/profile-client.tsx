@@ -608,7 +608,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                             <div className="flex justify-center md:justify-start gap-8 my-4">
                                 <StatItem value={projects.length} label="IMR Projects" />
                                 <StatItem value={emrInterests.length} label="EMR Interests" />
-                                <StatItem value={researchPapers.length + claims.length} label="Publications" />
+                                <StatItem value={researchPapers.length + claims.length} label="Publications & Claims" />
                             </div>
                         </div>
                     </div>
@@ -657,7 +657,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                     <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="projects">IMR Projects ({projects.length})</TabsTrigger>
                         <TabsTrigger value="emr">EMR Interests ({emrInterests.length})</TabsTrigger>
-                        <TabsTrigger value="publications">Publications & Incentives ({researchPapers.length} / {claims.length})</TabsTrigger>
+                        <TabsTrigger value="publications">Publications & Incentives ({researchPapers.length + claims.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="projects">
                         <div className="space-y-4 mt-4">
@@ -812,8 +812,9 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                                 <p className="font-semibold flex-1">{getClaimTitle(claim)}</p>
                                                 <Badge variant={claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                                             </div>
-                                            <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
+                                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm pt-2 border-t">
                                                 <span><strong className="text-muted-foreground">Claim Type:</strong> {claim.claimType}</span>
+                                                {claim.indexType && claim.claimType === 'Research Papers' && <span><strong className="text-muted-foreground">Index:</strong> {claim.indexType.toUpperCase()}</span>}
                                                 {claim.finalApprovedAmount && <span><strong className="text-muted-foreground">Approved Amount:</strong> ₹{claim.finalApprovedAmount.toLocaleString('en-IN')}</span>}
                                                 <span><strong className="text-muted-foreground">Submitted:</strong> {format(parseISO(claim.submissionDate), 'PPP')}</span>
                                             </div>
