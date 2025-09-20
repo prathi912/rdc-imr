@@ -429,6 +429,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
           },
           getSize: () => [150, 50],
           handleError: (e) => {
+              // Instead of throwing, log the error and continue
               console.error("Docxtemplater Image Module Error:", e);
           }
       });
@@ -487,6 +488,25 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         approver4_amount: approval4?.approvedAmount?.toLocaleString('en-IN') || claim.finalApprovedAmount?.toLocaleString('en-IN') || '',
         date: format(new Date(), 'dd/MM/yyyy'),
       };
+      
+      const checklistFields = [
+        'name', 'designation', 'publicationType', 'journalName', 'locale', 'indexType',
+        'journalClassification', 'authorRoleAndPosition', 'totalPuAuthors', 'printIssn',
+        'publicationProofUrls', 'isPuNameInPublication', 'publicationMonth'
+      ];
+      
+      for (let i = 0; i < checklistFields.length; i++) {
+          const fieldId = checklistFields[i];
+          const c_index = i + 1;
+      
+          // Approver 1
+          const a1_status = approval1?.verifiedFields?.[fieldId];
+          data[`a1_c${c_index}`] = a1_status === true ? '✓' : a1_status === false ? '✗' : '';
+      
+          // Approver 2
+          const a2_status = approval2?.verifiedFields?.[fieldId];
+          data[`a2_c${c_index}`] = a2_status === true ? '✓' : a2_status === false ? '✗' : '';
+      }
       
       if (imageBuffers.approver2_sign) data.approver2_sign = imageBuffers.approver2_sign;
       if (imageBuffers.approver3_sign) data.approver3_sign = imageBuffers.approver3_sign;
