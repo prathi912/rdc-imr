@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,12 +41,12 @@ export default function BulkUploadIncentivesPage() {
   const { toast } = useToast();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  useState(() => {
+  useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setCurrentUser(JSON.parse(storedUser));
     }
-  });
+  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,7 +108,10 @@ export default function BulkUploadIncentivesPage() {
     setIsLoading(true);
     setUploadResult(null);
     try {
-      const result = await bulkUploadIncentiveClaims(data, claimType, currentUser.uid);
+      // Sanitize the data to ensure it's a plain object array before sending to the server action
+      const plainData = JSON.parse(JSON.stringify(data));
+      const result = await bulkUploadIncentiveClaims(plainData, claimType, currentUser.uid);
+      
       if (result.success) {
         setUploadResult(result.data);
         toast({ title: 'Upload Processed', description: `${result.data.successfulClaims} claims created from ${result.data.totalRecords} records.` });
