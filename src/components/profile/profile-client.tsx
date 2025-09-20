@@ -608,7 +608,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                             <div className="flex justify-center md:justify-start gap-8 my-4">
                                 <StatItem value={projects.length} label="IMR Projects" />
                                 <StatItem value={emrInterests.length} label="EMR Interests" />
-                                <StatItem value={researchPapers.length} label="Research Papers" />
+                                <StatItem value={researchPapers.length + claims.length} label="Publications" />
                             </div>
                         </div>
                     </div>
@@ -654,11 +654,10 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
 
             <div className="w-full max-w-4xl mt-8">
                 <Tabs defaultValue="projects" className="w-full">
-                    <TabsList className="grid w-full grid-cols-4">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="projects">IMR Projects ({projects.length})</TabsTrigger>
                         <TabsTrigger value="emr">EMR Interests ({emrInterests.length})</TabsTrigger>
-                        <TabsTrigger value="papers">Paper Publications ({researchPapers.length})</TabsTrigger>
-                        <TabsTrigger value="incentives">Incentive Claims ({claims.length})</TabsTrigger>
+                        <TabsTrigger value="publications">Publications & Incentives ({researchPapers.length} / {claims.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="projects">
                         <div className="space-y-4 mt-4">
@@ -720,105 +719,111 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                             )}
                         </div>
                     </TabsContent>
-                    <TabsContent value="papers">
-                        <div className="space-y-4 mt-4">
-                            {isOwner && (
-                                <Button onClick={() => { setPaperToEdit(null); setIsAddEditDialogOpen(true); }} className="mb-4" variant="outline" size="sm">
-                                    <Plus className="mr-2 h-4 w-4" /> Add Research Paper
-                                </Button>
-                            )}
-                            {researchPapers.length > 0 ? researchPapers.map(paper => {
-                                const myRole = paper.authors.find((a: Author) => a.uid === user.uid)?.role;
-                                const pendingRequests = paper.coAuthorRequests?.filter((req: Author) => req.status === 'pending');
-                                return (
-                                <Card key={paper.id}>
-                                    <CardContent className="p-4 space-y-2">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                                <a href={paper.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">{paper.title}</a>
-                                                {myRole && <Badge variant="secondary" className="ml-2">{myRole}</Badge>}
-                                            </div>
-                                            {isOwner && paper.mainAuthorUid === user.uid && (
-                                                <TooltipProvider>
-                                                <div className="flex gap-2">
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setPaperToEdit(paper); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4"/></Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent><p>Edit Paper</p></TooltipContent>
-                                                    </Tooltip>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPaperToDelete(paper)}><Trash2 className="h-4 w-4"/></Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent><p>Delete Paper</p></TooltipContent>
-                                                    </Tooltip>
+                    <TabsContent value="publications">
+                        <div className="space-y-6 mt-4">
+                            <div>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="text-xl font-bold">Research Papers</h3>
+                                    {isOwner && (
+                                        <Button onClick={() => { setPaperToEdit(null); setIsAddEditDialogOpen(true); }} variant="outline" size="sm">
+                                            <Plus className="mr-2 h-4 w-4" /> Add Paper
+                                        </Button>
+                                    )}
+                                </div>
+                                {researchPapers.length > 0 ? researchPapers.map(paper => {
+                                    const myRole = paper.authors.find((a: Author) => a.uid === user.uid)?.role;
+                                    const pendingRequests = paper.coAuthorRequests?.filter((req: Author) => req.status === 'pending');
+                                    return (
+                                    <Card key={paper.id}>
+                                        <CardContent className="p-4 space-y-2">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1">
+                                                    <a href={paper.url} target="_blank" rel="noopener noreferrer" className="font-semibold hover:underline">{paper.title}</a>
+                                                    {myRole && <Badge variant="secondary" className="ml-2">{myRole}</Badge>}
                                                 </div>
-                                                </TooltipProvider>
-                                            )}
-                                        </div>
-                                        <div className="border rounded-lg overflow-hidden">
-                                          <Table>
-                                              <TableHeader>
-                                                  <TableRow>
-                                                      <TableHead>Author Name</TableHead>
-                                                      <TableHead>Role</TableHead>
-                                                      <TableHead>Email</TableHead>
-                                                  </TableRow>
-                                              </TableHeader>
-                                              <TableBody>
-                                                  {paper.authors.filter((a: Author) => a.status === 'approved').map((author: Author) => (
-                                                      <TableRow key={author.email}>
-                                                          <TableCell>{author.name} {author.isExternal && <span className="text-xs text-muted-foreground">(Ext)</span>}</TableCell>
-                                                          <TableCell><Badge variant={author.role === 'First Author' ? 'default' : 'secondary'}>{author.role}</Badge></TableCell>
-                                                          <TableCell>{author.email}</TableCell>
-                                                      </TableRow>
-                                                  ))}
-                                              </TableBody>
-                                          </Table>
-                                        </div>
-                                        {isOwner && paper.mainAuthorUid === user.uid && pendingRequests && pendingRequests.length > 0 && (
-                                            <div className="mt-4 p-3 bg-muted/50 rounded-md">
-                                                <h4 className="text-sm font-semibold mb-2">Pending Co-Author Requests</h4>
-                                                <div className="space-y-2">
-                                                    {pendingRequests.map((req: Author) => (
-                                                        <div key={req.uid} className="flex items-center justify-between text-sm">
-                                                            <span>{req.name} ({req.email})</span>
-                                                            <div className="flex gap-2">
-                                                                <Button size="sm" variant="outline" className="h-7 text-green-600 border-green-600 hover:bg-green-100 hover:text-green-700" onClick={() => handleCoAuthorAction(paper, req, 'accept')}><Check className="h-4 w-4"/> Accept</Button>
-                                                                <Button size="sm" variant="outline" className="h-7 text-destructive border-destructive hover:bg-red-100 hover:text-destructive" onClick={() => handleCoAuthorAction(paper, req, 'reject')}><X className="h-4 w-4"/> Reject</Button>
-                                                            </div>
-                                                        </div>
+                                                {isOwner && paper.mainAuthorUid === user.uid && (
+                                                    <TooltipProvider>
+                                                    <div className="flex gap-2">
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setPaperToEdit(paper); setIsAddEditDialogOpen(true); }}><Edit className="h-4 w-4"/></Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent><p>Edit Paper</p></TooltipContent>
+                                                        </Tooltip>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPaperToDelete(paper)}><Trash2 className="h-4 w-4"/></Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent><p>Delete Paper</p></TooltipContent>
+                                                        </Tooltip>
+                                                    </div>
+                                                    </TooltipProvider>
+                                                )}
+                                            </div>
+                                            <div className="border rounded-lg overflow-hidden">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Author Name</TableHead>
+                                                        <TableHead>Role</TableHead>
+                                                        <TableHead>Email</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {paper.authors.filter((a: Author) => a.status === 'approved').map((author: Author) => (
+                                                        <TableRow key={author.email}>
+                                                            <TableCell>{author.name} {author.isExternal && <span className="text-xs text-muted-foreground">(Ext)</span>}</TableCell>
+                                                            <TableCell><Badge variant={author.role === 'First Author' ? 'default' : 'secondary'}>{author.role}</Badge></TableCell>
+                                                            <TableCell>{author.email}</TableCell>
+                                                        </TableRow>
                                                     ))}
-                                                </div>
+                                                </TableBody>
+                                            </Table>
                                             </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}) : (
-                                <Card><CardContent className="p-6 text-center text-muted-foreground">No research papers found.</CardContent></Card>
-                            )}
-                        </div>
-                    </TabsContent>
-                    <TabsContent value="incentives">
-                        <div className="space-y-4 mt-4">
-                             {claims.length > 0 ? claims.map(claim => (
-                                <Card key={claim.id}>
-                                    <CardContent className="p-4 space-y-2">
-                                        <div className="flex justify-between items-start">
-                                            <p className="font-semibold flex-1">{getClaimTitle(claim)}</p>
-                                            <Badge variant={claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
-                                            <span><strong className="text-muted-foreground">Claim Type:</strong> {claim.claimType}</span>
-                                            {claim.finalApprovedAmount && <span><strong className="text-muted-foreground">Approved Amount:</strong> ₹{claim.finalApprovedAmount.toLocaleString('en-IN')}</span>}
-                                            <span><strong className="text-muted-foreground">Submitted:</strong> {format(parseISO(claim.submissionDate), 'PPP')}</span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )) : (
-                                <Card><CardContent className="p-6 text-center text-muted-foreground">No incentive claims found.</CardContent></Card>
-                            )}
+                                            {isOwner && paper.mainAuthorUid === user.uid && pendingRequests && pendingRequests.length > 0 && (
+                                                <div className="mt-4 p-3 bg-muted/50 rounded-md">
+                                                    <h4 className="text-sm font-semibold mb-2">Pending Co-Author Requests</h4>
+                                                    <div className="space-y-2">
+                                                        {pendingRequests.map((req: Author) => (
+                                                            <div key={req.uid} className="flex items-center justify-between text-sm">
+                                                                <span>{req.name} ({req.email})</span>
+                                                                <div className="flex gap-2">
+                                                                    <Button size="sm" variant="outline" className="h-7 text-green-600 border-green-600 hover:bg-green-100 hover:text-green-700" onClick={() => handleCoAuthorAction(paper, req, 'accept')}><Check className="h-4 w-4"/> Accept</Button>
+                                                                    <Button size="sm" variant="outline" className="h-7 text-destructive border-destructive hover:bg-red-100 hover:text-destructive" onClick={() => handleCoAuthorAction(paper, req, 'reject')}><X className="h-4 w-4"/> Reject</Button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                )}) : (
+                                    <Card><CardContent className="p-6 text-center text-muted-foreground">No research papers added yet.</CardContent></Card>
+                                )}
+                            </div>
+                             <div className="mt-8">
+                                <h3 className="text-xl font-bold mb-4">Incentive Claims</h3>
+                                <div className="space-y-4">
+                                {claims.length > 0 ? claims.map(claim => (
+                                    <Card key={claim.id}>
+                                        <CardContent className="p-4 space-y-2">
+                                            <div className="flex justify-between items-start">
+                                                <p className="font-semibold flex-1">{getClaimTitle(claim)}</p>
+                                                <Badge variant={claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
+                                                <span><strong className="text-muted-foreground">Claim Type:</strong> {claim.claimType}</span>
+                                                {claim.finalApprovedAmount && <span><strong className="text-muted-foreground">Approved Amount:</strong> ₹{claim.finalApprovedAmount.toLocaleString('en-IN')}</span>}
+                                                <span><strong className="text-muted-foreground">Submitted:</strong> {format(parseISO(claim.submissionDate), 'PPP')}</span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )) : (
+                                    <Card><CardContent className="p-6 text-center text-muted-foreground">No incentive claims found.</CardContent></Card>
+                                )}
+                                </div>
+                            </div>
                         </div>
                     </TabsContent>
                 </Tabs>
