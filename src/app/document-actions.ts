@@ -421,9 +421,10 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       const imageModule = new ImageModule({
           centered: false,
           getImage: (tag: string) => {
+              // tag will contain the base64 data
               return Buffer.from(tag, 'base64');
           },
-          getSize: () => [150, 50],
+          getSize: () => [120, 40], // Adjust size as needed
       });
 
       const doc = new Docxtemplater(zip, {
@@ -459,19 +460,19 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       }, {} as Record<string, string>);
   
       const data: { [key: string]: any } = {
-        name: user.name,
+        name: user.name || '',
         designation: `${user.designation || 'N/A'}, ${user.department || 'N/A'}`,
-        typeofpublication: claim.publicationType || 'N/A',
-        journal_name: claim.journalName || 'N/A',
-        locale: claim.locale || 'N/A',
-        indexed: claim.indexType?.toUpperCase() || 'N/A',
+        typeofpublication: claim.publicationType || '',
+        journal_name: claim.journalName || '',
+        locale: claim.locale || '',
+        indexed: claim.indexType?.toUpperCase() || '',
         wos_type: claim.wosType || '',
-        q_rating: claim.journalClassification || 'N/A',
-        role: claim.authorType || 'N/A',
-        author_position: claim.authorPosition || 'N/A',
+        q_rating: claim.journalClassification || '',
+        role: claim.authorType || '',
+        author_position: claim.authorPosition || '',
         total_authors: (claim.authors || []).length,
-        print_issn: claim.printIssn || 'N/A',
-        e_issn: claim.electronicIssn || 'N/A',
+        print_issn: claim.printIssn || '',
+        e_issn: claim.electronicIssn || '',
         publish_month: claim.publicationMonth || '',
         publish_year: claim.publicationYear || '',
         
@@ -501,21 +502,12 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
           data[`a2_c${c_index}`] = a2_status === true ? '✓' : a2_status === false ? '✗' : '';
       }
       
+      // Pass base64 image data for the image module
       if (imageBuffers.approver2_sign) data.approver2_sign = imageBuffers.approver2_sign;
       if (imageBuffers.approver3_sign) data.approver3_sign = imageBuffers.approver3_sign;
       if (imageBuffers.approver4_sign) data.approver4_sign = imageBuffers.approver4_sign;
       
-      doc.setData(data);
-  
-      try {
-        doc.render();
-      } catch (error: any) {
-        console.error('Docxtemplater render error:', error);
-        if (error.properties && error.properties.errors) {
-            console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
-        }
-        return { success: false, error: 'Failed to render the document template. Check for mismatched placeholders.' };
-      }
+      doc.render(data);
   
       const buf = doc.getZip().generate({ type: 'nodebuffer' });
       const base64 = buf.toString('base64');
@@ -523,6 +515,9 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       return { success: true, fileData: base64 };
     } catch (error: any) {
       console.error('Error generating research paper incentive form:', error);
+      if (error.properties && error.properties.errors) {
+          console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
+      }
       return { success: false, error: error.message || 'Failed to generate the form.' };
     }
 }
