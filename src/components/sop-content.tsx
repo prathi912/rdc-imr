@@ -23,6 +23,7 @@ const sopContent = `
 <ul>
     <li>Submitting Intramural research project proposals (IMR).</li>
     <li>Registering interest in Extramural research funding calls (EMR).</li>
+    <li>Applying for research-related incentives (e.g., for publications, patents).</li>
     <li>Maintaining a public researcher profile and managing publications.</li>
 </ul>
 <h3>Profile & Settings</h3>
@@ -110,6 +111,24 @@ const sopContent = `
     <li><strong>Manage Uploads:</strong>
         <ul>
             <li>Before the deadline, you can view, replace, or remove your uploaded presentation using the "Manage PPT" button on your application card.</li>
+        </ul>
+    </li>
+</ol>
+<h3>Incentive Claim Workflow</h3>
+<ol>
+    <li><strong>Access Portal:</strong> Navigate to <strong>Incentive Claims</strong> from the sidebar.</li>
+    <li><strong>Select Claim Type:</strong> Choose the category for which you are claiming an incentive (e.g., Research Papers, Patents, Books).</li>
+    <li><strong>Fill the Form:</strong> Complete the detailed application form for your chosen category. You will be required to provide specific details and upload supporting documents (e.g., publication proofs, payment receipts).</li>
+    <li><strong>Save or Submit:</strong>
+        <ul>
+            <li>You can <strong>Save as Draft</strong> at any point to save your progress.</li>
+            <li>Once complete, click <strong>Submit Claim</strong>.</li>
+        </ul>
+    </li>
+    <li><strong>Track Status:</strong>
+        <ul>
+            <li>Go to the <strong>My Claims</strong> tab on the Incentive Claims page to track the status of all your submissions.</li>
+            <li>If another author on a paper you co-authored submits a claim, it will appear in the <strong>Co-Author Claims</strong> tab, allowing you to apply for your share of the incentive.</li>
         </ul>
     </li>
 </ol>

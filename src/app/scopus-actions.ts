@@ -104,21 +104,17 @@ export async function fetchAdvancedScopusData(
     const issnToQuery = printIssn || electronicIssn;
     if (issnToQuery) {
         try {
-            const serialApiUrl = `https://api.elsevier.com/content/serial/title/issn/${issnToQuery}?apiKey=${apiKey}&view=CITESCORE`;
+            const serialApiUrl = `https://api.elsevier.com/content/serial/title/issn/${issnToQuery}?apiKey=${apiKey}&view=ENHANCED`;
             const serialResponse = await fetch(serialApiUrl, { headers: { Accept: "application/json" } });
             if (serialResponse.ok) {
                 const serialData = await serialResponse.json();
                 const serialTitleResponse = serialData?.['serial-title-response']?.[0];
-                const sjrList = serialTitleResponse?.SJRList?.SJR;
+                const subjectArea = serialTitleResponse?.['subject-area'];
 
-                if (Array.isArray(sjrList) && sjrList.length > 0) {
-                    // Find the most recent SJR entry with a quartile
-                    const latestSjr = sjrList.sort((a, b) => parseInt(b['@year']) - parseInt(a['@year']))[0];
-                    if (latestSjr && latestSjr['$']) {
-                         const quartileMatch = latestSjr['$'].match(/\(Q(\d)\)/);
-                         if (quartileMatch && quartileMatch[1]) {
-                             journalClassification = `Q${quartileMatch[1]}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
-                         }
+                if (Array.isArray(subjectArea) && subjectArea.length > 0) {
+                    const primarySubject = subjectArea.find((s: any) => s['@primary'] === 'true') || subjectArea[0];
+                    if (primarySubject?.['@quartile']) {
+                        journalClassification = `Q${primarySubject['@quartile']}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
                     }
                 }
             }

@@ -27,7 +27,8 @@ import {
   Settings,
   GraduationCap,
   Calendar,
-  NotebookPen
+  NotebookPen,
+  Award
 } from 'lucide-react';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 
@@ -53,6 +54,11 @@ const tutorialSteps = {
       icon: Calendar,
       title: 'Browse EMR Opportunities',
       description: "Navigate to the 'EMR Calendar' to see all available externally funded research calls. Register your interest for any open call before the deadline.",
+    },
+    {
+        icon: Award,
+        title: 'Claim Incentives',
+        description: "Visit the 'Incentive Claims' module to apply for incentives for your published research papers, patents, books, and more. Track your claim status from the same page.",
     },
     {
       icon: Book,
