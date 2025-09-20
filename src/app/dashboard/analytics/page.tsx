@@ -252,16 +252,31 @@ export default function AnalyticsPage() {
 
   const submissionsByYearData = useMemo(() => {
     if (filteredProjects.length === 0) return [];
-    
+
+    const currentYear = new Date().getFullYear();
+    const startYear = currentYear - 5;
+
     const projectsToCount = submissionsByYearType === 'sanctions'
         ? filteredProjects.filter(p => ['Sanctioned', 'In Progress', 'Completed'].includes(p.status) && p.grant)
         : filteredProjects;
+    
+    const yearCounts = projectsToCount
+      .filter(p => {
+        const year = getYear(parseISO(p.submissionDate));
+        return year >= startYear && year <= currentYear;
+      })
+      .reduce((acc, project) => {
+        const year = getYear(parseISO(project.submissionDate));
+        acc[year] = (acc[year] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
 
-    const yearCounts = projectsToCount.reduce((acc, project) => {
-      const year = getYear(parseISO(project.submissionDate));
-      acc[year] = (acc[year] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    // Ensure all years in the range are present
+    for (let year = startYear; year <= currentYear; year++) {
+      if (!yearCounts[year]) {
+        yearCounts[year] = 0;
+      }
+    }
 
     return Object.entries(yearCounts)
       .map(([year, count]) => ({ year, count }))
@@ -555,7 +570,42 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
-      <div className="mt-8 grid gap-6 md:grid-cols-1">
+       <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                <div>
+                  <CardTitle>Yearly Submissions & Sanctions</CardTitle>
+                  <CardDescription>Total IMR submissions vs. sanctions over the last 6 years.</CardDescription>
+                </div>
+                 <div className="flex items-center gap-2">
+                    <Select value={submissionsByYearType} onValueChange={(value) => setSubmissionsByYearType(value as 'submissions' | 'sanctions')}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="submissions">Submissions</SelectItem>
+                        <SelectItem value="sanctions">Sanctions</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="icon" onClick={() => handleExport(submissionsYearChartRef, 'yearly_submissions_sanctions')}><Download className="h-4 w-4" /></Button>
+                 </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div ref={submissionsYearChartRef} className="p-4 bg-card">
+              <ChartContainer config={submissionsByYearType === 'submissions' ? submissionsConfig : sanctionsConfig} className="h-[300px] w-full">
+                <BarChart data={submissionsByYearData}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} />
+                  <YAxis allowDecimals={false} />
+                  <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" fill={submissionsByYearType === 'submissions' ? 'var(--color-submissions)' : 'var(--color-sanctions)'} radius={4} />
+                </BarChart>
+              </ChartContainer>
+            </div>
+          </CardContent>
+        </Card>
         <Card>
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
