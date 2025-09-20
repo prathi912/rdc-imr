@@ -12,7 +12,7 @@ import admin from 'firebase-admin';
 import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
-import * as fflate from 'fflate';
+import JSZip from 'jszip';
 import { getTemplateContent } from '@/lib/template-manager';
 import { getSystemSettings } from './actions';
 import { generateBookIncentiveForm } from './incentive-actions';
@@ -268,13 +268,13 @@ export async function generateOfficeNotingsZip(claimIds: string[]): Promise<{ su
             return { success: false, error: 'Could not generate any of the requested documents.' };
         }
 
-        const zipData: Record<string, Uint8Array> = {};
+        const zip = new JSZip();
         successfulDocs.forEach(doc => {
-            zipData[doc.fileName] = new Uint8Array(doc.content);
+            zip.file(doc.fileName, doc.content);
         });
 
-        const zipContent = fflate.zipSync(zipData);
-        const base64 = Buffer.from(zipContent).toString('base64');
+        const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
+        const base64 = zipContent.toString('base64');
 
         await logActivity('INFO', 'Generated office notings ZIP', { count: successfulDocs.length });
         return { success: true, fileData: base64 };
