@@ -18,14 +18,12 @@ import type { User } from '@/types';
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
 
 type IncentiveUploadData = {
-  'Email ID': string;
-  name: string;
-  'MIS ID': string;
-  Designation: string;
   'Title of Paper': string;
-  'Month & year': string;
-  Index: 'Scopus' | 'WOS' | 'Scopus & WOS';
-  'Incentive given in Rs.': number;
+  Email: string;
+  Journal: string;
+  Amount: number;
+  Index: 'Scopus' | 'WOS' | 'Scopus & WOS' | 'ESCI';
+  'Date of proof': string | number | Date;
 };
 
 type UploadResult = {
@@ -60,12 +58,13 @@ export default function BulkUploadIncentivesPage() {
     reader.onload = (event) => {
       try {
         const binaryStr = event.target?.result;
-        const workbook = XLSX.read(binaryStr, { type: 'binary' });
+        const workbook = XLSX.read(binaryStr, { type: 'binary', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const requiredColumns = ['Email ID', 'name', 'MIS ID', 'Designation', 'Title of Paper', 'Month & year', 'Index', 'Incentive given in Rs.'];
+        const requiredColumns = ['Title of Paper', 'Email', 'Journal', 'Amount', 'Index', 'Date of proof'];
+        
         const firstRow = jsonData[0];
         if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
           toast({
@@ -129,9 +128,9 @@ export default function BulkUploadIncentivesPage() {
           <CardContent>
             <Alert>
               <FileWarning className="h-4 w-4" />
-              <AlertTitle>Important: File Format</AlertTitle>
+              <AlertTitle>Important: File Format for Research Papers</AlertTitle>
               <AlertDescription>
-                Ensure your Excel file has these exact columns: <code className="font-mono text-xs">Email ID</code>, <code className="font-mono text-xs">name</code>, <code className="font-mono text-xs">MIS ID</code>, <code className="font-mono text-xs">Designation</code>, <code className="font-mono text-xs">Title of Paper</code>, <code className="font-mono text-xs">Month & year</code>, <code className="font-mono text-xs">Index</code>, <code className="font-mono text-xs">Incentive given in Rs.</code>.
+                Ensure your Excel file has these exact columns: <code className="font-mono text-xs">Title of Paper</code>, <code className="font-mono text-xs">Email</code>, <code className="font-mono text-xs">Journal</code>, <code className="font-mono text-xs">Amount</code>, <code className="font-mono text-xs">Index</code>, <code className="font-mono text-xs">Date of proof</code>.
               </AlertDescription>
             </Alert>
             <div className="mt-6 flex flex-col sm:flex-row items-center gap-4">
@@ -199,19 +198,19 @@ export default function BulkUploadIncentivesPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>PI Name</TableHead>
-                      <TableHead>Email ID</TableHead>
+                      <TableHead>Email</TableHead>
                       <TableHead>Title of Paper</TableHead>
+                      <TableHead>Journal</TableHead>
                       <TableHead className="text-right">Incentive (Rs.)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.map((row, index) => (
                       <TableRow key={index}>
-                        <TableCell>{row.name}</TableCell>
-                        <TableCell>{row['Email ID']}</TableCell>
+                        <TableCell>{row['Email']}</TableCell>
                         <TableCell className="font-medium">{row['Title of Paper']}</TableCell>
-                        <TableCell className="text-right">{row['Incentive given in Rs.'].toLocaleString('en-IN')}</TableCell>
+                        <TableCell>{row['Journal']}</TableCell>
+                        <TableCell className="text-right">{row['Amount']?.toLocaleString('en-IN')}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
