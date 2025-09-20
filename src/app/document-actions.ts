@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import fs from 'fs';
@@ -418,9 +417,12 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       
       const imageOptions = {
         centered: false,
-        getImage: (tag: string) => Buffer.from(tag, 'base64'),
+        getImage: (tagValue: string) => {
+            return Buffer.from(tagValue, 'base64');
+        },
         getSize: () => [120, 40],
       };
+
       const imageModule = new ImageModule(imageOptions);
 
       const doc = new Docxtemplater(zip, {
@@ -431,26 +433,23 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       });
       
       const approvals = claim.approvals || [];
-      const approval1 = approvals[0];
-      const approval2 = approvals[1];
-      const approval3 = approvals[2];
-      const approval4 = approvals[3];
+      const approval1 = approvals[0] || null;
+      const approval2 = approvals[0] || null;
+      const approval3 = approvals[1] || null;
+      const approval4 = approvals[2] || null;
+
       
       const signatureUrls = {
-        approver2_sign_url: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/sign1.jpg",
-        approver3_sign_url: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/anandsirsign.PNG",
-        approver4_sign_url: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/GeetikaMadamSign.jpeg",
+        approver2_sign: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/sign1.jpg",
+        approver3_sign: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/anandsirsign.PNG",
+        approver4_sign: "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/GeetikaMadamSign.jpeg",
       };
 
-      const imagePromises = Object.entries(signatureUrls)
-        .map(async ([key, url]) => {
+      const imagePromises = Object.entries(signatureUrls).map(async ([key, url]) => {
           const buffer = await getImageAsBuffer(url);
-          // The key for the data should match the placeholder in the template without the {%}
-          // e.g., for {%approver2_sign}, the key is 'approver2_sign'
-          const dataKey = key.replace('_url', ''); 
-          return { key: dataKey, buffer };
-        });
-
+          return { key, buffer };
+      });
+      
       const resolvedImages = await Promise.all(imagePromises);
       const imagePlaceholders = resolvedImages.reduce((acc, { key, buffer }) => {
           if (buffer) {
@@ -458,7 +457,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
           }
           return acc;
       }, {} as Record<string, string>);
-  
+
       const data: { [key: string]: any } = {
         name: user.name || '',
         designation: `${user.designation || 'N/A'}, ${user.department || 'N/A'}`,
@@ -483,7 +482,11 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         approver4_comments: approval4?.comments || '',
         approver4_amount: approval4?.approvedAmount?.toLocaleString('en-IN') || claim.finalApprovedAmount?.toLocaleString('en-IN') || '',
         date: format(new Date(), 'dd/MM/yyyy'),
-        ...imagePlaceholders, // Add the base64 image data
+        
+        // Use the new syntax for images
+        approver2_sign: imagePlaceholders.approver2_sign,
+        approver3_sign: imagePlaceholders.approver3_sign,
+        approver4_sign: imagePlaceholders.approver4_sign,
       };
       
       const checklistFields = [
@@ -517,3 +520,5 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       return { success: false, error: error.message || 'Failed to generate the form.' };
     }
 }
+
+    
