@@ -96,21 +96,39 @@ const researchPaperSchema = z
   )
    .refine(
     (data) => {
-      if (data.indexType === 'scopus' || data.indexType === 'both') {
+      if (data.indexType === 'scopus') {
         return !!data.scopusLink && data.scopusLink.length > 0;
       }
       return true;
     },
-    { message: 'Scopus URL is required for this index type.', path: ['scopusLink'] }
+    { message: 'Scopus URL is required when Scopus is selected.', path: ['scopusLink'] }
   )
   .refine(
     (data) => {
-      if (data.indexType === 'wos' || data.indexType === 'both') {
+      if (data.indexType === 'wos') {
         return !!data.wosLink && data.wosLink.length > 0;
       }
       return true;
     },
-    { message: 'Web of Science URL is required for this index type.', path: ['wosLink'] }
+    { message: 'Web of Science URL is required when WoS is selected.', path: ['wosLink'] }
+  )
+   .refine(
+    (data) => {
+      if (data.indexType === 'both') {
+        return (!!data.scopusLink && data.scopusLink.length > 0);
+      }
+      return true;
+    },
+    { message: 'Scopus URL is required when Both is selected.', path: ['scopusLink'] }
+  )
+   .refine(
+    (data) => {
+      if (data.indexType === 'both') {
+         return (!!data.wosLink && data.wosLink.length > 0);
+      }
+      return true;
+    },
+    { message: 'Web of Science URL is required when Both is selected.', path: ['wosLink'] }
   )
   .refine(
     (data) => {
