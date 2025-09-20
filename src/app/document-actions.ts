@@ -441,10 +441,11 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
           modules: [imageModule],
       });
       
-      const approval1 = claim.approvals?.find(a => a?.stage === 1);
-      const approval2 = claim.approvals?.find(a => a?.stage === 2);
-      const approval3 = claim.approvals?.find(a => a?.stage === 3);
-      const approval4 = claim.approvals?.find(a => a?.stage === 4);
+      const approvals = claim.approvals || [];
+      const approval1 = approvals[0] || null;
+      const approval2 = approvals[1] || null;
+      const approval3 = approvals[2] || null;
+      const approval4 = approvals[3] || null;
       
       const signatureUrls = {
         approver2_sign: approvers.find(a => a.stage === 2)?.signatureUrl,
@@ -492,7 +493,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       };
       
       const checklistFields = [
-        'name', 'designation', 'publicationType', 'journalName', 'locale', 'indexType',
+        'name', 'designation', 'publicationType', 'journalName', 'locale', 'indexType', 'wosType',
         'journalClassification', 'authorRoleAndPosition', 'totalPuAuthors', 'printIssn',
         'publicationProofUrls', 'isPuNameInPublication', 'publicationMonth'
       ];
