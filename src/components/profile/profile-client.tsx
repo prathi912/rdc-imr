@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails } from '@/types';
+import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails, IncentiveClaim } from '@/types';
 import { getResearchDomain, uploadFileToServer } from '@/app/actions';
 import { updateEmrInterestDetails } from '@/app/emr-actions';
 import { findUserByMisId } from '@/app/userfinding';
@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload, CalendarDays, FileText, Check, UserCheck, UserX } from 'lucide-react';
+import { Bot, Loader2, Mail, Briefcase, Building2, BookCopy, Phone, Plus, UserPlus, X, Edit, Trash2, Search, Upload, CalendarDays, FileText, Check, UserCheck, UserX, Award } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -470,7 +470,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
 }
 
 
-export function ProfileClient({ user, projects, emrInterests: initialEmrInterests, fundingCalls }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[] }) {
+export function ProfileClient({ user, projects, emrInterests: initialEmrInterests, fundingCalls, claims }: { user: User; projects: Project[], emrInterests: EmrInterest[], fundingCalls: FundingCall[], claims: IncentiveClaim[] }) {
     const [domain, setDomain] = useState<string | null>(user.researchDomain || null);
     const [loadingDomain, setLoadingDomain] = useState(false);
     const [researchPapers, setResearchPapers] = useState<ResearchPaper[]>([]);
@@ -579,6 +579,10 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
         </div>
     );
     
+    const getClaimTitle = (claim: IncentiveClaim) => {
+        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
+    };
+
     return (
         <div className="flex flex-col items-center">
             <Card className="w-full max-w-4xl shadow-xl border-0 bg-card/80 backdrop-blur-lg">
@@ -650,10 +654,11 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
 
             <div className="w-full max-w-4xl mt-8">
                 <Tabs defaultValue="projects" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="projects">IMR Projects ({projects.length})</TabsTrigger>
                         <TabsTrigger value="emr">EMR Interests ({emrInterests.length})</TabsTrigger>
                         <TabsTrigger value="papers">Paper Publications ({researchPapers.length})</TabsTrigger>
+                        <TabsTrigger value="incentives">Incentive Claims ({claims.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="projects">
                         <div className="space-y-4 mt-4">
@@ -792,6 +797,27 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                 </Card>
                             )}) : (
                                 <Card><CardContent className="p-6 text-center text-muted-foreground">No research papers found.</CardContent></Card>
+                            )}
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="incentives">
+                        <div className="space-y-4 mt-4">
+                             {claims.length > 0 ? claims.map(claim => (
+                                <Card key={claim.id}>
+                                    <CardContent className="p-4 space-y-2">
+                                        <div className="flex justify-between items-start">
+                                            <p className="font-semibold flex-1">{getClaimTitle(claim)}</p>
+                                            <Badge variant={claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-4 text-sm pt-2 border-t">
+                                            <span><strong className="text-muted-foreground">Claim Type:</strong> {claim.claimType}</span>
+                                            {claim.finalApprovedAmount && <span><strong className="text-muted-foreground">Approved Amount:</strong> ₹{claim.finalApprovedAmount.toLocaleString('en-IN')}</span>}
+                                            <span><strong className="text-muted-foreground">Submitted:</strong> {format(parseISO(claim.submissionDate), 'PPP')}</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )) : (
+                                <Card><CardContent className="p-6 text-center text-muted-foreground">No incentive claims found.</CardContent></Card>
                             )}
                         </div>
                     </TabsContent>

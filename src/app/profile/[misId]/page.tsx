@@ -76,6 +76,11 @@ export default function ProfilePage() {
         setProfileUser(fetchedUser)
 
         // --- Data Fetching (if permission is granted) ---
+        const claimsRef = collection(db, "incentiveClaims");
+        const claimsQuery = query(claimsRef, where("uid", "==", fetchedUser.uid), orderBy("submissionDate", "desc"));
+        const claimsSnapshot = await getDocs(claimsQuery);
+        setClaims(claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim)));
+        
         const emrInterestsRef = collection(db, "emrInterests");
         const emrInterestsQuery = query(
           emrInterestsRef, 
@@ -90,10 +95,12 @@ export default function ProfilePage() {
 
         if (fetchedEmrInterests.length > 0) {
             const callIds = [...new Set(fetchedEmrInterests.map(i => i.callId))];
-            const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
-            const callsSnapshot = await getDocs(callsQuery);
-            const fetchedCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-            setFundingCalls(fetchedCalls);
+            if (callIds.length > 0) {
+              const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
+              const callsSnapshot = await getDocs(callsQuery);
+              const fetchedCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+              setFundingCalls(fetchedCalls);
+            }
         }
 
         try {
@@ -209,7 +216,7 @@ export default function ProfilePage() {
         showBackButton={false}
       />
       <div className="mt-8">
-        <ProfileClient user={profileUser} projects={projects} emrInterests={emrInterests} fundingCalls={fundingCalls} />
+        <ProfileClient user={profileUser} projects={projects} emrInterests={emrInterests} fundingCalls={fundingCalls} claims={claims} />
       </div>
     </div>
   )

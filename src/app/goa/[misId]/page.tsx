@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { collection, query, where, getDocs, limit, or } from "firebase/firestore"
+import { collection, query, where, getDocs, limit, or, orderBy } from "firebase/firestore"
 import { db } from "@/lib/config"
 import type { User, IncentiveClaim, Project, EmrInterest, FundingCall, ResearchPaper } from "@/types"
 import { PageHeader } from "@/components/page-header"
@@ -78,6 +78,11 @@ export default function GoaProfilePage() {
         setProfileUser(fetchedUser)
 
         // --- Data Fetching (if permission is granted) ---
+        const claimsRef = collection(db, "incentiveClaims");
+        const claimsQuery = query(claimsRef, where("uid", "==", fetchedUser.uid), orderBy("submissionDate", "desc"));
+        const claimsSnapshot = await getDocs(claimsQuery);
+        setClaims(claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim)));
+
         const emrInterestsRef = collection(db, "emrInterests");
         const emrInterestsQuery = query(
           emrInterestsRef, 
@@ -92,10 +97,12 @@ export default function GoaProfilePage() {
 
         if (fetchedEmrInterests.length > 0) {
             const callIds = [...new Set(fetchedEmrInterests.map(i => i.callId))];
-            const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
-            const callsSnapshot = await getDocs(callsQuery);
-            const fetchedCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
-            setFundingCalls(fetchedCalls);
+            if(callIds.length > 0) {
+                const callsQuery = query(collection(db, 'fundingCalls'), where('__name__', 'in', callIds));
+                const callsSnapshot = await getDocs(callsQuery);
+                const fetchedCalls = callsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall));
+                setFundingCalls(fetchedCalls);
+            }
         }
 
         try {
@@ -211,7 +218,7 @@ export default function GoaProfilePage() {
         showBackButton={false}
       />
       <div className="mt-8">
-        <ProfileClient user={profileUser} projects={projects} emrInterests={emrInterests} fundingCalls={fundingCalls} />
+        <ProfileClient user={profileUser} projects={projects} emrInterests={emrInterests} fundingCalls={fundingCalls} claims={claims} />
       </div>
     </div>
   )
