@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import fs from 'fs';
@@ -18,6 +19,7 @@ import ImageModule from 'docxtemplater-image-module-free';
 import { generateBookIncentiveForm } from './incentive-actions';
 import { generateMembershipIncentiveForm } from './membership-actions';
 import { generatePatentIncentiveForm } from './patent-actions';
+
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -239,8 +241,9 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
                 break;
             default:
                 // Fallback to a generic noting if a specific one isn't available
-                result = await generateOfficeNotingForClaim(claimId);
-                break;
+                // For now, we will consider this a failure to ensure specific forms are created.
+                console.warn(`No specific office noting generator found for claim type: ${claim.claimType}. Claim ID: ${claimId}`);
+                return null;
         }
 
         if (result.success && result.fileData) {
@@ -429,7 +432,6 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
           },
           getSize: () => [150, 50],
           handleError: (e) => {
-              // Instead of throwing, log the error and continue
               console.error("Docxtemplater Image Module Error:", e);
           }
       });
@@ -472,6 +474,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         journal_name: claim.journalName || 'N/A',
         locale: claim.locale || 'N/A',
         indexed: claim.indexType?.toUpperCase() || 'N/A',
+        wos_type: claim.wosType || '',
         q_rating: claim.journalClassification || 'N/A',
         role: claim.authorType || 'N/A',
         author_position: claim.authorPosition || 'N/A',
@@ -480,6 +483,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         e_issn: claim.electronicIssn || 'N/A',
         publish_month: claim.publicationMonth || '',
         publish_year: claim.publicationYear || '',
+        
         approver2_comments: approval2?.comments || '',
         approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
         approver3_comments: approval3?.comments || '',
@@ -499,11 +503,9 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
           const fieldId = checklistFields[i];
           const c_index = i + 1;
       
-          // Approver 1
           const a1_status = approval1?.verifiedFields?.[fieldId];
           data[`a1_c${c_index}`] = a1_status === true ? '✓' : a1_status === false ? '✗' : '';
       
-          // Approver 2
           const a2_status = approval2?.verifiedFields?.[fieldId];
           data[`a2_c${c_index}`] = a2_status === true ? '✓' : a2_status === false ? '✗' : '';
       }
