@@ -6,12 +6,12 @@ import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell, Legend, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
-import type { Project, User, EmrInterest } from '@/types';
+import type { Project, User, EmrInterest, IncentiveClaim } from '@/types';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, onSnapshot, or, orderBy, Timestamp } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, getYear, subDays, startOfDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DollarSign, Download, Users } from 'lucide-react';
+import { Award, Download, Users } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -47,6 +47,7 @@ const ChartLegendContent = (props: any) => {
 export default function AnalyticsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [emrProjects, setEmrProjects] = useState<EmrInterest[]>([]);
+  const [incentiveClaims, setIncentiveClaims] = useState<IncentiveClaim[]>([]);
   const [loginLogs, setLoginLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
@@ -61,7 +62,7 @@ export default function AnalyticsPage() {
   const submissionsTimeChartRef = useRef<HTMLDivElement>(null);
   const submissionsYearChartRef = useRef<HTMLDivElement>(null);
   const projectsByGroupChartRef = useRef<HTMLDivElement>(null);
-  const grantAmountChartRef = useRef<HTMLDivElement>(null);
+  const incentiveAmountChartRef = useRef<HTMLDivElement>(null);
   const activeUsersChartRef = useRef<HTMLDivElement>(null);
 
   const handleExport = useCallback(async (ref: React.RefObject<HTMLDivElement>, fileName: string) => {
@@ -106,8 +107,9 @@ export default function AnalyticsPage() {
     
     const projectsCollection = collection(db, 'projects');
     const emrCollection = collection(db, 'emrInterests');
+    const claimsCollection = collection(db, 'incentiveClaims');
     const logsCollection = collection(db, 'logs');
-    let projectsQuery, emrQuery;
+    let projectsQuery, emrQuery, claimsQuery;
     
     const sevenDaysAgo = startOfDay(subDays(new Date(), 6));
     const logsQuery = query(logsCollection, where('message', '==', 'User logged in'), where('timestamp', '>=', sevenDaysAgo.toISOString()));
@@ -121,18 +123,23 @@ export default function AnalyticsPage() {
     if (isCro && user.faculties && user.faculties.length > 0) {
         projectsQuery = query(projectsCollection, where('faculty', 'in', user.faculties));
         emrQuery = query(emrCollection, where('faculty', 'in', user.faculties), where('status', 'in', ['Sanctioned', 'Process Complete']));
+        claimsQuery = query(claimsCollection, where('faculty', 'in', user.faculties));
     } else if (isHod && user.department && user.institute) {
         projectsQuery = query(projectsCollection, where('departmentName', '==', user.department), where('institute', '==', user.institute));
         emrQuery = query(emrCollection, where('department', '==', user.department), where('status', 'in', ['Sanctioned', 'Process Complete']));
+        claimsQuery = query(claimsCollection, where('faculty', '==', user.faculty)); // HODs are faculty-scoped for claims
     } else if (isSpecialPitUser) {
         projectsQuery = query(projectsCollection, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']));
         emrQuery = query(emrCollection, where('institute', 'in', ['Parul Institute of Technology', 'Parul Institute of Technology-Diploma studies']), where('status', 'in', ['Sanctioned', 'Process Complete']));
+        claimsQuery = query(claimsCollection, where('faculty', '==', 'Faculty of Engineering & Technology'));
     } else if (isPrincipal && user.institute) {
         projectsQuery = query(projectsCollection, where('institute', '==', user.institute));
         emrQuery = query(emrCollection, where('faculty', '==', user.faculty), where('status', 'in', ['Sanctioned', 'Process Complete']));
+        claimsQuery = query(claimsCollection, where('faculty', '==', user.faculty));
     } else {
         projectsQuery = query(projectsCollection);
         emrQuery = query(emrCollection, where('status', 'in', ['Sanctioned', 'Process Complete']));
+        claimsQuery = query(claimsCollection);
     }
     
     const unsubscribeProjects = onSnapshot(projectsQuery, (snapshot) => {
@@ -144,6 +151,10 @@ export default function AnalyticsPage() {
         setEmrProjects(snapshot.docs.map(doc => doc.data() as EmrInterest));
     }, (error) => { console.error("Error fetching EMR data:", error); });
     
+    const unsubscribeClaims = onSnapshot(claimsQuery, (snapshot) => {
+        setIncentiveClaims(snapshot.docs.map(doc => doc.data() as IncentiveClaim));
+    }, (error) => { console.error("Error fetching incentive claims:", error); });
+
     const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
         setLoginLogs(snapshot.docs.map(doc => doc.data()));
     }, (error) => { console.error("Error fetching log data:", error); });
@@ -151,6 +162,7 @@ export default function AnalyticsPage() {
     return () => {
         unsubscribeProjects();
         unsubscribeEmr();
+        unsubscribeClaims();
         unsubscribeLogs();
     }
 
@@ -311,29 +323,37 @@ export default function AnalyticsPage() {
     return config;
   }, [statusDistributionData]);
 
-  // --- Grant Chart Data & Config ---
-  const grantAmountData = useMemo(() => {
-    const imrTotal = projects.reduce((acc, p) => acc + (p.grant?.totalAmount || 0), 0);
-    const emrTotal = emrProjects.reduce((acc, p) => {
-        if (p.durationAmount) {
-            const match = p.durationAmount.match(/Amount: ([\d,]+)/);
-            if (match && match[1]) {
-                return acc + parseInt(match[1].replace(/,/g, ''), 10);
-            }
-        }
+  // --- Incentive Claim Chart Data & Config ---
+  const { incentiveAmountData, totalIncentiveAmount } = useMemo(() => {
+    const claimsByCategory = incentiveClaims
+      .filter(claim => (claim.finalApprovedAmount || 0) > 0)
+      .reduce((acc, claim) => {
+        const type = claim.claimType;
+        const amount = claim.finalApprovedAmount || 0;
+        acc[type] = (acc[type] || 0) + amount;
         return acc;
-    }, 0);
+      }, {} as Record<string, number>);
 
-    return [
-        { name: 'IMR Grants', value: imrTotal, fill: 'var(--color-imr)' },
-        { name: 'EMR Grants', value: emrTotal, fill: 'var(--color-emr)' },
-    ].filter(d => d.value > 0);
-  }, [projects, emrProjects]);
+    const chartData = Object.entries(claimsByCategory)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
 
-  const grantAmountConfig = {
-    imr: { label: 'IMR Grants', color: 'hsl(var(--primary))' },
-    emr: { label: 'EMR Grants', color: 'hsl(var(--accent))' },
-  } satisfies ChartConfig;
+    const totalAmount = chartData.reduce((sum, item) => sum + item.value, 0);
+
+    return { incentiveAmountData: chartData, totalIncentiveAmount: totalAmount };
+  }, [incentiveClaims]);
+
+  const incentiveAmountConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    incentiveAmountData.forEach((item, index) => {
+        config[item.name] = {
+            label: item.name,
+            color: COLORS[index % COLORS.length],
+        };
+    });
+    return config;
+  }, [incentiveAmountData]);
+
 
   const isCro = user?.role === 'CRO';
 
@@ -387,7 +407,7 @@ export default function AnalyticsPage() {
             </Select>
         )}
       </PageHeader>
-      <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
             <CardHeader>
                 <CardTitle>Daily Active Users</CardTitle>
@@ -405,6 +425,16 @@ export default function AnalyticsPage() {
                         </Bar>
                     </BarChart>
                 </ChartContainer>
+            </CardContent>
+        </Card>
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Sanctioned Incentives</CardTitle>
+                <Award className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">₹{totalIncentiveAmount.toLocaleString('en-IN')}</div>
+                <p className="text-xs text-muted-foreground">Across {incentiveClaims.filter(c => c.finalApprovedAmount).length} claims</p>
             </CardContent>
         </Card>
         <Card className="lg:col-span-2">
@@ -480,14 +510,14 @@ export default function AnalyticsPage() {
          <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Grant Funding</CardTitle>
-              <CardDescription>Total amount awarded to projects.</CardDescription>
+              <CardTitle>Incentive Amounts by Category</CardTitle>
+              <CardDescription>Total sanctioned amount per claim type.</CardDescription>
             </div>
-             <Button variant="outline" size="icon" onClick={() => handleExport(grantAmountChartRef, 'grant_funding_split')}><Download className="h-4 w-4" /></Button>
+             <Button variant="outline" size="icon" onClick={() => handleExport(incentiveAmountChartRef, 'incentive_amounts')}><Download className="h-4 w-4" /></Button>
           </CardHeader>
           <CardContent>
-            <div ref={grantAmountChartRef} className="p-4 bg-card">
-              <ChartContainer config={grantAmountConfig} className="h-[300px] w-full">
+            <div ref={incentiveAmountChartRef} className="p-4 bg-card">
+              <ChartContainer config={incentiveAmountConfig} className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                         <ChartTooltip
@@ -498,7 +528,7 @@ export default function AnalyticsPage() {
                             />}
                         />
                         <Pie
-                            data={grantAmountData}
+                            data={incentiveAmountData}
                             dataKey="value"
                             nameKey="name"
                             cx="50%"
@@ -513,8 +543,8 @@ export default function AnalyticsPage() {
                                 return ( <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central"> {`${(percent * 100).toFixed(0)}%`} </text> );
                             }}
                         >
-                            {grantAmountData.map((entry) => (
-                                <Cell key={`cell-${entry.name}`} fill={entry.fill} />
+                            {incentiveAmountData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                         </Pie>
                         <Legend content={<ChartLegendContent nameKey="name" />} />
