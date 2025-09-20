@@ -240,8 +240,6 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
                 result = await generatePatentIncentiveForm(claimId);
                 break;
             default:
-                // Fallback to a generic noting if a specific one isn't available
-                // For now, we will consider this a failure to ensure specific forms are created.
                 console.warn(`No specific office noting generator found for claim type: ${claim.claimType}. Claim ID: ${claimId}`);
                 return null;
         }
