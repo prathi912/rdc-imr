@@ -407,10 +407,12 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       }
       const user = userSnap.data() as User;
       
-      const content = await getTemplateContent('INCENTIVE_RESEARCH_PAPER.docx');
-      if (!content) {
-          return { success: false, error: 'Template file INCENTIVE_RESEARCH_PAPER.docx not found.' };
+      const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/INCENTIVE_RESEARCH_PAPER2.docx";
+      const response = await fetch(TEMPLATE_URL, { cache: 'no-store' });
+      if (!response.ok) {
+          return { success: false, error: `Template file could not be fetched from URL. Status: ${response.status}` };
       }
+      const content = Buffer.from(await response.arrayBuffer());
   
       const zip = new PizZip(content);
       
@@ -477,7 +479,7 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
         q_rating: claim.journalClassification || 'N/A',
         role: claim.authorType || 'N/A',
         author_position: claim.authorPosition || 'N/A',
-        total_authors: claim.authors?.filter(a => !a.isExternal).length || 0,
+        total_authors: (claim.authors || []).length,
         print_issn: claim.printIssn || 'N/A',
         e_issn: claim.electronicIssn || 'N/A',
         publish_month: claim.publicationMonth || '',
