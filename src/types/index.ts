@@ -486,7 +486,6 @@ export type CroAssignment = {
 export type ApproverSetting = {
     email: string;
     stage: 1 | 2 | 3 | 4;
-    signatureUrl?: string;
 };
 
 export type SystemSettings = {
