@@ -29,6 +29,7 @@ export async function fetchAdvancedScopusData(
     journalClassification?: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   }
   error?: string
+  warning?: string
   claimantIsAuthor?: boolean
 }> {
   const apiKey = process.env.SCOPUS_API_KEY
@@ -88,6 +89,7 @@ export async function fetchAdvancedScopusData(
     let journalWebsite: string | undefined = undefined;
     let publicationType: string | undefined = undefined;
     let journalClassification: 'Q1' | 'Q2' | 'Q3' | 'Q4' | undefined = undefined;
+    let warning: string | undefined = undefined;
 
 
     if (coverDate) {
@@ -123,12 +125,18 @@ export async function fetchAdvancedScopusData(
                      const percentile = parseFloat(citeScoreInfo.citeScoreTracker);
                      if (!isNaN(percentile)) {
                         journalClassification = calculateQuartile(percentile);
+                     } else {
+                        warning = 'Could not parse percentile from Scopus to determine Q rating.';
                      }
+                } else {
+                    warning = 'Q rating information was not available in the Scopus response for this journal.';
                 }
             } else {
+                 warning = `Could not fetch Q rating details. Scopus returned status: ${serialResponse.status}`;
                  console.warn(`Scopus Serial API failed with status: ${serialResponse.status}`);
             }
         } catch (serialError) {
+            warning = 'Could not fetch journal Q rating due to a network error. Please enter it manually.';
             console.warn("Could not fetch journal Q rating from Scopus Serial API, but proceeding without it.", serialError);
         }
     }
@@ -172,6 +180,7 @@ export async function fetchAdvancedScopusData(
         publicationType,
         journalClassification,
       },
+      warning,
     }
   } catch (error: any) {
     console.error("Error calling Scopus API:", error)

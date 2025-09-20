@@ -484,6 +484,16 @@ export function ResearchPaperForm() {
             form.setValue('autoFetchedFields', autoFetched);
 
             toast({ title: 'Success', description: `Form fields have been pre-filled from ${source.toUpperCase()}.` });
+            
+            if (result.warning) {
+                toast({
+                    variant: 'default',
+                    title: 'Heads Up',
+                    description: result.warning,
+                    duration: 7000,
+                });
+            }
+
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || `Failed to fetch data from ${source.toUpperCase()}.` });
         }
