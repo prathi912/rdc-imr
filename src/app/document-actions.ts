@@ -422,10 +422,10 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       
       const imageModule = new ImageModule({
           centered: false,
-          getImage: (tag: string) => {
-              // tag is the value from the template, e.g., 'data.approver2_sign'
-              const buffer = tag;
-              return buffer;
+          getImage: (tag: string, tagName: string) => {
+              // tagName is the value from the template, e.g., 'data.approver2_sign'
+              const key = tagName.replace('image_data.', ''); // Assuming your template uses {image_data.approver2_sign}
+              return data[key] || null; // Return the buffer or null
           },
           getSize: () => [150, 50], // width, height in pixels
       });
@@ -484,13 +484,14 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
       data.approver3_comments = approval3?.comments || 'N/A';
       data.approver3_amount = approval3?.approvedAmount?.toLocaleString('en-IN') || 'N/A';
       data.final_approved_amount = claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A';
+      data.date = format(new Date(), 'dd/MM/yyyy');
       
       // Add image buffers to the data object for the template
       data.approver2_sign = imageBuffers.approver2_sign;
       data.approver3_sign = imageBuffers.approver3_sign;
       data.approver4_sign = imageBuffers.approver4_sign;
       
-      doc.setData(data);
+      doc.setData({ ...data });
   
       try {
         doc.render();
