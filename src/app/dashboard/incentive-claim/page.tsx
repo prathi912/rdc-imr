@@ -499,11 +499,18 @@ export default function IncentiveClaimPage() {
   ], [membershipClaimInfo]);
   
   const enabledClaimTypes = useMemo(() => {
-    if (!systemSettings?.enabledIncentiveTypes) {
-        return claimTypes; // Default to all if not set
+    let filteredTypes = claimTypes;
+
+    if (user?.designation === 'Ph.D Scholar') {
+        return filteredTypes.filter(type => type.title === 'Research Papers');
     }
-    return claimTypes.filter(type => systemSettings.enabledIncentiveTypes![type.title] !== false);
-  }, [systemSettings, claimTypes]);
+
+    if (systemSettings?.enabledIncentiveTypes) {
+        filteredTypes = filteredTypes.filter(type => systemSettings.enabledIncentiveTypes![type.title] !== false);
+    }
+    
+    return filteredTypes;
+  }, [systemSettings, claimTypes, user]);
 
 
   return (
@@ -581,5 +588,3 @@ export default function IncentiveClaimPage() {
     </>
   );
 }
-
-    
