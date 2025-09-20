@@ -1,3 +1,4 @@
+
 import type { User } from "@/types"
 
 export const ALL_MODULES = [
@@ -22,6 +23,7 @@ export const ALL_MODULES = [
   { id: "bulk-upload", label: "Bulk Upload Projects" },
   { id: "bulk-upload-papers", label: "Bulk Upload Papers" },
   { id: "bulk-upload-emr", label: "Bulk Upload EMR Projects" },
+  { id: "bulk-upload-incentives", label: "Bulk Upload Incentives" },
   { id: "module-management", label: "Module Management" },
   { id: "notifications", label: "Notifications" },
   { id: "settings", label: "Settings" },
@@ -35,7 +37,7 @@ const facultyDefaults = [...coreModules, ...facultyCoreModules, "incentive-claim
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics"]
 const iqacDefaults = [...coreModules, "all-projects", "analytics"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "manage-users", "emr-management", "bulk-upload", "bulk-upload-papers", "manage-incentive-claims"]
-const superAdminDefaults = [...adminDefaults, "module-management", "bulk-upload-emr"]
+const superAdminDefaults = [...adminDefaults, "module-management", "bulk-upload-emr", "bulk-upload-incentives"]
 
 // Default modules for special designations who are otherwise 'faculty' role
 const principalDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"]

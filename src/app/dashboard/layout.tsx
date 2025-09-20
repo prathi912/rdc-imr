@@ -1,3 +1,4 @@
+
 "use client"
 
 import type React from "react"
@@ -256,6 +257,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         tooltip: "Bulk Upload EMR",
         icon: Upload,
         label: "Bulk Upload EMR",
+      },
+      {
+        id: "bulk-upload-incentives",
+        href: "/dashboard/bulk-upload-incentives",
+        tooltip: "Bulk Upload Incentives",
+        icon: Upload,
+        label: "Bulk Upload Incentives",
       },
       {
         id: "module-management",
