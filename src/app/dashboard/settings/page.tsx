@@ -25,6 +25,7 @@ import {
   getSystemSettings,
   updateSystemSettings,
   checkMisIdExists,
+  uploadApproverSignature,
 } from "@/app/actions"
 import type { User, SystemSettings, CroAssignment, ApproverSetting } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -36,12 +37,13 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award } from "lucide-react"
+import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon } from "lucide-react"
 import { Combobox } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import NextImage from 'next/image';
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -229,6 +231,8 @@ export default function SettingsPage() {
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [newAllowedDomain, setNewAllowedDomain] = useState("")
+  const [signatureFiles, setSignatureFiles] = useState<Record<number, File | null>>({});
+  const [isUploadingSignature, setIsUploadingSignature] = useState<number | null>(null);
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -591,7 +595,7 @@ export default function SettingsPage() {
     const previousApproverEmail = approvers.find(a => a.stage === stage)?.email;
 
     if (email) {
-      newApprovers.push({ stage, email });
+      newApprovers.push({ stage, email, signatureUrl: approvers.find(a => a.stage === stage)?.signatureUrl });
     }
     newApprovers.sort((a, b) => a.stage - b.stage);
 
@@ -627,6 +631,40 @@ export default function SettingsPage() {
         }
     }
   };
+
+  const handleSignatureUpload = async (stage: 2 | 3 | 4) => {
+    const file = signatureFiles[stage];
+    if (!file) {
+        toast({ variant: 'destructive', title: 'No file selected' });
+        return;
+    }
+    setIsUploadingSignature(stage);
+    try {
+        const dataUrl = await fileToDataUrl(file);
+        const result = await uploadApproverSignature(stage, dataUrl);
+        if (result.success && result.url) {
+            toast({ title: 'Signature Uploaded', description: `Signature for approver stage ${stage} has been updated.` });
+            setSystemSettings(prev => {
+                if (!prev) return null;
+                const approvers = prev.incentiveApprovers || [];
+                const idx = approvers.findIndex(a => a.stage === stage);
+                if (idx !== -1) {
+                    approvers[idx].signatureUrl = result.url;
+                } else {
+                    approvers.push({ stage, email: '', signatureUrl: result.url });
+                }
+                return { ...prev, incentiveApprovers: approvers };
+            });
+            setSignatureFiles(prev => ({ ...prev, [stage]: null }));
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    } finally {
+        setIsUploadingSignature(null);
+    }
+};
 
   const handleIncentiveTypeToggle = async (type: string, enabled: boolean) => {
     if (!systemSettings) return;
@@ -804,23 +842,54 @@ export default function SettingsPage() {
               </div>
               <div className="space-y-4">
                 <Form {...dummyForm}>
-                  <Label className="text-base">Incentive Approval Workflow</Label>
+                  <Label className="text-base">Incentive Approval Workflow & Signatures</Label>
                   <p className="text-sm text-muted-foreground">
-                    Define the email addresses for the four stages of incentive claim approval.
+                    Define the email addresses and upload digital signatures for the four stages of incentive claim approval.
                   </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      {[1, 2, 3, 4].map(stage => (
-                          <FormItem key={stage}>
-                              <FormLabel>Stage {stage} Approver Email</FormLabel>
-                              <Input 
-                                  type="email"
-                                  placeholder={`approver.stage${stage}@paruluniversity.ac.in`}
-                                  defaultValue={systemSettings.incentiveApprovers?.find(a => a.stage === stage)?.email || ''}
-                                  onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)}
-                                  disabled={isSavingSettings}
-                              />
-                          </FormItem>
-                      ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {[1, 2, 3, 4].map(stage => {
+                          const approver = systemSettings.incentiveApprovers?.find(a => a.stage === stage);
+                          return (
+                              <div key={stage} className="p-4 border rounded-lg space-y-3">
+                                  <FormItem>
+                                      <FormLabel>Stage {stage} Approver Email</FormLabel>
+                                      <Input 
+                                          type="email"
+                                          placeholder={`approver.stage${stage}@paruluniversity.ac.in`}
+                                          defaultValue={approver?.email || ''}
+                                          onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)}
+                                          disabled={isSavingSettings}
+                                      />
+                                  </FormItem>
+                                  {stage > 1 && (
+                                      <div className="space-y-2">
+                                          <FormLabel>Stage {stage} Signature</FormLabel>
+                                           {approver?.signatureUrl && (
+                                              <div className="flex items-center gap-2">
+                                                  <NextImage src={approver.signatureUrl} alt={`Stage ${stage} signature`} width={100} height={40} className="border rounded-md bg-white p-1" />
+                                              </div>
+                                          )}
+                                          <div className="flex items-center gap-2">
+                                              <Input 
+                                                  type="file" 
+                                                  accept="image/png"
+                                                  className="text-xs"
+                                                  onChange={(e) => setSignatureFiles(prev => ({...prev, [stage]: e.target.files?.[0] || null}))}
+                                              />
+                                              <Button 
+                                                  size="icon" 
+                                                  variant="outline" 
+                                                  disabled={isUploadingSignature === stage || !signatureFiles[stage]}
+                                                  onClick={() => handleSignatureUpload(stage as 2 | 3 | 4)}
+                                              >
+                                                  {isUploadingSignature === stage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                                              </Button>
+                                          </div>
+                                      </div>
+                                  )}
+                              </div>
+                          );
+                      })}
                   </div>
                 </Form>
               </div>
@@ -961,7 +1030,7 @@ export default function SettingsPage() {
                         onChange={field.onChange}
                         placeholder="Select your department"
                         searchPlaceholder="Search departments..."
-                        emptyPlaceholder="No department found."
+                        emptyPlaceholder="No department found. If you feel this is a error, please drop a mail to helpdesk.rdc@paruluniversity.ac.in"
                         disabled={isAcademicInfoLocked}
                       />
                       <FormMessage />

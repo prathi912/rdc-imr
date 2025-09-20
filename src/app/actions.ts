@@ -1,4 +1,5 @@
 
+
 "use server"
 
 import { getResearchDomainSuggestion, type ResearchDomainInput } from "@/ai/flows/research-domain-suggestion"
@@ -302,6 +303,44 @@ export async function updateSystemSettings(settings: SystemSettings): Promise<{ 
     return { success: false, error: error.message || "Failed to update settings." }
   }
 }
+
+export async function uploadApproverSignature(
+  stage: 2 | 3 | 4,
+  signatureDataUrl: string
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const path = `system/signatures/approver_stage_${stage}_signature.png`;
+    const uploadResult = await uploadFileToServer(signatureDataUrl, path);
+
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(uploadResult.error || "Signature upload failed.");
+    }
+    
+    const settings = await getSystemSettings();
+    const currentApprovers = settings.incentiveApprovers || [];
+    const approverIndex = currentApprovers.findIndex(a => a.stage === stage);
+    
+    if (approverIndex !== -1) {
+      currentApprovers[approverIndex].signatureUrl = uploadResult.url;
+    } else {
+      // This case should ideally not happen if an approver email is set, but handle it defensively.
+      const newApprover = { stage, email: '', signatureUrl: uploadResult.url };
+      currentApprovers.push(newApprover);
+      currentApprovers.sort((a,b) => a.stage - b.stage);
+    }
+    
+    await updateSystemSettings({ ...settings, incentiveApprovers: currentApprovers });
+    
+    await logActivity('INFO', `Approver signature for stage ${stage} updated.`);
+    return { success: true, url: uploadResult.url };
+
+  } catch (error: any) {
+    console.error(`Error uploading signature for stage ${stage}:`, error);
+    await logActivity('ERROR', 'Failed to upload approver signature', { stage, error: error.message });
+    return { success: false, error: error.message || 'Server error during upload.' };
+  }
+}
+
 
 export async function sendLoginOtp(email: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -2027,6 +2066,7 @@ export async function markImrAttendance(
     
 
     
+
 
 
 
