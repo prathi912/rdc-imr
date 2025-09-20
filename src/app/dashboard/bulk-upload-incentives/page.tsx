@@ -63,19 +63,27 @@ export default function BulkUploadIncentivesPage() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
 
+        if (jsonData.length === 0) {
+            toast({ variant: 'destructive', title: 'Empty File', description: 'The uploaded file contains no data.' });
+            return;
+        }
+
         const requiredColumns = ['Title of Paper', 'Email', 'Journal', 'Amount', 'Index', 'Date of proof'];
-        
         const firstRow = jsonData[0];
-        if (!firstRow || !requiredColumns.every(col => col in firstRow)) {
-          toast({
-            variant: 'destructive',
-            title: 'Invalid File Format',
-            description: `The Excel file must contain the following columns: ${requiredColumns.join(', ')}.`,
-            duration: 8000,
-          });
-          setData([]);
-          setFileName('');
-          return;
+        const headers = Object.keys(firstRow).map(h => h.trim().toLowerCase());
+        
+        const missingColumns = requiredColumns.filter(col => !headers.includes(col.trim().toLowerCase()));
+
+        if (missingColumns.length > 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid File Format',
+                description: `The Excel file is missing the following columns: ${missingColumns.join(', ')}.`,
+                duration: 8000,
+            });
+            setData([]);
+            setFileName('');
+            return;
         }
 
         setData(jsonData as IncentiveUploadData[]);
