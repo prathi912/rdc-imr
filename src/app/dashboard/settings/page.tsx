@@ -865,9 +865,10 @@ export default function SettingsPage() {
                                       <div className="space-y-2">
                                           <FormLabel>Stage {stage} Signature</FormLabel>
                                            {approver?.signatureUrl && (
-                                              <div className="flex items-center gap-2">
-                                                  <NextImage src={approver.signatureUrl} alt={`Stage ${stage} signature`} width={100} height={40} className="border rounded-md bg-white p-1" />
-                                              </div>
+                                                <div className="flex items-center gap-2 text-sm text-green-600">
+                                                    <ImageIcon className="h-4 w-4" />
+                                                    <span>Signature Uploaded</span>
+                                                </div>
                                           )}
                                           <div className="flex items-center gap-2">
                                               <Input 
