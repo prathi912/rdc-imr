@@ -3,6 +3,14 @@
 
 import type { IncentiveClaim } from '@/types';
 
+function calculateQuartile(percentile: number): 'Q1' | 'Q2' | 'Q3' | 'Q4' | undefined {
+    if (percentile >= 75) return 'Q1';
+    if (percentile >= 50) return 'Q2';
+    if (percentile >= 25) return 'Q3';
+    if (percentile >= 0) return 'Q4';
+    return undefined;
+}
+
 export async function fetchAdvancedScopusData(
   identifier: string, // Can be a URL or just a DOI
   claimantName: string,
@@ -109,13 +117,13 @@ export async function fetchAdvancedScopusData(
             if (serialResponse.ok) {
                 const serialData = await serialResponse.json();
                 const serialTitleResponse = serialData?.['serial-title-response']?.[0];
-                const subjectArea = serialTitleResponse?.['subject-area'];
+                const citeScoreInfo = serialTitleResponse?.citeScoreYearInfoList;
 
-                if (Array.isArray(subjectArea) && subjectArea.length > 0) {
-                    const primarySubject = subjectArea.find((s: any) => s['@primary'] === 'true') || subjectArea[0];
-                    if (primarySubject?.['@quartile']) {
-                        journalClassification = `Q${primarySubject['@quartile']}` as 'Q1' | 'Q2' | 'Q3' | 'Q4';
-                    }
+                if (citeScoreInfo?.citeScoreTracker && citeScoreInfo?.citeScoreCurrentMetric) {
+                     const percentile = parseFloat(citeScoreInfo.citeScoreTracker);
+                     if (!isNaN(percentile)) {
+                        journalClassification = calculateQuartile(percentile);
+                     }
                 }
             } else {
                  console.warn(`Scopus Serial API failed with status: ${serialResponse.status}`);
