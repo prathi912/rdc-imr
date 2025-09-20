@@ -18,6 +18,7 @@ This is the base role for all teaching and research staff.
 **Key Responsibilities:**
 -   Submitting Intramural research project proposals (IMR).
 -   Registering interest in Extramural research funding calls (EMR).
+-   Applying for research-related incentives (e.g., for publications, patents).
 -   Maintaining a public researcher profile and managing publications.
 
 ### Profile & Settings
@@ -77,6 +78,17 @@ This is the base role for all teaching and research staff.
 
 5.  **Manage Uploads:**
     -   Before the deadline, you can view, replace, or remove your uploaded presentation using the "Manage PPT" button on your application card.
+
+### Incentive Claim Workflow
+1.  **Access Portal:** Navigate to **Incentive Claims** from the sidebar.
+2.  **Select Claim Type:** Choose the category for which you are claiming an incentive (e.g., Research Papers, Patents, Books).
+3.  **Fill the Form:** Complete the detailed application form for your chosen category. You will be required to provide specific details and upload supporting documents (e.g., publication proofs, payment receipts).
+4.  **Save or Submit:**
+    -   You can **Save as Draft** at any point to save your progress.
+    -   Once complete, click **Submit Claim**.
+5.  **Track Status:**
+    -   Go to the **My Claims** tab on the Incentive Claims page to track the status of all your submissions.
+    -   If another author on a paper you co-authored submits a claim, it will appear in the **Co-Author Claims** tab, allowing you to apply for your share of the incentive.
 
 ### Public Profile & Publications
 -   Your public profile page is accessible to administrators and assigned evaluators for review purposes.
