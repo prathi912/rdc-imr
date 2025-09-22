@@ -138,6 +138,16 @@ const researchPaperSchema = z
       return correspondingAuthors.length <= 1
     },
     { message: "Only one author can be designated as the Corresponding Author.", path: ["authors"] },
+  )
+  .refine(
+    (data) => {
+      if (data.publicationType === 'Scopus Indexed Conference Proceedings') {
+        const presentingAuthors = data.authors.filter(author => author.role === 'Presenting Author' || author.role === 'First & Presenting Author');
+        return presentingAuthors.length <= 1;
+      }
+      return true;
+    },
+    { message: "Only one author can be the Presenting Author for a conference proceeding.", path: ["authors"] }
   );
 
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>
@@ -475,8 +485,18 @@ export function ResearchPaperForm() {
     [watchAuthors]
   );
   
+  const presentingAuthorExists = useMemo(() =>
+    watchAuthors.some(author => author.role === 'Presenting Author' || author.role === 'First & Presenting Author'),
+    [watchAuthors]
+  );
+  
   const getAvailableRoles = (currentAuthor?: Author) => {
     if (publicationType === 'Scopus Indexed Conference Proceedings') {
+        const isCurrentAuthorPresenting = currentAuthor && (currentAuthor.role === 'Presenting Author' || currentAuthor.role === 'First & Presenting Author');
+        // If a presenting author exists and it's not the current one, disable presenting roles
+        if (presentingAuthorExists && !isCurrentAuthorPresenting) {
+            return conferenceAuthorRoles.filter(role => role !== 'Presenting Author' && role !== 'First & Presenting Author');
+        }
         return conferenceAuthorRoles;
     }
     const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
