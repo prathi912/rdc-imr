@@ -33,7 +33,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
@@ -274,6 +274,7 @@ export function ConferenceForm() {
         const participationCertificateUrl = await uploadFileHelper(data.participationCertificate?.[0], 'conference-cert');
         const prizeProofUrl = await uploadFileHelper(data.prizeProof?.[0], 'conference-prize-proof');
         const travelReceiptsUrl = await uploadFileHelper(data.travelReceipts?.[0], 'conference-travel-receipts');
+        const flightTicketsUrl = await uploadFileHelper(data.flightTickets?.[0], 'conference-flight-tickets');
 
         if (govtFundingRequestProofUrl) claimData.govtFundingRequestProofUrl = govtFundingRequestProofUrl;
         if (abstractUrl) claimData.abstractUrl = abstractUrl;
@@ -413,5 +414,3 @@ export function ConferenceForm() {
     </Card>
   );
 }
-
-    
