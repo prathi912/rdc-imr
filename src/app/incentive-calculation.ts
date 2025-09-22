@@ -77,6 +77,7 @@ function adjustForPublicationType(baseAmount: number, publicationType: string | 
              if (journalClassification === 'Q1' || journalClassification === 'Q2') {
                 return baseAmount; // 100% for Q1/Q2 review articles
             }
+            // For Q3, Q4, or any other classification, it's 80%
             return baseAmount * 0.8;
         case 'Letter to the Editor/Editorial':
              return 2500; // Total amount to be distributed
