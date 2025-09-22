@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -117,20 +118,23 @@ export async function calculateResearchPaperIncentive(
             return { success: true, amount: 0 }; // No PU authors
         }
         
+        // Rule for Scopus Conference Proceedings: Only Presenting authors are eligible
+        if (publicationType === 'Scopus Indexed Conference Proceedings') {
+            const presentingAuthors = internalAuthors.filter(a => a.role === 'Presenting Author' || a.role === 'First & Presenting Author');
+            const isClaimantPresenting = presentingAuthors.some(a => a.email.toLowerCase() === claimant.email.toLowerCase());
+            
+            if (!isClaimantPresenting) {
+                return { success: true, amount: 0, error: 'Only Presenting Authors can claim for this publication type.' };
+            }
+            
+            const amountPerPresentingAuthor = totalSpecifiedIncentive / (presentingAuthors.length || 1);
+            return { success: true, amount: Math.round(amountPerPresentingAuthor) };
+        }
+        
         const mainAuthors = internalAuthors.filter(a => a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author');
         const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
 
         let finalAmount = 0;
-
-        // Rule for Scopus Conference Proceedings: Only First/Presenting Author
-        if (publicationType === 'Scopus Indexed Conference Proceedings') {
-            if (claimant.role === 'First Author' || claimant.role === 'First & Corresponding Author') {
-                finalAmount = totalSpecifiedIncentive / (mainAuthors.length || 1);
-            } else {
-                finalAmount = 0; // Not a first/presenting author
-            }
-            return { success: true, amount: Math.round(finalAmount) };
-        }
 
         // Rule 1: First or Corresponding author from PU is the sole internal author
         if (mainAuthors.length === 1 && coAuthors.length === 0 && internalAuthors.length === 1) {
@@ -391,5 +395,3 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
-
-    

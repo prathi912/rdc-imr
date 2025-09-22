@@ -48,7 +48,7 @@ export type Author = {
   uid?: string | null // Present for internal authors who are registered on the portal
   email: string
   name: string
-  role: "First Author" | "Corresponding Author" | "Co-Author" | "First & Corresponding Author"
+  role: "First Author" | "Corresponding Author" | "Co-Author" | "First & Corresponding Author" | "Presenting Author" | "First & Presenting Author";
   isExternal: boolean
   status: 'approved' | 'pending' | 'Applied';
 }
@@ -510,5 +510,3 @@ export type FoundUser = {
   misId: string;
   campus: string;
 }
-
-    
