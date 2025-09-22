@@ -72,7 +72,7 @@ const researchPaperSchema = z
           name: z.string(),
           email: z.string().email(),
           uid: z.string().optional().nullable(),
-          role: z.enum(["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"]),
+          role: z.enum(["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author", "Presenting Author", "First & Presenting Author"]),
           isExternal: z.boolean(),
           status: z.enum(['approved', 'pending', 'Applied'])
         }),
@@ -170,7 +170,9 @@ const sdgGoalsList = [
   "Goal 17: Partnerships for the Goals",
 ]
 
-const coAuthorRoles: Author['role'][] = ["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"]
+const coAuthorRoles: Author['role'][] = ["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"];
+const conferenceAuthorRoles: Author['role'][] = ['Presenting Author', 'First & Presenting Author'];
+
 const authorPositions = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 
 const wosTypeOptions = [
@@ -444,6 +446,7 @@ export function ResearchPaperForm() {
   }, [searchParams, user, form, toast]);
 
   const indexType = form.watch("indexType")
+  const publicationType = form.watch("publicationType");
 
   const isSpecialFaculty = useMemo(
     () => (user?.faculty ? SPECIAL_POLICY_FACULTIES.includes(user.faculty) : false),
@@ -473,6 +476,9 @@ export function ResearchPaperForm() {
   );
   
   const getAvailableRoles = (currentAuthor?: Author) => {
+    if (publicationType === 'Scopus Indexed Conference Proceedings') {
+        return conferenceAuthorRoles;
+    }
     const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
     if (firstAuthorExists && !isCurrentAuthorFirst) {
       return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
@@ -1370,5 +1376,3 @@ export function ResearchPaperForm() {
     </div>
   )
 }
-
-    
