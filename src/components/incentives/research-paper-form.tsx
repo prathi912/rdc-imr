@@ -171,7 +171,7 @@ const sdgGoalsList = [
 ]
 
 const coAuthorRoles: Author['role'][] = ["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"];
-const conferenceAuthorRoles: Author['role'][] = ['Presenting Author', 'First & Presenting Author'];
+const conferenceAuthorRoles: Author['role'][] = ['Presenting Author', 'First & Presenting Author', 'Co-Author'];
 
 const authorPositions = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
 
@@ -1154,6 +1154,15 @@ export function ResearchPaperForm() {
                 
                 <div className="space-y-4 pt-4">
                   <FormLabel>Author(s) & Roles</FormLabel>
+                  {publicationType === 'Scopus Indexed Conference Proceedings' && (
+                    <Alert variant="default">
+                        <Info className="h-4 w-4" />
+                        <AlertTitle>Conference Proceedings Policy</AlertTitle>
+                        <AlertDescription>
+                            Only authors with the role of 'Presenting Author' or 'First & Presenting Author' are eligible for an incentive for this publication type. Other co-authors can be added for record-keeping.
+                        </AlertDescription>
+                    </Alert>
+                  )}
                   {fields.map((field, index) => (
                     <div
                       key={field.id}

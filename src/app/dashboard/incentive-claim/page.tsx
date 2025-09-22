@@ -166,7 +166,7 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
             if (claim.claimType === 'Research Papers') {
                 // To calculate, we need to pass the claim data as if the current user is the claimant
                 const claimDataForCalc = { ...claim, userEmail: currentUser.email };
-                result = await calculateResearchPaperIncentive(claimDataForCalc, currentUser.faculty || '');
+                result = await calculateResearchPaperIncentive(claimDataForCalc, currentUser.faculty || '', currentUser.designation);
             } else if (claim.claimType === 'Books') {
                  // For books, the calculation depends on the co-author's role and other factors
                 result = await calculateBookIncentive(claim);
@@ -257,7 +257,12 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         <div className="space-y-4">
             {claimsToShow.map(claim => {
                  const myDetails = getMyCoAuthorDetails(claim);
-                 const canApply = myDetails?.status === 'pending' && !!currentUser?.bankDetails;
+                 // Special rule for Scopus Conference Proceedings
+                 const isScopusConference = claim.publicationType === 'Scopus Indexed Conference Proceedings';
+                 const isPresentingAuthor = myDetails?.role === 'Presenting Author' || myDetails?.role === 'First & Presenting Author';
+                 const canApplyForConference = isScopusConference ? isPresentingAuthor : true;
+                 
+                 const canApply = myDetails?.status === 'pending' && !!currentUser?.bankDetails && canApplyForConference;
 
                 return (
                  <Card key={claim.id}>
@@ -275,10 +280,22 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
                             <p className="text-sm text-muted-foreground">Primary Author: <span className="font-medium text-foreground">{claim.userName}</span></p>
                              <div className="flex items-center gap-2">
                                 <Badge variant="outline">{claim.claimType}</Badge>
+                                {isScopusConference && !isPresentingAuthor && (
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                <Badge variant="destructive">Not Eligible</Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Only Presenting Authors can claim for this publication type.</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
                              </div>
                         </div>
                         <Button onClick={() => handleOpenDialog(claim)} disabled={!canApply}>
-                            {canApply ? 'View & Apply' : 'Applied'}
+                            {myDetails?.status === 'Applied' ? 'Applied' : 'View & Apply'}
                         </Button>
                     </CardContent>
                 </Card>

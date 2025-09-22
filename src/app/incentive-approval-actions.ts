@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -90,6 +89,9 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
         if (finalClaimData.status !== 'Draft' && finalClaimData.authors) {
             const coAuthorsToNotify = finalClaimData.authors.filter(a => a.uid && a.uid !== claimData.uid);
             for (const coAuthor of coAuthorsToNotify) {
+                const isConferenceProceeding = finalClaimData.publicationType === 'Scopus Indexed Conference Proceedings';
+                const canApply = !isConferenceProceeding || (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author');
+
                 const notification = {
                     uid: coAuthor.uid,
                     title: `${claimData.userName} has listed you as a co-author on an incentive claim.`,
@@ -101,23 +103,30 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
                 await adminDb.collection('notifications').add(notification);
 
                 if (coAuthor.email) {
+                     const emailHtml = `
+                        <div ${EMAIL_STYLES.background}>
+                            ${EMAIL_STYLES.logo}
+                            <p style="color:#ffffff;">Dear ${coAuthor.name},</p>
+                            <p style="color:#e0e0e0;">
+                                This is to inform you that ${claimData.userName} has submitted an incentive claim for the publication/work titled "<strong style="color:#ffffff;">${claimData.paperTitle || claimData.publicationTitle || 'N/A'}</strong>" and has listed you as a co-author.
+                            </p>
+                            ${canApply
+                                ? `<p style="color:#e0e0e0;">
+                                    If you wish to claim your share of the incentive, please log in to the portal and visit the "Co-Author Claims" tab on the Incentive Claim page to submit your application.
+                                </p>`
+                                : `<p style="color:#e0e0e0;">
+                                    As per university policy, only presenting authors are eligible for an incentive for this type of publication. This notification is for your records.
+                                </p>`
+                            }
+                            ${EMAIL_STYLES.footer}
+                        </div>
+                    `;
+
                     await sendEmail({
                         to: coAuthor.email,
                         subject: `You've been added as a co-author on an incentive claim`,
                         from: 'default',
-                        html: `
-                            <div ${EMAIL_STYLES.background}>
-                                ${EMAIL_STYLES.logo}
-                                <p style="color:#ffffff;">Dear ${coAuthor.name},</p>
-                                <p style="color:#e0e0e0;">
-                                    This is to inform you that ${claimData.userName} has submitted an incentive claim for the publication/work titled "<strong style="color:#ffffff;">${claimData.paperTitle || claimData.publicationTitle || 'N/A'}</strong>" and has listed you as a co-author.
-                                </p>
-                                <p style="color:#e0e0e0;">
-                                    If you wish to claim your share of the incentive, please log in to the portal and visit the "Co-Author Claims" tab on the Incentive Claim page to submit your application.
-                                </p>
-                                ${EMAIL_STYLES.footer}
-                            </div>
-                        `
+                        html: emailHtml
                     });
                 }
             }
