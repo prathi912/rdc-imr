@@ -1,4 +1,5 @@
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -233,7 +234,7 @@ export type IncentiveClaim = {
 
   // Research Paper Fields
   publicationType?: string;
-  indexType?: "wos" | "scopus" | "both" | "esci";
+  indexType?: "wos" | "scopus" | "both" | "sci";
   doi?: string;
   scopusLink?: string;
   wosLink?: string;

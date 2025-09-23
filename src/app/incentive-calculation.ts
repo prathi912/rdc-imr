@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -49,7 +50,7 @@ function getBaseIncentiveForPaper(claimData: Partial<IncentiveClaim>, faculty: s
 
     if (isSpecialFaculty) {
         // For Category A, only the Quartile-based incentives apply, which are handled above.
-        // No other incentives like ESCI or UGC are applicable for them.
+        // No other incentives like UGC are applicable for them.
         return 0;
     } else {
         // Rules for faculties NOT in Category A
@@ -57,7 +58,6 @@ function getBaseIncentiveForPaper(claimData: Partial<IncentiveClaim>, faculty: s
              // Assuming Q3/Q4 might be derived elsewhere, but based on text it's a flat rate
              return 3000;
         }
-        if (indexType === 'esci') return 2000;
         if (publicationType === 'UGC listed journals (Journals found qualified through UGC-CARE Protocol, Group-I)') return 1000;
 
         return 0;
@@ -265,11 +265,7 @@ export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, 
                 case 'Q3': maxReimbursementLimit = 20000; break;
                 case 'Q4': maxReimbursementLimit = 15000; break;
             }
-        } else if (!isSpecialFaculty) {
-            if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
-                maxReimbursementLimit = 8000;
-            }
-        }
+        } 
         
         const actualAmountPaid = apcTotalAmount || 0;
         const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);

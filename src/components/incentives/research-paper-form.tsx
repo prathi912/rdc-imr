@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -47,7 +48,7 @@ const ACCEPTED_FILE_TYPES = ["application/pdf"]
 const researchPaperSchema = z
   .object({
     publicationType: z.string({ required_error: "Please select a publication type." }),
-    indexType: z.enum(["wos", "scopus", "both", "esci", "sci"]).optional(),
+    indexType: z.enum(["wos", "scopus", "both", "sci"]).optional(),
     doi: z.string().min(5, 'A valid DOI is required to fetch data.').optional().or(z.literal('')),
     scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     wosLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
@@ -177,7 +178,6 @@ const indexTypeOptions = [
   { value: "wos", label: "WoS" },
   { value: "scopus", label: "Scopus" },
   { value: "both", label: "Both" },
-  { value: "esci", label: "ESCI" },
   { value: "sci", label: "SCI" },
 ]
 const journalClassificationOptions = [
