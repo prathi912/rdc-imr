@@ -494,6 +494,7 @@ export type SystemSettings = {
   incentiveApprovers?: ApproverSetting[];
   iqacEmail?: string;
   enabledIncentiveTypes?: Record<string, boolean>;
+  imrEvaluationDays?: number;
 }
 
 export type LoginOtp = {

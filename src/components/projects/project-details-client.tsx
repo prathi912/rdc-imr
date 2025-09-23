@@ -11,7 +11,7 @@ import { format, startOfToday, isToday, parseISO, isAfter, subDays, addDays, isB
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-import type { Project, User, GrantDetails, Evaluation, GrantPhase } from "@/types"
+import type { Project, User, GrantDetails, Evaluation, GrantPhase, SystemSettings } from "@/types"
 import { db } from "@/lib/config"
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs, where, query } from "firebase/firestore"
 import {
@@ -25,7 +25,8 @@ import {
   sendEmail,
   generateOfficeNotingForm,
   deleteImrProject,
-  markImrAttendance
+  markImrAttendance,
+  getSystemSettings,
 } from "@/app/actions"
 import { findUserByMisId } from '@/app/userfinding';
 import { useToast } from "@/hooks/use-toast"
@@ -291,6 +292,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isNotingDialogOpen, setIsNotingDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const isMobile = useIsMobile();
 
   // Co-PI management state
@@ -365,6 +367,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     if (storedUser) {
       setUser(JSON.parse(storedUser))
     }
+    const fetchSettings = async () => {
+        const settings = await getSystemSettings();
+        setSystemSettings(settings);
+    };
+    fetchSettings();
   }, [])
 
   useEffect(() => {
@@ -412,12 +419,13 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     if (!project.meetingDetails?.date) return false;
     const meetingDate = parseISO(project.meetingDetails.date);
     const today = startOfToday();
-    const fifteenDaysAfterMeeting = addDays(meetingDate, 15);
+    const evaluationDays = systemSettings?.imrEvaluationDays ?? 0;
+    const deadline = addDays(meetingDate, evaluationDays);
 
     // The evaluation is active if today is on or after the meeting date,
-    // and on or before 15 days after the meeting date.
-    return !isBefore(today, meetingDate) && !isAfter(today, fifteenDaysAfterMeeting);
-  }, [project.meetingDetails?.date]);
+    // and on or before the deadline.
+    return !isBefore(today, meetingDate) && !isAfter(today, deadline);
+  }, [project.meetingDetails?.date, systemSettings]);
   
   const showEvaluationForm = user && project.status === "Under Review" && isAssignedEvaluator && isEvaluationPeriodActive;
 

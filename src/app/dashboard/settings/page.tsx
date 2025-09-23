@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -168,6 +167,8 @@ const institutes = [
   "Parul Institute of Physiotherapy",
   "Parul Institute of Physiotherapy and Research",
   "Parul Institute of Social Work",
+  "Parul Institute of Technology",
+  "Parul Institute of Technology-Diploma studies",
   "Parul Institute of Vocational Education",
   "Parul Medical Institute & Hospital",
   "Parul Polytechnic Institute",
@@ -635,6 +636,12 @@ export default function SettingsPage() {
     const newSettings = { ...currentSettings, [type]: enabled };
     await handleSystemSettingsSave({ ...systemSettings, enabledIncentiveTypes: newSettings });
   };
+  
+  const handleImrEvaluationDaysChange = async (days: number) => {
+    if (!systemSettings) return;
+    await handleSystemSettingsSave({ ...systemSettings, imrEvaluationDays: days });
+  };
+
 
   const isAcademicInfoLocked = isCro || isPrincipal
 
@@ -704,6 +711,27 @@ export default function SettingsPage() {
                   onCheckedChange={handle2faToggle}
                   disabled={isSavingSettings}
                 />
+              </div>
+              
+              <div className="space-y-4 rounded-lg border p-4">
+                  <div className="flex items-center gap-2">
+                      <CalendarIcon className="h-5 w-5" />
+                      <Label className="text-base">IMR Evaluation Window</Label>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Set the number of days evaluators have to submit their feedback after the scheduled meeting date. Set to 0 to only allow same-day evaluations.
+                  </p>
+                  <div className="flex items-center gap-2">
+                      <Input 
+                          type="number"
+                          className="w-24"
+                          defaultValue={systemSettings.imrEvaluationDays || 0}
+                          onBlur={(e) => handleImrEvaluationDaysChange(parseInt(e.target.value, 10) || 0)}
+                          disabled={isSavingSettings}
+                          min="0"
+                      />
+                      <span className="text-sm text-muted-foreground">days</span>
+                  </div>
               </div>
 
                <div className="space-y-4 rounded-lg border p-4">
@@ -792,7 +820,7 @@ export default function SettingsPage() {
                 )}
               </div>
               <div className="space-y-4">
-                  <Label className="text-base">IQAC Email Address</Label>
+                <Label className="text-base">IQAC Email Address</Label>
                    <p className="text-sm text-muted-foreground">
                     The user who signs up with this email will be automatically assigned the IQAC role.
                   </p>
@@ -1260,5 +1288,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
-    
