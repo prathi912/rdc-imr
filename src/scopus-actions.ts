@@ -81,12 +81,21 @@ export async function fetchAdvancedScopusData(
     // Check for PU affiliation
     const affiliationData = retrievalResponse.affiliation;
     let isPuNameInPublication = false; // Default to false
-    if (affiliationData) {
-      const affiliations = Array.isArray(affiliationData) ? affiliationData : [affiliationData];
-      isPuNameInPublication = affiliations.some((affil: any) => 
-          affil && typeof affil === 'object' && affil['affilname'] && affil['affilname'].toLowerCase().includes('parul')
-      );
+    
+    // Robust check for affiliation data
+    if (Array.isArray(affiliationData)) {
+        try {
+            isPuNameInPublication = affiliationData.some((affil: any) => 
+                affil && typeof affil === 'object' && affil['affilname'] && affil['affilname'].toLowerCase().includes('parul')
+            );
+        } catch (e) {
+            console.warn("Could not parse Scopus affiliation data, ignoring.", e);
+        }
+    } else if (affiliationData && typeof affiliationData === 'object' && affiliationData['affilname']) {
+        // Handle case where it's a single object instead of an array
+        isPuNameInPublication = (affiliationData['affilname'] as string).toLowerCase().includes('parul');
     }
+
 
     let publicationMonth = '';
     let publicationYear = '';
