@@ -447,10 +447,13 @@ export function ResearchPaperForm() {
     [user?.faculty],
   )
 
-  const availableIndexTypes = useMemo(
-    () => (isSpecialFaculty ? indexTypeOptions.filter((o) => o.value !== "esci") : indexTypeOptions),
-    [isSpecialFaculty],
-  )
+  const availableIndexTypes = useMemo(() => {
+    let types = indexTypeOptions;
+    if (isSpecialFaculty) {
+        types = types.filter(o => o.value !== 'esci');
+    }
+    return types;
+  }, [isSpecialFaculty]);
 
   const availableClassifications = useMemo(() => {
       let options = journalClassificationOptions;
@@ -888,9 +891,14 @@ export function ResearchPaperForm() {
                           <FormControl>
                               <Input placeholder="Enter DOI (e.g., 10.1038/nature12345)" {...field} disabled={isSubmitting} />
                           </FormControl>
-                          <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
-                          <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
-                          <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi') || indexType !== 'sci'} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
+                          {indexType === 'sci' ? (
+                            <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
+                          ) : (
+                            <>
+                              <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
+                              <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
+                            </>
+                          )}
                       </div>
                       <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
                       <FormMessage />
