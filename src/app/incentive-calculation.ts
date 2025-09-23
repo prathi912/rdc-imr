@@ -270,9 +270,7 @@ export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, 
                 case 'Q4': maxReimbursementLimit = 15000; break;
             }
         } else if (!isSpecialFaculty) {
-            if (apcIndexingStatus?.includes('UGC-CARE Group-I')) {
-                maxReimbursementLimit = 5000;
-            } else if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
+            if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
                 maxReimbursementLimit = 8000;
             }
         }
