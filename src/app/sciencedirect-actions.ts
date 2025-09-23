@@ -1,8 +1,9 @@
 
 'use server';
 
+import type { IncentiveClaim } from '@/types';
+
 // This function is designed to fetch publication data from the ScienceDirect API.
-// It is currently a placeholder and needs to be implemented with the correct API logic.
 export async function fetchScienceDirectData(
   identifier: string,
   claimantName: string
@@ -11,7 +12,11 @@ export async function fetchScienceDirectData(
   data?: {
     paperTitle: string;
     journalName: string;
-    // Add other relevant fields from ScienceDirect API response
+    publicationMonth: string;
+    publicationYear: string;
+    isPuNameInPublication: boolean;
+    printIssn?: string;
+    electronicIssn?: string;
   };
   error?: string;
 }> {
@@ -21,15 +26,81 @@ export async function fetchScienceDirectData(
     return { success: false, error: "API integration is not configured on the server." };
   }
 
-  // Placeholder logic: This needs to be replaced with actual ScienceDirect API call logic.
-  // For now, it returns a success message indicating it's not yet implemented.
-  console.log(`Fetching from ScienceDirect with identifier: ${identifier}`);
+  const doiMatch = identifier.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
+  const doi = doiMatch ? doiMatch[1] : identifier;
   
-  // Example of what the API call might look like (this is a guess and needs verification)
-  // const apiUrl = `https://api.elsevier.com/content/article/doi/${encodeURIComponent(identifier)}?apiKey=${apiKey}`;
+  if (!doi) {
+      return { success: false, error: 'Could not extract a valid DOI from the input.' };
+  }
 
-  return {
-    success: false,
-    error: "ScienceDirect API fetching is not yet fully implemented.",
-  };
+  const apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}`;
+  
+  try {
+    const response = await fetch(apiUrl, {
+      headers: { "X-ELS-APIKey": apiKey, Accept: "application/json" },
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        const errorMessage = errorData?.['service-error']?.status?.statusText || "The resource specified cannot be found.";
+        throw new Error(`ScienceDirect API Error: ${errorMessage}`);
+    }
+
+    const data = await response.json();
+    const coredata = data?.["abstracts-retrieval-response"]?.coredata;
+    if (!coredata) {
+        return { success: false, error: "Invalid response from ScienceDirect API." };
+    }
+
+    const paperTitle = coredata["dc:title"] || "";
+    const journalName = coredata["prism:publicationName"] || "";
+    const coverDate = coredata["prism:coverDate"];
+    
+    let publicationMonth = '';
+    let publicationYear = '';
+    if (coverDate) {
+        const date = new Date(coverDate);
+        publicationYear = date.getFullYear().toString();
+        publicationMonth = date.toLocaleString('en-US', { month: 'long' });
+    }
+
+    const affiliations = data?.["abstracts-retrieval-response"]?.affiliation || [];
+    const isPuNameInPublication = Array.isArray(affiliations) 
+        ? affiliations.some((affil: any) => affil['affilname']?.toLowerCase().includes('parul'))
+        : (affiliations['affilname'] || '').toLowerCase().includes('parul');
+
+    let printIssn: string | undefined;
+    let electronicIssn: string | undefined;
+    const issnData = coredata["prism:issn"];
+    if (Array.isArray(issnData)) {
+      issnData.forEach((issn: any) => {
+        if (issn && typeof issn === 'object' && issn['$']) {
+          if (issn['@type'] === 'electronic') {
+            electronicIssn = issn['$'];
+          } else {
+            printIssn = issn['$'];
+          }
+        }
+      });
+    } else if (typeof issnData === 'string') {
+      printIssn = issnData;
+    }
+
+    return {
+      success: true,
+      data: {
+        paperTitle,
+        journalName,
+        publicationMonth,
+        publicationYear,
+        isPuNameInPublication,
+        printIssn,
+        electronicIssn,
+      },
+    };
+
+  } catch (error: any) {
+    console.error('Error fetching from ScienceDirect API:', error);
+    return { success: false, error: error.message || "An unexpected error occurred." };
+  }
 }
