@@ -33,7 +33,8 @@ export async function fetchScienceDirectData(
       return { success: false, error: 'Could not extract a valid DOI from the input.' };
   }
 
-  const apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}`;
+  // Switched to the Article Metadata API endpoint
+  const apiUrl = `https://api.elsevier.com/content/metadata/article?query=DOI(${encodeURIComponent(doi)})`;
   
   try {
     const response = await fetch(apiUrl, {
@@ -47,14 +48,14 @@ export async function fetchScienceDirectData(
     }
 
     const data = await response.json();
-    const coredata = data?.["abstracts-retrieval-response"]?.coredata;
-    if (!coredata) {
-        return { success: false, error: "Invalid response from ScienceDirect API." };
+    const entry = data?.["search-results"]?.entry?.[0];
+    if (!entry) {
+        return { success: false, error: "No matching record found in ScienceDirect for the provided DOI." };
     }
 
-    const paperTitle = coredata["dc:title"] || "";
-    const journalName = coredata["prism:publicationName"] || "";
-    const coverDate = coredata["prism:coverDate"];
+    const paperTitle = entry["dc:title"] || "";
+    const journalName = entry["prism:publicationName"] || "";
+    const coverDate = entry["prism:coverDate"];
     
     let publicationMonth = '';
     let publicationYear = '';
@@ -64,27 +65,17 @@ export async function fetchScienceDirectData(
         publicationMonth = date.toLocaleString('en-US', { month: 'long' });
     }
 
-    const affiliations = data?.["abstracts-retrieval-response"]?.affiliation || [];
-    const isPuNameInPublication = Array.isArray(affiliations) 
-        ? affiliations.some((affil: any) => affil['affilname']?.toLowerCase().includes('parul'))
-        : (affiliations['affilname'] || '').toLowerCase().includes('parul');
-
-    let printIssn: string | undefined;
-    let electronicIssn: string | undefined;
-    const issnData = coredata["prism:issn"];
-    if (Array.isArray(issnData)) {
-      issnData.forEach((issn: any) => {
-        if (issn && typeof issn === 'object' && issn['$']) {
-          if (issn['@type'] === 'electronic') {
-            electronicIssn = issn['$'];
-          } else {
-            printIssn = issn['$'];
-          }
-        }
-      });
-    } else if (typeof issnData === 'string') {
-      printIssn = issnData;
+    // Affiliation check requires a different approach with this API
+    let isPuNameInPublication = false;
+    const affiliations = entry?.affiliation;
+    if (Array.isArray(affiliations)) {
+        isPuNameInPublication = affiliations.some((affil: any) => affil['affilname']?.toLowerCase().includes('parul'));
+    } else if (affiliations && affiliations['affilname']) {
+        isPuNameInPublication = (affiliations['affilname'] || '').toLowerCase().includes('parul');
     }
+
+    let printIssn: string | undefined = entry["prism:issn"];
+    let electronicIssn: string | undefined = entry["prism:eIssn"];
 
     return {
       success: true,
