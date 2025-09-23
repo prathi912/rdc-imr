@@ -66,8 +66,15 @@ export default function DashboardPage() {
   return (
     <div className="animate-in fade-in-0 duration-500">
       {user && user.hasCompletedTutorial === false && <WelcomeTutorial user={user} />}
-      {showAdminView && <AdminDashboard />}
-      {showFacultyView && <FacultyDashboard user={user} />}
+      
+      {loading ? (
+        <DashboardSkeleton />
+      ) : (
+        <>
+            {showAdminView && <AdminDashboard />}
+            {showFacultyView && <FacultyDashboard user={user} />}
+        </>
+      )}
     </div>
   );
 }
