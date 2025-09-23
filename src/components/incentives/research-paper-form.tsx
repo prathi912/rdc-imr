@@ -96,39 +96,21 @@ const researchPaperSchema = z
   )
    .refine(
     (data) => {
-      if (data.indexType === 'scopus') {
+      if (data.indexType === 'scopus' || data.indexType === 'both') {
         return !!data.scopusLink && data.scopusLink.length > 0;
       }
       return true;
     },
-    { message: 'Scopus URL is required when Scopus is selected.', path: ['scopusLink'] }
+    { message: 'Scopus URL is required when Scopus or Both is selected.', path: ['scopusLink'] }
   )
   .refine(
     (data) => {
-      if (data.indexType === 'wos') {
+      if (data.indexType === 'wos' || data.indexType === 'both') {
         return !!data.wosLink && data.wosLink.length > 0;
       }
       return true;
     },
-    { message: 'Web of Science URL is required when WoS is selected.', path: ['wosLink'] }
-  )
-   .refine(
-    (data) => {
-      if (data.indexType === 'both') {
-        return (!!data.scopusLink && data.scopusLink.length > 0);
-      }
-      return true;
-    },
-    { message: 'Scopus URL is required when Both is selected.', path: ['scopusLink'] }
-  )
-   .refine(
-    (data) => {
-      if (data.indexType === 'both') {
-         return (!!data.wosLink && data.wosLink.length > 0);
-      }
-      return true;
-    },
-    { message: 'Web of Science URL is required when Both is selected.', path: ['wosLink'] }
+    { message: 'Web of Science URL is required when WoS or Both is selected.', path: ['wosLink'] }
   )
   .refine(
     (data) => {
@@ -931,7 +913,7 @@ export function ResearchPaperForm() {
                     name="scopusLink"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Scopus URL (Optional)</FormLabel>
+                        <FormLabel>Scopus URL</FormLabel>
                         <FormControl>
                             <Input placeholder="Enter full Scopus URL if DOI fetch fails" {...field} disabled={isSubmitting} />
                         </FormControl>
@@ -947,7 +929,7 @@ export function ResearchPaperForm() {
                     name="wosLink"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>WoS URL (Optional)</FormLabel>
+                        <FormLabel>WoS URL</FormLabel>
                          <FormControl>
                             <Input placeholder="Enter full WoS URL if DOI fetch fails" {...field} disabled={isSubmitting} />
                          </FormControl>
