@@ -74,8 +74,6 @@ export async function fetchAdvancedScopusData(
     const paperTitle = coredata["dc:title"] || "";
     const journalName = coredata["prism:publicationName"] || "";
     const coverDate = coredata["prism:coverDate"];
-    const printIssn = coredata["prism:issn"];
-    const electronicIssn = coredata["prism:eIssn"];
     const subtypeDescription = coredata["subtypeDescription"] || "";
     
     // Check for PU affiliation
@@ -94,6 +92,29 @@ export async function fetchAdvancedScopusData(
     } else if (affiliationData && typeof affiliationData === 'object' && affiliationData['affilname']) {
         // Handle case where it's a single object instead of an array
         isPuNameInPublication = (affiliationData['affilname'] as string).toLowerCase().includes('parul');
+    }
+
+    let printIssn: string | undefined;
+    let electronicIssn: string | undefined;
+
+    // Handle ISSN parsing
+    const issnData = coredata["prism:issn"];
+    if (Array.isArray(issnData)) {
+      issnData.forEach((issn: any) => {
+        if (issn && typeof issn === 'object' && issn['$']) {
+          if (issn['@type'] === 'electronic') {
+            electronicIssn = issn['$'];
+          } else {
+            printIssn = issn['$'];
+          }
+        }
+      });
+    } else if (typeof issnData === 'string') {
+      printIssn = issnData;
+    }
+    // Fallback to prism:eIssn if electronic wasn't in the array
+    if (!electronicIssn && coredata["prism:eIssn"]) {
+      electronicIssn = coredata["prism:eIssn"];
     }
 
 
