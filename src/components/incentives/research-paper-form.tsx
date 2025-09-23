@@ -47,7 +47,7 @@ const ACCEPTED_FILE_TYPES = ["application/pdf"]
 const researchPaperSchema = z
   .object({
     publicationType: z.string({ required_error: "Please select a publication type." }),
-    indexType: z.enum(["wos", "scopus", "both", "esci"]).optional(),
+    indexType: z.enum(["wos", "scopus", "both", "esci", "sci"]).optional(),
     doi: z.string().min(5, 'A valid DOI is required to fetch data.').optional().or(z.literal('')),
     scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     wosLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
@@ -178,6 +178,7 @@ const indexTypeOptions = [
   { value: "scopus", label: "Scopus" },
   { value: "both", label: "Both" },
   { value: "esci", label: "ESCI" },
+  { value: "sci", label: "SCI" },
 ]
 const journalClassificationOptions = [
     { value: 'Nature/Science/Lancet', label: 'Nature/Science/Lancet' },
@@ -889,7 +890,7 @@ export function ResearchPaperForm() {
                           </FormControl>
                           <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
                           <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
-                          <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
+                          <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi') || indexType !== 'sci'} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
                       </div>
                       <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
                       <FormMessage />
