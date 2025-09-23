@@ -39,18 +39,17 @@ export async function fetchAdvancedScopusData(
   }
 
   let apiUrl = '';
-  // Check if the identifier is a DOI
-  const doiMatch = identifier.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
   const eidMatch = identifier.match(/eid=([^&]+)/);
+  const doiMatch = identifier.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
 
-  if (doiMatch && doiMatch[1]) {
-    const doi = doiMatch[1];
-    apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}`;
-  } else if (eidMatch && eidMatch[1]) {
+  if (eidMatch && eidMatch[1]) {
     const eid = eidMatch[1];
     apiUrl = `https://api.elsevier.com/content/abstract/eid/${encodeURIComponent(eid)}`;
+  } else if (doiMatch && doiMatch[1]) {
+    const doi = doiMatch[1];
+    apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(doi)}`;
   } else {
-    // Assume the identifier is a DOI if no other pattern matches
+    // Fallback for raw DOI or other formats
     apiUrl = `https://api.elsevier.com/content/abstract/doi/${encodeURIComponent(identifier)}`;
   }
 
@@ -60,7 +59,7 @@ export async function fetchAdvancedScopusData(
     });
     if (!response.ok) {
         const errorData = await response.json();
-        const errorMessage = errorData?.['service-error']?.status?.statusText || response.statusText;
+        const errorMessage = errorData?.['service-error']?.status?.statusText || response.statusText || "The resource specified cannot be found.";
         throw new Error(`Scopus Abstract API Error: ${errorMessage}`);
     }
     const abstractData = await response.json();
@@ -76,11 +75,9 @@ export async function fetchAdvancedScopusData(
     const coverDate = coredata["prism:coverDate"];
     const subtypeDescription = coredata["subtypeDescription"] || "";
     
-    // Check for PU affiliation
     const affiliationData = retrievalResponse.affiliation;
-    let isPuNameInPublication = false; // Default to false
+    let isPuNameInPublication = false;
     
-    // Robust check for affiliation data
     if (Array.isArray(affiliationData)) {
         try {
             isPuNameInPublication = affiliationData.some((affil: any) => 
@@ -90,14 +87,13 @@ export async function fetchAdvancedScopusData(
             console.warn("Could not parse Scopus affiliation data, ignoring.", e);
         }
     } else if (affiliationData && typeof affiliationData === 'object' && affiliationData['affilname']) {
-        // Handle case where it's a single object instead of an array
         isPuNameInPublication = (affiliationData['affilname'] as string).toLowerCase().includes('parul');
     }
+
 
     let printIssn: string | undefined;
     let electronicIssn: string | undefined;
 
-    // Handle ISSN parsing
     const issnData = coredata["prism:issn"];
     if (Array.isArray(issnData)) {
       issnData.forEach((issn: any) => {
@@ -112,7 +108,6 @@ export async function fetchAdvancedScopusData(
     } else if (typeof issnData === 'string') {
       printIssn = issnData;
     }
-    // Fallback to prism:eIssn if electronic wasn't in the array
     if (!electronicIssn && coredata["prism:eIssn"]) {
       electronicIssn = coredata["prism:eIssn"];
     }
@@ -194,7 +189,6 @@ export async function fetchAdvancedScopusData(
           }
         } catch (e) {
           console.warn("Springer Nature API call failed, proceeding without website.", e);
-          // Do not throw an error, just proceed without the website.
         }
       }
     }

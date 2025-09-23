@@ -23,6 +23,7 @@ import type { User, IncentiveClaim, Author } from '@/types'
 import { uploadFileToServer } from '@/app/actions'
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
+import { fetchScienceDirectData } from "@/app/sciencedirect-actions";
 import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit } from 'lucide-react'
 import {
   DropdownMenu,
@@ -502,7 +503,7 @@ export function ResearchPaperForm() {
     }
   }, [availableIndexTypes, form])
 
-  const handleFetchData = async (source: 'scopus' | 'wos') => {
+  const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
     const doi = form.getValues('doi');
     if (!doi) {
       toast({ variant: 'destructive', title: 'No DOI Provided', description: 'Please enter a DOI to fetch data.' });
@@ -517,8 +518,14 @@ export function ResearchPaperForm() {
     toast({ title: `Fetching ${source.toUpperCase()} Data`, description: 'Please wait, this may take a moment...' });
     
     try {
-        const fetcher = source === 'scopus' ? fetchAdvancedScopusData : fetchWosDataByUrl;
-        const result = await fetcher(doi, user.name);
+        let result;
+        if (source === 'scopus') {
+            result = await fetchAdvancedScopusData(doi, user.name);
+        } else if (source === 'wos') {
+            result = await fetchWosDataByUrl(doi, user.name);
+        } else {
+            result = await fetchScienceDirectData(doi, user.name);
+        }
 
         if (result.success && result.data) {
             const autoFetched: (keyof ResearchPaperFormValues)[] = [];
@@ -534,7 +541,7 @@ export function ResearchPaperForm() {
 
             toast({ title: 'Success', description: `Form fields have been pre-filled from ${source.toUpperCase()}.` });
             
-            if (result.warning) {
+            if ('warning' in result && result.warning) {
                 toast({
                     variant: 'default',
                     title: 'Heads Up',
@@ -880,26 +887,9 @@ export function ResearchPaperForm() {
                           <FormControl>
                               <Input placeholder="Enter DOI (e.g., 10.1038/nature12345)" {...field} disabled={isSubmitting} />
                           </FormControl>
-                          <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => handleFetchData('scopus')}
-                              disabled={isSubmitting || isFetching || !form.getValues('doi')}
-                              title="Fetch data from Scopus"
-                          >
-                              {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                              Scopus
-                          </Button>
-                          <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => handleFetchData('wos')}
-                              disabled={isSubmitting || isFetching || !form.getValues('doi')}
-                              title="Fetch data from Web of Science"
-                          >
-                              {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
-                              WoS
-                          </Button>
+                          <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
+                          <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
+                          <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
                       </div>
                       <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
                       <FormMessage />
