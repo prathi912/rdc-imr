@@ -80,10 +80,13 @@ export async function fetchAdvancedScopusData(
     
     // Check for PU affiliation
     const affiliationData = retrievalResponse.affiliation;
-    const affiliations = Array.isArray(affiliationData) ? affiliationData : (affiliationData ? [affiliationData] : []);
-    const isPuNameInPublication = affiliations.some((affil: any) => 
-        affil['affilname'] && affil['affilname'].toLowerCase().includes('parul')
-    );
+    let isPuNameInPublication = false; // Default to false
+    if (affiliationData) {
+      const affiliations = Array.isArray(affiliationData) ? affiliationData : [affiliationData];
+      isPuNameInPublication = affiliations.some((affil: any) => 
+          affil && typeof affil === 'object' && affil['affilname'] && affil['affilname'].toLowerCase().includes('parul')
+      );
+    }
 
     let publicationMonth = '';
     let publicationYear = '';
