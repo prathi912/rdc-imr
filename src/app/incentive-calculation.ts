@@ -90,10 +90,6 @@ export async function calculateResearchPaperIncentive(
     designation?: string,
 ): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        if (claimData.isPuNameInPublication === false) {
-            return { success: true, amount: 0 };
-        }
-        
         const { authors = [], userEmail, publicationType, journalClassification } = claimData;
         const totalAuthors = authors.length || 1;
         
@@ -162,6 +158,11 @@ export async function calculateResearchPaperIncentive(
         // Fallback for cases like multiple main authors from PU but no co-authors
         else if (mainAuthors.length > 0 && coAuthors.length === 0) {
             finalAmount = totalSpecifiedIncentive / mainAuthors.length;
+        }
+
+        // New rule: If PU affiliation is not present, halve the incentive.
+        if (claimData.isPuNameInPublication === false) {
+            finalAmount /= 2;
         }
 
         return { success: true, amount: Math.round(finalAmount) };
@@ -249,8 +250,14 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
 
 export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, isSpecialFaculty: boolean): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { apcIndexingStatus, apcQRating, authors, apcTotalAmount } = claimData;
+        const { apcIndexingStatus, apcQRating, authors, apcTotalAmount, userEmail } = claimData;
         
+        // Find the claimant in the author list
+        const claimant = authors?.find(a => a.email.toLowerCase() === userEmail?.toLowerCase());
+        if (!claimant) {
+            return { success: false, error: "Claimant not found in the author list." };
+        }
+
         const totalAuthorCount = authors?.length || 1;
         if (totalAuthorCount === 0) {
             return { success: true, amount: 0 };
@@ -266,6 +273,11 @@ export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, 
                 case 'Q4': maxReimbursementLimit = 15000; break;
             }
         } 
+        if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
+            if (!isSpecialFaculty) {
+                maxReimbursementLimit = Math.max(maxReimbursementLimit, 8000);
+            }
+        }
         
         const actualAmountPaid = apcTotalAmount || 0;
         const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
