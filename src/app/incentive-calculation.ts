@@ -73,11 +73,10 @@ function adjustForPublicationType(baseAmount: number, publicationType: string | 
         case 'Case Reports/Short Surveys':
             return baseAmount * 0.9;
         case 'Review Articles':
-             if (journalClassification === 'Q1' || journalClassification === 'Q2') {
-                return baseAmount; // 100% for Q1/Q2 review articles
+             if (journalClassification === 'Q3' || journalClassification === 'Q4') {
+                return baseAmount * 0.8;
             }
-            // For Q3, Q4, or any other classification, it's 80%
-            return baseAmount * 0.8;
+            return baseAmount;
         case 'Letter to the Editor/Editorial':
              return 2500; // Total amount to be distributed
         default:
@@ -250,10 +249,12 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
 
 export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, isSpecialFaculty: boolean): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { apcIndexingStatus, apcQRating, authors } = claimData;
+        const { apcIndexingStatus, apcQRating, authors, apcTotalAmount } = claimData;
         
-        const internalAuthors = authors ? authors.filter(a => !a.isExternal) : [];
-        const internalAuthorCount = internalAuthors.length > 0 ? internalAuthors.length : 1;
+        const totalAuthorCount = authors?.length || 1;
+        if (totalAuthorCount === 0) {
+            return { success: true, amount: 0 };
+        }
         
         let maxReimbursementLimit = 0;
     
@@ -270,7 +271,10 @@ export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, 
             }
         }
         
-        const finalIncentive = maxReimbursementLimit / internalAuthorCount;
+        const actualAmountPaid = apcTotalAmount || 0;
+        const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
+        
+        const finalIncentive = admissibleAmount / totalAuthorCount;
         
         return { success: true, amount: Math.round(finalIncentive) };
     } catch (error: any) {
@@ -391,3 +395,5 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
+
+    
