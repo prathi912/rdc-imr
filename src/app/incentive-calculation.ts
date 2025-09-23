@@ -251,33 +251,36 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
 
 export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, isSpecialFaculty: boolean): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { apcIndexingStatus, apcQRating, authors } = claimData;
+        const { apcIndexingStatus, apcQRating, authors, apcAmountClaimed } = claimData;
         
-        const internalAuthorCount = authors ? authors.filter(author => !author.isExternal).length : 0;
-        if (internalAuthorCount === 0) {
+        const totalAuthorCount = authors ? authors.length : 1;
+        if (totalAuthorCount === 0) {
           return { success: true, amount: 0 };
         }
+
+        const actualApcPaid = apcAmountClaimed || 0;
         
-        let maxTotalIncentive = 0;
+        let maxReimbursementLimit = 0;
     
         if (apcIndexingStatus?.includes('Scopus') || apcIndexingStatus?.includes('Web of science')) {
             switch (apcQRating) {
-                case 'Q1': maxTotalIncentive = 40000; break;
-                case 'Q2': maxTotalIncentive = 30000; break;
-                case 'Q3': maxTotalIncentive = 20000; break;
-                case 'Q4': maxTotalIncentive = 15000; break;
+                case 'Q1': maxReimbursementLimit = 40000; break;
+                case 'Q2': maxReimbursementLimit = 30000; break;
+                case 'Q3': maxReimbursementLimit = 20000; break;
+                case 'Q4': maxReimbursementLimit = 15000; break;
             }
         } else if (!isSpecialFaculty) {
             if (apcIndexingStatus?.includes('UGC-CARE Group-I')) {
-                maxTotalIncentive = 5000;
+                maxReimbursementLimit = 5000;
             } else if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
-                maxTotalIncentive = 8000;
+                maxReimbursementLimit = 8000;
             }
         }
         
-        const individualIncentive = maxTotalIncentive > 0 ? maxTotalIncentive / internalAuthorCount : 0;
+        const calculatedShare = actualApcPaid / totalAuthorCount;
+        const finalIncentive = Math.min(calculatedShare, maxReimbursementLimit);
         
-        return { success: true, amount: Math.round(individualIncentive) };
+        return { success: true, amount: Math.round(finalIncentive) };
     } catch (error: any) {
          console.error("Error calculating APC incentive:", error);
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
