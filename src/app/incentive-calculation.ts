@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -251,14 +250,10 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
 
 export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, isSpecialFaculty: boolean): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { apcIndexingStatus, apcQRating, authors, apcAmountClaimed } = claimData;
+        const { apcIndexingStatus, apcQRating, authors } = claimData;
         
-        const totalAuthorCount = authors ? authors.length : 1;
-        if (totalAuthorCount === 0) {
-          return { success: true, amount: 0 };
-        }
-
-        const actualApcPaid = apcAmountClaimed || 0;
+        const internalAuthors = authors ? authors.filter(a => !a.isExternal) : [];
+        const internalAuthorCount = internalAuthors.length > 0 ? internalAuthors.length : 1;
         
         let maxReimbursementLimit = 0;
     
@@ -275,8 +270,7 @@ export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, 
             }
         }
         
-        const calculatedShare = actualApcPaid / totalAuthorCount;
-        const finalIncentive = Math.min(calculatedShare, maxReimbursementLimit);
+        const finalIncentive = maxReimbursementLimit / internalAuthorCount;
         
         return { success: true, amount: Math.round(finalIncentive) };
     } catch (error: any) {
