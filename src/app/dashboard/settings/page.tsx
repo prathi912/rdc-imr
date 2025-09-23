@@ -167,8 +167,6 @@ const institutes = [
   "Parul Institute of Physiotherapy",
   "Parul Institute of Physiotherapy and Research",
   "Parul Institute of Social Work",
-  "Parul Institute of Technology",
-  "Parul Institute of Technology-Diploma studies",
   "Parul Institute of Vocational Education",
   "Parul Medical Institute & Hospital",
   "Parul Polytechnic Institute",
@@ -361,7 +359,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const currentInstitute = profileForm.getValues('institute');
-    const appropriateInstitutes = selectedCampus === 'Goa' ? goaInstitutes : institutes;
+    const appropriateInstitutes = selectedCampus === 'Goa' ? goaInstitutes : [...new Set(institutes)];
     if (currentInstitute && !appropriateInstitutes.includes(currentInstitute)) {
         profileForm.setValue('institute', '');
     }
@@ -972,8 +970,8 @@ export default function SettingsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {(selectedCampus === 'Goa' ? goaInstitutes : institutes).map((i) => (
-                            <SelectItem key={i} value={i}>
+                          {[...new Set(selectedCampus === 'Goa' ? goaInstitutes : institutes)].map((i, index) => (
+                            <SelectItem key={`${i}-${index}`} value={i}>
                               {i}
                             </SelectItem>
                           ))}
