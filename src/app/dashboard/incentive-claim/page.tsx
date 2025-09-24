@@ -37,6 +37,7 @@ import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateBookIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
 import { Separator } from '@/components/ui/separator';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 function UserClaimsList({ 
@@ -397,6 +398,8 @@ export default function IncentiveClaimPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [membershipClaimInfo, setMembershipClaimInfo] = useState<{ canClaim: boolean; nextAvailableDate?: string }>({ canClaim: true });
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [activeTab, setActiveTab] = useState('apply');
+  const isMobile = useIsMobile();
 
   const fetchUserClaims = async (uid: string) => {
       setLoading(true);
@@ -528,7 +531,13 @@ export default function IncentiveClaimPage() {
     
     return filteredTypes;
   }, [systemSettings, claimTypes, user]);
-
+  
+  const tabs = [
+    { value: 'apply', label: 'Apply' },
+    { value: 'my-claims', label: `My Claims (${otherClaims.length})` },
+    { value: 'co-author', label: `Co-Author Claims (${coAuthorClaims.filter(c => c.authors?.find(a => a.uid === user?.uid)?.status === 'pending').length})` },
+    { value: 'draft', label: `Drafts (${draftClaims.length})` },
+  ];
 
   return (
     <>
@@ -539,13 +548,26 @@ export default function IncentiveClaimPage() {
         showBackButton={false}
       />
       <div className="mt-8">
-        <Tabs defaultValue="apply" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-            <TabsTrigger value="apply">Apply</TabsTrigger>
-            <TabsTrigger value="my-claims">My Claims ({otherClaims.length})</TabsTrigger>
-            <TabsTrigger value="co-author">Co-Author Claims ({coAuthorClaims.filter(c => c.authors?.find(a => a.uid === user?.uid)?.status === 'pending').length})</TabsTrigger>
-            <TabsTrigger value="draft">Drafts ({draftClaims.length})</TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {isMobile ? (
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a view" />
+              </SelectTrigger>
+              <SelectContent>
+                {tabs.map(tab => (
+                  <SelectItem key={tab.value} value={tab.value}>{tab.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <TabsList className="grid w-full grid-cols-4">
+              {tabs.map(tab => (
+                  <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+              ))}
+            </TabsList>
+          )}
+
           <TabsContent value="apply" className="mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {enabledClaimTypes.map(claim => {
@@ -583,13 +605,13 @@ export default function IncentiveClaimPage() {
               })}
             </div>
           </TabsContent>
-           <TabsContent value="my-claims">
+           <TabsContent value="my-claims" className="mt-4">
              {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={otherClaims} claimType="other" onViewDetails={handleViewDetails} />}
           </TabsContent>
-           <TabsContent value="co-author">
+           <TabsContent value="co-author" className="mt-4">
             {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} onClaimApplied={() => fetchAllData(user!.uid)} />}
           </TabsContent>
-          <TabsContent value="draft">
+          <TabsContent value="draft" className="mt-4">
              {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" onViewDetails={handleViewDetails}/>}
           </TabsContent>
         </Tabs>
@@ -605,3 +627,5 @@ export default function IncentiveClaimPage() {
     </>
   );
 }
+
+    
