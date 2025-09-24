@@ -540,7 +540,7 @@ export default function IncentiveClaimPage() {
       />
       <div className="mt-8">
         <Tabs defaultValue="apply" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
             <TabsTrigger value="apply">Apply</TabsTrigger>
             <TabsTrigger value="my-claims">My Claims ({otherClaims.length})</TabsTrigger>
             <TabsTrigger value="co-author">Co-Author Claims ({coAuthorClaims.filter(c => c.authors?.find(a => a.uid === user?.uid)?.status === 'pending').length})</TabsTrigger>
