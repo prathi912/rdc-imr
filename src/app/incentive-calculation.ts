@@ -90,7 +90,7 @@ export async function calculateResearchPaperIncentive(
     designation?: string,
 ): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { authors = [], userEmail, publicationType, journalClassification } = claimData;
+        const { authors = [], userEmail, publicationType, journalClassification, wasApcPaidByUniversity } = claimData;
         const totalAuthors = authors.length || 1;
         
         // Find the claimant in the author list
@@ -104,7 +104,10 @@ export async function calculateResearchPaperIncentive(
 
         // Special case for Letter to Editor/Editorial
         if (publicationType === 'Letter to the Editor/Editorial') {
-            const amountPerAuthor = totalSpecifiedIncentive / totalAuthors;
+            let amountPerAuthor = totalSpecifiedIncentive / totalAuthors;
+            if (wasApcPaidByUniversity) {
+                amountPerAuthor /= 2;
+            }
             return { success: true, amount: Math.round(amountPerAuthor) };
         }
 
@@ -122,7 +125,10 @@ export async function calculateResearchPaperIncentive(
                 return { success: true, amount: 0, error: 'Only Presenting Authors can claim for this publication type.' };
             }
             
-            const amountPerPresentingAuthor = totalSpecifiedIncentive / (presentingAuthors.length || 1);
+            let amountPerPresentingAuthor = totalSpecifiedIncentive / (presentingAuthors.length || 1);
+            if (wasApcPaidByUniversity) {
+                amountPerPresentingAuthor /= 2;
+            }
             return { success: true, amount: Math.round(amountPerPresentingAuthor) };
         }
         
@@ -158,6 +164,11 @@ export async function calculateResearchPaperIncentive(
         // Fallback for cases like multiple main authors from PU but no co-authors
         else if (mainAuthors.length > 0 && coAuthors.length === 0) {
             finalAmount = totalSpecifiedIncentive / mainAuthors.length;
+        }
+
+        // New rule: If APC was paid by university, halve the incentive.
+        if (wasApcPaidByUniversity) {
+            finalAmount /= 2;
         }
 
         // New rule: If PU affiliation is not present, halve the incentive.

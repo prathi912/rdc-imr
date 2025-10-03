@@ -252,6 +252,7 @@ export type IncentiveClaim = {
   publicationYear?: string;
   publicationProofUrls?: string[];
   isPuNameInPublication?: boolean;
+  wasApcPaidByUniversity?: boolean;
   totalCorrespondingAuthors?: number;
   totalPuStudentAuthors?: number;
   puStudentNames?: string;

@@ -67,6 +67,7 @@ const researchPaperSchema = z
     isPuNameInPublication: z
       .boolean()
       .refine((val) => val === true, { message: "PU name must be present in the publication for an incentive." }),
+    wasApcPaidByUniversity: z.boolean().default(false),
     authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
     authors: z
       .array(
@@ -291,6 +292,7 @@ function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit
                 {renderDetail("Publication Month/Year", `${data.publicationMonth}, ${data.publicationYear}`)}
                 {renderDetail("Your Author Position", data.authorPosition)}
                 {renderDetail("PU Name in Publication", data.isPuNameInPublication)}
+                {renderDetail("APC Paid by University", data.wasApcPaidByUniversity)}
                 {renderDetail("Total PU Student Authors", data.totalPuStudentAuthors)}
                 {renderDetail("PU Student Names", data.puStudentNames)}
                 {renderDetail("SDGs", data.sdgGoals)}
@@ -353,6 +355,7 @@ export function ResearchPaperForm() {
       sdgGoals: [],
       authors: [],
       isPuNameInPublication: true,
+      wasApcPaidByUniversity: false,
       totalPuStudentAuthors: 0,
       puStudentNames: '',
       autoFetchedFields: [],
@@ -1298,6 +1301,25 @@ export function ResearchPaperForm() {
                         <FormLabel className="text-base">
                           Is "Parul University" name present in the publication?
                         </FormLabel>
+                      </div>
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="wasApcPaidByUniversity"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">
+                          Was the Article Processing Charge (APC) paid by the University?
+                        </FormLabel>
+                         <FormDescription>If yes, the final incentive amount will be reduced by 50%.</FormDescription>
                       </div>
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} />
