@@ -1238,7 +1238,7 @@ export function ResearchPaperForm() {
                     name="authorPosition"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Author Position</FormLabel>
+                        <FormLabel>Your Author Position</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -1285,12 +1285,6 @@ export function ResearchPaperForm() {
                     )}
                   />
                 </div>
-                 {calculatedIncentive !== null && (
-                    <div className="p-4 bg-secondary rounded-md">
-                        <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
-                        <p className="text-xs text-muted-foreground">This is your individual share based on the policy, publication type, and author roles.</p>
-                    </div>
-                )}
                 
                 <FormField
                   control={form.control}
@@ -1329,6 +1323,13 @@ export function ResearchPaperForm() {
                   )}
                 />
 
+                {calculatedIncentive !== null && (
+                    <div className="p-4 bg-secondary rounded-md">
+                        <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
+                        <p className="text-xs text-muted-foreground">This is your individual share based on the policy, publication type, and author roles.</p>
+                    </div>
+                )}
+                
                 <FormField
                   control={form.control}
                   name="sdgGoals"
