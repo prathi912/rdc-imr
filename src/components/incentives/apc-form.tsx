@@ -155,20 +155,22 @@ export function ApcForm() {
 
   const formValues = form.watch();
 
-   const calculate = useCallback(async () => {
-        if (!user || !user.faculty) return;
-        const result = await calculateApcIncentive(formValues, isSpecialFaculty);
-        if (result.success) {
+  useEffect(() => {
+    const subscription = form.watch(async (value, { name, type }) => {
+      if (name === 'apcTotalAmount' || name === 'apcQRating' || name === 'apcIndexingStatus' || name.startsWith('authors')) {
+        if (user && user.faculty) {
+          const result = await calculateApcIncentive(value, isSpecialFaculty);
+          if (result.success) {
             setCalculatedIncentive(result.amount ?? null);
-        } else {
+          } else {
             console.error("Incentive calculation failed:", result.error);
             setCalculatedIncentive(null);
+          }
         }
-   }, [formValues, user, isSpecialFaculty]);
-
-   useEffect(() => {
-     calculate();
-   }, [calculate]);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, user, isSpecialFaculty]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
