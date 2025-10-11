@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -22,10 +23,13 @@ import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, Author } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { findUserByMisId } from '@/app/userfinding';
-import { Loader2, AlertCircle, Info, Plus, Trash2, Search } from 'lucide-react';
+import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Bot } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { calculateApcIncentive } from '@/app/incentive-calculation';
+import { fetchAdvancedScopusData } from '@/app/scopus-actions';
+import { fetchScienceDirectData } from '@/app/sciencedirect-actions';
+import { fetchWosDataByUrl } from '@/app/wos-actions';
 
 const authorSchema = z.object({
     name: z.string().min(2, 'Author name is required.'),
@@ -39,6 +43,9 @@ const authorSchema = z.object({
 const apcSchema = z.object({
   apcTypeOfArticle: z.string({ required_error: 'Please select an article type.' }),
   apcOtherArticleType: z.string().optional(),
+  apcIndexingStatus: z.array(z.string()).refine(value => value.some(item => item), { message: "You have to select at least one indexing status." }),
+  apcQRating: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
+  doi: z.string().optional(),
   apcPaperTitle: z.string().min(5, 'Paper title is required.'),
   authors: z.array(authorSchema).min(1, 'At least one author is required.')
   .refine(data => {
@@ -48,12 +55,10 @@ const apcSchema = z.object({
   apcTotalStudentAuthors: z.coerce.number().nonnegative("Number of students cannot be negative.").optional(),
   apcStudentNames: z.string().optional(),
   apcJournalDetails: z.string().min(5, 'Journal details are required.'),
-  apcQRating: z.enum(['Q1', 'Q2', 'Q3', 'Q4']).optional(),
   apcApcWaiverRequested: z.boolean().optional(),
   apcApcWaiverProof: z.any().optional(),
   apcJournalWebsite: z.string().url('Please enter a valid URL.'),
   apcIssnNo: z.string().min(5, 'ISSN is required.'),
-  apcIndexingStatus: z.array(z.string()).refine(value => value.some(item => item), { message: "You have to select at least one indexing status." }),
   apcSciImpactFactor: z.coerce.number().optional(),
   apcPublicationProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.'),
   apcInvoiceProof: z.any().refine((files) => files?.length > 0, 'Proof of payment/invoice is required.'),
@@ -101,6 +106,7 @@ export function ApcForm() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
@@ -117,16 +123,17 @@ export function ApcForm() {
     defaultValues: {
       apcTypeOfArticle: '',
       apcOtherArticleType: '',
+      apcIndexingStatus: [],
+      apcQRating: undefined,
+      doi: '',
       apcPaperTitle: '',
       authors: [],
       apcTotalStudentAuthors: 0,
       apcStudentNames: '',
       apcJournalDetails: '',
-      apcQRating: undefined,
       apcApcWaiverRequested: false,
       apcJournalWebsite: '',
       apcIssnNo: '',
-      apcIndexingStatus: [],
       apcSciImpactFactor: 0,
       apcPuNameInPublication: false,
       apcAmountClaimed: 0,
@@ -154,23 +161,23 @@ export function ApcForm() {
   }, [isSpecialFaculty]);
 
   const formValues = form.watch();
+  
+  const calculate = useCallback(async () => {
+    if (user && user.faculty) {
+      const result = await calculateApcIncentive(formValues, isSpecialFaculty);
+      if (result.success) {
+        setCalculatedIncentive(result.amount ?? null);
+      } else {
+        console.error("Incentive calculation failed:", result.error);
+        setCalculatedIncentive(null);
+      }
+    }
+  }, [formValues, user, isSpecialFaculty]);
 
   useEffect(() => {
-    const subscription = form.watch(async (value, { name, type }) => {
-      if (name === 'apcTotalAmount' || name === 'apcQRating' || name === 'apcIndexingStatus' || name.startsWith('authors')) {
-        if (user && user.faculty) {
-          const result = await calculateApcIncentive(value, isSpecialFaculty);
-          if (result.success) {
-            setCalculatedIncentive(result.amount ?? null);
-          } else {
-            console.error("Incentive calculation failed:", result.error);
-            setCalculatedIncentive(null);
-          }
-        }
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [form, user, isSpecialFaculty]);
+    calculate();
+  }, [calculate]);
+
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -210,6 +217,58 @@ export function ApcForm() {
 
   const watchArticleType = form.watch('apcTypeOfArticle');
   const watchWaiverRequested = form.watch('apcApcWaiverRequested');
+  const indexType = form.watch("apcIndexingStatus");
+
+  const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
+    const doi = form.getValues('doi');
+    if (!doi) {
+      toast({ variant: 'destructive', title: 'No DOI Provided', description: 'Please enter a DOI to fetch data.' });
+      return;
+    }
+    if (!user) {
+      toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant.' });
+      return;
+    }
+
+    setIsFetching(true);
+    toast({ title: `Fetching ${source.toUpperCase()} Data`, description: 'Please wait, this may take a moment...' });
+    
+    try {
+        let result;
+        if (source === 'scopus') {
+            result = await fetchAdvancedScopusData(doi, user.name);
+        } else if (source === 'wos') {
+            result = await fetchWosDataByUrl(doi, user.name);
+        } else {
+            result = await fetchScienceDirectData(doi, user.name);
+        }
+
+        if (result.success && result.data) {
+            form.setValue('apcPaperTitle', result.data.paperTitle || '');
+            form.setValue('apcJournalDetails', result.data.journalName || '');
+            form.setValue('apcJournalWebsite', result.data.journalWebsite || '');
+            form.setValue('apcIssnNo', result.data.printIssn || result.data.electronicIssn || '');
+            
+            toast({ title: 'Success', description: `Form fields have been pre-filled from ${source.toUpperCase()}.` });
+            
+            if ('warning' in result && result.warning) {
+                toast({
+                    variant: 'default',
+                    title: 'Heads Up',
+                    description: result.warning,
+                    duration: 7000,
+                });
+            }
+
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error || `Failed to fetch data from ${source.toUpperCase()}.` });
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+    } finally {
+        setIsFetching(false);
+    }
+  };
 
   const handleSearchCoPi = async () => {
     if (!coPiSearchTerm) return;
@@ -393,8 +452,32 @@ export function ApcForm() {
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">ARTICLE & JOURNAL DETAILS</h3>
                 <Separator />
-                <FormField control={form.control} name="apcTypeOfArticle" render={({ field }) => ( <FormItem><FormLabel>Type of Article</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-6">{articleTypes.map(type => (<FormItem key={type} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={type} /></FormControl><FormLabel className="font-normal">{type}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )}/>
+                <FormField control={form.control} name="apcTypeOfArticle" render={({ field }) => ( <FormItem><FormLabel>Type of Article</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-6">{articleTypes.map(type => (<FormItem key={type} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={type} /></FormControl><FormLabel className="font-normal">{type}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 {watchArticleType === 'Other' && <FormField name="apcOtherArticleType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Please specify other article type</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
+                <FormField name="apcIndexingStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Indexing/Listing status of the Journal</FormLabel>{availableIndexingStatuses.map(item => (<FormField key={item} control={form.control} name="apcIndexingStatus" render={({ field }) => ( <FormItem key={item} className="flex flex-row items-start space-x-3 space-y-0"><FormControl><Checkbox checked={field.value?.includes(item)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), item]) : field.onChange(field.value?.filter(value => value !== item)); }} /></FormControl><FormLabel className="font-normal">{item}</FormLabel></FormItem> )} />))}<FormMessage /></FormItem> )} />
+                <FormField name="apcQRating" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Q Rating of the Journal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Q Rating" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Q1">Q1</SelectItem><SelectItem value="Q2">Q2</SelectItem><SelectItem value="Q3">Q3</SelectItem><SelectItem value="Q4">Q4</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
+
+                <Separator />
+
+                <FormField
+                  control={form.control}
+                  name="doi"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>DOI (Digital Object Identifier)</FormLabel>
+                      <div className="flex items-center gap-2">
+                          <FormControl>
+                              <Input placeholder="Enter DOI to auto-fill details" {...field} disabled={isSubmitting} />
+                          </FormControl>
+                          <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
+                          <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from WoS"><Bot className="h-4 w-4" /> WoS</Button>
+                          <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from ScienceDirect"><Bot className="h-4 w-4" /> SCI</Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
                 <FormField name="apcPaperTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Paper</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem> )} />
                 
                 <div className="space-y-4">
@@ -450,8 +533,6 @@ export function ApcForm() {
                 <FormField name="apcJournalDetails" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Details of the Journal</FormLabel><FormControl><Textarea placeholder="Name, Vol, Page No., Year, DOI" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcJournalWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Journal Website</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcIssnNo" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISSN No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="apcIndexingStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Indexing/Listing status of the Journal</FormLabel>{availableIndexingStatuses.map(item => (<FormField key={item} control={form.control} name="apcIndexingStatus" render={({ field }) => ( <FormItem key={item} className="flex flex-row items-start space-x-3 space-y-0"><FormControl><Checkbox checked={field.value?.includes(item)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), item]) : field.onChange(field.value?.filter(value => value !== item)); }} /></FormControl><FormLabel className="font-normal">{item}</FormLabel></FormItem> )} />))}<FormMessage /></FormItem> )} />
-                <FormField name="apcQRating" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Q Rating of the Journal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Q Rating" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Q1">Q1</SelectItem><SelectItem value="Q2">Q2</SelectItem><SelectItem value="Q3">Q3</SelectItem><SelectItem value="Q4">Q4</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
                 <FormField name="apcSciImpactFactor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>SCI Impact Factor</FormLabel><FormControl><Input type="number" step="any" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcPuNameInPublication" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Is "PU" name present in the publication?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
                 <FormField name="apcPublicationProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Publication Attached</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
