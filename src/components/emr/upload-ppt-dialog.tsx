@@ -96,15 +96,18 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
     };
 
     const deadlineWithTime = interest.meetingSlot?.pptDeadline ? parseISO(interest.meetingSlot.pptDeadline) : null;
-    let isDeadlinePast = deadlineWithTime ? isAfter(new Date(), deadlineWithTime) : false;
-    let dialogDescription = 'Upload your presentation (below 5MB) for the upcoming evaluation meeting.';
+    const isDeadlinePast = deadlineWithTime ? isAfter(new Date(), deadlineWithTime) : false;
+    const isSuperAdmin = user.role === 'Super-admin';
 
-    if (deadlineWithTime) {
+    // Disable upload if the deadline is past, UNLESS the user is a super admin.
+    const isUploadDisabled = isDeadlinePast && !isSuperAdmin;
+
+    let dialogDescription = 'Upload your presentation (below 5MB) for the upcoming evaluation meeting.';
+    if (deadlineWithTime && !isSuperAdmin) {
         dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPpp')}.`;
+    } else if (isSuperAdmin) {
+        dialogDescription = "As a Super Admin, you can upload or replace presentations at any time."
     }
-    
-    // Super admins can always upload revisions. For others, the deadline applies.
-    const isUploadDisabled = (isDeadlinePast && !isRevision) || (isDeadlinePast && isRevision && user.role !== 'Super-admin');
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
