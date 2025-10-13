@@ -103,7 +103,7 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPpp')}.`;
     }
     
-    // Super admins can always upload revisions.
+    // Super admins can always upload revisions. For others, the deadline applies.
     const isUploadDisabled = (isDeadlinePast && !isRevision) || (isDeadlinePast && isRevision && user.role !== 'Super-admin');
 
     return (
