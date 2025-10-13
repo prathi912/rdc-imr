@@ -899,7 +899,7 @@ export async function uploadRevisedEmrPpt(
   interestId: string,
   pptDataUrl: string,
   originalFileName: string,
-  userName: string,
+  user: User,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId || !pptDataUrl) {
@@ -915,7 +915,7 @@ export async function uploadRevisedEmrPpt(
 
     // Standardize the filename
     const fileExtension = path.extname(originalFileName)
-    const standardizedName = `${userName.replace(/\s+/g, "_")}_revised_${new Date().getTime()}${fileExtension}`
+    const standardizedName = `${user.name.replace(/\s+/g, "_")}_revised_${new Date().getTime()}${fileExtension}`
 
     const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`
     const result = await uploadFileToServer(pptDataUrl, filePath)
@@ -924,12 +924,18 @@ export async function uploadRevisedEmrPpt(
       throw new Error(result.error || "Revised PPT upload failed.")
     }
 
-    await interestRef.update({
-      revisedPptUrl: result.url,
-      status: "Revision Submitted",
-    })
+    const updateData: { revisedPptUrl: string; status?: string } = {
+        revisedPptUrl: result.url,
+    };
 
-    await logActivity("INFO", "Revised EMR presentation uploaded", { interestId, userId: interest.userId })
+    // Only change status if the user is NOT a super admin
+    if (user.role !== 'Super-admin') {
+        updateData.status = "Revision Submitted";
+    }
+
+    await interestRef.update(updateData);
+
+    await logActivity("INFO", "Revised EMR presentation uploaded", { interestId, userId: interest.userId, uploader: user.uid })
     return { success: true }
   } catch (error: any) {
     console.error("Error uploading revised EMR presentation:", error)
@@ -1269,8 +1275,8 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
 
 export async function updateEmrFinalStatus(interestId: string, status: 'Sanctioned' | 'Not Sanctioned', proofDataUrl: string, fileName: string): Promise<{ success: boolean, error?: string }> {
     try {
-        if (!interestId || !status) {
-            return { success: false, error: "Interest ID and status are required." };
+        if (!interestId || !status || !proofDataUrl) {
+            return { success: false, error: "Interest ID, status, and proof are required." };
         }
 
         const interestRef = adminDb.collection('emrInterests').doc(interestId);
@@ -1280,19 +1286,18 @@ export async function updateEmrFinalStatus(interestId: string, status: 'Sanction
         }
         const interest = interestSnap.data() as EmrInterest;
 
-        const updateData: Partial<EmrInterest> = { status };
-
-        // Only upload file if a new one is provided
-        if (proofDataUrl && !proofDataUrl.startsWith('https://')) {
-            const path = `emr-final-proofs/${interest.callId}/${interest.userId}/${fileName}`;
-            const uploadResult = await uploadFileToServer(proofDataUrl, path);
-            if (!uploadResult.success || !uploadResult.url) {
-                throw new Error(uploadResult.error || "Failed to upload final proof.");
-            }
-            updateData.finalProofUrl = uploadResult.url;
+        // Upload proof
+        const path = `emr-final-proofs/${interest.callId}/${interest.userId}/${fileName}`;
+        const uploadResult = await uploadFileToServer(proofDataUrl, path);
+        if (!uploadResult.success || !uploadResult.url) {
+            throw new Error(uploadResult.error || "Failed to upload final proof.");
         }
 
-        await interestRef.update(updateData);
+        // Update interest document
+        await interestRef.update({
+            status,
+            finalProofUrl: uploadResult.url,
+        });
 
         // Notify Super Admins
         const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
@@ -1361,3 +1366,5 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
         return { success: false, error: "Failed to update attendance." };
     }
 }
+
+    
