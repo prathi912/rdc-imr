@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState } from 'react';
@@ -102,7 +103,8 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
         dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPpp')}.`;
     }
     
-    const isUploadDisabled = isDeadlinePast;
+    // Super admins can always upload revisions.
+    const isUploadDisabled = (isDeadlinePast && !isRevision) || (isDeadlinePast && isRevision && user.role !== 'Super-admin');
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -129,11 +131,11 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
                           )}
                        </div>
                     )}
-                    <Input type="file" accept=".ppt, .pptx" onChange={handleFileChange} disabled={isUploadDisabled && !isRevision} />
+                    <Input type="file" accept=".ppt, .pptx" onChange={handleFileChange} disabled={isUploadDisabled} />
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleUpload} disabled={isUploading || !pptFile || (isUploadDisabled && !isRevision)}>
+                    <Button onClick={handleUpload} disabled={isUploading || !pptFile || isUploadDisabled}>
                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
                         {interest.pptUrl && !isRevision ? 'Replace' : 'Upload'}
                     </Button>
