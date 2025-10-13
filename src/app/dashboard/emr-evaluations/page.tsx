@@ -230,12 +230,22 @@ export default function EmrEvaluationsPage() {
                             const myEvaluation = interest.evaluations.find((e:EmrEvaluation) => e.evaluatorUid === user?.uid);
                             const call = calls.find(c => c.id === interest.callId);
                             const allEvaluatorsAssigned = call?.meetingDetails?.assignedEvaluators || [];
+                            const presentationUrl = interest.revisedPptUrl || interest.pptUrl;
+                            const isRevised = !!interest.revisedPptUrl;
                             
                             return (
                             <TableRow key={interest.id}>
                                 <TableCell className="font-medium"><div>{interest.userName}</div><div className="text-xs text-muted-foreground">{interest.userDetails?.department}, {interest.userDetails?.institute}</div></TableCell>
                                 <TableCell>{getCallTitle(interest.callId)}</TableCell>
-                                <TableCell>{interest.pptUrl ? (<Button asChild variant="link" className="p-0 h-auto"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer"><FileText className="h-4 w-4 mr-1"/> View</a></Button>) : "Not Submitted"}</TableCell>
+                                <TableCell>
+                                    {presentationUrl ? (
+                                        <Button asChild variant="link" className="p-0 h-auto">
+                                            <a href={presentationUrl} target="_blank" rel="noopener noreferrer">
+                                                <FileText className="h-4 w-4 mr-1"/> View {isRevised ? 'Revised' : ''}
+                                            </a>
+                                        </Button>
+                                    ) : "Not Submitted"}
+                                </TableCell>
                                 <TableCell>{myEvaluation ? <Badge variant="default"><UserCheck className="h-3 w-3 mr-1"/> Submitted</Badge> : <Badge variant="secondary"><UserX className="h-3 w-3 mr-1"/> Pending</Badge>}</TableCell>
                                 {isSuperAdmin && (<TableCell>
                                     {interest.evaluations.length > 0 ? (
