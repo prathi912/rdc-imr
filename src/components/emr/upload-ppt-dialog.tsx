@@ -99,18 +99,23 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
     const isDeadlinePast = deadlineWithTime ? isAfter(new Date(), deadlineWithTime) : false;
     const isSuperAdmin = user.role === 'Super-admin';
 
-    // Disable upload if the deadline is past, UNLESS the user is a super admin.
+    // Super Admins are never disabled by deadlines.
     const isUploadDisabled = isDeadlinePast && !isSuperAdmin;
 
     let dialogDescription = 'Upload your presentation (below 5MB) for the upcoming evaluation meeting.';
     if (deadlineWithTime && !isSuperAdmin) {
-        dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPpp')}.`;
+        dialogDescription = `The deadline to upload is ${format(deadlineWithTime, 'PPpp')}. After this time, you will not be able to upload a new presentation.`;
     } else if (isSuperAdmin) {
-        dialogDescription = "As a Super Admin, you can upload or replace presentations at any time."
+        dialogDescription = "As a Super Admin, you can upload or replace presentations at any time, bypassing any deadlines."
+    }
+    
+    // For revisions, the dialog title and description are always the same.
+    if (isRevision) {
+        dialogDescription = "Upload the revised presentation file. This will replace any previous submission."
     }
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!isUploading) onOpenChange(open); }}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>{isRevision ? 'Submit Revised Presentation' : 'Manage Your Presentation'}</DialogTitle>
@@ -134,11 +139,11 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
                           )}
                        </div>
                     )}
-                    <Input type="file" accept=".ppt, .pptx" onChange={handleFileChange} disabled={isUploadDisabled} />
+                    <Input type="file" accept=".ppt, .pptx" onChange={handleFileChange} disabled={isUploadDisabled && !isRevision} />
                 </div>
                 <DialogFooter>
-                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleUpload} disabled={isUploading || !pptFile || isUploadDisabled}>
+                    <DialogClose asChild><Button variant="outline" disabled={isUploading}>Cancel</Button></DialogClose>
+                    <Button onClick={handleUpload} disabled={isUploading || !pptFile || (isUploadDisabled && !isRevision)}>
                         {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Upload className="mr-2 h-4 w-4"/>}
                         {interest.pptUrl && !isRevision ? 'Replace' : 'Upload'}
                     </Button>
