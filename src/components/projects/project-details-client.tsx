@@ -101,10 +101,10 @@ const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | 
 
 const durationSchema = z
   .object({
-    startDate: z.string().min(1, "A start date is required."),
-    endDate: z.string().min(1, "An end date is required."),
+    startDate: z.date({ required_error: "A start date is required." }),
+    endDate: z.date({ required_error: "An end date is required." }),
   })
-  .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
+  .refine((data) => data.endDate > data.startDate, {
     message: "End date must be after start date.",
     path: ["endDate"],
   })
@@ -304,6 +304,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const durationForm = useForm<DurationFormData>({
     resolver: zodResolver(durationSchema),
+    defaultValues: {
+      startDate: initialProject.projectStartDate ? format(new Date(initialProject.projectStartDate), "yyyy-MM-dd") : "",
+      endDate: initialProject.projectEndDate ? format(new Date(initialProject.projectEndDate), "yyyy-MM-dd") : "",
+    }
   })
 
   const evaluatorForm = useForm<EvaluatorFormData>({
@@ -390,8 +394,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   useEffect(() => {
     durationForm.reset({
-      startDate: project.projectStartDate ? format(new Date(project.projectStartDate), 'yyyy-MM-dd') : '',
-      endDate: project.projectEndDate ? format(new Date(project.projectEndDate), 'yyyy-MM-dd') : '',
+      startDate: project.projectStartDate ? format(parseISO(project.projectStartDate), 'yyyy-MM-dd') : '',
+      endDate: project.projectEndDate ? format(parseISO(project.projectEndDate), 'yyyy-MM-dd') : '',
     })
     evaluatorForm.reset({
       evaluatorUids: project.meetingDetails?.assignedEvaluators || [],
@@ -754,6 +758,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         projectStartDate: new Date(data.startDate).toISOString(),
         projectEndDate: new Date(data.endDate).toISOString(),
       }))
+      onProjectUpdate({
+        ...project,
+        projectStartDate: new Date(data.startDate).toISOString(),
+        projectEndDate: new Date(data.endDate).toISOString(),
+      })
       setIsDurationDialogOpen(false)
     } else {
       toast({ variant: "destructive", title: "Error", description: result.error })
@@ -770,6 +779,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         ...prev,
         meetingDetails: { ...prev.meetingDetails!, assignedEvaluators: data.evaluatorUids },
       }))
+      onProjectUpdate({
+        ...project,
+        meetingDetails: { ...project.meetingDetails!, assignedEvaluators: data.evaluatorUids },
+      })
       setIsEvaluatorDialogOpen(false)
     } else {
       toast({ variant: "destructive", title: "Error", description: result.error })
@@ -864,7 +877,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   };
 
   const canViewEvaluations = isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive);
-  const showAdminActions = isSuperAdmin && project.status !== 'Draft';
+  const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
 
   return (
     <>
@@ -877,6 +890,50 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   Download Office Notings
               </Button>
             )}
+             {showAdminActions && (
+                <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {project.projectStartDate ? "Update Duration" : "Set Duration"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Set Project Duration</DialogTitle>
+                      <DialogDescription>Define the start and end dates for this project.</DialogDescription>
+                    </DialogHeader>
+                    <Form {...durationForm}>
+                      <form
+                        id="duration-form"
+                        onSubmit={durationForm.handleSubmit(handleDurationSubmit)}
+                        className="space-y-4 py-4"
+                      >
+                         <FormField name="startDate" control={durationForm.control} render={({ field }) => ( 
+                           <FormItem className="flex flex-col">
+                             <FormLabel>Start Date</FormLabel>
+                             <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2010} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} initialFocus /></PopoverContent></Popover>
+                             <FormMessage />
+                           </FormItem> 
+                         )} />
+                         <FormField name="endDate" control={durationForm.control} render={({ field }) => ( 
+                          <FormItem className="flex flex-col">
+                            <FormLabel>End Date</FormLabel>
+                              <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2010} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} initialFocus /></PopoverContent></Popover>
+                            <FormMessage />
+                          </FormItem> 
+                         )} />
+                      </form>
+                    </Form>
+                    <DialogFooter>
+                       <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                      <Button type="submit" form="duration-form" disabled={isUpdating}>
+                        {isUpdating ? "Saving..." : "Save Duration"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
              {isSuperAdmin && (
                 <Button variant="destructive" onClick={() => setIsDeleteDialogOpen(true)}>
                     <Trash2 className="mr-2 h-4 w-4" /> Delete Project
@@ -1013,49 +1070,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DialogContent>
                 </Dialog>
               )}
-              {isSuperAdmin && (
-                <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {project.projectStartDate ? "Update Duration" : "Set Duration"}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Set Project Duration</DialogTitle>
-                      <DialogDescription>Define the start and end dates for this project.</DialogDescription>
-                    </DialogHeader>
-                    <Form {...durationForm}>
-                      <form
-                        id="duration-form"
-                        onSubmit={durationForm.handleSubmit(handleDurationSubmit)}
-                        className="space-y-4 py-4"
-                      >
-                         <FormField name="startDate" control={durationForm.control} render={({ field }) => ( 
-                           <FormItem className="flex flex-col">
-                             <FormLabel>Start Date</FormLabel>
-                             <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString())} initialFocus /></PopoverContent></Popover>
-                             <FormMessage />
-                           </FormItem> 
-                         )} />
-                         <FormField name="endDate" control={durationForm.control} render={({ field }) => ( 
-                          <FormItem className="flex flex-col">
-                            <FormLabel>End Date</FormLabel>
-                              <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString())} initialFocus /></PopoverContent></Popover>
-                            <FormMessage />
-                          </FormItem> 
-                         )} />
-                      </form>
-                    </Form>
-                    <DialogFooter>
-                      <Button type="submit" form="duration-form" disabled={isUpdating}>
-                        {isUpdating ? "Saving..." : "Save Duration"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
+              
               {isAdmin && project.status === "Recommended" && !project.grant && (
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
