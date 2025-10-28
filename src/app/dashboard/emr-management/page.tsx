@@ -318,6 +318,7 @@ export default function EmrManagementOverviewPage() {
                                                     <TableHead>Call Title</TableHead>
                                                     <TableHead>Agency</TableHead>
                                                     <TableHead>Registrations</TableHead>
+                                                    <TableHead>Date Added</TableHead>
                                                     <TableHead>Status</TableHead>
                                                     <TableHead>Announced</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
@@ -327,6 +328,7 @@ export default function EmrManagementOverviewPage() {
                                                         <TableCell className="font-medium whitespace-normal">{call.title}</TableCell>
                                                         <TableCell className="whitespace-normal">{call.agency}</TableCell>
                                                         <TableCell>{interestCounts[call.id] || 0}</TableCell>
+                                                        <TableCell>{format(parseISO(call.createdAt), 'PP')}</TableCell>
                                                         <TableCell>{getStatusBadge(call)}</TableCell>
                                                         <TableCell>
                                                             {call.isAnnounced ? (
@@ -401,4 +403,3 @@ export default function EmrManagementOverviewPage() {
         </>
     );
 }
-
