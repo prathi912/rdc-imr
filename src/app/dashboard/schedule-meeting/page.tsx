@@ -10,6 +10,7 @@ import { format, startOfToday, subMonths } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
+import { PageHeader } from '@/components/page-header';
 import { db } from '@/lib/config';
 import type { Project, User, SystemSettings } from '@/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +34,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageHeader } from '@/components/page-header';
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
@@ -48,7 +48,8 @@ function ProjectListTable({
     onSelectOne,
     usersMap,
     title,
-    description
+    description,
+    dateColumnHeader
 } : {
     projects: Project[],
     selectedProjects: string[],
@@ -56,7 +57,8 @@ function ProjectListTable({
     onSelectOne: (id: string, checked: boolean) => void,
     usersMap: Map<string, User>,
     title: string,
-    description: string
+    description: string,
+    dateColumnHeader: string
 }) {
     return (
         <Card>
@@ -78,7 +80,7 @@ function ProjectListTable({
                             </TableHead>
                             <TableHead>Title</TableHead>
                             <TableHead>PI</TableHead>
-                            <TableHead>Submission/Grant Date</TableHead>
+                            <TableHead>{dateColumnHeader}</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -292,6 +294,7 @@ export default function ScheduleMeetingPage() {
                             usersMap={usersMap}
                             title="Projects Awaiting Meeting"
                             description="Select new submissions to schedule for their initial evaluation meeting."
+                            dateColumnHeader="Submission Date"
                         />
                     </TabsContent>
                     <TabsContent value="mid-term-review" className="mt-4">
@@ -303,6 +306,7 @@ export default function ScheduleMeetingPage() {
                             usersMap={usersMap}
                             title="Projects Due for Mid-term Review"
                             description={`These projects were funded at least ${systemSettings?.imrMidTermReviewMonths ?? 6} months ago and are due for a progress review.`}
+                            dateColumnHeader="Grant Awarded Date"
                         />
                     </TabsContent>
                 </Tabs>
