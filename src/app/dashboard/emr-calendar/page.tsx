@@ -45,8 +45,8 @@ import { uploadFileToServer } from '@/app/actions';
 import { createFundingCall, announceEmrCall } from '@/app/emr-actions';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { Checkbox } from '../ui/checkbox';
-import { EmrActions } from './emr-actions';
+import { Checkbox } from '@/components/ui/checkbox';
+import { EmrActions } from '@/components/emr/emr-actions';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -596,4 +596,3 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         </div>
     );
 }
-
