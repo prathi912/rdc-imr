@@ -42,6 +42,8 @@ export type User = {
   hasCompletedTutorial?: boolean
   sidebarOrder?: string[]
   researchDomain?: string
+  inAppNotificationsEnabled?: boolean;
+  emailNotificationsEnabled?: boolean;
 }
 
 export type Author = {
@@ -288,7 +290,7 @@ export type IncentiveClaim = {
   filingDate?: string; // ISO
   publicationDate?: string; // ISO
   grantDate?: string; // ISO
-  currentStatus?: 'Filed' | 'Published' | 'Granted';
+  currentStatus?: 'Awarded' | 'Published' | 'Under Examination' | 'FER Responded' | 'Amended Examination';
 
 
   // Conference Fields

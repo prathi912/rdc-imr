@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, ArrowUpDown, ChevronDown, ShieldCheck, Loader2, Library, Users2, Ban } from "lucide-react";
+import { MoreHorizontal, ArrowUpDown, ChevronDown, ShieldCheck, Loader2, Library, Users2, Ban, Bell } from "lucide-react";
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -53,6 +53,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { bulkGrantModuleAccess, bulkRevokeModuleAccess } from '@/app/actions';
+import { Switch } from '@/components/ui/switch';
+
 
 const ROLES: User['role'][] = ['faculty', 'admin', 'CRO', 'IQAC'];
 const SUPER_ADMIN_ROLE: User['role'] = 'Super-admin';
@@ -68,6 +70,68 @@ const faculties = [
     "Faculty of Nursing", "Faculty of Pharmacy", "Faculty of Physiotherapy", "Faculty of Public Health", 
     "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
 ];
+
+function NotificationSettingsDialog({ user, open, onOpenChange, onUpdate }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void, onUpdate: () => void }) {
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+    const [inAppEnabled, setInAppEnabled] = useState(user?.inAppNotificationsEnabled ?? true);
+    const [emailEnabled, setEmailEnabled] = useState(user?.emailNotificationsEnabled ?? true);
+
+    useEffect(() => {
+        if (user) {
+            setInAppEnabled(user.inAppNotificationsEnabled ?? true);
+            setEmailEnabled(user.emailNotificationsEnabled ?? true);
+        }
+    }, [user]);
+
+    if (!user) return null;
+
+    const handleSaveChanges = async () => {
+        setIsSaving(true);
+        try {
+            const userDocRef = doc(db, 'users', user.uid);
+            await updateDoc(userDocRef, { 
+                inAppNotificationsEnabled: inAppEnabled,
+                emailNotificationsEnabled: emailEnabled,
+            });
+            toast({ title: 'Notification Settings Updated' });
+            onUpdate();
+            onOpenChange(false);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'Could not update notification settings.' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+         <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Notification Settings for {user.name}</DialogTitle>
+                    <DialogDescription>Manage how this user receives notifications from the portal.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <Label htmlFor="in-app-switch">In-App Notifications</Label>
+                        <Switch id="in-app-switch" checked={inAppEnabled} onCheckedChange={setInAppEnabled} />
+                    </div>
+                     <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <Label htmlFor="email-switch">Email Notifications</Label>
+                        <Switch id="email-switch" checked={emailEnabled} onCheckedChange={setEmailEnabled} />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button onClick={handleSaveChanges} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Changes
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function ModuleManagerDialog({ user, open, onOpenChange, onUpdate }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void, onUpdate: () => void }) {
     const { toast } = useToast();
@@ -212,6 +276,7 @@ export default function ManageUsersPage() {
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [userToView, setUserToView] = useState<User | null>(null);
   const [userToManageModules, setUserToManageModules] = useState<User | null>(null);
+  const [userToManageNotifications, setUserToManageNotifications] = useState<User | null>(null);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -523,6 +588,9 @@ export default function ManageUsersPage() {
                                 <DropdownMenuItem onSelect={() => setUserToManageModules(user)}>
                                     <ShieldCheck className="mr-2 h-4 w-4" /> Manage Modules
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setUserToManageNotifications(user)}>
+                                    <Bell className="mr-2 h-4 w-4" /> Notification Settings
+                                </DropdownMenuItem>
                                 <DropdownMenuSub>
                                     <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
                                     <DropdownMenuPortal>
@@ -533,7 +601,7 @@ export default function ManageUsersPage() {
                                                     onClick={() => handleRoleChange(user.uid, role)}
                                                     disabled={user.role === role}
                                                 >
-                                                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                                                   {role.charAt(0).toUpperCase() + role.slice(1)}
                                                 </DropdownMenuItem>
                                             ))}
                                         </DropdownMenuSubContent>
@@ -619,6 +687,7 @@ export default function ManageUsersPage() {
       </div>
        <ProfileDetailsDialog user={userToView} open={!!userToView} onOpenChange={() => setUserToView(null)} />
        <ModuleManagerDialog user={userToManageModules} open={!!userToManageModules} onOpenChange={() => setUserToManageModules(null)} onUpdate={fetchUsersAndClaims} />
+       <NotificationSettingsDialog user={userToManageNotifications} open={!!userToManageNotifications} onOpenChange={() => setUserToManageNotifications(null)} onUpdate={fetchUsersAndClaims} />
        {userToDelete && (
           <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
               <AlertDialogContent>
