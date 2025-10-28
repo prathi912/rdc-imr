@@ -66,7 +66,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText, Trash2, UserCheck } from 'lucide-react'
@@ -74,12 +74,12 @@ import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edi
 import { GrantManagement } from "./grant-management"
 import { EvaluationForm } from "./evaluation-form"
 import { EvaluationsSummary } from "./evaluations-summary"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
-import { Textarea } from "../ui/textarea"
-import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover"
-import { Calendar } from "../ui/calendar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip"
-import { Checkbox } from "../ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface ProjectDetailsClientProps {
   project: Project
@@ -989,7 +989,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="revised-proposal" className="text-right">
+                        <Label htmlFor="revised-proposal" className="text-right col-span-1">
                           Proposal (PDF)
                         </Label>
                         <Input
