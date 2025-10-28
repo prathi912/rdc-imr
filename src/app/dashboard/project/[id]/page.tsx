@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -67,7 +66,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText, Trash2, UserCheck } from 'lucide-react'
@@ -75,12 +74,12 @@ import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edi
 import { GrantManagement } from "./grant-management"
 import { EvaluationForm } from "./evaluation-form"
 import { EvaluationsSummary } from "./evaluations-summary"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
-import { Textarea } from "../ui/textarea"
-import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover"
-import { Calendar } from "../ui/calendar"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip"
-import { Checkbox } from "../ui/checkbox"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface ProjectDetailsClientProps {
   project: Project
@@ -990,7 +989,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="revised-proposal" className="text-right col-span-1">
+                        <Label htmlFor="revised-proposal" className="text-right">
                           Proposal (PDF)
                         </Label>
                         <Input
@@ -1014,6 +1013,111 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DialogContent>
                 </Dialog>
               )}
+              {isSuperAdmin && (
+                <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline">
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {project.projectStartDate ? "Update Duration" : "Set Duration"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Set Project Duration</DialogTitle>
+                      <DialogDescription>Define the start and end dates for this project.</DialogDescription>
+                    </DialogHeader>
+                    <Form {...durationForm}>
+                      <form
+                        id="duration-form"
+                        onSubmit={durationForm.handleSubmit(handleDurationSubmit)}
+                        className="space-y-4 py-4"
+                      >
+                         <FormField name="startDate" control={durationForm.control} render={({ field }) => ( 
+                           <FormItem className="flex flex-col">
+                             <FormLabel>Start Date</FormLabel>
+                             <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString())} initialFocus /></PopoverContent></Popover>
+                             <FormMessage />
+                           </FormItem> 
+                         )} />
+                         <FormField name="endDate" control={durationForm.control} render={({ field }) => ( 
+                          <FormItem className="flex flex-col">
+                            <FormLabel>End Date</FormLabel>
+                              <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString())} initialFocus /></PopoverContent></Popover>
+                            <FormMessage />
+                          </FormItem> 
+                         )} />
+                      </form>
+                    </Form>
+                    <DialogFooter>
+                      <Button type="submit" form="duration-form" disabled={isUpdating}>
+                        {isUpdating ? "Saving..." : "Save Duration"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+              {isAdmin && project.status === "Recommended" && !project.grant && (
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <DollarSign className="mr-2 h-4 w-4" /> Award Grant
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Award New Grant</DialogTitle>
+                      <DialogDescription>
+                        Set the sanction number and details for the first phase of the grant for "{project.title}".
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="sanction-number" className="text-right">
+                          Sanction No.
+                        </Label>
+                        <Input
+                          id="sanction-number"
+                          value={sanctionNumber}
+                          onChange={(e) => setSanctionNumber(e.target.value)}
+                          className="col-span-3"
+                          placeholder="e.g., RDC/IMSL/122"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="phase-name" className="text-right">
+                          Phase Name
+                        </Label>
+                        <Input
+                          id="phase-name"
+                          value={phaseName}
+                          onChange={(e) => setPhaseName(e.target.value)}
+                          className="col-span-3"
+                          placeholder="e.g., Phase 1 - Equipment"
+                        />
+                      </div>
+                      <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="phase-amount" className="text-right">
+                          Amount (₹)
+                        </Label>
+                        <Input
+                          id="phase-amount"
+                          type="number"
+                          value={phaseAmount}
+                          onChange={(e) => setPhaseAmount(Number(e.target.value))}
+                          className="col-span-3"
+                          placeholder="e.g., 200000"
+                        />
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="glass" onClick={handleAwardGrant} disabled={isAwarding}>
+                        {isAwarding ? "Awarding..." : "Confirm & Award"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+
               {canRequestClosure && (
                 <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
                   <DialogTrigger asChild>
