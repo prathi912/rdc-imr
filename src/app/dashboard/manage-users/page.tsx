@@ -44,10 +44,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { db } from '@/lib/config';
 import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
-import type { User, IncentiveClaim } from '@/types';
+import type { User, IncentiveClaim, NotificationSettings } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getDefaultModulesForRole, ALL_MODULES } from '@/lib/modules';
+import { getDefaultModulesForRole, ALL_MODULES } from "@/lib/modules";
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -71,29 +71,52 @@ const faculties = [
     "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
 ];
 
+const notificationTypes = [
+  { id: 'projectStatus', label: 'IMR Project Status Updates' },
+  { id: 'emrStatus', label: 'EMR Status Updates' },
+  { id: 'evaluations', label: 'New Evaluation Assignments' },
+  { id: 'grantUpdates', label: 'Grant & Financial Updates' },
+  { id: 'coAuthor', label: 'Co-Author/Publication Updates' },
+  { id: 'general', label: 'General Announcements' },
+] as const;
+
+type NotificationTypeId = typeof notificationTypes[number]['id'];
+
 function NotificationSettingsDialog({ user, open, onOpenChange, onUpdate }: { user: User | null, open: boolean, onOpenChange: (open: boolean) => void, onUpdate: () => void }) {
     const { toast } = useToast();
     const [isSaving, setIsSaving] = useState(false);
-    const [inAppEnabled, setInAppEnabled] = useState(user?.inAppNotificationsEnabled ?? true);
-    const [emailEnabled, setEmailEnabled] = useState(user?.emailNotificationsEnabled ?? true);
+    const [settings, setSettings] = useState<NotificationSettings>({});
 
     useEffect(() => {
         if (user) {
-            setInAppEnabled(user.inAppNotificationsEnabled ?? true);
-            setEmailEnabled(user.emailNotificationsEnabled ?? true);
+            const defaultSettings: NotificationSettings = {};
+            notificationTypes.forEach(type => {
+                defaultSettings[type.id] = {
+                    inApp: user.notificationSettings?.[type.id]?.inApp ?? true,
+                    email: user.notificationSettings?.[type.id]?.email ?? true,
+                };
+            });
+            setSettings(defaultSettings);
         }
     }, [user]);
 
     if (!user) return null;
 
+    const handleSettingChange = (typeId: NotificationTypeId, channel: 'inApp' | 'email', value: boolean) => {
+        setSettings(prev => ({
+            ...prev,
+            [typeId]: {
+                ...prev[typeId],
+                [channel]: value,
+            }
+        }));
+    };
+
     const handleSaveChanges = async () => {
         setIsSaving(true);
         try {
             const userDocRef = doc(db, 'users', user.uid);
-            await updateDoc(userDocRef, { 
-                inAppNotificationsEnabled: inAppEnabled,
-                emailNotificationsEnabled: emailEnabled,
-            });
+            await updateDoc(userDocRef, { notificationSettings: settings });
             toast({ title: 'Notification Settings Updated' });
             onUpdate();
             onOpenChange(false);
@@ -106,20 +129,36 @@ function NotificationSettingsDialog({ user, open, onOpenChange, onUpdate }: { us
 
     return (
          <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>Notification Settings for {user.name}</DialogTitle>
-                    <DialogDescription>Manage how this user receives notifications from the portal.</DialogDescription>
+                    <DialogDescription>Manage how this user receives different types of notifications from the portal.</DialogDescription>
                 </DialogHeader>
-                <div className="py-4 space-y-4">
-                    <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <Label htmlFor="in-app-switch">In-App Notifications</Label>
-                        <Switch id="in-app-switch" checked={inAppEnabled} onCheckedChange={setInAppEnabled} />
+                <div className="py-4 space-y-2 max-h-[60vh] overflow-y-auto pr-4">
+                    <div className="grid grid-cols-3 gap-2 font-semibold text-sm sticky top-0 bg-background py-2">
+                        <div className="col-span-1">Notification Type</div>
+                        <div className="text-center">In-App</div>
+                        <div className="text-center">Email</div>
                     </div>
-                     <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                        <Label htmlFor="email-switch">Email Notifications</Label>
-                        <Switch id="email-switch" checked={emailEnabled} onCheckedChange={setEmailEnabled} />
-                    </div>
+                    {notificationTypes.map(type => (
+                        <div key={type.id} className="grid grid-cols-3 gap-2 items-center p-2 border rounded-md">
+                            <Label htmlFor={`in-app-${type.id}`} className="col-span-1 text-sm">{type.label}</Label>
+                            <div className="flex justify-center">
+                                <Switch
+                                    id={`in-app-${type.id}`}
+                                    checked={settings[type.id]?.inApp ?? true}
+                                    onCheckedChange={(checked) => handleSettingChange(type.id, 'inApp', checked)}
+                                />
+                            </div>
+                            <div className="flex justify-center">
+                                <Switch
+                                    id={`email-${type.id}`}
+                                    checked={settings[type.id]?.email ?? true}
+                                    onCheckedChange={(checked) => handleSettingChange(type.id, 'email', checked)}
+                                />
+                            </div>
+                        </div>
+                    ))}
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>

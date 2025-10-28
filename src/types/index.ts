@@ -18,6 +18,13 @@ export type UserBankDetails = {
   ifscCode: string
 }
 
+export type NotificationSettings = {
+  [key: string]: {
+    inApp: boolean;
+    email: boolean;
+  }
+}
+
 export type User = {
   uid: string
   name: string
@@ -42,8 +49,7 @@ export type User = {
   hasCompletedTutorial?: boolean
   sidebarOrder?: string[]
   researchDomain?: string
-  inAppNotificationsEnabled?: boolean;
-  emailNotificationsEnabled?: boolean;
+  notificationSettings?: NotificationSettings;
 }
 
 export type Author = {
