@@ -323,7 +323,9 @@ export default function EmrManagementOverviewPage() {
                                                     <TableHead>Announced</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow></TableHeader>
-                                                <TableBody>{filteredCalls.map(call => (
+                                                <TableBody>{filteredCalls.map(call => {
+                                                    const isClosed = isAfter(new Date(), parseISO(call.interestDeadline));
+                                                    return (
                                                     <TableRow key={call.id}>
                                                         <TableCell className="font-medium whitespace-normal">{call.title}</TableCell>
                                                         <TableCell className="whitespace-normal">{call.agency}</TableCell>
@@ -346,7 +348,7 @@ export default function EmrManagementOverviewPage() {
                                                                 <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>
                                                                     <Edit className="mr-2 h-4 w-4" /> Edit
                                                                 </Button>
-                                                                 {!call.isAnnounced && (
+                                                                 {!call.isAnnounced && !isClosed && (
                                                                     <Button variant="secondary" size="sm" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
                                                                         <Send className="mr-2 h-4 w-4" /> Announce
                                                                     </Button>
@@ -355,7 +357,7 @@ export default function EmrManagementOverviewPage() {
                                                             )}
                                                         </TableCell>
                                                     </TableRow>
-                                                ))}</TableBody>
+                                                )})}</TableBody>
                                             </Table>
                                         </div>
                                     ) : (
