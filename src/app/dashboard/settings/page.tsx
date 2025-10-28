@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -36,7 +35,7 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon } from "lucide-react"
+import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock } from "lucide-react"
 import { Combobox } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -636,6 +635,11 @@ export default function SettingsPage() {
     await handleSystemSettingsSave({ ...systemSettings, enabledIncentiveTypes: newSettings });
   };
   
+  const handleImrMidTermReviewChange = async (months: number) => {
+    if (!systemSettings) return;
+    await handleSystemSettingsSave({ ...systemSettings, imrMidTermReviewMonths: months });
+  };
+
   const handleImrEvaluationDaysChange = async (days: number) => {
     if (!systemSettings) return;
     await handleSystemSettingsSave({ ...systemSettings, imrEvaluationDays: days });
@@ -710,6 +714,27 @@ export default function SettingsPage() {
                   onCheckedChange={handle2faToggle}
                   disabled={isSavingSettings}
                 />
+              </div>
+
+              <div className="space-y-4 rounded-lg border p-4">
+                  <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      <Label className="text-base">IMR Mid-term Review Window</Label>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Set the number of months after a grant is awarded that a project becomes eligible for a mid-term review.
+                  </p>
+                  <div className="flex items-center gap-2">
+                      <Input 
+                          type="number"
+                          className="w-24"
+                          defaultValue={systemSettings.imrMidTermReviewMonths || 6}
+                          onBlur={(e) => handleImrMidTermReviewChange(parseInt(e.target.value, 10) || 6)}
+                          disabled={isSavingSettings}
+                          min="1"
+                      />
+                      <span className="text-sm text-muted-foreground">months</span>
+                  </div>
               </div>
               
               <div className="space-y-4 rounded-lg border p-4">
@@ -1287,4 +1312,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-

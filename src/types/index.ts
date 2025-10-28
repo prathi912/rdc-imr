@@ -504,6 +504,7 @@ export type SystemSettings = {
   incentiveApprovers?: ApproverSetting[];
   iqacEmail?: string;
   enabledIncentiveTypes?: Record<string, boolean>;
+  imrMidTermReviewMonths?: number;
   imrEvaluationDays?: number;
 }
 
