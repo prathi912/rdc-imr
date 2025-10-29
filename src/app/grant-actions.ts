@@ -347,13 +347,6 @@ export async function updatePhaseStatus(
     if (newStatus === "Utilization Submitted") {
       const settings = await getSystemSettings();
       const adminRoles = ["Super-admin", "admin"];
-      const notifyEmails = new Set<string>();
-
-      // Add the custom email from settings
-      if (settings.utilizationNotificationEmail) {
-        notifyEmails.add(settings.utilizationNotificationEmail);
-      }
-
       const usersRef = adminDb.collection("users");
       const q = usersRef.where("role", "in", adminRoles);
       const adminUsersSnapshot = await q.get();
@@ -362,10 +355,6 @@ export async function updatePhaseStatus(
       const notificationTitle = `${project.pi} requested the next grant phase for "${project.title}".`
 
       adminUsersSnapshot.forEach((userDoc) => {
-        const adminUser = userDoc.data() as User;
-        if (adminUser.email) {
-            notifyEmails.add(adminUser.email);
-        }
         const notificationRef = adminDb.collection("notifications").doc()
         batch.set(notificationRef, {
           uid: userDoc.id,
@@ -378,7 +367,7 @@ export async function updatePhaseStatus(
       
       await batch.commit();
 
-      if (notifyEmails.size > 0) {
+      if (settings.utilizationNotificationEmail) {
         const emailHtml = `
             <div ${EMAIL_STYLES.background}>
                 ${EMAIL_STYLES.logo}
@@ -391,14 +380,13 @@ export async function updatePhaseStatus(
         `;
 
         await sendEmailUtility({
-            to: Array.from(notifyEmails).join(','),
+            to: settings.utilizationNotificationEmail,
             subject: `Action Required: Next Grant Phase Request for Project: ${project.title}`,
             html: emailHtml,
             from: 'default'
         });
+        await logActivity("INFO", "Admins and designated contact notified for next phase disbursement", { projectId, notifiedEmail: settings.utilizationNotificationEmail });
       }
-
-      await logActivity("INFO", "Admins and designated contact notified for next phase disbursement", { projectId, notifiedEmails: Array.from(notifyEmails) });
     }
 
     const updatedProject = { ...project, grant: updatedGrant }
