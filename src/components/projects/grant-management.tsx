@@ -50,7 +50,7 @@ interface GrantManagementProps {
 }
 
 const addPhaseSchema = z.object({
-  name: z.string().min(3, "Phase name is required."),
+  installmentRefNumber: z.string().min(3, "Installment Ref. No. is required."),
   amount: z.coerce.number().positive("Amount must be a positive number."),
 })
 
@@ -109,7 +109,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
 
   const phaseForm = useForm<z.infer<typeof addPhaseSchema>>({
     resolver: zodResolver(addPhaseSchema),
-    defaultValues: { name: "", amount: 0 },
+    defaultValues: { installmentRefNumber: "", amount: 0 },
   })
 
   const transactionForm = useForm<z.infer<typeof transactionSchema>>({
@@ -151,23 +151,26 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   }
 
   const handleAddPhase = async (values: z.infer<typeof addPhaseSchema>) => {
-    if (!grant) return
-    setIsSubmitting(true)
+    if (!grant) return;
+    setIsSubmitting(true);
     try {
-      const result = await addGrantPhase(project.id, values.name, values.amount)
+      const result = await addGrantPhase(project.id, {
+          installmentRefNumber: values.installmentRefNumber,
+          amount: values.amount
+      });
       if (result.success && result.updatedProject) {
-        onUpdate(result.updatedProject)
-        toast({ title: "Success", description: "New grant phase added." })
-        phaseForm.reset()
-        setIsAddPhaseOpen(false)
+        onUpdate(result.updatedProject);
+        toast({ title: "Success", description: "New grant phase added." });
+        phaseForm.reset();
+        setIsAddPhaseOpen(false);
       } else {
-        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to add new phase." })
+        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to add new phase." });
       }
     } catch (error) {
-      console.error(error)
-      toast({ variant: "destructive", title: "Error", description: "Failed to add new phase." })
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to add new phase." });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
@@ -262,14 +265,14 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     onSubmit={phaseForm.handleSubmit(handleAddPhase)}
                     className="space-y-4 py-4"
                   >
-                    <FormField
-                      name="name"
+                     <FormField
+                      name="installmentRefNumber"
                       control={phaseForm.control}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Phase Name</FormLabel>
+                          <FormLabel>Installment Ref. No.</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="e.g., Phase 2 - Consumables" />
+                            <Input {...field} placeholder="e.g., RDC/CP/IMR/133" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -324,6 +327,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     <CardDescription className="mt-1">
                       Amount:{" "}
                       <span className="font-semibold text-foreground">₹{phase.amount.toLocaleString("en-IN")}</span>
+                       {phase.installmentRefNumber && ` | Ref: ${phase.installmentRefNumber}`}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
