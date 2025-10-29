@@ -198,7 +198,7 @@ function AttendanceDialog({ isOpen, onOpenChange, project, allUsers, onUpdate }:
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Mark Meeting Attendance</DialogTitle>
-                    <DialogDescription>Select any PI or evaluators who were absent from the meeting.</DialogDescription>
+                    <DialogDescription>Select any applicants or evaluators who were absent from the meeting.</DialogDescription>
                 </DialogHeader>
                 <Form {...form}>
                     <form id="attendance-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6 py-4 max-h-[60vh] overflow-y-auto pr-4">
@@ -428,11 +428,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     return !isBefore(today, meetingDate) && !isAfter(today, deadline);
   }, [project.meetingDetails?.date, systemSettings]);
   
-  const showEvaluationForm = user && 
-    project.status === "Under Review" && 
-    isAssignedEvaluator && 
-    isEvaluationPeriodActive &&
-    project.submissionDate < (project.meetingDetails?.date || '2000-01-01'); // Only show for initial submission review, not mid-term.
+  const isInitialMeeting = project.status === "Under Review" && project.submissionDate < (project.meetingDetails?.date || '2000-01-01');
+  const isMidTermMeeting = project.status === "Under Review" && project.submissionDate >= (project.meetingDetails?.date || '3000-01-01');
+
+  const showEvaluationForm = user && isInitialMeeting && isAssignedEvaluator && isEvaluationPeriodActive;
 
 
   const assignedEvaluatorsCount = project.meetingDetails?.assignedEvaluators?.length ?? 0;
@@ -1198,7 +1197,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </AlertDescription>
               </Alert>
           )}
-          {project.meetingDetails && (
+           {project.meetingDetails && isInitialMeeting && (
             <>
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
                 <div className="flex justify-between items-start flex-wrap gap-2">
@@ -1265,6 +1264,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       {format(new Date(project.projectStartDate), "PPP")} -{" "}
                       {format(new Date(project.projectEndDate), "PPP")}
                     </dd>
+                  </>
+                )}
+                {isMidTermMeeting && project.meetingDetails?.date && (
+                   <>
+                    <dt className="font-medium text-muted-foreground">Mid-Term Review Date</dt>
+                    <dd>{formatDate(project.meetingDetails.date)}</dd>
                   </>
                 )}
               </dl>
@@ -1732,5 +1737,3 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
-
-    
