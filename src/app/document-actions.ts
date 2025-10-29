@@ -374,6 +374,7 @@ export async function exportClaimToExcel(
   }
 }
 
+// This parser is needed to handle both single `{}` and double `{{}}` braces in the same template.
 const angularParser = (tag: string) => {
     return {
         get(scope: any, context: any) {
@@ -389,61 +390,169 @@ const angularParser = (tag: string) => {
     };
 };
 
-
 export async function generateInstallmentOfficeNoting(
   projectId: string,
   phaseData: { installmentRefNumber: string; amount: number; }
-): Promise<{ success: boolean; fileData?: string; error?: string }> {
-    try {
-        const projectRef = adminDb.collection('projects').doc(projectId);
-        const projectSnap = await projectRef.get();
-        if (!projectSnap.exists) {
-            return { success: false, error: "Project not found." };
-        }
-        const project = projectSnap.data() as Project;
-        
-        const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Template_Office_Note_IMR_Instalment.docx";
-        const response = await fetch(TEMPLATE_URL, { cache: 'no-store' });
-        if (!response.ok) {
-            return { success: false, error: 'Office Note template could not be loaded.' };
-        }
-        const content = Buffer.from(await response.arrayBuffer());
+) {
+  try {
+    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+    if (!projectSnap.exists) return { success: false, error: "Project not found." };
+    const project = projectSnap.data() as Project;
 
-        const zip = new PizZip(content);
-        const doc = new Docxtemplater(zip, {
-          parser: angularParser,
-          nullGetter: () => "N/A",
-        });
+    const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Template_Office_Note_IMR_Instalment.docx";
+    const response = await fetch(TEMPLATE_URL, { cache: 'no-store' });
+    if (!response.ok) throw new Error('Template not found.');
+    const content = Buffer.from(await response.arrayBuffer());
 
-        const previousPhase = project.grant?.phases[project.grant.phases.length - 1];
-        const previousPhaseNumber = project.grant?.phases.length || 0;
+    const zip = new PizZip(content);
+    const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        parser: angularParser, // Use the custom parser
+    });
 
-        const data = {
-            Instalment_Reference: phaseData.installmentRefNumber,
-            date: format(new Date(), 'dd/MM/yyyy'),
-            PI_name: project.pi || 'N/A',
-            sanction_reference: project.grant?.sanctionNumber || 'N/A',
-            date_sanction: project.submissionDate ? format(parseISO(project.submissionDate), 'dd/MM/yyyy') : 'N/A',
-            total_sanction: project.grant?.totalAmount ? project.grant.totalAmount.toLocaleString('en-IN') : 'N/A',
-            phase_number: toWords(previousPhaseNumber),
-            previous_phase_amount: previousPhase?.amount.toLocaleString('en-IN') || 'N/A',
-            previous_phase_award_date: previousPhase?.disbursementDate ? format(parseISO(previousPhase.disbursementDate), 'dd/MM/yyyy') : 'N/A',
-            midterm_review_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
-            next_phase_number: toWords(previousPhaseNumber + 1),
-            next_phase_amount: phaseData.amount.toLocaleString('en-IN'),
-        };
+    const safeDate = (val?: string) => {
+      try { return val ? format(parseISO(val), 'dd/MM/yyyy') : 'N/A'; }
+      catch { return 'N/A'; }
+    };
 
-        doc.render(data);
+    const phases = project.grant?.phases || [];
+    const previousPhase = phases[phases.length - 1];
+    const previousPhaseNumber = phases.length;
 
-        const buf = doc.getZip().generate({ type: 'nodebuffer' });
-        const base64 = buf.toString('base64');
-        return { success: true, fileData: base64 };
+    const data = {
+      Instalment_Reference: phaseData.installmentRefNumber || 'N/A',
+      date: format(new Date(), 'dd/MM/yyyy'),
+      PI_name: project.pi || 'N/A',
+      sanction_reference: project.grant?.sanctionNumber || 'N/A',
+      date_sanction: safeDate(project.grant?.phases?.[0]?.disbursementDate || project.submissionDate),
+      total_sanction: project.grant?.totalAmount?.toLocaleString('en-IN') || 'N/A',
+      phase_number: toWords(previousPhaseNumber),
+      previous_phase_amount: previousPhase?.amount?.toLocaleString('en-IN') || 'N/A',
+      previous_phase_award_date: safeDate(previousPhase?.disbursementDate),
+      midterm_review_date: safeDate(project.meetingDetails?.date),
+      next_phase_number: toWords(previousPhaseNumber + 1),
+      next_phase_amount: phaseData.amount?.toLocaleString('en-IN') || 'N/A',
+    };
 
-    } catch (error: any) {
-        console.error("Error generating installment office noting:", error);
-        if (error.properties && error.properties.errors) {
-            console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
-        }
-        return { success: false, error: error.message || 'Failed to generate the form.' };
+    doc.render(data);
+    const buf = doc.getZip().generate({ type: 'nodebuffer' });
+    return { success: true, fileData: buf.toString('base64') };
+
+  } catch (error: any) {
+    console.error("Error generating installment office noting:", error);
+    if (error.properties?.errors) {
+      console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
     }
+    return { success: false, error: error.message };
+  }
+}
+
+export async function generateOfficeNotingForm(
+  projectId: string,
+  formData: {
+    projectDuration: string
+    phases: { name: string; amount: number }[]
+  },
+): Promise<{ success: boolean; fileData?: string; error?: string }> {
+  try {
+    const projectRef = adminDb.collection("projects").doc(projectId)
+    const projectSnap = await projectRef.get()
+    if (!projectSnap.exists) {
+      return { success: false, error: "Project not found." }
+    }
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Project
+
+    const piUserRef = adminDb.collection("users").doc(project.pi_uid)
+    const piUserSnap = await piUserRef.get()
+    const piUser = piUserSnap.exists ? (piUserSnap.data() as User) : null
+
+    let coPi1User: User | null = null
+    if (project.coPiDetails && project.coPiDetails.length > 0 && project.coPiDetails[0].uid) {
+      const coPi1UserRef = adminDb.collection("users").doc(project.coPiDetails[0].uid!)
+      const coPi1UserSnap = await coPi1UserRef.get()
+      if (coPi1UserSnap.exists) {
+        coPi1User = coPi1UserSnap.data() as User
+      }
+    }
+
+    const templatePath = path.join(process.cwd(), "src", "templates", "IMR_OFFICE_NOTING_TEMPLATE.docx")
+    if (!fs.existsSync(templatePath)) {
+      return { success: false, error: "Office Notings form template not found on the server." }
+    }
+    const content = fs.readFileSync(templatePath)
+
+    const zip = new PizZip(content)
+
+    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true })
+
+    const coPiData: { [key: string]: string } = {}
+    const coPiNames = project.coPiDetails?.map((c) => c.name) || []
+    for (let i = 0; i < 4; i++) {
+      coPiData[`co-pi${i + 1}`] = coPiNames[i] || ""
+    }
+
+    const phaseData: { [key: string]: string } = {}
+    let totalAmount = 0
+    for (let i = 0; i < 4; i++) {
+      if (formData.phases[i]) {
+        phaseData[`phase${i + 1}_amount`] = formData.phases[i].amount.toLocaleString("en-IN")
+        totalAmount += formData.phases[i].amount
+      } else {
+        phaseData[`phase${i + 1}_amount`] = "N/A"
+      }
+    }
+
+    const data = {
+      pi_name: project.pi,
+      pi_designation: piUser?.designation || "N/A",
+      pi_department: piUser?.department || project.departmentName || "N/A",
+      pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || "N/A",
+      pi_email: project.pi_email,
+      ...coPiData,
+      copi_designation: coPi1User?.designation || "N/A",
+      copi_department: coPi1User?.department || "N/A",
+      project_title: project.title,
+      project_duration: formData.projectDuration,
+      ...phaseData,
+      total_amount: totalAmount.toLocaleString("en-IN"),
+      presentation_date: project.meetingDetails?.date
+        ? format(parseISO(project.meetingDetails.date), "dd/MM/yyyy")
+        : "N/A",
+      presentation_time: project.meetingDetails?.time || "N/A",
+      date: format(new Date(), 'dd/MM/yyyy'),
+    }
+
+    doc.setData(data)
+
+    try {
+      doc.render()
+    } catch (error: any) {
+      console.error("Docxtemplater render error:", error)
+      if (error.properties && error.properties.errors) {
+        console.error("Template errors:", JSON.stringify(error.properties.errors))
+      }
+      return { success: false, error: "Failed to render the document template." }
+    }
+
+    const buf = doc.getZip().generate({ type: "nodebuffer" })
+    const base64 = buf.toString("base64")
+
+    if (project.status === "Recommended") {
+      await projectRef.update({
+        projectDuration: formData.projectDuration,
+        phases: formData.phases,
+      })
+    }
+
+    return { success: true, fileData: base64 }
+  } catch (error: any) {
+    console.error("Error generating office notings form:", error)
+    await logActivity("ERROR", "Failed to generate office notings form", {
+      projectId,
+      error: error.message,
+      stack: error.stack,
+    })
+    return { success: false, error: error.message || "Failed to generate the form." }
+  }
 }
