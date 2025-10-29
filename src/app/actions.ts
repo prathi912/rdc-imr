@@ -800,50 +800,6 @@ export async function scheduleMeeting(
 
       const projectTitles = projectsToSchedule.map((p) => `<li style="color: #cccccc;">${p.title}</li>`).join("")
       
-      const evaluatorEmailHtml = isMidTermReview
-        ? `
-            <div ${EMAIL_STYLES.background}>
-                ${EMAIL_STYLES.logo}
-                <p style="color: #ffffff;">Dear Evaluator,</p>
-                <p style="color: #e0e0e0;">
-                    You have been assigned to an <strong style="color:#ffffff;">IMR Mid-term Review Meeting</strong> committee. Your presence is kindly requested.
-                </p>
-                <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
-                <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
-                <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
-                <p style="color: #e0e0e0;">The following projects are scheduled for review:</p>
-                <ul style="list-style-type: none; padding-left: 0;">
-                    ${projectTitles}
-                </ul>
-                <p style="color: #cccccc;">Thank you for your contribution to the research ecosystem at Parul University.</p>
-                ${EMAIL_STYLES.footer}
-            </div>
-        `
-        : `
-            <div ${EMAIL_STYLES.background}>
-                ${EMAIL_STYLES.logo}
-                <p style="color: #ffffff;">Dear Evaluator,</p>
-                <p style="color: #e0e0e0;">
-                    You have been assigned to an <strong style="color:#ffffff;">IMR Evaluation Meeting</strong> committee with the following details. You are requested to be present.
-                </p>
-                <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
-                <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
-                <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
-                <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
-                <ul style="list-style-type: none; padding-left: 0;">
-                    ${projectTitles}
-                </ul>
-                <p style="color: #cccccc;">
-                    You can access your evaluation queue on the
-                    <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="color: #64b5f6; text-decoration: underline;">
-                     PU Research Projects Portal
-                    </a>.
-                </p>
-                ${EMAIL_STYLES.footer}
-            </div>
-        `;
-
-
       for (const evaluatorDocSnapshot of evaluatorDocs) {
         if (evaluatorDocSnapshot.exists) {
           const evaluator = evaluatorDocSnapshot.data() as User
@@ -858,10 +814,53 @@ export async function scheduleMeeting(
           })
 
           if (evaluator.email) {
+              const emailHtml = isMidTermReview
+              ? `
+                  <div ${EMAIL_STYLES.background}>
+                      ${EMAIL_STYLES.logo}
+                      <p style="color: #ffffff;">Dear ${evaluator.name},</p>
+                      <p style="color: #e0e0e0;">
+                          You have been assigned to an <strong style="color:#ffffff;">IMR Mid-term Review Meeting</strong> committee. Your presence is kindly requested.
+                      </p>
+                      <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
+                      <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
+                      <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+                      <p style="color: #e0e0e0;">The following projects are scheduled for review:</p>
+                      <ul style="list-style-type: none; padding-left: 0;">
+                          ${projectTitles}
+                      </ul>
+                      <p style="color: #cccccc;">Thank you for your contribution to the research ecosystem at Parul University.</p>
+                      ${EMAIL_STYLES.footer}
+                  </div>
+              `
+              : `
+                  <div ${EMAIL_STYLES.background}>
+                      ${EMAIL_STYLES.logo}
+                      <p style="color: #ffffff;">Dear ${evaluator.name},</p>
+                      <p style="color: #e0e0e0;">
+                          You have been assigned to an <strong style="color:#ffffff;">IMR Evaluation Meeting</strong> committee with the following details. You are requested to be present.
+                      </p>
+                      <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
+                      <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
+                      <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+                      <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
+                      <ul style="list-style-type: none; padding-left: 0;">
+                          ${projectTitles}
+                      </ul>
+                      <p style="color: #cccccc;">
+                          You can access your evaluation queue on the
+                          <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="color: #64b5f6; text-decoration: underline;">
+                           PU Research Projects Portal
+                          </a>.
+                      </p>
+                      ${EMAIL_STYLES.footer}
+                  </div>
+              `;
+
             await sendEmailUtility({
               to: evaluator.email,
               subject: `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term Review' : 'New Submission'})`,
-              html: evaluatorEmailHtml,
+              html: emailHtml,
               from: "default",
             })
           }
@@ -1674,7 +1673,7 @@ export async function generateOfficeNotingForm(
   try {
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
-    if (!projectSnap.exists()) {
+    if (!projectSnap.exists) {
       return { success: false, error: "Project not found." }
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project
@@ -1916,5 +1915,6 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
     });
   }
 }
+
 
 
