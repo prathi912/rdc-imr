@@ -247,7 +247,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             <DollarSign className="h-6 w-6" />
             <CardTitle>Grant Management</CardTitle>
           </div>
-          {canAddPhase && (
+          {canAddPhase && remainingAmount > 0 && (
             <Dialog open={isAddPhaseOpen} onOpenChange={setIsAddPhaseOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -321,7 +321,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const totalUtilized = phase.transactions?.reduce((acc, t) => acc + t.amount, 0) || 0
           const utilizationPercentage = phase.amount > 0 ? (totalUtilized / phase.amount) * 100 : 0;
           const hasReachedThreshold = utilizationPercentage >= 80;
-          const nextPhaseIsPending = grant.phases && index + 1 < grant.phases.length && grant.phases[index + 1].status === 'Pending Disbursement';
+          const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1)); // Either money is left or it's not the last phase
 
           return (
             <Card key={phase.id} className="bg-muted/30">
@@ -337,7 +337,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge variant={phase.status === "Disbursed" ? "default" : "secondary"}>{phase.status}</Badge>
-                    {/* Admins, Super-admins, and CROs can change phase status */}
                     {canChangeStatus && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -400,7 +399,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   </div>
                 </div>
 
-                {/* Transactions */}
                 {phase.transactions && phase.transactions.length > 0 ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -480,7 +478,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   <div className="text-center py-8">
                     <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground mb-4">No transactions recorded for this phase.</p>
-                    {/* PIs can add transactions to disbursed phases */}
                     {(isPI || isCoPi || isAdmin) && phase.status === "Disbursed" && (
                       <Button
                         onClick={() => {
@@ -495,18 +492,17 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   </div>
                 )}
 
-                 {phase.status === 'Disbursed' && hasReachedThreshold && nextPhaseIsPending && (
+                 {isPI && phase.status === 'Disbursed' && hasReachedThreshold && hasRemainingGrant && (
                   <div className="mt-4 flex justify-end">
                     <Button
                       onClick={() => handlePhaseStatusUpdate(phase.id, 'Utilization Submitted')}
                       disabled={isSubmitting}
                     >
-                      Submit Utilization & Request Next Phase
+                      Submit Utilization &amp; Request Next Phase
                     </Button>
                   </div>
                 )}
 
-                {/* Warning for over-utilization */}
                 {totalUtilized > phase.amount && (
                   <Alert className="mt-4">
                     <AlertCircle className="h-4 w-4" />
@@ -521,7 +517,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           )
         })}
 
-        {/* Add Transaction Dialog */}
         <Dialog open={isTransactionOpen} onOpenChange={setIsTransactionOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
