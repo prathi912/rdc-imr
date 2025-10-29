@@ -285,8 +285,8 @@ export default function ScheduleMeetingPage() {
             <div className="lg:col-span-2">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="new-submissions">New Submissions</TabsTrigger>
-                        <TabsTrigger value="mid-term-review">Mid-term Review</TabsTrigger>
+                        <TabsTrigger value="new-submissions">New Submissions ({newSubmissions.length})</TabsTrigger>
+                        <TabsTrigger value="mid-term-review">Mid-term Review ({midTermReviewProjects.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="new-submissions" className="mt-4">
                         <ProjectListTable
