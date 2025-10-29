@@ -104,6 +104,7 @@ export type GrantPhase = {
   id: string // Can be a timestamp + random string
   name: string
   amount: number
+  installmentRefNumber?: string;
   status: "Pending Disbursement" | "Disbursed" | "Utilization Submitted" | "Completed"
   disbursementDate?: string
   transactions?: Transaction[]
@@ -495,6 +496,7 @@ export type CroAssignment = {
 export type ApproverSetting = {
     email: string;
     stage: 1 | 2 | 3 | 4;
+    signatureUrl?: string;
 };
 
 export type SystemSettings = {
