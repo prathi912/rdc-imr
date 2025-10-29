@@ -744,15 +744,21 @@ export async function scheduleMeeting(
 
     for (const projectData of projectsToSchedule) {
       const projectRef = adminDb.collection("projects").doc(projectData.id)
-      batch.update(projectRef, {
+
+      const updateData: any = {
         meetingDetails: {
           date: meetingDetails.date,
           time: meetingDetails.time,
           venue: meetingDetails.venue,
           assignedEvaluators: meetingDetails.evaluatorUids,
         },
-        status: "Under Review",
-      })
+      };
+
+      if (!isMidTermReview) {
+        updateData.status = "Under Review";
+      }
+
+      batch.update(projectRef, updateData);
 
       const notificationRef = adminDb.collection("notifications").doc()
       batch.set(notificationRef, {
@@ -1915,6 +1921,7 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
     });
   }
 }
+
 
 
 

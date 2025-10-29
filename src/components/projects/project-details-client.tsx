@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -28,8 +27,8 @@ import {
   deleteImrProject,
   markImrAttendance,
   getSystemSettings,
-  generateRecommendationForm,
 } from "@/app/actions"
+import { generateRecommendationForm } from "@/app/document-actions"
 import { findUserByMisId } from '@/app/userfinding';
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
@@ -335,7 +334,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     try {
         const projectRef = doc(db, 'projects', initialProject.id);
         const projectSnap = await getDoc(projectRef);
-        if (projectSnap.exists) {
+        if (projectSnap.exists()) {
             const updatedProject = { id: projectSnap.id, ...projectSnap.data() } as Project;
             setProject(updatedProject);
             onProjectUpdate(updatedProject);
@@ -431,17 +430,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }, [project.meetingDetails?.date, systemSettings]);
   
   const isInitialMeeting = useMemo(() => {
-    // A meeting is initial if the project is in "Under Review" status and it's not a mid-term meeting.
-    if (project.status !== "Under Review" || !project.meetingDetails?.date) {
-        return false;
-    }
-    const grantStartDate = project.grant?.phases?.[0]?.disbursementDate;
-    // If there's no grant yet, it MUST be an initial meeting.
-    if (!grantStartDate) return true;
-    
-    // If there is a grant, the meeting date must be before the grant started.
-    return isBefore(parseISO(project.meetingDetails.date), parseISO(grantStartDate));
-  }, [project.status, project.grant, project.meetingDetails?.date]);
+    // A meeting is initial if the project is in "Under Review" status.
+    return project.status === "Under Review" && !!project.meetingDetails?.date;
+  }, [project.status, project.meetingDetails?.date]);
 
   const isMidTermMeeting = useMemo(() => {
     if (!project.meetingDetails?.date) return false;
@@ -818,6 +809,35 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     handleStatusUpdate(data.statusToSet, data.comments);
   };
 
+  const handlePrint = async (notingData: NotingFormData) => {
+    setIsPrinting(true);
+    const result = await generateOfficeNotingForm(project.id, notingData);
+    if (result.success && result.fileData) {
+      const byteCharacters = atob(result.fileData);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Office_Noting_${project.pi.replace(/\s/g, '_')}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
+      setIsNotingDialogOpen(false);
+      refetchProject();
+    } else {
+      toast({ variant: 'destructive', title: 'Download Failed', description: result.error });
+    }
+    setIsPrinting(false);
+  };
+
   const handleOpenNotingDialog = () => {
     notingForm.reset({
         projectDuration: project.projectDuration || '',
@@ -955,7 +975,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
                 {project.status}
               </Badge>
-              {isAdmin && project.status === "Under Review" ? (
+              {isAdmin && project.status === "Under Review" && isInitialMeeting ? (
                  <TooltipProvider>
                   <DropdownMenu>
                     <Tooltip>
@@ -988,7 +1008,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TooltipProvider>
-              ) : isAdmin && project.status !== 'Draft' ? (
+              ) : isAdmin && project.status !== 'Draft' && !isMidTermMeeting ? (
                  <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" disabled={isUpdating}>
@@ -1059,81 +1079,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 </Dialog>
               )}
               
-              {isAdmin && project.status === "Recommended" && !project.grant && (
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button>
-                      <DollarSign className="mr-2 h-4 w-4" /> Award Grant
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Award New Grant</DialogTitle>
-                      <DialogDescription>
-                        Set the sanction number and details for the first phase of the grant for "{project.title}".
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                      <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="sanction-number" className="text-right">
-                              Overall Sanction No.
-                          </Label>
-                          <Input
-                              id="sanction-number"
-                              value={sanctionNumber}
-                              onChange={(e) => setSanctionNumber(e.target.value)}
-                              className="col-span-3"
-                              placeholder="e.g., RDC/IMSL/218"
-                          />
-                      </div>
-                       <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="total-sanction-amount" className="text-right col-span-1">
-                              Total Sanction Amount (₹)
-                          </Label>
-                          <Input
-                              id="total-sanction-amount"
-                              type="number"
-                              value={totalSanctionAmount}
-                              onChange={(e) => setTotalSanctionAmount(Number(e.target.value))}
-                              className="col-span-3"
-                              placeholder="e.g., 500000"
-                          />
-                      </div>
-                      <Separator />
-                       <p className="text-sm font-medium text-center">Phase 1 (Installment 1)</p>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="installment-ref-number" className="text-right">
-                            Installment Ref. No.
-                        </Label>
-                        <Input
-                            id="installment-ref-number"
-                            value={installmentRefNumber}
-                            onChange={(e) => setInstallmentRefNumber(e.target.value)}
-                            className="col-span-3"
-                            placeholder="e.g., RDC/CP/IMR/132"
-                        />
-                      </div>
-                      <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="phase-amount" className="text-right">
-                          Installment Amount (₹)
-                        </Label>
-                        <Input
-                          id="phase-amount"
-                          type="number"
-                          value={phaseAmount}
-                          onChange={(e) => setPhaseAmount(Number(e.target.value))}
-                          className="col-span-3"
-                          placeholder="e.g., 200000"
-                        />
-                      </div>
-                    </div>
-                    <DialogFooter>
-                      <Button type="button" variant="ghost" onClick={handleAwardGrant} disabled={isAwarding}>
-                        {isAwarding ? "Awarding..." : "Confirm & Award"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+              {isSuperAdmin && project.status === "Recommended" && !project.grant && (
+                <Button onClick={handleOpenNotingDialog}>
+                  <DollarSign className="mr-2 h-4 w-4" /> Award Grant
+                </Button>
               )}
 
               {canRequestClosure && (
@@ -1254,6 +1203,21 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               <Separator />
             </>
           )}
+           {isMidTermMeeting && (
+            <>
+              <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
+                <div className="flex justify-between items-start flex-wrap gap-2">
+                  <h3 className="font-semibold text-lg">IMR Mid-Term Review Meeting</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                  <p>
+                    <strong>Date:</strong> {formatDate(project.meetingDetails?.date)}
+                  </p>
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
           {(project.status === "Revision Needed" || project.status === "Not Recommended") && (project.revisionComments || project.rejectionComments) && (
             <>
               <Alert variant="destructive">
@@ -1285,12 +1249,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       {format(new Date(project.projectStartDate), "PPP")} -{" "}
                       {format(new Date(project.projectEndDate), "PPP")}
                     </dd>
-                  </>
-                )}
-                {isMidTermMeeting && project.meetingDetails?.date && (
-                   <>
-                    <dt className="font-medium text-muted-foreground">Mid-Term Review Date</dt>
-                    <dd>{formatDate(project.meetingDetails.date)}</dd>
                   </>
                 )}
               </dl>
