@@ -489,7 +489,7 @@ export async function generateInstallmentOfficeNoting(
         const content = Buffer.from(await response.arrayBuffer());
 
         const zip = new PizZip(content);
-        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => "" });
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => "N/A" });
         
         const previousPhase = project.grant?.phases[project.grant.phases.length - 1];
         const previousPhaseNumber = project.grant?.phases.length || 0;
