@@ -1058,7 +1058,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                             value={sanctionNumber}
                             onChange={(e) => setSanctionNumber(e.target.value)}
                             className="col-span-3"
-                            placeholder="e.g., RDC/IMSL/122"
+                            placeholder="e.g., RDC/IMSL/218"
                         />
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
@@ -1280,6 +1280,18 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 <dd>{project.departmentName}</dd>
                  <dt className="font-medium text-muted-foreground">Campus</dt>
                 <dd>{piUser?.campus || 'N/A'}</dd>
+                {(isAdmin || isSuperAdmin) && project.piCvUrl && (
+                  <>
+                    <dt className="font-medium text-muted-foreground">PI CV</dt>
+                    <dd>
+                      <Button asChild variant="link" className="p-0 h-auto">
+                        <a href={project.piCvUrl} target="_blank" rel="noopener noreferrer">
+                          View CV
+                        </a>
+                      </Button>
+                    </dd>
+                  </>
+                )}
               </dl>
             </div>
           </div>
