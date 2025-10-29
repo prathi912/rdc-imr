@@ -2,7 +2,7 @@
 
 'use server';
 
-import { adminDb } from "@/lib/admin";
+import { adminDb, adminStorage } from "@/lib/admin";
 import type { Project, GrantPhase, GrantDetails, User } from "@/types";
 import { sendEmail as sendEmailUtility } from "@/lib/email";
 
@@ -37,7 +37,7 @@ const EMAIL_STYLES = {
 
 export async function awardInitialGrant(
     projectId: string,
-    grantData: { sanctionNumber: string; amount: number; installmentRefNumber: string },
+    grantData: { sanctionNumber: string; totalAmount: number; installmentRefNumber: string; amount: number; },
     pi: { uid: string; name: string; email?: string },
     projectTitle: string
 ): Promise<{ success: boolean; error?: string, updatedProject?: Project }> {
@@ -54,7 +54,7 @@ export async function awardInitialGrant(
         };
 
         const newGrant: GrantDetails = {
-            totalAmount: grantData.amount,
+            totalAmount: grantData.totalAmount,
             sanctionNumber: grantData.sanctionNumber,
             status: "Awarded",
             phases: [newPhase],
@@ -80,6 +80,7 @@ export async function awardInitialGrant(
                     <h3 style="color:#ffffff;">Grant Details:</h3>
                     <ul style="color:#e0e0e0; list-style-type: none; padding-left: 0;">
                         <li><strong>Project Sanction Number:</strong> ${newGrant.sanctionNumber}</li>
+                        <li><strong>Total Sanctioned Amount:</strong> ₹${newGrant.totalAmount.toLocaleString('en-IN')}</li>
                         <li><strong>Phase 1 Installment Ref. No:</strong> ${newPhase.installmentRefNumber}</li>
                         <li><strong>Phase 1 Amount:</strong> ₹${newPhase.amount.toLocaleString('en-IN')}</li>
                     </ul>
@@ -95,7 +96,7 @@ export async function awardInitialGrant(
             });
         }
         
-        await logActivity('INFO', 'Initial grant awarded', { projectId, sanctionNumber: grantData.sanctionNumber, amount: grantData.amount });
+        await logActivity('INFO', 'Initial grant awarded', { projectId, sanctionNumber: grantData.sanctionNumber, totalAmount: grantData.totalAmount, phase1Amount: grantData.amount });
         
         const updatedProjectSnap = await projectRef.get();
         const updatedProject = { id: updatedProjectSnap.id, ...updatedProjectSnap.data() } as Project;
@@ -145,7 +146,7 @@ export async function addGrantPhase(
     const updatedGrant: GrantDetails = {
       ...project.grant,
       phases: updatedPhases,
-      totalAmount: updatedPhases.reduce((acc, p) => acc + p.amount, 0),
+      totalAmount: project.grant.totalAmount, // Keep totalAmount same
     }
 
     await projectRef.update({ grant: updatedGrant })
@@ -210,7 +211,7 @@ export async function addTransaction(
     if (transactionData.invoiceDataUrl) {
       console.log("Invoice data URL found, preparing to upload.");
       const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
-      const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
+      const result = await adminStorage.uploadFileToServer(transactionData.invoiceDataUrl, path);
 
       if (!result.success || !result.url) {
         console.error("Invoice upload failed:", result.error);

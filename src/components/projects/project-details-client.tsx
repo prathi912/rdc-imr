@@ -274,6 +274,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const { toast } = useToast()
   const router = useRouter()
   const [sanctionNumber, setSanctionNumber] = useState("")
+  const [totalSanctionAmount, setTotalSanctionAmount] = useState<number | ''>('');
   const [installmentRefNumber, setInstallmentRefNumber] = useState("");
   const [phaseAmount, setPhaseAmount] = useState<number | "">("")
   const [isAwarding, setIsAwarding] = useState(false)
@@ -410,10 +411,13 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     if (!user) return false
     if (isSuperAdmin) return true
     if (isAssignedEvaluator && project.meetingDetails?.date) {
-      return isToday(parseISO(project.meetingDetails.date))
+      const evaluationDays = systemSettings?.imrEvaluationDays ?? 0;
+      const meetingDate = parseISO(project.meetingDetails.date);
+      const deadline = addDays(meetingDate, evaluationDays);
+      return isToday(meetingDate) || (isAfter(new Date(), meetingDate) && !isAfter(new Date(), deadline));
     }
     return false
-  }, [user, isSuperAdmin, isAssignedEvaluator, project.meetingDetails])
+  }, [user, isSuperAdmin, isAssignedEvaluator, project.meetingDetails, systemSettings])
   
   const isEvaluationPeriodActive = useMemo(() => {
     if (!project.meetingDetails?.date) return false;
@@ -530,11 +534,15 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }
 
   const handleAwardGrant = async () => {
+    if (!totalSanctionAmount || totalSanctionAmount <= 0) {
+        toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid total sanction amount.' });
+        return;
+    }
     if (!phaseAmount || phaseAmount <= 0) {
       toast({
         variant: "destructive",
         title: "Invalid Amount",
-        description: "Please enter a valid amount for the first phase.",
+        description: "Please enter a valid amount for the first installment.",
       })
       return
     }
@@ -559,8 +567,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     try {
       const grantData = {
           sanctionNumber: sanctionNumber.trim(),
-          amount: phaseAmount,
+          totalAmount: totalSanctionAmount,
           installmentRefNumber: installmentRefNumber.trim(),
+          amount: phaseAmount,
       };
       
       const result = await awardInitialGrant(
@@ -580,6 +589,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         setPhaseAmount("");
         setSanctionNumber("");
         setInstallmentRefNumber("");
+        setTotalSanctionAmount('');
       } else {
         throw new Error(result.error || "Failed to award grant.");
       }
@@ -1050,17 +1060,32 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                       <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="sanction-number" className="text-right">
-                            Sanction No.
-                        </Label>
-                        <Input
-                            id="sanction-number"
-                            value={sanctionNumber}
-                            onChange={(e) => setSanctionNumber(e.target.value)}
-                            className="col-span-3"
-                            placeholder="e.g., RDC/IMSL/218"
-                        />
+                          <Label htmlFor="sanction-number" className="text-right">
+                              Overall Sanction No.
+                          </Label>
+                          <Input
+                              id="sanction-number"
+                              value={sanctionNumber}
+                              onChange={(e) => setSanctionNumber(e.target.value)}
+                              className="col-span-3"
+                              placeholder="e.g., RDC/IMSL/218"
+                          />
                       </div>
+                       <div className="grid grid-cols-4 items-center gap-4">
+                          <Label htmlFor="total-sanction-amount" className="text-right col-span-1">
+                              Total Sanction Amount (₹)
+                          </Label>
+                          <Input
+                              id="total-sanction-amount"
+                              type="number"
+                              value={totalSanctionAmount}
+                              onChange={(e) => setTotalSanctionAmount(Number(e.target.value))}
+                              className="col-span-3"
+                              placeholder="e.g., 500000"
+                          />
+                      </div>
+                      <Separator />
+                       <p className="text-sm font-medium text-center">Phase 1 (Installment 1)</p>
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="installment-ref-number" className="text-right">
                             Installment Ref. No.
@@ -1075,7 +1100,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="phase-amount" className="text-right">
-                          Amount (₹)
+                          Installment Amount (₹)
                         </Label>
                         <Input
                           id="phase-amount"
@@ -1703,4 +1728,3 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
-
