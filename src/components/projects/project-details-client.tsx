@@ -428,8 +428,19 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     return !isBefore(today, meetingDate) && !isAfter(today, deadline);
   }, [project.meetingDetails?.date, systemSettings]);
   
-  const isInitialMeeting = project.status === "Under Review" && project.submissionDate < (project.meetingDetails?.date || '2000-01-01');
-  const isMidTermMeeting = project.status === "Under Review" && project.submissionDate >= (project.meetingDetails?.date || '3000-01-01');
+  const isInitialMeeting = useMemo(() => {
+    if (project.status !== "Under Review" || !project.meetingDetails?.date) {
+        return false;
+    }
+    return project.submissionDate < project.meetingDetails.date;
+  }, [project.status, project.submissionDate, project.meetingDetails?.date]);
+
+  const isMidTermMeeting = useMemo(() => {
+    if (project.status !== "Under Review" || !project.meetingDetails?.date) {
+        return false;
+    }
+    return project.submissionDate >= project.meetingDetails.date;
+  }, [project.status, project.submissionDate, project.meetingDetails?.date]);
 
   const showEvaluationForm = user && isInitialMeeting && isAssignedEvaluator && isEvaluationPeriodActive;
 
@@ -859,7 +870,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
         <div className="flex items-center gap-2">
-            {isSuperAdmin && project.status === "Under Review" && allEvaluationsIn && (
+            {isAdmin && project.status === "Under Review" && allEvaluationsIn && (
               <Button onClick={handleOpenNotingDialog} disabled={isPrinting}>
                   <Download className="mr-2 h-4 w-4" />
                   Download Office Notings
@@ -934,7 +945,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
                 {project.status}
               </Badge>
-              {isSuperAdmin && project.status === "Under Review" ? (
+              {isAdmin && project.status === "Under Review" ? (
                  <TooltipProvider>
                   <DropdownMenu>
                     <Tooltip>
@@ -967,7 +978,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TooltipProvider>
-              ) : isSuperAdmin && project.status !== 'Draft' ? (
+              ) : isAdmin && project.status !== 'Draft' ? (
                  <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" disabled={isUpdating}>
@@ -1737,3 +1748,4 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
+
