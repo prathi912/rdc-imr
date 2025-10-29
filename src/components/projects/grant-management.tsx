@@ -238,6 +238,19 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       setIsSubmitting(false)
     }
   }
+  
+  const getPhaseBadgeVariant = (status: GrantPhase['status']) => {
+    switch (status) {
+        case 'Disbursed':
+            return 'default';
+        case 'Utilization Submitted':
+            return 'default';
+        case 'Completed':
+            return 'outline';
+        default:
+            return 'secondary';
+    }
+  };
 
   return (
     <Card className="mt-8">
@@ -321,7 +334,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const totalUtilized = phase.transactions?.reduce((acc, t) => acc + t.amount, 0) || 0
           const utilizationPercentage = phase.amount > 0 ? (totalUtilized / phase.amount) * 100 : 0;
           const hasReachedThreshold = utilizationPercentage >= 80;
-          const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1)); // Either money is left or it's not the last phase
+          const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1));
 
           return (
             <Card key={phase.id} className="bg-muted/30">
@@ -336,7 +349,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={phase.status === "Disbursed" ? "default" : "secondary"}>{phase.status}</Badge>
+                    <Badge variant={getPhaseBadgeVariant(phase.status)}>{phase.status}</Badge>
                     {canChangeStatus && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
