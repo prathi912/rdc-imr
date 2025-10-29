@@ -37,7 +37,12 @@ const EMAIL_STYLES = {
 
 export async function awardInitialGrant(
     projectId: string,
-    grantData: { sanctionNumber: string; totalAmount: number; installmentRefNumber: string; amount: number; },
+    grantData: { 
+      sanctionNumber: string; 
+      totalAmount: number; 
+      installmentRefNumber: string; 
+      amount: number; 
+    },
     pi: { uid: string; name: string; email?: string },
     projectTitle: string
 ): Promise<{ success: boolean; error?: string, updatedProject?: Project }> {
@@ -146,13 +151,11 @@ export async function addGrantPhase(
     const updatedGrant: GrantDetails = {
       ...project.grant,
       phases: updatedPhases,
-      totalAmount: project.grant.totalAmount, // Keep totalAmount same
     }
 
     await projectRef.update({ grant: updatedGrant })
     await logActivity("INFO", "Grant phase added", { projectId, phaseName, amount: phaseData.amount })
 
-    // Add notification for new grant phase
     const notification = {
       uid: project.pi_uid,
       projectId: projectId,
@@ -161,6 +164,30 @@ export async function addGrantPhase(
       isRead: false,
     }
     await adminDb.collection("notifications").add(notification)
+
+    if (project.pi_email) {
+        const emailHtml = `
+            <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear ${project.pi},</p>
+                <p style="color:#e0e0e0;">A new grant phase has been sanctioned for your project, <strong>"${project.title}"</strong>.</p>
+                <h3 style="color:#ffffff;">Phase Details:</h3>
+                <ul style="color:#e0e0e0; list-style-type: none; padding-left: 0;">
+                    <li><strong>Phase Name:</strong> ${newPhase.name}</li>
+                    <li><strong>Installment Ref. No:</strong> ${newPhase.installmentRefNumber}</li>
+                    <li><strong>Amount:</strong> ₹${newPhase.amount.toLocaleString('en-IN')}</li>
+                </ul>
+                <p style="color:#e0e0e0;">This amount will be disbursed to your account shortly.</p>
+                ${EMAIL_STYLES.footer}
+            </div>
+        `;
+        await sendEmailUtility({
+            to: project.pi_email,
+            subject: `New Grant Phase Sanctioned for: ${project.title}`,
+            html: emailHtml,
+            from: 'default'
+        });
+    }
 
     const updatedProject = { ...project, grant: updatedGrant }
     return { success: true, updatedProject }
