@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import type React from "react"
@@ -27,6 +28,7 @@ import {
   deleteImrProject,
   markImrAttendance,
   getSystemSettings,
+  generateRecommendationForm,
 } from "@/app/actions"
 import { findUserByMisId } from '@/app/userfinding';
 import { useToast } from "@/hooks/use-toast"
@@ -429,25 +431,26 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }, [project.meetingDetails?.date, systemSettings]);
   
   const isInitialMeeting = useMemo(() => {
-    if (project.status !== "Under Review" || !project.meetingDetails?.date) {
-        return false;
-    }
-    // A simple heuristic: if submission date is very close to meeting date, it's likely initial.
-    // A better approach is needed if mid-term review scheduling alters the status to "Under Review".
-    // For now, let's consider any "Under Review" as an initial meeting for simplicity in this context.
-    return true; 
-  }, [project.status, project.submissionDate, project.meetingDetails?.date]);
-
-  const isMidTermMeeting = useMemo(() => {
+    // A meeting is initial if the project is in "Under Review" status and it's not a mid-term meeting.
     if (project.status !== "Under Review" || !project.meetingDetails?.date) {
         return false;
     }
     const grantStartDate = project.grant?.phases?.[0]?.disbursementDate;
+    // If there's no grant yet, it MUST be an initial meeting.
+    if (!grantStartDate) return true;
+    
+    // If there is a grant, the meeting date must be before the grant started.
+    return isBefore(parseISO(project.meetingDetails.date), parseISO(grantStartDate));
+  }, [project.status, project.grant, project.meetingDetails?.date]);
+
+  const isMidTermMeeting = useMemo(() => {
+    if (!project.meetingDetails?.date) return false;
+    const grantStartDate = project.grant?.phases?.[0]?.disbursementDate;
     if (!grantStartDate) return false;
     
-    // A mid-term review's meeting date will be after the grant has started.
-    return isAfter(parseISO(project.meetingDetails.date), parseISO(grantStartDate));
-  }, [project.status, project.grant, project.meetingDetails?.date]);
+    // A mid-term review's meeting date will be on or after the grant has started.
+    return !isBefore(parseISO(project.meetingDetails.date), parseISO(grantStartDate));
+  }, [project.grant, project.meetingDetails?.date]);
 
   const showEvaluationForm = user && isInitialMeeting && isAssignedEvaluator && isEvaluationPeriodActive;
 
@@ -835,12 +838,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
   };
 
-  const handlePrint = async (data: NotingFormData) => {
+  const handlePrintRecommendationForm = async () => {
     setIsPrinting(true);
     try {
-        const result = await generateOfficeNotingForm(project.id, data);
+        const result = await generateRecommendationForm(project.id);
         if (result.success && result.fileData) {
-            onProjectUpdate({ ...project, projectDuration: data.projectDuration, phases: data.phases });
             const byteCharacters = atob(result.fileData);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
@@ -852,13 +854,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `IMR_Office_Noting_${project.pi.replace(/\s/g, '_')}.docx`;
+            a.download = `IMR_Recommendation_${project.pi.replace(/\s/g, '_')}.docx`;
             document.body.appendChild(a);
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
-            toast({ title: "Download Started", description: "Office Notings form is being downloaded." });
-            setIsNotingDialogOpen(false);
+            toast({ title: "Download Started", description: "Recommendation form is being downloaded." });
         } else {
             throw new Error(result.error || "Failed to generate form.");
         }
@@ -870,6 +871,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
   };
 
+
   const canViewEvaluations = isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive);
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
 
@@ -878,10 +880,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
         <div className="flex items-center gap-2">
-            {isAdmin && project.status === "Recommended" && (
-              <Button onClick={handleOpenNotingDialog} disabled={isPrinting}>
+             {isAdmin && project.status === "Recommended" && (
+              <Button onClick={handlePrintRecommendationForm} disabled={isPrinting}>
                   <Download className="mr-2 h-4 w-4" />
-                  Download Office Notings
+                  Download Recommendation Form
               </Button>
             )}
              {showAdminActions && (
@@ -1216,7 +1218,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </AlertDescription>
               </Alert>
           )}
-           {project.meetingDetails && isInitialMeeting && (
+           {isInitialMeeting && (
             <>
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
                 <div className="flex justify-between items-start flex-wrap gap-2">
@@ -1229,13 +1231,13 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
                   <p>
-                    <strong>Date:</strong> {formatDate(project.meetingDetails.date)}
+                    <strong>Date:</strong> {formatDate(project.meetingDetails?.date)}
                   </p>
                   <p>
-                    <strong>Time:</strong> {project.meetingDetails.time}
+                    <strong>Time:</strong> {project.meetingDetails?.time}
                   </p>
                   <p>
-                    <strong>Venue:</strong> {project.meetingDetails.venue}
+                    <strong>Venue:</strong> {project.meetingDetails?.venue}
                   </p>
                 </div>
                 {isAdmin && assignedEvaluatorNames.length > 0 && (
