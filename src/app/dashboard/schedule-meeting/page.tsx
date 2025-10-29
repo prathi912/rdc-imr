@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { format, startOfToday, subMonths } from 'date-fns';
+import { format, startOfToday, subMonths, parseISO, isAfter } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 
@@ -88,9 +88,23 @@ function ProjectListTable({
                             {projects.map(project => {
                                 const piUser = usersMap.get(project.pi_uid);
                                 const profileLink = piUser?.campus === 'Goa' ? `/goa/${piUser.misId}` : `/profile/${piUser?.misId}`;
-                                const displayDate = project.status === 'Submitted'
-                                    ? project.submissionDate
-                                    : (project.grant?.phases[0]?.disbursementDate || project.projectStartDate || project.submissionDate);
+                                
+                                let displayDate;
+                                if (project.status === 'Submitted') {
+                                    displayDate = project.submissionDate;
+                                } else {
+                                    const disbursementDates = project.grant?.phases
+                                        ?.map(p => p.disbursementDate)
+                                        .filter((d): d is string => !!d)
+                                        .map(d => parseISO(d));
+                                    
+                                    if (disbursementDates && disbursementDates.length > 0) {
+                                        const latestDate = new Date(Math.max.apply(null, disbursementDates.map(d => d.getTime())));
+                                        displayDate = latestDate.toISOString();
+                                    } else {
+                                        displayDate = project.projectStartDate || project.submissionDate;
+                                    }
+                                }
 
                                 return (
                                 <TableRow key={project.id} data-state={selectedProjects.includes(project.id) ? "selected" : ""}>
@@ -194,7 +208,11 @@ export default function ScheduleMeetingPage() {
     const thresholdDate = subMonths(new Date(), reviewMonths);
     const grantStartDate = p.grant?.phases?.[0]?.disbursementDate || p.projectStartDate;
     if (!grantStartDate) return false;
-    return new Date(grantStartDate) <= thresholdDate;
+    
+    // Check if a mid-term review has already been conducted by checking for a meeting date after the grant start date.
+    const hasHadMidTermReview = p.meetingDetails?.date && isAfter(parseISO(p.meetingDetails.date), parseISO(grantStartDate));
+
+    return isAfter(thresholdDate, parseISO(grantStartDate)) && !hasHadMidTermReview;
   });
 
   const projectsForCurrentTab = activeTab === 'new-submissions' ? newSubmissions : midTermReviewProjects;
@@ -309,7 +327,7 @@ export default function ScheduleMeetingPage() {
                             usersMap={usersMap}
                             title="Projects Due for Mid-term Review"
                             description={`These projects were funded at least ${systemSettings?.imrMidTermReviewMonths ?? 6} months ago and are due for a progress review.`}
-                            dateColumnHeader="Grant Awarded Date"
+                            dateColumnHeader="Last Disbursement Date"
                         />
                     </TabsContent>
                 </Tabs>
