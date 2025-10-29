@@ -69,7 +69,7 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
   try {
     const projectRef = adminDb.collection('projects').doc(projectId);
     const projectSnap = await projectRef.get();
-    if (!projectSnap.exists()) {
+    if (!projectSnap.exists) {
       return { success: false, error: 'Project not found.' };
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
@@ -306,7 +306,7 @@ export async function exportClaimToExcel(
   try {
     const claimRef = adminDb.collection("incentiveClaims").doc(claimId)
     const claimSnap = await claimRef.get()
-    if (!claimSnap.exists()) {
+    if (!claimSnap.exists) {
       return { success: false, error: "Claim not found." }
     }
     const claim = claimSnap.data() as IncentiveClaim
@@ -378,14 +378,14 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
   try {
     const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
     const claimSnap = await claimRef.get();
-    if (!claimSnap.exists()) {
+    if (!claimSnap.exists) {
       return { success: false, error: 'Incentive claim not found.' };
     }
     const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
 
     const userRef = adminDb.collection('users').doc(claim.uid);
     const userSnap = await userRef.get();
-    if (!userSnap.exists()) {
+    if (!userSnap.exists) {
         return { success: false, error: 'Claimant user profile not found.' };
     }
     const user = userSnap.data() as User;
@@ -476,7 +476,7 @@ export async function generateInstallmentOfficeNoting(
     try {
         const projectRef = adminDb.collection('projects').doc(projectId);
         const projectSnap = await projectRef.get();
-        if (!projectSnap.exists()) {
+        if (!projectSnap.exists) {
             return { success: false, error: "Project not found." };
         }
         const project = projectSnap.data() as Project;
@@ -493,42 +493,27 @@ export async function generateInstallmentOfficeNoting(
           paragraphLoop: true,
           linebreaks: true,
           nullGetter: () => "N/A",
-          parser: (tag) => {
-            if (tag === 'Instalment_Reference') {
-              return { get: () => `{${tag}}` };
-            }
-            if (tag.startsWith('{') && tag.endsWith('}')) {
-              return { get: () => tag };
-            }
-            return { get: () => `{${tag}}` };
-          },
         });
 
         const previousPhase = project.grant?.phases[project.grant.phases.length - 1];
         const previousPhaseNumber = project.grant?.phases.length || 0;
 
         const data = {
-            'Instalment_Reference': phaseData.installmentRefNumber,
-            'date': format(new Date(), 'dd/MM/yyyy'),
-            'PI_name': project.pi,
-            'sanction_reference': project.grant?.sanctionNumber || 'N/A',
-            'date_sanction': project.submissionDate ? format(parseISO(project.submissionDate), 'dd/MM/yyyy') : 'N/A',
-            'total_sanction': project.grant?.totalAmount ? project.grant.totalAmount.toLocaleString('en-IN') : 'N/A',
-            'phase_number': toWords(previousPhaseNumber),
-            'previous_phase_amount': previousPhase?.amount.toLocaleString('en-IN') || 'N/A',
-            'previous_phase_award_date': previousPhase?.disbursementDate ? format(parseISO(previousPhase.disbursementDate), 'dd/MM/yyyy') : 'N/A',
-            'midterm_review_date': project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
-            'next_phase_number': toWords(previousPhaseNumber + 1),
-            'next_phase_amount': phaseData.amount.toLocaleString('en-IN'),
+            Instalment_Reference: phaseData.installmentRefNumber,
+            date: format(new Date(), 'dd/MM/yyyy'),
+            PI_name: project.pi,
+            sanction_reference: project.grant?.sanctionNumber || 'N/A',
+            date_sanction: project.submissionDate ? format(parseISO(project.submissionDate), 'dd/MM/yyyy') : 'N/A',
+            total_sanction: project.grant?.totalAmount ? project.grant.totalAmount.toLocaleString('en-IN') : 'N/A',
+            phase_number: toWords(previousPhaseNumber),
+            previous_phase_amount: previousPhase?.amount.toLocaleString('en-IN') || 'N/A',
+            previous_phase_award_date: previousPhase?.disbursementDate ? format(parseISO(previousPhase.disbursementDate), 'dd/MM/yyyy') : 'N/A',
+            midterm_review_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
+            next_phase_number: toWords(previousPhaseNumber + 1),
+            next_phase_amount: phaseData.amount.toLocaleString('en-IN'),
         };
-        
-        const rawData: { [key: string]: string } = {};
-        Object.entries(data).forEach(([key, value]) => {
-          rawData[`{${key}}`] = value;
-          rawData[`{{${key}}}`] = value;
-        });
 
-        doc.render(rawData);
+        doc.render(data);
 
         const buf = doc.getZip().generate({ type: 'nodebuffer' });
         const base64 = buf.toString('base64');
@@ -542,5 +527,3 @@ export async function generateInstallmentOfficeNoting(
         return { success: false, error: error.message || 'Failed to generate the form.' };
     }
 }
-
-    
