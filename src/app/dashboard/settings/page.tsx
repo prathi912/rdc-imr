@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import type React from "react"
@@ -35,7 +36,7 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock } from "lucide-react"
+import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock, Mail } from "lucide-react"
 import { Combobox } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -842,6 +843,21 @@ export default function SettingsPage() {
                         </TableBody>
                     </Table>
                 )}
+              </div>
+              <div className="space-y-4 rounded-lg border p-4">
+                  <div className="flex items-center gap-2">
+                      <Mail className="h-5 w-5" />
+                      <Label className="text-base">Utilization Report Email Recipient</Label>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    The email address that will receive a notification when a PI submits a utilization report and requests the next grant phase.
+                  </p>
+                  <Input 
+                      placeholder="finance.rdc@paruluniversity.ac.in"
+                      defaultValue={systemSettings.utilizationNotificationEmail || ''}
+                      onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, utilizationNotificationEmail: e.target.value })}
+                      disabled={isSavingSettings}
+                  />
               </div>
               <div className="space-y-4">
                 <Label className="text-base">IQAC Email Address</Label>

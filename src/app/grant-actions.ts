@@ -5,6 +5,7 @@
 import { adminDb, adminStorage } from "@/lib/admin";
 import type { Project, GrantPhase, GrantDetails, User } from "@/types";
 import { sendEmail as sendEmailUtility } from "@/lib/email";
+import { getSystemSettings } from './actions';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -342,29 +343,62 @@ export async function updatePhaseStatus(
     }
     await adminDb.collection("notifications").add(piNotification)
 
-    // Add notification for admins if utilization is submitted
+    // Notify admins and designated email if utilization is submitted
     if (newStatus === "Utilization Submitted") {
-      const adminRoles = ["Super-admin", "admin"]
-      const usersRef = adminDb.collection("users")
-      const q = usersRef.where("role", "in", adminRoles)
-      const adminUsersSnapshot = await q.get()
+      const settings = await getSystemSettings();
+      const adminRoles = ["Super-admin", "admin"];
+      const notifyEmails = new Set<string>();
 
-      if (!adminUsersSnapshot.empty) {
-        const batch = adminDb.batch()
-        const notificationTitle = `${project.pi} requested the next grant phase for "${project.title}".`
-        adminUsersSnapshot.forEach((userDoc) => {
-          const notificationRef = adminDb.collection("notifications").doc()
-          batch.set(notificationRef, {
-            uid: userDoc.id,
-            projectId,
-            title: notificationTitle,
-            createdAt: new Date().toISOString(),
-            isRead: false,
-          })
-        })
-        await batch.commit()
-        await logActivity("INFO", "Admins notified for next phase disbursement", { projectId })
+      // Add the custom email from settings
+      if (settings.utilizationNotificationEmail) {
+        notifyEmails.add(settings.utilizationNotificationEmail);
       }
+
+      const usersRef = adminDb.collection("users");
+      const q = usersRef.where("role", "in", adminRoles);
+      const adminUsersSnapshot = await q.get();
+
+      const batch = adminDb.batch()
+      const notificationTitle = `${project.pi} requested the next grant phase for "${project.title}".`
+
+      adminUsersSnapshot.forEach((userDoc) => {
+        const adminUser = userDoc.data() as User;
+        if (adminUser.email) {
+            notifyEmails.add(adminUser.email);
+        }
+        const notificationRef = adminDb.collection("notifications").doc()
+        batch.set(notificationRef, {
+          uid: userDoc.id,
+          projectId,
+          title: notificationTitle,
+          createdAt: new Date().toISOString(),
+          isRead: false,
+        })
+      });
+      
+      await batch.commit();
+
+      if (notifyEmails.size > 0) {
+        const emailHtml = `
+            <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear Administrator,</p>
+                <p style="color:#e0e0e0;">This is to inform you that the Principal Investigator, <strong>${project.pi}</strong>, has submitted their utilization report for <strong>${updatedPhases[phaseIndex].name}</strong> of the project titled:</p>
+                <p style="color:#ffffff; font-size: 1.1em; text-align: center; margin: 15px 0;"><strong>"${project.title}"</strong></p>
+                <p style="color:#e0e0e0;">They are now requesting the disbursement of the next grant phase. Please visit the project details page on the portal to review the utilization and add the next phase.</p>
+                ${EMAIL_STYLES.footer}
+            </div>
+        `;
+
+        await sendEmailUtility({
+            to: Array.from(notifyEmails).join(','),
+            subject: `Action Required: Next Grant Phase Request for Project: ${project.title}`,
+            html: emailHtml,
+            from: 'default'
+        });
+      }
+
+      await logActivity("INFO", "Admins and designated contact notified for next phase disbursement", { projectId, notifiedEmails: Array.from(notifyEmails) });
     }
 
     const updatedProject = { ...project, grant: updatedGrant }

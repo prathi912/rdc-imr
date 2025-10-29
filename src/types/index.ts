@@ -508,6 +508,7 @@ export type SystemSettings = {
   enabledIncentiveTypes?: Record<string, boolean>;
   imrMidTermReviewMonths?: number;
   imrEvaluationDays?: number;
+  utilizationNotificationEmail?: string;
 }
 
 export type LoginOtp = {
