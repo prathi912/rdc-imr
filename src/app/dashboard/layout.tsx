@@ -52,7 +52,7 @@ import {
 import { UserNav } from "@/components/user-nav"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Logo } from "@/components/logo"
-import type { User } from "@/types"
+import type { User, SystemSettings } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { auth, db } from "@/lib/config"
@@ -60,7 +60,7 @@ import { signOut, onAuthStateChanged, type User as FirebaseUser } from "firebase
 import { useToast } from "@/hooks/use-toast"
 import { collection, onSnapshot, query, where, doc } from "firebase/firestore"
 import { getDefaultModulesForRole } from "@/lib/modules"
-import { saveSidebarOrder } from "@/app/actions"
+import { saveSidebarOrder, getSystemSettings } from "@/app/actions"
 import { TutorialDialog } from "@/components/tutorial-dialog"
 import {
   AlertDialog,
@@ -72,6 +72,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { subMonths } from 'date-fns'
+
 
 interface NavItem {
   id: string
@@ -411,12 +413,47 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     // Pending Meetings listener (for admins)
     if (user.allowedModules?.includes("schedule-meeting")) {
-      const projectsQuery = query(collection(db, "projects"), where("status", "==", "Submitted"))
-      unsubscribes.push(
-        onSnapshot(projectsQuery, (snapshot) => {
-          setPendingMeetingsCount(snapshot.size)
-        }),
-      )
+      let unsubscribeNew: () => void;
+      let unsubscribeMidTerm: () => void;
+
+      const fetchSettingsAndSubscribe = async () => {
+        const settings: SystemSettings = await getSystemSettings();
+        const reviewMonths = settings?.imrMidTermReviewMonths ?? 6;
+        const thresholdDate = subMonths(new Date(), reviewMonths);
+
+        const newSubmissionsQuery = query(collection(db, "projects"), where("status", "==", "Submitted"));
+        const midTermQuery = query(
+          collection(db, "projects"), 
+          where('status', '==', 'In Progress'),
+          where('grant.phases.0.disbursementDate', '<=', thresholdDate.toISOString())
+        );
+
+        let newCount = 0;
+        let midTermCount = 0;
+
+        const updateTotal = () => {
+          setPendingMeetingsCount(newCount + midTermCount);
+        };
+
+        unsubscribeNew = onSnapshot(newSubmissionsQuery, (snapshot) => {
+          newCount = snapshot.size;
+          updateTotal();
+        });
+
+        unsubscribeMidTerm = onSnapshot(midTermQuery, (snapshot) => {
+            midTermCount = snapshot.docs.filter(doc => {
+                const project = doc.data();
+                // Additional client-side check if needed, though Firestore should handle it
+                const firstDisbursement = project.grant?.phases?.[0]?.disbursementDate;
+                return firstDisbursement && new Date(firstDisbursement) <= thresholdDate;
+            }).length;
+            updateTotal();
+        });
+
+        unsubscribes.push(unsubscribeNew, unsubscribeMidTerm);
+      };
+
+      fetchSettingsAndSubscribe();
     }
 
     // Incentive Approvals listener
