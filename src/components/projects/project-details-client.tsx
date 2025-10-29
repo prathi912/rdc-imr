@@ -932,77 +932,69 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
                 {project.status}
               </Badge>
-              {isSuperAdmin && project.status !== 'Draft' && (
-                <>
-                  {project.status === "Under Review" ? (
-                     <TooltipProvider>
-                      <DropdownMenu>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="outline" disabled={isUpdating}>
-                                Update Status <ChevronDown className="ml-2 h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                          </TooltipTrigger>
-                           {!allEvaluationsIn ? (
-                                <TooltipContent><p>All evaluations must be submitted first.</p></TooltipContent>
-                           ) : null}
-                        </Tooltip>
-                        <DropdownMenuContent align="end">
-                           <DropdownMenuItem 
-                              onClick={() => handleApprovalClick("Recommended")}
-                              disabled={!allEvaluationsIn}
-                           >
-                              <Check className="mr-2 h-4 w-4" /> Recommended
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
-                            <X className="mr-2 h-4 w-4 text-destructive" />{" "}
-                            <span className="text-destructive">Not Recommend</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
-                            <Edit className="mr-2 h-4 w-4" /> Request Revision
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TooltipProvider>
-                  ) : project.status === "Pending Completion Approval" ? (
-                    <Button onClick={() => handleStatusUpdate("Completed")} disabled={isUpdating}>
-                      <FileCheck2 className="mr-2 h-4 w-4" /> Approve Completion
+              {isSuperAdmin && project.status === "Under Review" ? (
+                 <TooltipProvider>
+                  <DropdownMenu>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" disabled={isUpdating}>
+                            Update Status <ChevronDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                       {!allEvaluationsIn ? (
+                            <TooltipContent><p>All evaluations must be submitted first.</p></TooltipContent>
+                       ) : null}
+                    </Tooltip>
+                    <DropdownMenuContent align="end">
+                       <DropdownMenuItem 
+                          onClick={() => handleApprovalClick("Recommended")}
+                          disabled={!allEvaluationsIn}
+                       >
+                          <Check className="mr-2 h-4 w-4" /> Recommended
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
+                        <X className="mr-2 h-4 w-4 text-destructive" />{" "}
+                        <span className="text-destructive">Not Recommend</span>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
+                        <Edit className="mr-2 h-4 w-4" /> Request Revision
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TooltipProvider>
+              ) : isSuperAdmin && project.status !== 'Draft' ? (
+                 <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" disabled={isUpdating}>
+                       <Edit className="mr-2 h-4 w-4" /> Revise Decision <ChevronDown className="ml-2 h-4 w-4" />
                     </Button>
-                  ) : (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" disabled={isUpdating}>
-                           <Edit className="mr-2 h-4 w-4" /> Revise Decision <ChevronDown className="ml-2 h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                           {project.status !== "Recommended" && (
-                             <DropdownMenuItem onClick={() => handleApprovalClick("Recommended")}>
-                               <Check className="mr-2 h-4 w-4" /> Recommended
-                             </DropdownMenuItem>
-                           )}
-                           {project.status !== "Not Recommended" && (
-                             <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
-                               <X className="mr-2 h-4 w-4 text-destructive" />{" "}
-                               <span className="text-destructive">Not Recommend</span>
-                             </DropdownMenuItem>
-                           )}
-                           {project.status !== "Revision Needed" && (
-                             <>
-                               <DropdownMenuSeparator />
-                               <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
-                                 <Edit className="mr-2 h-4 w-4" /> Request Revision
-                               </DropdownMenuItem>
-                             </>
-                           )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </>
-              )}
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                       {project.status !== "Recommended" && (
+                         <DropdownMenuItem onClick={() => handleApprovalClick("Recommended")}>
+                           <Check className="mr-2 h-4 w-4" /> Recommended
+                         </DropdownMenuItem>
+                       )}
+                       {project.status !== "Not Recommended" && (
+                         <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
+                           <X className="mr-2 h-4 w-4 text-destructive" />{" "}
+                           <span className="text-destructive">Not Recommend</span>
+                         </DropdownMenuItem>
+                       )}
+                       {project.status !== "Revision Needed" && (
+                         <>
+                           <DropdownMenuSeparator />
+                           <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
+                             <Edit className="mr-2 h-4 w-4" /> Request Revision
+                           </DropdownMenuItem>
+                         </>
+                       )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
               {isPI && project.status === "Revision Needed" && (
                 <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
                   <DialogTrigger asChild>
@@ -1194,6 +1186,15 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {project.wasAbsent && (
+              <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>PI Was Absent</AlertTitle>
+                  <AlertDescription>
+                      The Principal Investigator was marked as absent for the scheduled evaluation meeting. This project will need to be rescheduled.
+                  </AlertDescription>
+              </Alert>
+          )}
           {project.meetingDetails && (
             <>
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
