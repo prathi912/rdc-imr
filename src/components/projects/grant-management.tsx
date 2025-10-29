@@ -158,20 +158,10 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     XLSX.writeFile(workbook, `${project.title.replace(/\s+/g, "_")}_${phase.name.replace(/\s+/g, "_")}_Transactions.xlsx`)
   }
   
-  const handleDownloadNoting = async () => {
-    const values = phaseForm.getValues();
-    const isValid = await phaseForm.trigger();
-    if (!isValid) {
-        toast({ variant: 'destructive', title: 'Invalid Data', description: 'Please fill in the required fields correctly.' });
-        return;
-    }
-    
+  const handleDownloadNoting = async (phaseDetails: { installmentRefNumber: string, amount: number }) => {
     setIsDownloading(true);
     try {
-        const result = await generateInstallmentOfficeNoting(project.id, {
-            installmentRefNumber: values.installmentRefNumber,
-            amount: values.amount,
-        });
+        const result = await generateInstallmentOfficeNoting(project.id, phaseDetails);
 
         if (result.success && result.fileData) {
             const byteCharacters = atob(result.fileData);
@@ -191,6 +181,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             a.remove();
             window.URL.revokeObjectURL(url);
             toast({ title: "Download Started" });
+            setIsAddPhaseOpen(false); // Close dialog on successful download
         } else {
             throw new Error(result.error || "Failed to generate document.");
         }
@@ -200,6 +191,15 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
         setIsDownloading(false);
     }
   };
+
+  const handleDownloadPhaseNoting = async (phase: GrantPhase) => {
+    if (!phase.installmentRefNumber || !phase.amount) {
+        toast({ variant: 'destructive', title: 'Missing Data', description: 'This phase is missing the reference number or amount needed to generate the note.' });
+        return;
+    }
+    await handleDownloadNoting({ installmentRefNumber: phase.installmentRefNumber, amount: phase.amount });
+  };
+
 
   const handleAddPhase = async (values: z.infer<typeof addPhaseSchema>) => {
     setIsSubmitting(true);
@@ -288,11 +288,10 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const getPhaseBadgeVariant = (status: GrantPhase['status']) => {
     switch (status) {
         case 'Disbursed':
+        case 'Completed':
             return 'default';
         case 'Utilization Submitted':
             return 'default';
-        case 'Completed':
-            return 'outline';
         default:
             return 'secondary';
     }
@@ -358,7 +357,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   </form>
                 </Form>
                 <DialogFooter className="gap-2">
-                  <Button variant="outline" onClick={handleDownloadNoting} disabled={isDownloading}>
+                  <Button variant="outline" onClick={() => handleDownloadNoting(phaseForm.getValues())} disabled={isDownloading}>
                     {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
                     Download Office Note
                   </Button>
@@ -432,6 +431,11 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                    )}
+                    {isAdmin && phase.installmentRefNumber && (
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadPhaseNoting(phase)}>
+                            <Download className="mr-2 h-4 w-4" /> Office Note
+                        </Button>
                     )}
                   </div>
                 </div>
