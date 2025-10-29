@@ -1,3 +1,4 @@
+
 'use server';
 
 import fs from 'fs';
@@ -217,7 +218,7 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
     try {
         const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
         const claimSnap = await claimRef.get();
-        if (!claimSnap.exists()) return null;
+        if (!claimSnap.exists) return null;
 
         const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
         
@@ -475,7 +476,7 @@ export async function generateInstallmentOfficeNoting(
     try {
         const projectRef = adminDb.collection('projects').doc(projectId);
         const projectSnap = await projectRef.get();
-        if (!projectSnap.exists()) {
+        if (!projectSnap.exists) {
             return { success: false, error: "Project not found." };
         }
         const project = projectSnap.data() as Project;
@@ -498,8 +499,8 @@ export async function generateInstallmentOfficeNoting(
             date: format(new Date(), 'dd/MM/yyyy'),
             PI_name: project.pi,
             sanction_reference: project.grant?.sanctionNumber || 'N/A',
-            date_sanction: project.grant?.phases[0].disbursementDate ? format(parseISO(project.grant.phases[0].disbursementDate), 'dd/MM/yyyy') : 'N/A',
-            total_sanction: project.grant?.totalAmount.toLocaleString('en-IN') || 'N/A',
+            date_sanction: project.grant?.phases?.[0]?.disbursementDate ? format(parseISO(project.grant.phases[0].disbursementDate), 'dd/MM/yyyy') : 'N/A',
+            total_sanction: project.grant?.totalAmount ? project.grant.totalAmount.toLocaleString('en-IN') : 'N/A',
             phase_number: toWords(previousPhaseNumber),
             previous_phase_amount: previousPhase?.amount.toLocaleString('en-IN') || 'N/A',
             previous_phase_award_date: previousPhase?.disbursementDate ? format(parseISO(previousPhase.disbursementDate), 'dd/MM/yyyy') : 'N/A',
