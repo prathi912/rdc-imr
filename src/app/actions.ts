@@ -34,6 +34,7 @@ import { formatInTimeZone } from "date-fns-tz"
 import type * as z from "zod"
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
+import { generateOfficeNotingForm } from "./document-actions"
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -977,4 +978,240 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
     await batch.commit()
     await logActivity("INFO", "Completion request notification sent to admins", { projectId, projectTitle })
     return { success: true }
-  } catch (error: any
+  } catch (error: any) {
+    console.error("Error notifying admins for completion request:", error)
+    await logActivity("ERROR", "Failed to notify admins on completion request", {
+      projectId,
+      error: error.message,
+      stack: error.stack,
+    })
+    return { success: false, error: error.message || "Failed to notify admins for completion." }
+  }
+}
+
+export async function updateProjectWithRevision(projectId: string, revisedProposalUrl: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    await projectRef.update({
+      revisedProposalUrl,
+      status: 'Under Review',
+      revisionSubmissionDate: new Date().toISOString(),
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Failed to update project with revision." };
+  }
+}
+
+export async function updateProjectDuration(projectId: string, startDate: string, endDate: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    await projectRef.update({
+      projectStartDate: startDate,
+      projectEndDate: endDate,
+    });
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Failed to update project duration." };
+  }
+}
+
+export async function updateProjectEvaluators(projectId: string, evaluatorUids: string[]): Promise<{ success: boolean; error?: string }> {
+    try {
+        const projectRef = adminDb.collection("projects").doc(projectId);
+        await projectRef.update({ 'meetingDetails.assignedEvaluators': evaluatorUids });
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message || "Failed to update evaluators." };
+    }
+}
+
+export async function updateCoInvestigators(projectId: string, coPiUids: string[]): Promise<{ success: boolean; error?: string }> {
+    try {
+        const projectRef = adminDb.collection("projects").doc(projectId);
+        const userDocs = await Promise.all(coPiUids.map(uid => adminDb.collection('users').doc(uid).get()));
+        const coPiDetails = userDocs.map(doc => {
+            const data = doc.data() as User;
+            return {
+                uid: doc.id,
+                name: data.name,
+                email: data.email,
+            }
+        });
+
+        await projectRef.update({
+            coPiUids,
+            coPiDetails
+        });
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message || "Failed to update Co-PIs." };
+    }
+}
+
+
+export async function addGrantPhase(projectId: string, name: string, amount: number, installmentRefNumber: string): Promise<{ success: boolean, updatedProject?: Project, error?: string }> {
+    try {
+        const projectRef = adminDb.collection("projects").doc(projectId);
+        const newPhase: GrantPhase = {
+            id: new Date().toISOString(),
+            name,
+            amount,
+            status: "Pending Disbursement",
+            transactions: [],
+            installmentRefNumber,
+        };
+
+        await projectRef.update({
+            'grant.phases': FieldValue.arrayUnion(newPhase)
+        });
+
+        const updatedDoc = await projectRef.get();
+        const updatedProject = { id: updatedDoc.id, ...updatedDoc.data() } as Project;
+
+        return { success: true, updatedProject };
+    } catch (error: any) {
+        return { success: false, error: error.message || "Failed to add new phase." };
+    }
+}
+
+export async function addTransaction(projectId: string, phaseId: string, transaction: Omit<Transaction, 'id'> & { invoiceDataUrl: string, invoiceFileName: string }): Promise<{ success: boolean, updatedProject?: Project, error?: string }> {
+  try {
+    console.log("Server: addTransaction started for phase", phaseId);
+    const { invoiceDataUrl, invoiceFileName, ...transactionData } = transaction;
+
+    const filePath = `invoices/${projectId}/${phaseId}/${invoiceFileName}`;
+    console.log("Server: Uploading file to", filePath);
+    const result = await uploadFileToServer(invoiceDataUrl, filePath);
+    console.log("Server: Upload result", result);
+
+    if (!result.success || !result.url) {
+      throw new Error(result.error || "Invoice upload failed.");
+    }
+    
+    const newTransaction: Transaction = {
+      ...transactionData,
+      id: new Date().toISOString(),
+      phaseId,
+      invoiceUrl: result.url,
+    };
+    
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    
+    console.log("Server: Running transaction to update project...");
+    const updatedProject = await adminDb.runTransaction(async (t) => {
+        const doc = await t.get(projectRef);
+        if (!doc.exists) {
+            throw "Project not found!";
+        }
+        const project = doc.data() as Project;
+        const grant = project.grant;
+        if (!grant) {
+            throw "Grant not found on project!";
+        }
+
+        const phaseIndex = grant.phases.findIndex(p => p.id === phaseId);
+        if (phaseIndex === -1) {
+            throw "Phase not found!";
+        }
+
+        grant.phases[phaseIndex].transactions = [...(grant.phases[phaseIndex].transactions || []), newTransaction];
+
+        t.update(projectRef, { grant: grant });
+        return { id: doc.id, ...doc.data(), grant: grant } as Project;
+    });
+    
+    console.log("Server: Transaction complete.");
+    return { success: true, updatedProject };
+  } catch (error: any) {
+    console.error("Server error in addTransaction:", error);
+    return { success: false, error: error.message || "Failed to add transaction." };
+  }
+}
+
+export async function updatePhaseStatus(projectId: string, phaseId: string, newStatus: GrantPhase['status']): Promise<{ success: boolean, updatedProject?: Project, error?: string }> {
+    try {
+        const projectRef = adminDb.collection("projects").doc(projectId);
+        const updatedProject = await adminDb.runTransaction(async (t) => {
+            const doc = await t.get(projectRef);
+            if (!doc.exists) throw "Project not found!";
+            
+            const project = doc.data() as Project;
+            const grant = project.grant;
+            if (!grant) throw "Grant not found!";
+            
+            const phaseIndex = grant.phases.findIndex(p => p.id === phaseId);
+            if (phaseIndex === -1) throw "Phase not found!";
+            
+            grant.phases[phaseIndex].status = newStatus;
+            if (newStatus === 'Disbursed') {
+                grant.phases[phaseIndex].disbursementDate = new Date().toISOString();
+            }
+             if (newStatus === 'Utilization Submitted') {
+                grant.phases[phaseIndex].utilizationSubmissionDate = new Date().toISOString();
+            }
+
+            t.update(projectRef, { grant: grant });
+            return { id: doc.id, ...project, grant };
+        });
+        return { success: true, updatedProject };
+    } catch (error: any) {
+        return { success: false, error: error.message || "Failed to update phase status." };
+    }
+}
+
+export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, userUid: string): Promise<{ success: boolean; projects?: Project[] }> {
+    const projectsRef = collection(db, "projects");
+    const q = query(
+        projectsRef,
+        where('pi_uid', '==', userUid),
+        where('status', '==', 'Under Review'),
+        where('meetingDetails.assignedEvaluators', 'array-contains', evaluatorUid)
+    );
+    const snapshot = await getDocs(q);
+    const projects = snapshot.docs.map(doc => doc.data() as Project);
+    return { success: true, projects };
+}
+
+
+export async function markImrAttendance(projectsInMeeting: {projectId: string, piUid: string}[], absentPiUids: string[], absentEvaluatorUids: string[], meetingDetails: any): Promise<{ success: boolean; error?: string }> {
+    try {
+        const batch = adminDb.batch();
+
+        for (const proj of projectsInMeeting) {
+            if (absentPiUids.includes(proj.piUid)) {
+                const projectRef = adminDb.collection('projects').doc(proj.projectId);
+                batch.update(projectRef, {
+                    wasAbsent: true,
+                });
+            }
+        }
+        
+        if (absentEvaluatorUids.length > 0 && meetingDetails) {
+            // Find all projects in the same meeting to update them all
+            const projectsRef = adminDb.collection('projects');
+            const q = query(projectsRef, 
+                where('meetingDetails.date', '==', meetingDetails.date),
+                where('meetingDetails.time', '==', meetingDetails.time),
+                where('meetingDetails.venue', '==', meetingDetails.venue)
+            );
+            const snapshot = await getDocs(q);
+            snapshot.forEach(doc => {
+                batch.update(doc.ref, {
+                    'meetingDetails.absentEvaluators': FieldValue.arrayUnion(...absentEvaluatorUids)
+                });
+            });
+        }
+
+        await batch.commit();
+        await logActivity('INFO', 'IMR meeting attendance marked', { projectsInMeeting, absentPiUids, absentEvaluatorUids });
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error marking IMR attendance:", error);
+        await logActivity('ERROR', 'Failed to mark IMR attendance', {
+            error: error.message,
+            stack: error.stack
+        });
+        return { success: false, error: "Failed to update attendance." };
+    }
+}
