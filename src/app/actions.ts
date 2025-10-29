@@ -59,6 +59,34 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
   }
 }
 
+export async function isEmailDomainAllowed(email: string): Promise<{ allowed: boolean; isCro: boolean, croFaculty: string | null }> {
+    try {
+        const settings = await getSystemSettings();
+        const allowedDomains = settings.allowedDomains || ['@paruluniversity.ac.in', '@goa.paruluniversity.ac.in'];
+        const croAssignments = settings.croAssignments || [];
+
+        // Special case for primary super admin
+        if (email === 'rathipranav07@gmail.com') {
+            return { allowed: true, isCro: false, croFaculty: null };
+        }
+        
+        const isAllowed = allowedDomains.some(domain => email.endsWith(domain));
+        
+        const matchingAssignment = croAssignments.find(assignment => email.toLowerCase() === assignment.email.toLowerCase());
+
+        if (matchingAssignment) {
+            return { allowed: isAllowed, isCro: true, croFaculty: matchingAssignment.faculty };
+        }
+
+        return { allowed: isAllowed, isCro: false, croFaculty: null };
+    } catch (error) {
+        console.error('Error checking email domain:', error);
+        // Fallback to original domains on error
+        const defaultAllowed = email.endsWith('@paruluniversity.ac.in') || email.endsWith('@goa.paruluniversity.ac.in');
+        return { allowed: defaultAllowed, isCro: false, croFaculty: null };
+    }
+}
+
 export async function deleteImrProject(
   projectId: string,
   reason: string,
@@ -365,7 +393,7 @@ export async function verifyLoginOtp(email: string, otp: string): Promise<{ succ
     return { success: true }
   } catch (error: any) {
     console.error("Error verifying OTP:", error)
-    return { success: false, error: "An unexpected error occurred during verification." }
+    return { success: false, error: "An unexpected error occurred during OTP verification." }
   }
 }
 
@@ -976,8 +1004,6 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
     })
 
     await batch.commit()
-    await logActivity("INFO", "Completion request notification sent to admins", { projectId, projectTitle })
-    return { success: true }
   } catch (error: any) {
     console.error("Error notifying admins for completion request:", error)
     await logActivity("ERROR", "Failed to notify admins on completion request", {
@@ -1161,7 +1187,7 @@ export async function updatePhaseStatus(projectId: string, phaseId: string, newS
 }
 
 export async function fetchEvaluatorProjectsForUser(evaluatorUid: string, userUid: string): Promise<{ success: boolean; projects?: Project[] }> {
-    const projectsRef = collection(db, "projects");
+    const projectsRef = adminDb.collection("projects");
     const q = query(
         projectsRef,
         where('pi_uid', '==', userUid),
@@ -1215,3 +1241,7 @@ export async function markImrAttendance(projectsInMeeting: {projectId: string, p
         return { success: false, error: "Failed to update attendance." };
     }
 }
+
+    
+
+    
