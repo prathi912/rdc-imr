@@ -10,7 +10,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { awardInitialGrant, addGrantPhase, addTransaction, updatePhaseStatus } from "@/app/grant-actions"
+import { addGrantPhase, addTransaction, updatePhaseStatus } from "@/app/grant-actions"
+import { generateInstallmentOfficeNoting } from "@/app/document-actions"
 import { useState } from "react"
 import {
   DollarSign,
@@ -64,6 +65,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [isAddPhaseOpen, setIsAddPhaseOpen] = useState(false)
   const [isTransactionOpen, setIsTransactionOpen] = useState(false)
   const [currentPhaseId, setCurrentPhaseId] = useState<string | null>(null)
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const grant = project.grant
   if (!grant) return null
@@ -154,6 +156,49 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     XLSX.utils.book_append_sheet(workbook, worksheet, "Transactions")
     XLSX.writeFile(workbook, `${project.title.replace(/\s+/g, "_")}_${phase.name.replace(/\s+/g, "_")}_Transactions.xlsx`)
   }
+  
+  const handleDownloadNoting = async () => {
+    const values = phaseForm.getValues();
+    const isValid = await phaseForm.trigger();
+    if (!isValid) {
+        toast({ variant: 'destructive', title: 'Invalid Data', description: 'Please fill in the required fields correctly.' });
+        return;
+    }
+    
+    setIsDownloading(true);
+    try {
+        const result = await generateInstallmentOfficeNoting(project.id, {
+            installmentRefNumber: values.installmentRefNumber,
+            amount: values.amount,
+        });
+
+        if (result.success && result.fileData) {
+            const byteCharacters = atob(result.fileData);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Office_Note_Installment_${project.pi.replace(/\s+/g, '_')}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            toast({ title: "Download Started" });
+        } else {
+            throw new Error(result.error || "Failed to generate document.");
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Download Failed', description: error.message });
+    } finally {
+        setIsDownloading(false);
+    }
+  };
 
   const handleAddPhase = async (values: z.infer<typeof addPhaseSchema>) => {
     setIsSubmitting(true);
@@ -311,7 +356,12 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     />
                   </form>
                 </Form>
-                <DialogFooter>
+                <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={handleDownloadNoting} disabled={isDownloading}>
+                    {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
+                    Download Office Note
+                  </Button>
+                  <div className="flex-grow"></div>
                   <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                   </DialogClose>
@@ -335,6 +385,9 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const utilizationPercentage = phase.amount > 0 ? (totalUtilized / phase.amount) * 100 : 0;
           const hasReachedThreshold = utilizationPercentage >= 80;
           const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1));
+          
+          const canRequestNextPhase = isPI && phase.status === 'Disbursed' && hasReachedThreshold && hasRemainingGrant;
+
 
           return (
             <Card key={phase.id} className="bg-muted/30">
@@ -505,13 +558,13 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   </div>
                 )}
 
-                 {isPI && phase.status === 'Disbursed' && hasReachedThreshold && hasRemainingGrant && (
+                 {canRequestNextPhase && (
                   <div className="mt-4 flex justify-end">
                     <Button
                       onClick={() => handlePhaseStatusUpdate(phase.id, 'Utilization Submitted')}
                       disabled={isSubmitting}
                     >
-                      Submit Utilization &amp; Request Next Phase
+                      Submit Utilization & Request Next Phase
                     </Button>
                   </div>
                 )}

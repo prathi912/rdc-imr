@@ -1,5 +1,3 @@
-
-
 'use server';
 
 import fs from 'fs';
@@ -468,4 +466,60 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
     }
     return { success: false, error: error.message || 'Failed to generate the form.' };
   }
+}
+
+export async function generateInstallmentOfficeNoting(
+  projectId: string,
+  phaseData: { installmentRefNumber: string; amount: number; }
+): Promise<{ success: boolean; fileData?: string; error?: string }> {
+    try {
+        const projectRef = adminDb.collection('projects').doc(projectId);
+        const projectSnap = await projectRef.get();
+        if (!projectSnap.exists()) {
+            return { success: false, error: "Project not found." };
+        }
+        const project = projectSnap.data() as Project;
+        
+        const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Template_Office_Note_IMR_Instalment.docx";
+        const response = await fetch(TEMPLATE_URL, { cache: 'no-store' });
+        if (!response.ok) {
+            return { success: false, error: 'Office Note template could not be loaded.' };
+        }
+        const content = Buffer.from(await response.arrayBuffer());
+
+        const zip = new PizZip(content);
+        const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => "" });
+        
+        const previousPhase = project.grant?.phases[project.grant.phases.length - 1];
+        const previousPhaseNumber = project.grant?.phases.length || 0;
+
+        const data = {
+            Instalment_Reference: phaseData.installmentRefNumber,
+            date: format(new Date(), 'dd/MM/yyyy'),
+            PI_name: project.pi,
+            sanction_reference: project.grant?.sanctionNumber || 'N/A',
+            date_sanction: project.grant?.phases[0].disbursementDate ? format(parseISO(project.grant.phases[0].disbursementDate), 'dd/MM/yyyy') : 'N/A',
+            total_sanction: project.grant?.totalAmount.toLocaleString('en-IN') || 'N/A',
+            phase_number: toWords(previousPhaseNumber),
+            previous_phase_amount: previousPhase?.amount.toLocaleString('en-IN') || 'N/A',
+            previous_phase_award_date: previousPhase?.disbursementDate ? format(parseISO(previousPhase.disbursementDate), 'dd/MM/yyyy') : 'N/A',
+            midterm_review_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
+            next_phase_number: toWords(previousPhaseNumber + 1),
+            next_phase_amount: phaseData.amount.toLocaleString('en-IN'),
+        };
+
+        doc.setData(data);
+        doc.render();
+
+        const buf = doc.getZip().generate({ type: 'nodebuffer' });
+        const base64 = buf.toString('base64');
+        return { success: true, fileData: base64 };
+
+    } catch (error: any) {
+        console.error("Error generating installment office noting:", error);
+        if (error.properties && error.properties.errors) {
+            console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
+        }
+        return { success: false, error: error.message || 'Failed to generate the form.' };
+    }
 }
