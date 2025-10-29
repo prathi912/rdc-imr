@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -240,7 +241,9 @@ export default function ScheduleMeetingPage() {
           pi_email: p.pi_email 
       }));
 
-    const result = await scheduleMeeting(projectsToSchedule, meetingDetails);
+    const isMidTermReview = activeTab === 'mid-term-review';
+
+    const result = await scheduleMeeting(projectsToSchedule, meetingDetails, isMidTermReview);
 
     if (result.success) {
       toast({ title: 'Meeting Scheduled!', description: 'The meeting has been scheduled and PIs have been notified.' });

@@ -729,15 +729,18 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
 export async function scheduleMeeting(
   projectsToSchedule: { id: string; pi_uid: string; title: string; pi_email?: string }[],
   meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[] },
+  isMidTermReview: boolean = false,
 ) {
   try {
     const batch = adminDb.batch()
     const timeZone = "Asia/Kolkata"
-    // Combine date and time into a single string for robust parsing
     const meetingDateTimeString = `${meetingDetails.date}T${meetingDetails.time}:00`
 
     const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")
     const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")
+
+    const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting"
+    const subjectPrefix = isMidTermReview ? "Mid-term Review" : "IMR Meeting"
 
     for (const projectData of projectsToSchedule) {
       const projectRef = adminDb.collection("projects").doc(projectData.id)
@@ -755,7 +758,7 @@ export async function scheduleMeeting(
       batch.set(notificationRef, {
         uid: projectData.pi_uid,
         projectId: projectData.id,
-        title: `IMR meeting scheduled for your project: "${projectData.title}"`,
+        title: `${subjectPrefix} scheduled for your project: "${projectData.title}"`,
         createdAt: new Date().toISOString(),
         isRead: false,
       })
@@ -763,13 +766,13 @@ export async function scheduleMeeting(
       if (projectData.pi_email) {
         await sendEmailUtility({
           to: projectData.pi_email,
-          subject: `IMR Meeting Scheduled for Your Project: ${projectData.title}`,
+          subject: `${subjectPrefix} Scheduled for Your Project: ${projectData.title}`,
           html: `
             <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
               <p style="color: #ffffff;">Dear Researcher,</p>
               <p style="color: #e0e0e0;">
-                An <strong style="color: #ffffff;">IMR evaluation meeting</strong> has been scheduled for your project, 
+                An <strong style="color: #ffffff;">${meetingType}</strong> has been scheduled for your project, 
                 "<strong style="color: #ffffff;">${projectData.title}</strong>".
               </p>
               <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
@@ -813,13 +816,13 @@ export async function scheduleMeeting(
           if (evaluator.email) {
             await sendEmailUtility({
               to: evaluator.email,
-              subject: "IMR Evaluation Committee Assignment",
+              subject: `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term Review' : 'New Submission'})`,
               html: `
                 <div ${EMAIL_STYLES.background}>
                     ${EMAIL_STYLES.logo}
                     <p style="color: #ffffff;">Dear Evaluator,</p>
                     <p style="color: #e0e0e0;">
-                        You have been assigned to the IMR evaluation committee for a meeting with the following details. You are requested to be present.
+                        You have been assigned to an <strong style="color:#ffffff;">${meetingType}</strong> committee with the following details. You are requested to be present.
                     </p>
                     <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
                     <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
@@ -845,7 +848,7 @@ export async function scheduleMeeting(
     }
 
     await batch.commit()
-    await logActivity("INFO", "IMR meeting scheduled", {
+    await logActivity("INFO", `IMR ${isMidTermReview ? 'mid-term review' : ''} meeting scheduled`, {
       projectIds: projectsToSchedule.map((p) => p.id),
       meetingDate: meetingDetails.date,
     })
@@ -1623,7 +1626,7 @@ export async function generateOfficeNotingForm(
   try {
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
-    if (!projectSnap.exists()) {
+    if (!projectSnap.exists) {
       return { success: false, error: "Project not found." }
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project
@@ -1831,3 +1834,38 @@ export async function addTransaction(...args: Parameters<typeof import('./grant-
     const { addTransaction: originalAddTransaction } = await import('./grant-actions');
     return originalAddTransaction(...args);
 }
+
+export async function notifySuperAdminsOnNewUser(userName: string, role: string) {
+  try {
+    const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
+    if (superAdminUsersSnapshot.empty) {
+      console.log("No Super-admin users found to notify for new user.");
+      return;
+    }
+
+    const batch = adminDb.batch();
+    const notificationTitle = `New ${role} signed up: ${userName}`;
+
+    superAdminUsersSnapshot.forEach((userDoc) => {
+      const notificationRef = adminDb.collection("notifications").doc();
+      batch.set(notificationRef, {
+        uid: userDoc.id,
+        title: notificationTitle,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+      });
+    });
+
+    await batch.commit();
+    await logActivity("INFO", "New user notification sent to super-admins", { userName, role });
+  } catch (error: any) {
+    console.error("Error notifying Super-admins about new user:", error);
+    await logActivity("ERROR", "Failed to notify super-admins on new user", {
+      userName,
+      role,
+      error: error.message,
+      stack: error.stack,
+    });
+  }
+}
+
