@@ -203,7 +203,7 @@ export type ApprovalStage = {
   timestamp: string; // ISO string
   comments: string;
   approvedAmount: number;
-  stage: number; // 1, 2, or 3
+  stage: number; // 1, 2, 3 or 4
   verifiedFields?: { [key: string]: boolean };
 };
 
@@ -219,7 +219,7 @@ export type IncentiveClaim = {
   userName: string
   userEmail: string
   claimId?: string; // Standardized, sequential ID like RDC/IC/PAPER/0001
-  status: "Pending" | "Accepted" | "Rejected" | "Draft" | "Pending Stage 1 Approval" | "Pending Stage 2 Approval" | "Pending Stage 3 Approval" | "Submitted to Accounts" | "Payment Completed";
+  status: "Pending" | "Accepted" | "Rejected" | "Draft" | "Pending Stage 1 Approval" | "Pending Stage 2 Approval" | "Pending Stage 3 Approval" | "Pending Stage 4 Approval" | "Submitted to Accounts" | "Payment Completed";
   submissionDate: string // ISO String
   faculty: string
   bankDetails?: UserBankDetails
@@ -509,6 +509,7 @@ export type SystemSettings = {
   imrMidTermReviewMonths?: number;
   imrEvaluationDays?: number;
   utilizationNotificationEmail?: string;
+  dndEmail?: string;
 }
 
 export type LoginOtp = {

@@ -1,6 +1,7 @@
 'use server';
 
 import nodemailer from 'nodemailer';
+import { getSystemSettings } from '@/app/actions';
 
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
@@ -48,6 +49,17 @@ interface EmailOptions {
 }
 
 export async function sendEmail({ to, subject, html, attachments, from = 'default' }: EmailOptions) {
+  // DND Check
+  try {
+    const settings = await getSystemSettings();
+    if (settings.dndEmail && to.toLowerCase() === settings.dndEmail.toLowerCase()) {
+        console.log(`Email to ${to} blocked due to DND setting.`);
+        return { success: true, message: 'Email blocked by DND setting.' };
+    }
+  } catch (e) {
+    console.error("Could not fetch system settings to check DND, proceeding to send email.", e);
+  }
+
   const isDefaultConfigured = GMAIL_USER && GMAIL_APP_PASSWORD;
   const isRdcConfigured = RDC_EMAIL && RDC_PASSWORD;
   

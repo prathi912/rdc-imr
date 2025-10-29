@@ -36,7 +36,7 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock, Mail } from "lucide-react"
+import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock, Mail, BellOff } from "lucide-react"
 import { Combobox } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -781,6 +781,22 @@ export default function SettingsPage() {
                         ))}
                     </div>
                 </div>
+              
+              <div className="space-y-4 rounded-lg border p-4">
+                <div className="flex items-center gap-2">
+                    <BellOff className="h-5 w-5" />
+                    <Label className="text-base">Do Not Disturb (DND) Email</Label>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                    The email address entered here will be excluded from all automated system email notifications.
+                </p>
+                <Input 
+                    placeholder="dnd.user@paruluniversity.ac.in"
+                    defaultValue={systemSettings.dndEmail || ''}
+                    onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })}
+                    disabled={isSavingSettings}
+                />
+              </div>
 
               <div className="space-y-4">
                 <Label className="text-base">Allowed Email Domains</Label>
