@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -80,7 +79,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Checkbox } from "../ui/checkbox"
 
 interface ProjectDetailsClientProps {
   project: Project
@@ -429,7 +428,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     return !isBefore(today, meetingDate) && !isAfter(today, deadline);
   }, [project.meetingDetails?.date, systemSettings]);
   
-  const showEvaluationForm = user && project.status === "Under Review" && isAssignedEvaluator && isEvaluationPeriodActive;
+  const showEvaluationForm = user && 
+    project.status === "Under Review" && 
+    isAssignedEvaluator && 
+    isEvaluationPeriodActive &&
+    project.submissionDate < (project.meetingDetails?.date || '2000-01-01'); // Only show for initial submission review, not mid-term.
 
 
   const assignedEvaluatorsCount = project.meetingDetails?.assignedEvaluators?.length ?? 0;
@@ -1729,3 +1732,5 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
+
+    
