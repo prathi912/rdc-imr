@@ -34,6 +34,7 @@ import { formatInTimeZone } from "date-fns-tz"
 import type * as z from "zod"
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
+import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -57,6 +58,8 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
     console.error("Original Log Entry:", { level, message, context })
   }
 }
+
+export { awardInitialGrant, addGrantPhase, updatePhaseStatus };
 
 export async function deleteImrProject(
   projectId: string,
@@ -1825,4 +1828,8 @@ export async function markImrAttendance(
     return { success: false, error: "Failed to update attendance." };
   }
 }
-export { addGrantPhase, addTransaction, updatePhaseStatus } from './grant-actions';
+
+export async function addTransaction(...args: Parameters<typeof import('./grant-actions').addTransaction>) {
+    const { addTransaction: originalAddTransaction } = await import('./grant-actions');
+    return originalAddTransaction(...args);
+}

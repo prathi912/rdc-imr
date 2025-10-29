@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import type React from "react"
@@ -15,7 +16,7 @@ import type { Project, User, GrantDetails, Evaluation, GrantPhase, SystemSetting
 import { db } from "@/lib/config"
 import { doc, updateDoc, addDoc, collection, getDoc, getDocs, where, query } from "firebase/firestore"
 import {
-  uploadFileToServer,
+  awardInitialGrant,
   updateProjectStatus,
   updateProjectWithRevision,
   updateProjectDuration,
@@ -273,7 +274,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const { toast } = useToast()
   const router = useRouter()
   const [sanctionNumber, setSanctionNumber] = useState("")
-  const [phaseName, setPhaseName] = useState("Phase 1")
+  const [installmentRefNumber, setInstallmentRefNumber] = useState("");
   const [phaseAmount, setPhaseAmount] = useState<number | "">("")
   const [isAwarding, setIsAwarding] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -304,10 +305,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const durationForm = useForm<DurationFormData>({
     resolver: zodResolver(durationSchema),
-    defaultValues: {
-      startDate: initialProject.projectStartDate ? format(new Date(initialProject.projectStartDate), "yyyy-MM-dd") : "",
-      endDate: initialProject.projectEndDate ? format(new Date(initialProject.projectEndDate), "yyyy-MM-dd") : "",
-    }
   })
 
   const evaluatorForm = useForm<EvaluatorFormData>({
@@ -394,8 +391,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   useEffect(() => {
     durationForm.reset({
-      startDate: project.projectStartDate ? format(parseISO(project.projectStartDate), 'yyyy-MM-dd') : '',
-      endDate: project.projectEndDate ? format(parseISO(project.projectEndDate), 'yyyy-MM-dd') : '',
+      startDate: project.projectStartDate ? parseISO(project.projectStartDate) : undefined,
+      endDate: project.projectEndDate ? parseISO(project.projectEndDate) : undefined,
     })
     evaluatorForm.reset({
       evaluatorUids: project.meetingDetails?.assignedEvaluators || [],
@@ -409,7 +406,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid)
   const canViewDocuments = isPI || isCoPi || isAdmin || isAssignedEvaluator
 
-  // Check if user can view Co-PI CVs (evaluators on evaluation day or super admins always)
   const canViewCoPiCVs = useMemo(() => {
     if (!user) return false
     if (isSuperAdmin) return true
@@ -426,8 +422,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     const evaluationDays = systemSettings?.imrEvaluationDays ?? 0;
     const deadline = addDays(meetingDate, evaluationDays);
 
-    // The evaluation is active if today is on or after the meeting date,
-    // and on or before the deadline.
     return !isBefore(today, meetingDate) && !isAfter(today, deadline);
   }, [project.meetingDetails?.date, systemSettings]);
   
@@ -545,84 +539,53 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       return
     }
     if (!sanctionNumber || sanctionNumber.trim() === "") {
-      toast({
-        variant: "destructive",
-        title: "Sanction Number Required",
-        description: "Please enter the sanction number.",
-      })
-      return
+        toast({
+            variant: "destructive",
+            title: "Sanction Number Required",
+            description: "Please enter the overall project sanction number.",
+        });
+        return;
     }
+    if (!installmentRefNumber || installmentRefNumber.trim() === "") {
+        toast({
+            variant: "destructive",
+            title: "Installment Ref. Number Required",
+            description: "Please enter the reference number for this installment.",
+        });
+        return;
+    }
+
     setIsAwarding(true)
     try {
-      const projectRef = doc(db, "projects", project.id)
-
-      const newPhase: GrantPhase = {
-        id: new Date().toISOString(),
-        name: phaseName.trim(),
-        amount: phaseAmount,
-        status: "Pending Disbursement",
-        transactions: [],
-      }
-
-      const newGrant: GrantDetails = {
-        totalAmount: phaseAmount,
-        sanctionNumber: sanctionNumber.trim(),
-        status: "Awarded",
-        phases: [newPhase],
-        bankDetails: piUser?.bankDetails,
-      }
-
-      await updateDoc(projectRef, { grant: newGrant })
-
-      // In-app notification
-      await addDoc(collection(db, "notifications"), {
-        uid: project.pi_uid,
-        title: `Congratulations! Your project "${project.title}" has been awarded a grant.`,
-        projectId: project.id,
-        createdAt: new Date().toISOString(),
-        isRead: false,
-      })
+      const grantData = {
+          sanctionNumber: sanctionNumber.trim(),
+          amount: phaseAmount,
+          installmentRefNumber: installmentRefNumber.trim(),
+      };
       
-      // Email notification
-      if (project.pi_email) {
-          const emailHtml = `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-                <h2>Congratulations, ${project.pi}!</h2>
-                <p>We are pleased to inform you that your Intramural Research (IMR) project, <strong>"${project.title}"</strong>, has been sanctioned and a grant has been awarded.</p>
-                <h3>Grant Details:</h3>
-                <ul>
-                    <li><strong>Sanction Number:</strong> ${newGrant.sanctionNumber}</li>
-                    <li><strong>Total Amount:</strong> ₹${newGrant.totalAmount.toLocaleString('en-IN')}</li>
-                    <li><strong>Initial Phase:</strong> ${newPhase.name} (₹${newPhase.amount.toLocaleString('en-IN')})</li>
-                </ul>
-                <p>The first phase amount will be disbursed to your registered bank account shortly. You can now log your project expenses through the grant management section on the portal.</p>
-                <p>Thank you for your valuable contribution to research at Parul University.</p>
-                <br/>
-                <p>Best Regards,</p>
-                <p><strong>The R&D Cell Team</strong></p>
-            </div>
-          `;
-          await sendEmail({
-              to: project.pi_email,
-              subject: `Grant Awarded for Your IMR Project: ${project.title}`,
-              html: emailHtml,
-              from: 'default'
-          });
+      const result = await awardInitialGrant(
+        project.id,
+        grantData,
+        { uid: project.pi_uid, name: project.pi, email: project.pi_email },
+        project.title
+      );
+
+      if (result.success && result.updatedProject) {
+        onProjectUpdate(result.updatedProject); // This should trigger a re-render with new grant info
+        toast({
+          title: "Grant Awarded!",
+          description: `Phase 1 of the grant has been created.`,
+        });
+        setIsDialogOpen(false);
+        setPhaseAmount("");
+        setSanctionNumber("");
+        setInstallmentRefNumber("");
+      } else {
+        throw new Error(result.error || "Failed to award grant.");
       }
-
-
-      setProject({ ...project, grant: newGrant })
-      toast({
-        title: "Grant Awarded!",
-        description: `Phase 1 of the grant for ₹${phaseAmount.toLocaleString("en-IN")} has been created.`,
-      })
-      setIsDialogOpen(false)
-      setPhaseName("Phase 1")
-      setPhaseAmount("")
-      setSanctionNumber("")
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error awarding grant:", error)
-      toast({ variant: "destructive", title: "Error", description: "Failed to award grant." })
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to award grant." })
     } finally {
       setIsAwarding(false)
     }
@@ -750,18 +713,18 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const handleDurationSubmit = async (data: DurationFormData) => {
     setIsUpdating(true)
-    const result = await updateProjectDuration(project.id, new Date(data.startDate).toISOString(), new Date(data.endDate).toISOString())
+    const result = await updateProjectDuration(project.id, data.startDate.toISOString(), data.endDate.toISOString())
     if (result.success) {
       toast({ title: "Success", description: "Project duration has been updated." })
       setProject((prev) => ({
         ...prev,
-        projectStartDate: new Date(data.startDate).toISOString(),
-        projectEndDate: new Date(data.endDate).toISOString(),
+        projectStartDate: data.startDate.toISOString(),
+        projectEndDate: data.endDate.toISOString(),
       }))
       onProjectUpdate({
         ...project,
-        projectStartDate: new Date(data.startDate).toISOString(),
-        projectEndDate: new Date(data.endDate).toISOString(),
+        projectStartDate: data.startDate.toISOString(),
+        projectEndDate: data.endDate.toISOString(),
       })
       setIsDurationDialogOpen(false)
     } else {
@@ -912,14 +875,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                          <FormField name="startDate" control={durationForm.control} render={({ field }) => ( 
                            <FormItem className="flex flex-col">
                              <FormLabel>Start Date</FormLabel>
-                             <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2010} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} initialFocus /></PopoverContent></Popover>
+                             <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2010} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
                              <FormMessage />
                            </FormItem> 
                          )} />
                          <FormField name="endDate" control={durationForm.control} render={({ field }) => ( 
                           <FormItem className="flex flex-col">
                             <FormLabel>End Date</FormLabel>
-                              <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(parseISO(field.value), "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2010} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value ? parseISO(field.value) : undefined} onSelect={(date) => field.onChange(date?.toISOString().split('T')[0])} initialFocus /></PopoverContent></Popover>
+                              <Popover><PopoverTrigger asChild><FormControl><div><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></div></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2010} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
                             <FormMessage />
                           </FormItem> 
                          )} />
@@ -1088,26 +1051,26 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     <div className="grid gap-4 py-4">
                       <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="sanction-number" className="text-right">
-                          Sanction No.
+                            Sanction No.
                         </Label>
                         <Input
-                          id="sanction-number"
-                          value={sanctionNumber}
-                          onChange={(e) => setSanctionNumber(e.target.value)}
-                          className="col-span-3"
-                          placeholder="e.g., RDC/IMSL/122"
+                            id="sanction-number"
+                            value={sanctionNumber}
+                            onChange={(e) => setSanctionNumber(e.target.value)}
+                            className="col-span-3"
+                            placeholder="e.g., RDC/IMSL/122"
                         />
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="phase-name" className="text-right">
-                          Phase Name
+                        <Label htmlFor="installment-ref-number" className="text-right">
+                            Installment Ref. No.
                         </Label>
                         <Input
-                          id="phase-name"
-                          value={phaseName}
-                          onChange={(e) => setPhaseName(e.target.value)}
-                          className="col-span-3"
-                          placeholder="e.g., Phase 1 - Equipment"
+                            id="installment-ref-number"
+                            value={installmentRefNumber}
+                            onChange={(e) => setInstallmentRefNumber(e.target.value)}
+                            className="col-span-3"
+                            placeholder="e.g., RDC/CP/IMR/132"
                         />
                       </div>
                       <div className="grid grid-cols-4 items-center gap-4">
@@ -1125,7 +1088,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                       </div>
                     </div>
                     <DialogFooter>
-                      <Button type="button" variant="glass" onClick={handleAwardGrant} disabled={isAwarding}>
+                      <Button type="button" variant="ghost" onClick={handleAwardGrant} disabled={isAwarding}>
                         {isAwarding ? "Awarding..." : "Confirm & Award"}
                       </Button>
                     </DialogFooter>
@@ -1728,3 +1691,4 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
+

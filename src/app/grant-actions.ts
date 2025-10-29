@@ -60,7 +60,7 @@ export async function awardInitialGrant(
             phases: [newPhase],
         };
 
-        await projectRef.update({ grant: newGrant });
+        await projectRef.update({ grant: newGrant, status: 'In Progress' });
 
         const notification = {
             uid: pi.uid,
@@ -81,7 +81,7 @@ export async function awardInitialGrant(
                     <ul style="color:#e0e0e0; list-style-type: none; padding-left: 0;">
                         <li><strong>Project Sanction Number:</strong> ${newGrant.sanctionNumber}</li>
                         <li><strong>Phase 1 Installment Ref. No:</strong> ${newPhase.installmentRefNumber}</li>
-                        <li><strong>Total Sanctioned Amount:</strong> ₹${newGrant.totalAmount.toLocaleString('en-IN')}</li>
+                        <li><strong>Phase 1 Amount:</strong> ₹${newPhase.amount.toLocaleString('en-IN')}</li>
                     </ul>
                     <p style="color:#e0e0e0;">The first phase amount will be disbursed to your registered bank account shortly. You can now log your project expenses through the grant management section on the portal.</p>
                     ${EMAIL_STYLES.footer}
