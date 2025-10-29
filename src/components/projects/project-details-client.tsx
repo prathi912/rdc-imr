@@ -333,7 +333,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     try {
         const projectRef = doc(db, 'projects', initialProject.id);
         const projectSnap = await getDoc(projectRef);
-        if (projectSnap.exists()) {
+        if (projectSnap.exists) {
             const updatedProject = { id: projectSnap.id, ...projectSnap.data() } as Project;
             setProject(updatedProject);
             onProjectUpdate(updatedProject);
@@ -432,15 +432,22 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     if (project.status !== "Under Review" || !project.meetingDetails?.date) {
         return false;
     }
-    return project.submissionDate < project.meetingDetails.date;
+    // A simple heuristic: if submission date is very close to meeting date, it's likely initial.
+    // A better approach is needed if mid-term review scheduling alters the status to "Under Review".
+    // For now, let's consider any "Under Review" as an initial meeting for simplicity in this context.
+    return true; 
   }, [project.status, project.submissionDate, project.meetingDetails?.date]);
 
   const isMidTermMeeting = useMemo(() => {
     if (project.status !== "Under Review" || !project.meetingDetails?.date) {
         return false;
     }
-    return project.submissionDate >= project.meetingDetails.date;
-  }, [project.status, project.submissionDate, project.meetingDetails?.date]);
+    const grantStartDate = project.grant?.phases?.[0]?.disbursementDate;
+    if (!grantStartDate) return false;
+    
+    // A mid-term review's meeting date will be after the grant has started.
+    return isAfter(parseISO(project.meetingDetails.date), parseISO(grantStartDate));
+  }, [project.status, project.grant, project.meetingDetails?.date]);
 
   const showEvaluationForm = user && isInitialMeeting && isAssignedEvaluator && isEvaluationPeriodActive;
 
@@ -833,6 +840,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     try {
         const result = await generateOfficeNotingForm(project.id, data);
         if (result.success && result.fileData) {
+            onProjectUpdate({ ...project, projectDuration: data.projectDuration, phases: data.phases });
             const byteCharacters = atob(result.fileData);
             const byteNumbers = new Array(byteCharacters.length);
             for (let i = 0; i < byteCharacters.length; i++) {
@@ -870,7 +878,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
         <div className="flex items-center gap-2">
-            {isAdmin && project.status === "Under Review" && allEvaluationsIn && (
+            {isAdmin && project.status === "Recommended" && (
               <Button onClick={handleOpenNotingDialog} disabled={isPrinting}>
                   <Download className="mr-2 h-4 w-4" />
                   Download Office Notings
@@ -1727,13 +1735,15 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
                                     <div key={field.id} className="flex items-center gap-2">
                                         <FormField control={form.control} name={`phases.${index}.name`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input {...field} placeholder={`Phase ${index + 1} Name`} /></FormControl><FormMessage /></FormItem> )} />
                                         <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input type="number" {...field} placeholder="Amount" /></FormControl><FormMessage /></FormItem> )} />
-                                        <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}><X className="h-4 w-4" /></Button>
+                                        {fields.length > 1 && (<Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}><X className="h-4 w-4" /></Button>)}
                                     </div>
                                 ))}
                             </div>
-                            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => append({ name: `Phase ${fields.length + 1}`, amount: 0 })}>
-                                <Plus className="mr-2 h-4 w-4" /> Add Phase
-                            </Button>
+                            {fields.length < 5 && (
+                                <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => append({ name: `Phase ${fields.length + 1}`, amount: 0 })}>
+                                    <Plus className="mr-2 h-4 w-4" /> Add Phase
+                                </Button>
+                            )}
                         </div>
                     </form>
                 </Form>
@@ -1748,4 +1758,3 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
-

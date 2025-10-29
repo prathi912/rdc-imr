@@ -376,19 +376,19 @@ export async function exportClaimToExcel(
 
 // This parser is needed to handle both single `{}` and double `{{}}` braces in the same template.
 const angularParser = (tag: string) => {
+    // This will be used for tags like `{{name}}`
+    if (tag.startsWith('{{') && tag.endsWith('}}')) {
+        const innerTag = tag.substring(2, tag.length - 2);
+        return {
+            get: (scope: any) => scope[innerTag]
+        };
+    }
+    // This is the default parser for tags like `{name}`
     return {
-        get(scope: any, context: any) {
-            if (tag === '.') {
-                return scope;
-            }
-            if (context.scopePath.includes(tag)) {
-                return '[Circular]';
-            }
-            const newScopePath = [...context.scopePath, tag];
-            return context.scopeManager.getValue(tag.split('.'), { ...context, scopePath: newScopePath });
-        },
+        get: (scope: any) => scope[tag]
     };
 };
+
 
 export async function generateInstallmentOfficeNoting(
   projectId: string,
@@ -408,7 +408,7 @@ export async function generateInstallmentOfficeNoting(
     const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
-        parser: angularParser, // Use the custom parser
+        parser: angularParser,
     });
 
     const safeDate = (val?: string) => {
