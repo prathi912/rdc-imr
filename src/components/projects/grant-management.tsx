@@ -10,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { addGrantPhase, addTransaction, updatePhaseStatus } from "@/app/grant-actions"
+import { awardInitialGrant, addGrantPhase, addTransaction, updatePhaseStatus } from "@/app/grant-actions"
 import { useState } from "react"
 import {
   DollarSign,
@@ -49,40 +49,6 @@ interface GrantManagementProps {
   onUpdate: (updatedProject: Project) => void
 }
 
-const addPhaseSchema = z.object({
-  installmentRefNumber: z.string().min(3, "Installment Ref. No. is required."),
-  amount: z.coerce.number().positive("Amount must be a positive number."),
-})
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_FILE_TYPES = ["application/pdf"];
-
-const transactionSchema = z
-  .object({
-    dateOfTransaction: z.string().min(1, "Transaction date is required."),
-    amount: z.coerce.number().positive("Amount must be a positive number."),
-    vendorName: z.string().min(2, "Vendor name is required."),
-    isGstRegistered: z.boolean().default(false),
-    gstNumber: z.string().optional(),
-    description: z.string().min(10, "Description is required."),
-    invoice: z.any()
-      .refine((files) => files?.length > 0, "An invoice file is required.")
-      .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, `File size must be less than 5MB.`)
-      .refine((files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type), "Only .pdf files are accepted."),
-  })
-  .refine(
-    (data) => {
-      if (data.isGstRegistered) {
-        return !!data.gstNumber && data.gstNumber.length > 0
-      }
-      return true
-    },
-    {
-      message: "GST number is required for registered vendors.",
-      path: ["gstNumber"],
-    },
-  )
-  
 const fileToDataUrl = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -99,13 +65,52 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [isTransactionOpen, setIsTransactionOpen] = useState(false)
   const [currentPhaseId, setCurrentPhaseId] = useState<string | null>(null)
 
-  // Define roles for adding phases and changing status
+  const grant = project.grant
+  if (!grant) return null
+
+  const totalDisbursed = grant.phases?.reduce((acc, phase) => acc + phase.amount, 0) || 0;
+  const remainingAmount = grant.totalAmount - totalDisbursed;
+
+  const addPhaseSchema = z.object({
+    installmentRefNumber: z.string().min(3, "Installment Ref. No. is required."),
+    amount: z.coerce.number().positive("Amount must be a positive number.").max(remainingAmount, `Amount cannot exceed the remaining balance of ₹${remainingAmount.toLocaleString('en-IN')}.`),
+  })
+
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+  const ACCEPTED_FILE_TYPES = ["application/pdf"];
+
+  const transactionSchema = z
+    .object({
+      dateOfTransaction: z.string().min(1, "Transaction date is required."),
+      amount: z.coerce.number().positive("Amount must be a positive number."),
+      vendorName: z.string().min(2, "Vendor name is required."),
+      isGstRegistered: z.boolean().default(false),
+      gstNumber: z.string().optional(),
+      description: z.string().min(10, "Description is required."),
+      invoice: z.any()
+        .refine((files) => files?.length > 0, "An invoice file is required.")
+        .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, `File size must be less than 5MB.`)
+        .refine((files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type), "Only .pdf files are accepted."),
+    })
+    .refine(
+      (data) => {
+        if (data.isGstRegistered) {
+          return !!data.gstNumber && data.gstNumber.length > 0
+        }
+        return true
+      },
+      {
+        message: "GST number is required for registered vendors.",
+        path: ["gstNumber"],
+      },
+    )
+  
+
   const canAddPhase = user.role === "admin" || user.role === "Super-admin"
   const canChangeStatus = user.role === "admin" || user.role === "Super-admin"
   const isPI = user.uid === project.pi_uid || user.email === project.pi_email
   const isCoPi = project.coPiUids?.includes(user.uid) || false;
   const isAdmin = user.role === 'admin' || user.role === 'Super-admin';
-  const grant = project.grant
 
   const phaseForm = useForm<z.infer<typeof addPhaseSchema>>({
     resolver: zodResolver(addPhaseSchema),
@@ -151,7 +156,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   }
 
   const handleAddPhase = async (values: z.infer<typeof addPhaseSchema>) => {
-    if (!grant) return;
     setIsSubmitting(true);
     try {
       const result = await addGrantPhase(project.id, {
@@ -235,8 +239,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     }
   }
 
-  if (!grant) return null
-
   return (
     <Card className="mt-8">
       <CardHeader>
@@ -245,7 +247,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             <DollarSign className="h-6 w-6" />
             <CardTitle>Grant Management</CardTitle>
           </div>
-          {/* Only admins and Super-admins can add new phases */}
           {canAddPhase && (
             <Dialog open={isAddPhaseOpen} onOpenChange={setIsAddPhaseOpen}>
               <DialogTrigger asChild>
@@ -257,7 +258,11 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add New Grant Phase</DialogTitle>
-                  <DialogDescription>Define a new disbursement phase for this project.</DialogDescription>
+                  <DialogDescription>
+                    Define a new disbursement phase for this project.
+                    <br />
+                    <span className="font-semibold text-foreground">Remaining Grant Amount: ₹{remainingAmount.toLocaleString('en-IN')}</span>
+                  </DialogDescription>
                 </DialogHeader>
                 <Form {...phaseForm}>
                   <form
