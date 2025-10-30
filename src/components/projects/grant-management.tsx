@@ -388,8 +388,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const canAddExpense = (isPI || isCoPi || isAdmin) && phase.status === "Disbursed";
           
           const previousPhase = index > 0 ? grant.phases[index - 1] : null;
-          const showOfficeNoteButton = isAdmin && index > 0 && previousPhase?.status === 'Utilization Submitted';
-
+          const showOfficeNoteButton = isAdmin && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
 
           return (
             <Card key={phase.id} className="bg-muted/30">
