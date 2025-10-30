@@ -386,6 +386,9 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           
           const canRequestNextPhase = isPI && phase.status === "Disbursed" && hasReachedThreshold && hasRemainingGrant;
           const canAddExpense = (isPI || isCoPi || isAdmin) && phase.status === "Disbursed";
+          
+          const previousPhase = index > 0 ? grant.phases[index - 1] : null;
+          const showOfficeNoteButton = isAdmin && index > 0 && previousPhase?.status === 'Utilization Submitted';
 
 
           return (
@@ -431,7 +434,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
-                    {isAdmin && phase.installmentRefNumber && index > 0 && ( // Condition to show button only for phase 2 onwards
+                    {showOfficeNoteButton && (
                         <Button variant="outline" size="sm" onClick={() => handleDownloadPhaseNoting(phase)}>
                             <Download className="mr-2 h-4 w-4" /> Office Note
                         </Button>
@@ -475,7 +478,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         <FileText className="h-4 w-4" />
                         Transactions ({phase.transactions?.length || 0})
                         </h4>
-                        <div className="flex items-center gap-2">
+                         <div className="flex items-center gap-2">
                             {canAddExpense && (
                               <Button
                                 size="sm"
