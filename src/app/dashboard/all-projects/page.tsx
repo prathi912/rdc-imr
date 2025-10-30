@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -553,7 +552,7 @@ export default function AllProjectsPage() {
       </PageHeader>
       
       <div className="flex flex-col sm:flex-row flex-wrap items-center py-4 gap-2 sm:gap-4">
-        <Input placeholder="Filter by Title, PI, Email, or Sanction No..." value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); updateUrlParams({ q: event.target.value || undefined }); }} className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-xs" />
+        <Input placeholder="Filter by Title, PI, Email, or Sanction No..." value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); updateUrlParams({ q: event.target.value || undefined }); }} className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-md" />
         <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
             <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); updateUrlParams({ status: value === 'all' ? undefined : value }); }} disabled={activeTab === 'emr'}>
                 <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
@@ -674,4 +673,3 @@ export default function AllProjectsPage() {
     </>
   );
 }
-
