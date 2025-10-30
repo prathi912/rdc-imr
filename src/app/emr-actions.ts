@@ -112,14 +112,17 @@ export async function uploadFileToServer(
 
     const buffer = Buffer.from(base64Data, "base64");
 
+    // The modern, correct way to upload and get a public URL
     await file.save(buffer, {
       metadata: {
         contentType: mimeType,
       },
     });
 
+    // Make the file public
     await file.makePublic();
     
+    // Get the public URL
     const publicUrl = file.publicUrl();
 
     console.log(`File uploaded successfully to ${path}, URL: ${publicUrl}`);
@@ -132,6 +135,7 @@ export async function uploadFileToServer(
     return { success: false, error: error.message || "Failed to upload file." };
   }
 }
+
 
 export async function registerEmrInterest(
   callId: string,
@@ -1236,9 +1240,9 @@ export async function updateEmrInterestDetails(
     }
 }
 
-export async function signAndUploadEndorsement(interestId: string, signedEndorsementUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
+export async function signAndUploadEndorsement(interestId: string, signedEndorsementDataUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
     try {
-        if (!interestId || !signedEndorsementUrl) {
+        if (!interestId || !signedEndorsementDataUrl) {
             return { success: false, error: "Interest ID and signed endorsement form URL are required." };
         }
         
@@ -1250,7 +1254,7 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
         const interest = interestSnap.data() as EmrInterest;
         
         const path = `emr-endorsements/${interest.callId}/${interest.userId}/signed_${fileName}`;
-        const uploadResult = await uploadFileToServer(signedEndorsementUrl, path);
+        const uploadResult = await uploadFileToServer(signedEndorsementDataUrl, path);
 
         if (!uploadResult.success || !uploadResult.url) {
             throw new Error(uploadResult.error || "Failed to upload signed endorsement form.");
@@ -1270,8 +1274,7 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
                     ${EMAIL_STYLES.logo}
                     <p style="color:#ffffff;">Dear ${interest.userName},</p>
                     <p style="color:#e0e0e0;">Your endorsement form for the EMR call "<strong style="color:#ffffff;">${interest.callTitle || 'N/A'}</strong>" has been signed and uploaded by the RDC.</p>
-                    <p style="color:#e0e0e0;">You can now proceed to submit the application to the funding agency. Once submitted, please log the submission details on the portal.</p>
-                    <p style="color:#cccccc;">You can view the signed document in your EMR application details on the portal.</p>
+                    <p style="color:#e0e0e0;">The signed document is attached to this email for your records. You can now proceed to submit the application to the funding agency. Once submitted, please log the submission details on the portal.</p>
                     ${EMAIL_STYLES.footer}
                 </div>
             `;
@@ -1279,7 +1282,11 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
                 to: interest.userEmail,
                 subject: `Your EMR Endorsement Form is Ready`,
                 html: emailHtml,
-                from: 'default'
+                from: 'default',
+                attachments: [{
+                    filename: `Signed_Endorsement_${interest.userName.replace(/\s/g, '_')}.pdf`,
+                    path: uploadResult.url
+                }]
             });
         }
 
@@ -1392,4 +1399,5 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
     
 
     
+
 
