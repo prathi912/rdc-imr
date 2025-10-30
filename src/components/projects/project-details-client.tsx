@@ -1402,75 +1402,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         </CardContent>
       </Card>
 
-      {isAdmin &&
-        ["Recommended", "In Progress", "Completed", "Pending Completion Approval"].includes(project.status) && (
-          <Card className="mt-8">
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Banknote className="h-6 w-6" />
-                <CardTitle>PI Bank Details (for Grant Disbursement)</CardTitle>
-              </div>
-              <CardDescription>
-                These are the bank details provided by the Principal Investigator for grant payment.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {piUser?.bankDetails ? (
-                <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
-                  <div>
-                    <dt className="font-medium text-muted-foreground">Beneficiary Name</dt>
-                    <dd>{piUser.bankDetails.beneficiaryName}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-muted-foreground">Bank Name</dt>
-                    <dd>{piUser.bankDetails.bankName}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-muted-foreground">Account Number</dt>
-                    <dd>{piUser.bankDetails.accountNumber}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-muted-foreground">IFSC Code</dt>
-                    <dd>{piUser.bankDetails.ifscCode}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-muted-foreground">Branch</dt>
-                    <dd>{piUser.bankDetails.branchName}</dd>
-                  </div>
-                  <div>
-                    <dt className="font-medium text-muted-foreground">City</dt>
-                    <dd>{piUser.bankDetails.city}</dd>
-                  </div>
-                </dl>
-              ) : (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Bank Details Missing</AlertTitle>
-                  <AlertDescription>
-                    The Principal Investigator has not provided their bank details in their profile settings. Please ask
-                    them to update it to proceed with grant disbursement.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
       {canViewEvaluations && evaluations.length > 0 && user && (
           <EvaluationsSummary project={project} evaluations={evaluations} currentUser={user} />
       )}
       
-      {isPI && !canViewEvaluations && (
-          <Card className="mt-8">
-              <CardHeader>
-                  <CardTitle>Evaluation Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <p className="text-muted-foreground">{evaluations.length} of {project.meetingDetails?.assignedEvaluators?.length || 0} evaluations submitted.</p>
-              </CardContent>
-          </Card>
-      )}
-
       {showEvaluationForm && user && (
         <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchEvaluations} />
       )}
@@ -1679,3 +1614,4 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
+
