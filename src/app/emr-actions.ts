@@ -1269,11 +1269,16 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
         await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
         
         if (interest.userEmail) {
+            // Fetch the call title to ensure it's in the email
+            const callRef = adminDb.collection("fundingCalls").doc(interest.callId);
+            const callSnap = await callRef.get();
+            const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : interest.callTitle || 'N/A';
+
             const emailHtml = `
                 <div ${EMAIL_STYLES.background}>
                     ${EMAIL_STYLES.logo}
                     <p style="color:#ffffff;">Dear ${interest.userName},</p>
-                    <p style="color:#e0e0e0;">Your endorsement form for the EMR call "<strong style="color:#ffffff;">${interest.callTitle || 'N/A'}</strong>" has been signed and uploaded by the RDC.</p>
+                    <p style="color:#e0e0e0;">Your endorsement form for the EMR call "<strong style="color:#ffffff;">${callTitle}</strong>" has been signed and uploaded by the RDC.</p>
                     <p style="color:#e0e0e0;">You can now proceed to submit the application to the funding agency. Once submitted, please log the submission details on the portal.</p>
                     <p style="color:#cccccc;">The signed document is attached for your records and can also be viewed in your EMR application details on the portal.</p>
                     ${EMAIL_STYLES.footer}
@@ -1397,12 +1402,3 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
         return { success: false, error: "Failed to update attendance." };
     }
 }
-
-    
-
-    
-
-
-
-
-    
