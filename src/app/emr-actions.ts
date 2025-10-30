@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
@@ -91,45 +92,47 @@ export async function uploadFileToServer(
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     if (!fileDataUrl || typeof fileDataUrl !== "string") {
-      throw new Error("Invalid file data URL provided.")
+      throw new Error("Invalid file data URL provided.");
     }
 
-    const bucket = adminStorage.bucket()
-    const file = bucket.file(path)
+    const bucket = adminStorage.bucket();
+    const file = bucket.file(path);
 
-    // Extract mime type and base64 data from data URL
-    const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/)
+    const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/);
     if (!match || match.length < 3) {
-      throw new Error("Invalid data URL format.")
+      throw new Error("Invalid data URL format.");
     }
 
-    const mimeType = match[1]
-    const base64Data = match[2]
+    const mimeType = match[1];
+    const base64Data = match[2];
 
     if (!mimeType || !base64Data) {
-      throw new Error("Could not extract file data from data URL.")
+      throw new Error("Could not extract file data from data URL.");
     }
 
-    const buffer = Buffer.from(base64Data, "base64")
+    const buffer = Buffer.from(base64Data, "base64");
 
-    // Upload the file buffer
+    // The modern, correct way to upload and get a public URL
     await file.save(buffer, {
       metadata: {
         contentType: mimeType,
       },
-      public: true, // Make the file public
-    })
+    });
 
+    // Make the file public
+    await file.makePublic();
+    
     // Get the public URL
-    const downloadUrl = file.publicUrl()
+    const publicUrl = file.publicUrl();
 
-    console.log(`File uploaded successfully to ${path}, URL: ${downloadUrl}`)
+    console.log(`File uploaded successfully to ${path}, URL: ${publicUrl}`);
 
-    return { success: true, url: downloadUrl }
+    return { success: true, url: publicUrl };
+
   } catch (error: any) {
-    console.error("Error uploading file via admin:", error)
-    await logActivity("ERROR", "File upload failed", { path, error: error.message, stack: error.stack })
-    return { success: false, error: error.message || "Failed to upload file." }
+    console.error("Error uploading file via admin:", error);
+    await logActivity("ERROR", "File upload failed", { path, error: error.message, stack: error.stack });
+    return { success: false, error: error.message || "Failed to upload file." };
   }
 }
 
@@ -899,7 +902,7 @@ export async function uploadRevisedEmrPpt(
   interestId: string,
   pptDataUrl: string,
   originalFileName: string,
-  user: User,
+  userName: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId || !pptDataUrl) {
@@ -915,7 +918,7 @@ export async function uploadRevisedEmrPpt(
 
     // Standardize the filename
     const fileExtension = path.extname(originalFileName)
-    const standardizedName = `${user.name.replace(/\s+/g, "_")}_revised_${new Date().getTime()}${fileExtension}`
+    const standardizedName = `${userName.replace(/\s+/g, "_")}_revised_${new Date().getTime()}${fileExtension}`
 
     const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`
     const result = await uploadFileToServer(pptDataUrl, filePath)
@@ -924,18 +927,12 @@ export async function uploadRevisedEmrPpt(
       throw new Error(result.error || "Revised PPT upload failed.")
     }
 
-    const updateData: { revisedPptUrl: string; status?: string } = {
-        revisedPptUrl: result.url,
-    };
+    await interestRef.update({
+      revisedPptUrl: result.url,
+      status: "Revision Submitted",
+    })
 
-    // Only change status if the user is NOT a super admin
-    if (user.role !== 'Super-admin') {
-        updateData.status = "Revision Submitted";
-    }
-
-    await interestRef.update(updateData);
-
-    await logActivity("INFO", "Revised EMR presentation uploaded", { interestId, userId: interest.userId, uploader: user.uid })
+    await logActivity("INFO", "Revised EMR presentation uploaded", { interestId, userId: interest.userId })
     return { success: true }
   } catch (error: any) {
     console.error("Error uploading revised EMR presentation:", error)
