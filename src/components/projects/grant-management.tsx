@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useForm } from "react-hook-form"
@@ -476,16 +477,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         Transactions ({phase.transactions?.length || 0})
                       </h4>
                       <div className="flex items-center gap-2">
-                        {phase.transactions && phase.transactions.length > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleExportTransactions(phase)}
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Export Excel
-                          </Button>
-                        )}
                         {canAddExpense && (
                           <Button
                             size="sm"
@@ -496,6 +487,16 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                           >
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Add Expense
+                          </Button>
+                        )}
+                        {phase.transactions && phase.transactions.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExportTransactions(phase)}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export
                           </Button>
                         )}
                       </div>
