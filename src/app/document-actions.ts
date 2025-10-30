@@ -75,10 +75,18 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
     
-    // Fetch PI user data for additional details
     const piUserRef = adminDb.collection('users').doc(project.pi_uid);
     const piUserSnap = await piUserRef.get();
     const piUser = piUserSnap.exists ? (piUserSnap.data() as User) : null;
+
+    let coPi1User: User | null = null;
+    if (project.coPiDetails && project.coPiDetails.length > 0 && project.coPiDetails[0].uid) {
+        const coPi1UserRef = adminDb.collection('users').doc(project.coPiDetails[0].uid!);
+        const coPi1UserSnap = await coPi1UserRef.get();
+        if (coPi1UserSnap.exists) {
+            coPi1User = coPi1UserSnap.data() as User;
+        }
+    }
 
     const evaluationsRef = projectRef.collection('evaluations');
     const evaluationsSnap = await evaluationsRef.get();
@@ -107,15 +115,41 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
         return `${e.evaluatorName} (${e.recommendation}):\n${e.comments}`;
     }).join('\n\n');
 
+    const coPiData: { [key: string]: string } = {};
+    const coPiNames = project.coPiDetails?.map((c) => c.name) || [];
+    for (let i = 0; i < 4; i++) {
+      coPiData[`co-pi${i + 1}`] = coPiNames[i] || 'N/A';
+    }
+
+    const phaseData: { [key: string]: string } = {};
+    let totalAmount = project.grant?.totalAmount || 0;
+    const projectPhases = project.grant?.phases || project.phases || [];
+    for (let i = 0; i < 4; i++) {
+      if (projectPhases[i]) {
+        phaseData[`phase${i + 1}_amount`] = projectPhases[i].amount.toLocaleString("en-IN");
+      } else {
+        phaseData[`phase${i + 1}_amount`] = "N/A";
+      }
+    }
+
     const data = {
         pi_name: project.pi || 'N/A',
+        pi_designation: piUser?.designation || 'N/A',
+        pi_department: piUser?.department || project.departmentName || 'N/A',
+        pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || "N/A",
+        pi_email: project.pi_email || "N/A",
+        ...coPiData,
+        copi_designation: coPi1User?.designation || 'N/A', 
+        copi_department: coPi1User?.department || 'N/A',
         submission_date: project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : 'N/A',
         project_title: project.title || 'N/A',
+        project_duration: project.projectDuration || 'N/A',
         faculty: piUser?.faculty || project.faculty || 'N/A',
-        department: piUser?.department || project.departmentName || 'N/A',
         institute: piUser?.institute || project.institute || 'N/A',
         grant_amount: project.grant?.totalAmount.toLocaleString('en-IN') || 'N/A',
-        evaluator_comments: recommendationText || 'No evaluations submitted yet.'
+        evaluator_comments: recommendationText || 'No evaluations submitted yet.',
+        ...phaseData,
+        total_amount: totalAmount.toLocaleString('en-IN'),
     };
     
     doc.setData(data);
@@ -485,11 +519,12 @@ export async function generateOfficeNotingForm(
       }
     }
 
-    const templatePath = path.join(process.cwd(), "src", "templates", "IMR_OFFICE_NOTING_TEMPLATE.docx")
-    if (!fs.existsSync(templatePath)) {
-      return { success: false, error: "Office Notings form template not found on the server." }
+    const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/IMR_OFFICE_NOTING_TEMPLATE.docx";
+    const response = await fetch(TEMPLATE_URL);
+    if (!response.ok) {
+        return { success: false, error: "Office Notings form template not found on the server." };
     }
-    const content = fs.readFileSync(templatePath)
+    const content = Buffer.from(await response.arrayBuffer());
 
     const zip = new PizZip(content)
 
@@ -564,3 +599,5 @@ export async function generateOfficeNotingForm(
     return { success: false, error: error.message || "Failed to generate the form." }
   }
 }
+
+    
