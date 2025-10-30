@@ -399,8 +399,18 @@ export default function AllProjectsPage() {
       }
       if (facultyFilter.length > 0 && !facultyFilter.includes(project.faculty)) return false;
       if (!searchTerm) return true;
+      
       const lowerCaseSearch = searchTerm.toLowerCase();
-      return project.title.toLowerCase().includes(lowerCaseSearch) || project.pi.toLowerCase().includes(lowerCaseSearch);
+      const sanctionNumber = project.grant?.sanctionNumber || '';
+      const installmentRefNumbers = project.grant?.phases?.map(p => p.installmentRefNumber || '').join(' ') || '';
+
+      return (
+        project.title.toLowerCase().includes(lowerCaseSearch) ||
+        project.pi.toLowerCase().includes(lowerCaseSearch) ||
+        (project.pi_email && project.pi_email.toLowerCase().includes(lowerCaseSearch)) ||
+        (sanctionNumber && sanctionNumber.toLowerCase().includes(lowerCaseSearch)) ||
+        (installmentRefNumbers && installmentRefNumbers.toLowerCase().includes(lowerCaseSearch))
+      );
     });
   }, [allImrProjects, searchTerm, statusFilter, facultyFilter]);
   
@@ -543,7 +553,7 @@ export default function AllProjectsPage() {
       </PageHeader>
       
       <div className="flex flex-col sm:flex-row flex-wrap items-center py-4 gap-2 sm:gap-4">
-        <Input placeholder="Filter by title or PI..." value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); updateUrlParams({ q: event.target.value || undefined }); }} className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-xs" />
+        <Input placeholder="Filter by Title, PI, Email, or Sanction No..." value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); updateUrlParams({ q: event.target.value || undefined }); }} className="w-full sm:w-auto sm:flex-grow md:flex-grow-0 md:max-w-xs" />
         <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
             <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); updateUrlParams({ status: value === 'all' ? undefined : value }); }} disabled={activeTab === 'emr'}>
                 <SelectTrigger className="w-full sm:w-[220px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
