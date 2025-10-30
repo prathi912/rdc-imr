@@ -75,6 +75,11 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     }
     const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
     
+    // Fetch PI user data for additional details
+    const piUserRef = adminDb.collection('users').doc(project.pi_uid);
+    const piUserSnap = await piUserRef.get();
+    const piUser = piUserSnap.exists ? (piUserSnap.data() as User) : null;
+
     const evaluationsRef = projectRef.collection('evaluations');
     const evaluationsSnap = await evaluationsRef.get();
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
@@ -103,12 +108,12 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     }).join('\n\n');
 
     const data = {
-        pi_name: project.pi,
-        submission_date: new Date(project.submissionDate).toLocaleDateString(),
-        project_title: project.title,
-        faculty: project.faculty,
-        department: project.departmentName,
-        institute: project.institute,
+        pi_name: project.pi || 'N/A',
+        submission_date: project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : 'N/A',
+        project_title: project.title || 'N/A',
+        faculty: piUser?.faculty || project.faculty || 'N/A',
+        department: piUser?.department || project.departmentName || 'N/A',
+        institute: piUser?.institute || project.institute || 'N/A',
         grant_amount: project.grant?.totalAmount.toLocaleString('en-IN') || 'N/A',
         evaluator_comments: recommendationText || 'No evaluations submitted yet.'
     };
@@ -119,6 +124,9 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
       doc.render();
     } catch (error: any) {
       console.error('Docxtemplater render error:', error);
+      if (error.properties?.errors) {
+        console.error("Template errors:", JSON.stringify(error.properties.errors));
+      }
       return { success: false, error: 'Failed to render the document template.' };
     }
 
