@@ -57,7 +57,7 @@ export async function awardInitialGrant(
             id: new Date().toISOString() + `-${index}`,
             name: phase.name,
             amount: phase.amount,
-            installmentRefNumber: phase.installmentRefNumber,
+            installmentRefNumber: phase.installmentRefNumber || null,
             status: index === 0 ? "Pending Disbursement" : "Pending", // Only first phase is active
             transactions: [],
         }));
