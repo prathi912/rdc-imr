@@ -93,7 +93,7 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
   };
 
   const calculateUtilization = (project: Project) => {
-    if (!project.grant || !project.grant.totalAmount) {
+    if (!project.grant || !project.grant.totalAmount || !project.grant.phases) {
       return null;
     }
     const totalGrantAmount = project.grant.totalAmount;
