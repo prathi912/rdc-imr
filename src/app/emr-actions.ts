@@ -1274,12 +1274,14 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
                     ${EMAIL_STYLES.logo}
                     <p style="color:#ffffff;">Dear ${interest.userName},</p>
                     <p style="color:#e0e0e0;">Your endorsement form for the EMR call "<strong style="color:#ffffff;">${interest.callTitle || 'N/A'}</strong>" has been signed and uploaded by the RDC.</p>
-                    <p style="color:#e0e0e0;">The signed document is attached to this email for your records. You can now proceed to submit the application to the funding agency. Once submitted, please log the submission details on the portal.</p>
+                    <p style="color:#e0e0e0;">You can now proceed to submit the application to the funding agency. Once submitted, please log the submission details on the portal.</p>
+                    <p style="color:#cccccc;">The signed document is attached for your records and can also be viewed in your EMR application details on the portal.</p>
                     ${EMAIL_STYLES.footer}
                 </div>
             `;
             await sendEmailUtility({
                 to: interest.userEmail,
+                cc: interest.coPiEmails,
                 subject: `Your EMR Endorsement Form is Ready`,
                 html: emailHtml,
                 from: 'default',
@@ -1401,3 +1403,6 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
     
 
 
+
+
+    
