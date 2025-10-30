@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -115,7 +114,11 @@ function ProjectListTable({
                                         aria-label={`Select project ${project.title}`}
                                     />
                                     </TableCell>
-                                    <TableCell className="font-medium">{project.title}</TableCell>
+                                    <TableCell className="font-medium">
+                                        <Link href={`/dashboard/project/${project.id}`} className="hover:underline text-primary" target="_blank">
+                                            {project.title}
+                                        </Link>
+                                    </TableCell>
                                     <TableCell>
                                         <div>
                                             {piUser?.misId ? (
