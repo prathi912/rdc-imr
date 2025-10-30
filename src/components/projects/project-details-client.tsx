@@ -273,11 +273,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isUpdating, setIsUpdating] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
-  const [sanctionNumber, setSanctionNumber] = useState("")
-  const [totalSanctionAmount, setTotalSanctionAmount] = useState<number | ''>('');
-  const [installmentRefNumber, setInstallmentRefNumber] = useState("");
-  const [phaseAmount, setPhaseAmount] = useState<number | "">("")
-  const [isAwarding, setIsAwarding] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false)
   const [completionReportFile, setCompletionReportFile] = useState<File | null>(null)
@@ -294,6 +289,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isNotingDialogOpen, setIsNotingDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
+  const [isAwarding, setIsAwarding] = useState(false);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const isMobile = useIsMobile();
 
@@ -303,6 +299,17 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [coPiList, setCoPiList] = useState<{ uid: string; name: string }[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [isSavingCoPis, setIsSavingCoPis] = useState(false)
+
+  const awardGrantSchema = z.object({
+    sanctionNumber: z.string().min(1, "Sanction number is required."),
+    totalAmount: z.coerce.number().positive("Total amount must be a positive number."),
+    installmentRefNumber: z.string().min(1, "Installment reference number is required."),
+    amount: z.coerce.number().positive("Phase amount must be a positive number."),
+  });
+  
+  const awardGrantForm = useForm<z.infer<typeof awardGrantSchema>>({
+    resolver: zodResolver(awardGrantSchema),
+  });
 
   const durationForm = useForm<DurationFormData>({
     resolver: zodResolver(durationSchema),
@@ -547,73 +554,51 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     setIsSavingCoPis(false)
   }
 
-  const handleAwardGrant = async () => {
-    if (!totalSanctionAmount || totalSanctionAmount <= 0) {
-        toast({ variant: 'destructive', title: 'Invalid Amount', description: 'Please enter a valid total sanction amount.' });
-        return;
-    }
-    if (!phaseAmount || phaseAmount <= 0) {
-      toast({
-        variant: "destructive",
-        title: "Invalid Amount",
-        description: "Please enter a valid amount for the first installment.",
-      })
-      return
-    }
-    if (!sanctionNumber || sanctionNumber.trim() === "") {
-        toast({
-            variant: "destructive",
-            title: "Sanction Number Required",
-            description: "Please enter the overall project sanction number.",
-        });
-        return;
-    }
-    if (!installmentRefNumber || installmentRefNumber.trim() === "") {
-        toast({
-            variant: "destructive",
-            title: "Installment Ref. Number Required",
-            description: "Please enter the reference number for this installment.",
-        });
-        return;
-    }
-
+  const handleAwardGrantAndDownload = async (values: z.infer<typeof awardGrantSchema>) => {
     setIsAwarding(true)
     try {
-      const grantData = {
-          sanctionNumber: sanctionNumber.trim(),
-          totalAmount: totalSanctionAmount,
-          installmentRefNumber: installmentRefNumber.trim(),
-          amount: phaseAmount,
-      };
-      
-      const result = await awardInitialGrant(
-        project.id,
-        grantData,
-        { uid: project.pi_uid, name: project.pi, email: project.pi_email },
-        project.title
-      );
+        const result = await awardInitialGrant(
+            project.id,
+            values,
+            { uid: project.pi_uid, name: project.pi, email: project.pi_email },
+            project.title
+        );
 
-      if (result.success && result.updatedProject) {
-        onProjectUpdate(result.updatedProject); // This should trigger a re-render with new grant info
-        toast({
-          title: "Grant Awarded!",
-          description: `Phase 1 of the grant has been created.`,
-        });
+        if (!result.success || !result.updatedProject) {
+            throw new Error(result.error || "Failed to award grant.");
+        }
+        
+        onProjectUpdate(result.updatedProject);
+        toast({ title: "Grant Awarded!", description: `Phase 1 of the grant has been created.` });
+        
+        // Now, generate and download the form
+        const printResult = await generateRecommendationForm(project.id);
+        if (printResult.success && printResult.fileData) {
+            const byteCharacters = atob(printResult.fileData);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `IMR_Recommendation_${project.pi.replace(/\s/g, '_')}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } else {
+            throw new Error(printResult.error || "Failed to generate recommendation form.");
+        }
+
         setIsDialogOpen(false);
-        setPhaseAmount("");
-        setSanctionNumber("");
-        setInstallmentRefNumber("");
-        setTotalSanctionAmount('');
-      } else {
-        throw new Error(result.error || "Failed to award grant.");
-      }
     } catch (error: any) {
-      console.error("Error awarding grant:", error)
-      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to award grant." })
+        console.error("Error in award and download process:", error);
+        toast({ variant: "destructive", title: "Error", description: error.message });
     } finally {
-      setIsAwarding(false)
+        setIsAwarding(false);
     }
-  }
+  };
 
   const handleCompletionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -858,40 +843,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
   };
 
-  const handlePrintRecommendationForm = async () => {
-    setIsPrinting(true);
-    try {
-        const result = await generateRecommendationForm(project.id);
-        if (result.success && result.fileData) {
-            const byteCharacters = atob(result.fileData);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
-
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `IMR_Recommendation_${project.pi.replace(/\s/g, '_')}.docx`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
-            toast({ title: "Download Started", description: "Recommendation form is being downloaded." });
-        } else {
-            throw new Error(result.error || "Failed to generate form.");
-        }
-    } catch (error: any) {
-        console.error("Print error:", error);
-        toast({ variant: 'destructive', title: "Download Failed", description: error.message });
-    } finally {
-        setIsPrinting(false);
-    }
-  };
-
-
   const canViewEvaluations = isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive);
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
 
@@ -900,11 +851,38 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
         <div className="flex items-center gap-2">
-             {isAdmin && project.status === "Recommended" && (
-              <Button onClick={handlePrintRecommendationForm} disabled={isPrinting}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download Recommendation Form
-              </Button>
+            {isAdmin && project.status === "Recommended" && (
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button>
+                            <Download className="mr-2 h-4 w-4" /> Download Recommendation Form
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Award Grant & Download</DialogTitle>
+                            <DialogDescription>
+                                To download the recommendation form, first confirm the grant details. This will update the project status and save the grant information.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <Form {...awardGrantForm}>
+                            <form id="award-grant-form" onSubmit={awardGrantForm.handleSubmit(handleAwardGrantAndDownload)} className="space-y-4 py-4">
+                                <FormField name="sanctionNumber" control={awardGrantForm.control} render={({ field }) => ( <FormItem><FormLabel>Project Sanction Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField name="totalAmount" control={awardGrantForm.control} render={({ field }) => ( <FormItem><FormLabel>Total Sanctioned Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <Separator />
+                                <h4 className="font-semibold">Phase 1 Details</h4>
+                                <FormField name="installmentRefNumber" control={awardGrantForm.control} render={({ field }) => ( <FormItem><FormLabel>Installment Ref. No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                <FormField name="amount" control={awardGrantForm.control} render={({ field }) => ( <FormItem><FormLabel>Phase 1 Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                            </form>
+                        </Form>
+                        <DialogFooter>
+                            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                            <Button type="submit" form="award-grant-form" disabled={isAwarding}>
+                                {isAwarding ? 'Processing...' : 'Save & Download'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             )}
              {showAdminActions && (
                 <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
@@ -981,7 +959,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" disabled={isUpdating}>
+                          <Button variant="outline" disabled={isUpdating || !allEvaluationsIn}>
                             Update Status <ChevronDown className="ml-2 h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -993,7 +971,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     <DropdownMenuContent align="end">
                        <DropdownMenuItem 
                           onClick={() => handleApprovalClick("Recommended")}
-                          disabled={!allEvaluationsIn}
                        >
                           <Check className="mr-2 h-4 w-4" /> Recommended
                       </DropdownMenuItem>
@@ -1079,12 +1056,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 </Dialog>
               )}
               
-              {isSuperAdmin && project.status === "Recommended" && !project.grant && (
-                <Button onClick={handleOpenNotingDialog}>
-                  <DollarSign className="mr-2 h-4 w-4" /> Award Grant
-                </Button>
-              )}
-
               {canRequestClosure && (
                 <Dialog open={isCompletionDialogOpen} onOpenChange={setIsCompletionDialogOpen}>
                   <DialogTrigger asChild>
