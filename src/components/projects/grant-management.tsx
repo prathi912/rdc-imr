@@ -45,7 +45,7 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import Link from "next/link"
 import { Badge } from "../ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
-import { adminStorage } from "@/lib/admin"
+import { uploadFileToServer } from "@/app/actions"
 
 
 interface GrantManagementProps {
@@ -266,23 +266,23 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   };
 
   const handlePhaseStatusUpdate = async (phaseId: string, newStatus: GrantPhase["status"]) => {
-    if (!grant) return
-    setIsSubmitting(true)
+    if (!grant || !project.id) return;
+    setIsSubmitting(true);
     try {
-      const result = await updatePhaseStatus(project.id, phaseId, newStatus)
+      const result = await updatePhaseStatus(project.id, phaseId, newStatus);
       if (result.success && result.updatedProject) {
-        onUpdate(result.updatedProject)
-        toast({ title: "Success", description: `Phase status updated to ${newStatus}.` })
+        onUpdate(result.updatedProject);
+        toast({ title: "Success", description: `Phase status updated to ${newStatus}.` });
       } else {
-        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to update phase status." })
+        toast({ variant: "destructive", title: "Error", description: result.error || "Failed to update phase status." });
       }
     } catch (error) {
-      console.error(error)
-      toast({ variant: "destructive", title: "Error", description: "Failed to update phase status." })
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to update phase status." });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
   
   const getPhaseBadgeVariant = (status: GrantPhase['status']) => {
     switch (status) {
@@ -470,37 +470,38 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   </div>
                 </div>
 
-                 <div className="space-y-4">
+                <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-semibold flex items-center gap-2">
+                        <h4 className="font-semibold flex items-center gap-2">
                         <FileText className="h-4 w-4" />
                         Transactions ({phase.transactions?.length || 0})
-                      </h4>
-                      <div className="flex items-center gap-2">
-                        {canAddExpense && (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setCurrentPhaseId(phase.id)
-                              setIsTransactionOpen(true)
-                            }}
-                          >
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add Expense
-                          </Button>
-                        )}
-                        {phase.transactions && phase.transactions.length > 0 && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleExportTransactions(phase)}
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Export
-                          </Button>
-                        )}
-                      </div>
+                        </h4>
+                        <div className="flex items-center gap-2">
+                             {canAddExpense && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setCurrentPhaseId(phase.id)
+                                  setIsTransactionOpen(true)
+                                }}
+                              >
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Add Expense
+                              </Button>
+                            )}
+                            {phase.transactions && phase.transactions.length > 0 && (
+                                <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleExportTransactions(phase)}
+                                >
+                                <Download className="mr-2 h-4 w-4" />
+                                Export
+                                </Button>
+                            )}
+                        </div>
                     </div>
+                    
                     {phase.transactions && phase.transactions.length > 0 ? (
                       <div className="overflow-x-auto">
                         <Table>
