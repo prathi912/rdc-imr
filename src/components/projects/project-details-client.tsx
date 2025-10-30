@@ -454,21 +454,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     return !isBefore(today, meetingDate) && !isAfter(today, deadline);
   }, [project.meetingDetails?.date, systemSettings]);
   
-  const isInitialMeeting = useMemo(() => {
-    // A meeting is initial if the project is in "Under Review" status.
-    return project.status === "Under Review" && !!project.meetingDetails?.date;
-  }, [project.status, project.meetingDetails?.date]);
-
-  const isMidTermMeeting = useMemo(() => {
-    if (!project.meetingDetails?.date) return false;
-    const grantStartDate = project.grant?.phases?.[0]?.disbursementDate;
-    if (!grantStartDate) return false;
-    
-    // A mid-term review's meeting date will be on or after the grant has started.
-    return !isBefore(parseISO(project.meetingDetails.date), parseISO(grantStartDate));
-  }, [project.grant, project.meetingDetails?.date]);
-
-  const showEvaluationForm = user && isInitialMeeting && isAssignedEvaluator && isEvaluationPeriodActive;
+  const isMeetingScheduled = !!project.meetingDetails?.date;
+  const showEvaluationForm = user && isMeetingScheduled && isAssignedEvaluator && isEvaluationPeriodActive;
 
 
   const assignedEvaluatorsCount = project.meetingDetails?.assignedEvaluators?.length ?? 0;
@@ -959,7 +946,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                 {project.status === "Not Recommended" && <X className="mr-2 h-4 w-4" />}
                 {project.status}
               </Badge>
-              {isAdmin && project.status === "Under Review" && isInitialMeeting ? (
+              {isAdmin && project.status === "Under Review" && (
                  <TooltipProvider>
                   <DropdownMenu>
                     <Tooltip>
@@ -991,36 +978,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TooltipProvider>
-              ) : isAdmin && project.status !== 'Draft' && !isMidTermMeeting ? (
-                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" disabled={isUpdating}>
-                       <Edit className="mr-2 h-4 w-4" /> Revise Decision <ChevronDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                       {project.status !== "Recommended" && (
-                         <DropdownMenuItem onClick={() => handleApprovalClick("Recommended")}>
-                           <Check className="mr-2 h-4 w-4" /> Recommended
-                         </DropdownMenuItem>
-                       )}
-                       {project.status !== "Not Recommended" && (
-                         <DropdownMenuItem onSelect={() => handleApprovalClick("Not Recommended")}>
-                           <X className="mr-2 h-4 w-4 text-destructive" />{" "}
-                           <span className="text-destructive">Not Recommend</span>
-                         </DropdownMenuItem>
-                       )}
-                       {project.status !== "Revision Needed" && (
-                         <>
-                           <DropdownMenuSeparator />
-                           <DropdownMenuItem onSelect={() => handleApprovalClick("Revision Needed")}>
-                             <Edit className="mr-2 h-4 w-4" /> Request Revision
-                           </DropdownMenuItem>
-                         </>
-                       )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : null}
+              )}
               {isPI && project.status === "Revision Needed" && (
                 <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
                   <DialogTrigger asChild>
@@ -1144,7 +1102,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </AlertDescription>
               </Alert>
           )}
-           {isInitialMeeting && (
+           {isMeetingScheduled && (
             <>
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
                 <div className="flex justify-between items-start flex-wrap gap-2">
@@ -1176,21 +1134,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </ul>
                   </div>
                 )}
-              </div>
-              <Separator />
-            </>
-          )}
-           {isMidTermMeeting && (
-            <>
-              <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
-                <div className="flex justify-between items-start flex-wrap gap-2">
-                  <h3 className="font-semibold text-lg">IMR Mid-Term Review Meeting</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
-                  <p>
-                    <strong>Date:</strong> {formatDate(project.meetingDetails?.date)}
-                  </p>
-                </div>
               </div>
               <Separator />
             </>

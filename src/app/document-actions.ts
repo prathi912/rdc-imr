@@ -150,6 +150,8 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
         evaluator_comments: recommendationText || 'No evaluations submitted yet.',
         ...phaseData,
         total_amount: totalAmount.toLocaleString('en-IN'),
+        presentation_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd-MM-yyyy') : 'N/A',
+        presentation_time: project.meetingDetails?.time || 'N/A',
     };
     
     doc.setData(data);
