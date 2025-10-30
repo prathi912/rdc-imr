@@ -487,7 +487,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                           </Button>
                         )}
                         {canAddExpense && (
-                           <Button
+                          <Button
                             size="sm"
                             onClick={() => {
                               setCurrentPhaseId(phase.id)
