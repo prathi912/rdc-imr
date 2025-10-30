@@ -44,6 +44,8 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import Link from "next/link"
 import { Badge } from "../ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
+import { adminStorage } from "@/lib/admin"
+
 
 interface GrantManagementProps {
   project: Project
@@ -227,15 +229,12 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const handleAddTransaction = async (values: z.infer<typeof transactionSchema>) => {
     if (!grant || !currentPhaseId) return;
     setIsSubmitting(true);
-    console.log("Client: handleAddTransaction called with values:", values);
     try {
         const invoiceFile = values.invoice?.[0];
         if (!invoiceFile) {
             throw new Error("Invoice file is missing.");
         }
-        console.log("Client: Converting file to data URL...");
         const invoiceDataUrl = await fileToDataUrl(invoiceFile);
-        console.log("Client: File converted. Calling server action...");
 
         const result = await addTransaction(project.id, currentPhaseId, {
             dateOfTransaction: values.dateOfTransaction,
@@ -248,7 +247,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             invoiceFileName: invoiceFile.name,
         });
 
-        console.log("Client: Server action result:", result);
         if (result.success && result.updatedProject) {
             onUpdate(result.updatedProject);
             toast({ title: "Success", description: "Transaction added successfully." });
