@@ -77,8 +77,13 @@ const bulkEditSchema = z.object({
     isOpenToPi: z.boolean().default(false),
 });
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
 const signEndorsementSchema = z.object({
-    signedEndorsement: z.any().refine(files => files?.length > 0, "A signed PDF is required."),
+    signedEndorsement: z.any()
+    .refine(files => files?.length > 0, "A signed PDF is required.")
+    .refine(files => files?.[0]?.size <= MAX_FILE_SIZE, `File size must be less than 5MB.`)
+    .refine(files => files?.[0]?.type === 'application/pdf', "Only PDF files are accepted."),
 });
 
 const attendanceSchema = z.object({
@@ -169,7 +174,7 @@ function AttendanceDialog({ call, interests, allUsers, isOpen, onOpenChange, onU
                                                         checked={field.value?.includes(evaluator.uid)}
                                                         onCheckedChange={(checked) => {
                                                             return checked
-                                                                ? field.onChange([...field.value, evaluator.uid])
+                                                                ? field.onChange([...(field.value || []), evaluator.uid])
                                                                 : field.onChange(field.value?.filter(id => id !== evaluator.uid));
                                                         }}
                                                     />

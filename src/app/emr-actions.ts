@@ -1239,35 +1239,41 @@ export async function updateEmrInterestDetails(
     }
 }
 
-export async function signAndUploadEndorsement(interestId: string, signedEndorsementUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
-    try {
-        if (!interestId || !signedEndorsementUrl) {
-            return { success: false, error: "Interest ID and signed endorsement form URL are required." };
-        }
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        await interestRef.update({
-            signedEndorsementUrl: signedEndorsementUrl,
-            status: 'Endorsement Signed',
-            endorsementSignedAt: new Date().toISOString()
-        });
-        
-        const interestSnap = await interestRef.get();
-        if (interestSnap.exists) {
-            const interest = interestSnap.data() as EmrInterest;
-            await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
-            // You can add email notification logic here if needed, similar to other functions.
-        }
+export async function signAndUploadEndorsement(interestId: string, signedEndorsementUrl: string, fileName: string) {
+  console.log("Start signAndUploadEndorsement", { interestId, signedEndorsementUrl, fileName });
 
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error signing endorsement form:", error);
-        await logActivity('ERROR', 'Failed to sign and upload EMR endorsement form', {
-            interestId,
-            error: error.message,
-            stack: error.stack
-        });
-        return { success: false, error: 'Failed to sign and upload endorsement form.' };
+  try {
+    if (!interestId || !signedEndorsementUrl) {
+      console.error("Missing parameters", { interestId, signedEndorsementUrl });
+      return { success: false, error: "Interest ID and signed endorsement form URL are required." };
     }
+
+    const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    console.log("Updating Firestore doc:", interestId);
+    await interestRef.update({
+      signedEndorsementUrl,
+      status: 'Endorsement Signed',
+      endorsementSignedAt: new Date().toISOString(),
+    });
+
+    const interestSnap = await interestRef.get();
+    if (interestSnap.exists) {
+      const interest = interestSnap.data() as EmrInterest;
+      try {
+        await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
+      } catch (logErr) {
+        console.error("logActivity failed:", logErr);
+      }
+    } else {
+      console.warn("Document not found for interestId:", interestId);
+    }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error signing endorsement form:", error);
+    await logActivity('ERROR', 'Failed to sign and upload EMR endorsement form', { interestId, error: error.message, stack: error.stack });
+    return { success: false, error: error.message || 'Failed to sign and upload endorsement form.' };
+  }
 }
 
 export async function updateEmrFinalStatus(interestId: string, status: 'Sanctioned' | 'Not Sanctioned', proofDataUrl: string, fileName: string): Promise<{ success: boolean, error?: string }> {
