@@ -490,7 +490,7 @@ export async function generateOfficeNotingForm(
     const coPiData: { [key: string]: string } = {}
     const coPiNames = project.coPiDetails?.map((c) => c.name) || []
     for (let i = 0; i < 4; i++) {
-      coPiData[`co-pi${i + 1}`] = coPiNames[i] || ""
+      coPiData[`co-pi${i + 1}`] = coPiNames[i] || "N/A"
     }
 
     const phaseData: { [key: string]: string } = {}
@@ -500,26 +500,26 @@ export async function generateOfficeNotingForm(
         phaseData[`phase${i + 1}_amount`] = formData.phases[i].amount.toLocaleString("en-IN")
         totalAmount += formData.phases[i].amount
       } else {
-        phaseData[`phase${i + 1}_amount`] = "" // Use empty string instead of "N/A"
+        phaseData[`phase${i + 1}_amount`] = "N/A"
       }
     }
 
     const data = {
-      pi_name: project.pi,
-      pi_designation: piUser?.designation || "",
-      pi_department: `${piUser?.designation || ""}, ${piUser?.department || ""}`,
-      pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || "",
-      pi_email: project.pi_email,
+      pi_name: project.pi || "N/A",
+      pi_designation: piUser?.designation || "N/A",
+      pi_department: `${piUser?.designation || "N/A"}, ${piUser?.department || "N/A"}`,
+      pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || "N/A",
+      pi_email: project.pi_email || "N/A",
       ...coPiData,
-      copi_designation: `${coPi1User?.designation || ""}, ${coPi1User?.department || ""}`,
-      project_title: project.title,
-      project_duration: formData.projectDuration || "",
+      copi_designation: `${coPi1User?.designation || "N/A"}, ${coPi1User?.department || "N/A"}`,
+      project_title: project.title || "N/A",
+      project_duration: formData.projectDuration || "N/A",
       ...phaseData,
       total_amount: totalAmount.toLocaleString("en-IN"),
       presentation_date: project.meetingDetails?.date
         ? format(parseISO(project.meetingDetails.date), "dd/MM/yyyy")
-        : "",
-      presentation_time: project.meetingDetails?.time || "",
+        : "N/A",
+      presentation_time: project.meetingDetails?.time || "N/A",
       date: format(new Date(), 'dd/MM/yyyy'),
     }
 
