@@ -69,6 +69,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [isTransactionOpen, setIsTransactionOpen] = useState(false)
   const [currentPhaseId, setCurrentPhaseId] = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false);
+  const [phaseForNoting, setPhaseForNoting] = useState<GrantPhase | null>(null);
 
   const grant = project.grant
   if (!grant) return null
@@ -80,6 +81,10 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     installmentRefNumber: z.string().min(3, "Installment Ref. No. is required."),
     amount: z.coerce.number().positive("Amount must be a positive number.").max(remainingAmount, `Amount cannot exceed the remaining balance of ₹${remainingAmount.toLocaleString('en-IN')}.`),
   })
+  
+  const notingFormSchema = z.object({
+    installmentRefNumber: z.string().min(3, "Installment Ref. No. is required."),
+  });
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
   const ACCEPTED_FILE_TYPES = ["application/pdf"];
@@ -121,6 +126,11 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     resolver: zodResolver(addPhaseSchema),
     defaultValues: { installmentRefNumber: "", amount: 0 },
   })
+  
+  const notingForm = useForm<z.infer<typeof notingFormSchema>>({
+    resolver: zodResolver(notingFormSchema),
+    defaultValues: { installmentRefNumber: "" },
+  });
 
   const transactionForm = useForm<z.infer<typeof transactionSchema>>({
     resolver: zodResolver(transactionSchema),
@@ -160,10 +170,14 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     XLSX.writeFile(workbook, `${project.title.replace(/\s+/g, "_")}_${phase.name.replace(/\s+/g, "_")}_Transactions.xlsx`)
   }
   
-  const handleDownloadNoting = async (phaseDetails: { installmentRefNumber: string, amount: number }) => {
+  const handleDownloadNoting = async (phase: GrantPhase, installmentRefNumber: string) => {
+    if (!phase.amount) {
+        toast({ variant: 'destructive', title: 'Missing Data', description: 'This phase is missing the amount needed to generate the note.' });
+        return;
+    }
     setIsDownloading(true);
     try {
-        const result = await generateInstallmentOfficeNoting(project.id, phaseDetails);
+        const result = await generateInstallmentOfficeNoting(project.id, { installmentRefNumber, amount: phase.amount });
 
         if (result.success && result.fileData) {
             const byteCharacters = atob(result.fileData);
@@ -183,7 +197,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             a.remove();
             window.URL.revokeObjectURL(url);
             toast({ title: "Download Started" });
-            setIsAddPhaseOpen(false); // Close dialog on successful download
+            setPhaseForNoting(null);
         } else {
             throw new Error(result.error || "Failed to generate document.");
         }
@@ -192,14 +206,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     } finally {
         setIsDownloading(false);
     }
-  };
-
-  const handleDownloadPhaseNoting = async (phase: GrantPhase) => {
-    if (!phase.installmentRefNumber || !phase.amount) {
-        toast({ variant: 'destructive', title: 'Missing Data', description: 'This phase is missing the reference number or amount needed to generate the note.' });
-        return;
-    }
-    await handleDownloadNoting({ installmentRefNumber: phase.installmentRefNumber, amount: phase.amount });
   };
 
 
@@ -296,6 +302,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   };
 
   return (
+    <>
     <Card className="mt-8">
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -354,12 +361,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                     />
                   </form>
                 </Form>
-                <DialogFooter className="gap-2">
-                  <Button variant="outline" onClick={() => handleDownloadNoting(phaseForm.getValues())} disabled={isDownloading}>
-                    {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
-                    Download Office Note
-                  </Button>
-                  <div className="flex-grow"></div>
+                <DialogFooter>
                   <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                   </DialogClose>
@@ -434,7 +436,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                       </DropdownMenu>
                     )}
                     {showOfficeNoteButton && (
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadPhaseNoting(phase)}>
+                        <Button variant="outline" size="sm" onClick={() => setPhaseForNoting(phase)}>
                             <Download className="mr-2 h-4 w-4" /> Office Note
                         </Button>
                     )}
@@ -705,7 +707,41 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={!!phaseForNoting} onOpenChange={() => setPhaseForNoting(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Generate Office Note for {phaseForNoting?.name}</DialogTitle>
+                    <DialogDescription>Please provide the installment reference number for this new phase to generate the office noting document.</DialogDescription>
+                </DialogHeader>
+                 <Form {...notingForm}>
+                    <form id="noting-form" onSubmit={notingForm.handleSubmit((data) => handleDownloadNoting(phaseForNoting!, data.installmentRefNumber))} className="py-4">
+                        <FormField
+                            name="installmentRefNumber"
+                            control={notingForm.control}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>New Installment Reference Number</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} placeholder="e.g., RDC/IMR/2024/002-2" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </form>
+                </Form>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="noting-form" disabled={isDownloading}>
+                        {isDownloading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Generating...</> : <><Download className="mr-2 h-4 w-4"/> Download</>}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
       </CardContent>
     </Card>
+    </>
   )
 }
