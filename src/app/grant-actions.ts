@@ -2,10 +2,10 @@
 
 'use server';
 
-import { adminDb, adminStorage } from "@/lib/admin";
-import type { Project, GrantPhase, GrantDetails, User } from "@/types";
+import { adminDb } from "@/lib/admin";
+import type { Project, GrantPhase, GrantDetails, User, Transaction } from "@/types";
 import { sendEmail as sendEmailUtility } from "@/lib/email";
-import { getSystemSettings } from './actions';
+import { getSystemSettings, uploadFileToServer } from './actions';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -243,7 +243,7 @@ export async function addTransaction(
     if (transactionData.invoiceDataUrl) {
       console.log("Invoice data URL found, preparing to upload.");
       const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
-      const result = await adminStorage.uploadFileToServer(transactionData.invoiceDataUrl, path);
+      const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
 
       if (!result.success || !result.url) {
         console.error("Invoice upload failed:", result.error);
