@@ -500,27 +500,26 @@ export async function generateOfficeNotingForm(
         phaseData[`phase${i + 1}_amount`] = formData.phases[i].amount.toLocaleString("en-IN")
         totalAmount += formData.phases[i].amount
       } else {
-        phaseData[`phase${i + 1}_amount`] = "N/A"
+        phaseData[`phase${i + 1}_amount`] = "" // Use empty string instead of "N/A"
       }
     }
 
     const data = {
       pi_name: project.pi,
-      pi_designation: piUser?.designation || "N/A",
-      pi_department: piUser?.department || project.departmentName || "N/A",
-      pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || "N/A",
+      pi_designation: piUser?.designation || "",
+      pi_department: `${piUser?.designation || ""}, ${piUser?.department || ""}`,
+      pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || "",
       pi_email: project.pi_email,
       ...coPiData,
-      copi_designation: coPi1User?.designation || "N/A",
-      copi_department: coPi1User?.department || "N/A",
+      copi_designation: `${coPi1User?.designation || ""}, ${coPi1User?.department || ""}`,
       project_title: project.title,
-      project_duration: formData.projectDuration,
+      project_duration: formData.projectDuration || "",
       ...phaseData,
       total_amount: totalAmount.toLocaleString("en-IN"),
       presentation_date: project.meetingDetails?.date
         ? format(parseISO(project.meetingDetails.date), "dd/MM/yyyy")
-        : "N/A",
-      presentation_time: project.meetingDetails?.time || "N/A",
+        : "",
+      presentation_time: project.meetingDetails?.time || "",
       date: format(new Date(), 'dd/MM/yyyy'),
     }
 
