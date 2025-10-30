@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useForm } from "react-hook-form"
@@ -432,7 +431,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
-                    {isAdmin && phase.installmentRefNumber && (
+                    {isAdmin && phase.installmentRefNumber && index > 0 && ( // Condition to show button only for phase 2 onwards
                         <Button variant="outline" size="sm" onClick={() => handleDownloadPhaseNoting(phase)}>
                             <Download className="mr-2 h-4 w-4" /> Office Note
                         </Button>
@@ -477,7 +476,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         Transactions ({phase.transactions?.length || 0})
                         </h4>
                         <div className="flex items-center gap-2">
-                             {canAddExpense && (
+                            {canAddExpense && (
                               <Button
                                 size="sm"
                                 onClick={() => {
@@ -489,7 +488,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                                 Add Expense
                               </Button>
                             )}
-                            {phase.transactions && phase.transactions.length > 0 && (
+                            {(phase.transactions?.length || 0) > 0 && (
                                 <Button
                                 variant="outline"
                                 size="sm"
@@ -502,7 +501,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         </div>
                     </div>
                     
-                    {phase.transactions && phase.transactions.length > 0 ? (
+                    {(phase.transactions?.length || 0) > 0 ? (
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
@@ -516,7 +515,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {phase.transactions.map((transaction) => (
+                            {phase.transactions?.map((transaction) => (
                               <TableRow key={transaction.id}>
                                 <TableCell>{new Date(transaction.dateOfTransaction).toLocaleDateString()}</TableCell>
                                 <TableCell>{transaction.vendorName}</TableCell>
