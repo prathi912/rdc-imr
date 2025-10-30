@@ -41,29 +41,32 @@ export async function awardInitialGrant(
     grantData: { 
       sanctionNumber: string; 
       totalAmount: number; 
-      installmentRefNumber: string; 
-      amount: number; 
+      phases: { name: string; amount: number; installmentRefNumber?: string }[];
     },
     pi: { uid: string; name: string; email?: string },
     projectTitle: string
 ): Promise<{ success: boolean; error?: string, updatedProject?: Project }> {
     try {
+        if (!grantData.phases || grantData.phases.length === 0) {
+            return { success: false, error: "At least one grant phase must be defined." };
+        }
+
         const projectRef = adminDb.collection('projects').doc(projectId);
 
-        const newPhase: GrantPhase = {
-            id: new Date().toISOString(),
-            name: 'Phase 1',
-            amount: grantData.amount,
-            installmentRefNumber: grantData.installmentRefNumber,
-            status: "Pending Disbursement",
+        const newPhases: GrantPhase[] = grantData.phases.map((phase, index) => ({
+            id: new Date().toISOString() + `-${index}`,
+            name: phase.name,
+            amount: phase.amount,
+            installmentRefNumber: phase.installmentRefNumber,
+            status: index === 0 ? "Pending Disbursement" : "Pending", // Only first phase is active
             transactions: [],
-        };
+        }));
 
         const newGrant: GrantDetails = {
             totalAmount: grantData.totalAmount,
             sanctionNumber: grantData.sanctionNumber,
             status: "Awarded",
-            phases: [newPhase],
+            phases: newPhases,
         };
 
         await projectRef.update({ grant: newGrant, status: 'In Progress' });
@@ -78,6 +81,7 @@ export async function awardInitialGrant(
         await adminDb.collection('notifications').add(notification);
 
         if (pi.email) {
+            const firstPhase = newPhases[0];
             const emailHtml = `
                 <div ${EMAIL_STYLES.background}>
                     ${EMAIL_STYLES.logo}
@@ -87,8 +91,8 @@ export async function awardInitialGrant(
                     <ul style="color:#e0e0e0; list-style-type: none; padding-left: 0;">
                         <li><strong>Project Sanction Number:</strong> ${newGrant.sanctionNumber}</li>
                         <li><strong>Total Sanctioned Amount:</strong> ₹${newGrant.totalAmount.toLocaleString('en-IN')}</li>
-                        <li><strong>Phase 1 Installment Ref. No:</strong> ${newPhase.installmentRefNumber}</li>
-                        <li><strong>Phase 1 Amount:</strong> ₹${newPhase.amount.toLocaleString('en-IN')}</li>
+                        <li><strong>Phase 1 Installment Ref. No:</strong> ${firstPhase.installmentRefNumber}</li>
+                        <li><strong>Phase 1 Amount:</strong> ₹${firstPhase.amount.toLocaleString('en-IN')}</li>
                     </ul>
                     <p style="color:#e0e0e0;">The first phase amount will be disbursed to your registered bank account shortly. You can now log your project expenses through the grant management section on the portal.</p>
                     ${EMAIL_STYLES.footer}
@@ -102,7 +106,7 @@ export async function awardInitialGrant(
             });
         }
         
-        await logActivity('INFO', 'Initial grant awarded', { projectId, sanctionNumber: grantData.sanctionNumber, totalAmount: grantData.totalAmount, phase1Amount: grantData.amount });
+        await logActivity('INFO', 'Initial grant awarded', { projectId, sanctionNumber: grantData.sanctionNumber, totalAmount: grantData.totalAmount, phases: grantData.phases.length });
         
         const updatedProjectSnap = await projectRef.get();
         const updatedProject = { id: updatedProjectSnap.id, ...updatedProjectSnap.data() } as Project;

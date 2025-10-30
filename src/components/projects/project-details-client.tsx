@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import type React from "react"
@@ -121,6 +122,25 @@ const revisionCommentSchema = z.object({
   statusToSet: z.enum(["Revision Needed", "Not Recommended"]),
 })
 type RevisionCommentFormData = z.infer<typeof revisionCommentSchema>
+
+const awardGrantSchema = z.object({
+    sanctionNumber: z.string().min(1, "Sanction number is required."),
+    totalAmount: z.coerce.number().positive("Total amount must be a positive number."),
+    phases: z.array(z.object({
+        name: z.string(),
+        amount: z.coerce.number().positive('Phase amount must be positive.'),
+        installmentRefNumber: z.string().optional(),
+    })).min(1, 'At least one phase is required.'),
+}).refine(data => {
+    const totalPhaseAmount = data.phases.reduce((sum, phase) => sum + phase.amount, 0);
+    return Math.abs(totalPhaseAmount - data.totalAmount) < 0.01; // Allow for floating point inaccuracies
+}, {
+    message: "The sum of phase amounts must equal the total sanctioned amount.",
+    path: ["totalAmount"],
+}).refine(data => data.phases.length > 0 && !!data.phases[0].installmentRefNumber, {
+    message: "Installment Reference No. is required for Phase 1.",
+    path: ["phases.0.installmentRefNumber"],
+});
 
 const notingFormSchema = z.object({
     projectDuration: z.string().min(3, 'Project duration is required.'),
@@ -300,15 +320,13 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isSearching, setIsSearching] = useState(false)
   const [isSavingCoPis, setIsSavingCoPis] = useState(false)
 
-  const awardGrantSchema = z.object({
-    sanctionNumber: z.string().min(1, "Sanction number is required."),
-    totalAmount: z.coerce.number().positive("Total amount must be a positive number."),
-    installmentRefNumber: z.string().min(1, "Installment reference number is required."),
-    amount: z.coerce.number().positive("Phase amount must be a positive number."),
-  });
-  
   const awardGrantForm = useForm<z.infer<typeof awardGrantSchema>>({
     resolver: zodResolver(awardGrantSchema),
+     defaultValues: {
+      sanctionNumber: "",
+      totalAmount: 0,
+      phases: [{ name: "Phase 1", amount: 0, installmentRefNumber: '' }],
+    },
   });
 
   const durationForm = useForm<DurationFormData>({
@@ -559,7 +577,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     try {
         const result = await awardInitialGrant(
             project.id,
-            values,
+            values, // Pass the entire phases array
             { uid: project.pi_uid, name: project.pi, email: project.pi_email },
             project.title
         );
@@ -569,9 +587,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         }
         
         onProjectUpdate(result.updatedProject);
-        toast({ title: "Grant Awarded!", description: `Phase 1 of the grant has been created.` });
+        toast({ title: "Grant Awarded!", description: `The grant has been created with all phases.` });
         
-        // Now, generate and download the form
         const printResult = await generateRecommendationForm(project.id);
         if (printResult.success && printResult.fileData) {
             const byteCharacters = atob(printResult.fileData);
@@ -865,22 +882,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                                 To download the recommendation form, first confirm the grant details. This will update the project status and save the grant information.
                             </DialogDescription>
                         </DialogHeader>
-                        <Form {...awardGrantForm}>
-                            <form id="award-grant-form" onSubmit={awardGrantForm.handleSubmit(handleAwardGrantAndDownload)} className="space-y-4 py-4">
-                                <FormField name="sanctionNumber" control={awardGrantForm.control} render={({ field }) => ( <FormItem><FormLabel>Project Sanction Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                <FormField name="totalAmount" control={awardGrantForm.control} render={({ field }) => ( <FormItem><FormLabel>Total Sanctioned Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                <Separator />
-                                <h4 className="font-semibold">Phase 1 Details</h4>
-                                <FormField name="installmentRefNumber" control={awardGrantForm.control} render={({ field }) => ( <FormItem><FormLabel>Installment Ref. No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                <FormField name="amount" control={awardGrantForm.control} render={({ field }) => ( <FormItem><FormLabel>Phase 1 Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            </form>
-                        </Form>
-                        <DialogFooter>
-                            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                            <Button type="submit" form="award-grant-form" disabled={isAwarding}>
-                                {isAwarding ? 'Processing...' : 'Save & Download'}
-                            </Button>
-                        </DialogFooter>
+                        <AwardGrantForm
+                            form={awardGrantForm}
+                            onSubmit={handleAwardGrantAndDownload}
+                            isAwarding={isAwarding}
+                        />
                     </DialogContent>
                 </Dialog>
             )}
@@ -1638,6 +1644,47 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       )}
     </>
   )
+}
+
+function AwardGrantForm({ form, onSubmit, isAwarding }: { form: any, onSubmit: (values: z.infer<typeof awardGrantSchema>) => void, isAwarding: boolean }) {
+    const { fields, append, remove } = useFieldArray({
+        control: form.control,
+        name: "phases",
+    });
+
+    return (
+        <Form {...form}>
+            <form id="award-grant-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                <FormField name="sanctionNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Project Sanction Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="totalAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Sanctioned Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                
+                <Separator />
+                <Label>Phase-wise Grant Amounts</Label>
+
+                {fields.map((field, index) => (
+                    <div key={field.id} className="p-3 border rounded-md space-y-3">
+                         <h4 className="font-semibold text-sm">{`Phase ${index + 1}`}</h4>
+                         {index === 0 && (
+                            <FormField control={form.control} name={`phases.${index}.installmentRefNumber`} render={({ field }) => ( <FormItem><FormLabel>Installment Ref. No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                         )}
+                         <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                         {fields.length > 1 && (<Button type="button" variant="destructive" size="sm" onClick={() => remove(index)}>Remove Phase</Button>)}
+                    </div>
+                ))}
+                 {fields.length < 5 && (
+                    <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => append({ name: `Phase ${fields.length + 1}`, amount: 0 })}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Phase
+                    </Button>
+                )}
+            </form>
+             <DialogFooter className="mt-4">
+                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                <Button type="submit" form="award-grant-form" disabled={isAwarding}>
+                    {isAwarding ? 'Processing...' : 'Save & Download'}
+                </Button>
+            </DialogFooter>
+        </Form>
+    );
 }
 
 
