@@ -384,7 +384,8 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const hasReachedThreshold = utilizationPercentage >= 80;
           const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1));
           
-          const canRequestNextPhase = isPI && phase.status === 'Disbursed' && hasReachedThreshold && hasRemainingGrant;
+          const canRequestNextPhase = isPI && phase.status === "Disbursed" && hasReachedThreshold && hasRemainingGrant;
+          const canAddExpense = (isPI || isCoPi || isAdmin) && phase.status === "Disbursed";
 
 
           return (
@@ -468,24 +469,25 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   </div>
                 </div>
 
-                {phase.transactions && phase.transactions.length > 0 ? (
-                  <div className="space-y-4">
+                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h4 className="font-semibold flex items-center gap-2">
                         <FileText className="h-4 w-4" />
-                        Transactions ({phase.transactions.length})
+                        Transactions ({phase.transactions?.length || 0})
                       </h4>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleExportTransactions(phase)}
-                        >
-                          <Download className="mr-2 h-4 w-4" />
-                          Export Excel
-                        </Button>
-                        {(isPI || isCoPi || isAdmin) && phase.status === "Disbursed" && (
+                        {phase.transactions && phase.transactions.length > 0 && (
                           <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExportTransactions(phase)}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export Excel
+                          </Button>
+                        )}
+                        {canAddExpense && (
+                           <Button
                             size="sm"
                             onClick={() => {
                               setCurrentPhaseId(phase.id)
@@ -498,68 +500,58 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         )}
                       </div>
                     </div>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Vendor</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>GST</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Invoice </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {phase.transactions.map((transaction) => (
-                            <TableRow key={transaction.id}>
-                              <TableCell>{new Date(transaction.dateOfTransaction).toLocaleDateString()}</TableCell>
-                              <TableCell>{transaction.vendorName}</TableCell>
-                              <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
-                              <TableCell>
-                                {transaction.isGstRegistered ? (
-                                  <span className="text-green-600">Yes ({transaction.gstNumber})</span>
-                                ) : (
-                                  <span className="text-muted-foreground">No</span>
-                                )}
-                              </TableCell>
-                              <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
-                              <TableCell>
-                                {transaction.invoiceUrl ? (
-                                  <Link
-                                    href={transaction.invoiceUrl}
-                                    target="_blank"
-                                    className="text-blue-600 hover:underline"
-                                  >
-                                    View Invoice
-                                  </Link>
-                                ) : (
-                                  <span className="text-muted-foreground">N/A</span>
-                                )}
-                              </TableCell>
+                    {phase.transactions && phase.transactions.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Vendor</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead>GST</TableHead>
+                              <TableHead>Description</TableHead>
+                              <TableHead>Invoice </TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground mb-4">No transactions recorded for this phase.</p>
-                    {(isPI || isCoPi || isAdmin) && phase.status === "Disbursed" && (
-                      <Button
-                        onClick={() => {
-                          setCurrentPhaseId(phase.id)
-                          setIsTransactionOpen(true)
-                        }}
-                      >
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add First Expense
-                      </Button>
+                          </TableHeader>
+                          <TableBody>
+                            {phase.transactions.map((transaction) => (
+                              <TableRow key={transaction.id}>
+                                <TableCell>{new Date(transaction.dateOfTransaction).toLocaleDateString()}</TableCell>
+                                <TableCell>{transaction.vendorName}</TableCell>
+                                <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
+                                <TableCell>
+                                  {transaction.isGstRegistered ? (
+                                    <span className="text-green-600">Yes ({transaction.gstNumber})</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">No</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
+                                <TableCell>
+                                  {transaction.invoiceUrl ? (
+                                    <Link
+                                      href={transaction.invoiceUrl}
+                                      target="_blank"
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      View Invoice
+                                    </Link>
+                                  ) : (
+                                    <span className="text-muted-foreground">N/A</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                       <div className="text-center py-8">
+                          <p className="text-muted-foreground">No transactions recorded for this phase.</p>
+                      </div>
                     )}
                   </div>
-                )}
+                
 
                  {canRequestNextPhase && (
                   <div className="mt-4 flex justify-end">
