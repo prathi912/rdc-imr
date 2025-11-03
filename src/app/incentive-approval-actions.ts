@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -63,7 +64,14 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
         const standardizedClaimId = `RDC/IC/${acronym}/${String(current).padStart(4, '0')}`;
         
-        const initialStatus = claimData.claimType === 'Research Papers' ? 'Pending' : 'Pending Stage 2 Approval';
+        const settings = await getSystemSettings();
+        const workflow = settings.incentiveApprovalWorkflows?.[claimData.claimType];
+        
+        let initialStatus: IncentiveClaim['status'] = 'Accepted'; // Default if no workflow
+        if (workflow && workflow.length > 0) {
+            const firstStage = Math.min(...workflow);
+            initialStatus = `Pending Stage ${firstStage} Approval`;
+        }
 
         const finalClaimData: Omit<IncentiveClaim, 'id'> = {
             ...claimData,
@@ -73,7 +81,6 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
             authorUids: (claimData.authors || []).map(a => a.uid).filter(Boolean) as string[],
         };
 
-        // If it's a research paper, try to find the corresponding paper in the `papers` collection
         if (claimData.claimType === 'Research Papers' && claimData.paperTitle && claimData.relevantLink) {
             const papersRef = adminDb.collection('papers');
             const q = papersRef.where('url', '==', claimData.relevantLink).limit(1);
@@ -85,7 +92,6 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
         await newClaimRef.set(finalClaimData);
 
-        // Send notifications to co-authors if it's not a draft
         if (finalClaimData.status !== 'Draft' && finalClaimData.authors) {
             const coAuthorsToNotify = finalClaimData.authors.filter(a => a.uid && a.uid !== claimData.uid);
             for (const coAuthor of coAuthorsToNotify) {
@@ -162,7 +168,6 @@ async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
             status: 'approved', // Automatically approved since it comes from a sanctioned claim
         }));
         
-        // Ensure the main claimant is in the authors list if not already present
         if (!authors.some(a => a.uid === claim.uid)) {
             authors.push({
                 uid: claim.uid,
@@ -239,7 +244,6 @@ export async function processIncentiveClaimAction(
     };
     
     const approvals = claim.approvals || [];
-    // Ensure the array is long enough, fill with null if needed
     while (approvals.length <= stageIndex) {
         approvals.push(null as any); 
     }
@@ -247,17 +251,18 @@ export async function processIncentiveClaimAction(
 
 
     let newStatus: IncentiveClaim['status'];
-    if (action === 'reject') {
-      newStatus = 'Rejected';
-    } else {
-        const isChecklistStage = (stageIndex === 0 || stageIndex === 1) && claim.claimType === 'Research Papers';
+    const workflow = settings.incentiveApprovalWorkflows?.[claim.claimType] || [1, 2, 3, 4]; // Default to all stages
 
-        if (isChecklistStage && (action === 'verify' || action === 'approve')) {
-             newStatus = `Pending Stage ${stageIndex + 2} Approval` as IncentiveClaim['status'];
-        } else if (stageIndex === 3) { // Final approval stage is now 3 (for stage 4)
-             newStatus = 'Accepted';
+    if (action === 'reject') {
+        newStatus = 'Rejected';
+    } else {
+        const currentStage = stageIndex + 1;
+        const nextStage = workflow.find(stage => stage > currentStage);
+
+        if (nextStage) {
+            newStatus = `Pending Stage ${nextStage} Approval`;
         } else {
-             newStatus = `Pending Stage ${stageIndex + 2} Approval` as IncentiveClaim['status'];
+            newStatus = 'Accepted'; // No more stages in the workflow
         }
     }
 
@@ -266,9 +271,13 @@ export async function processIncentiveClaimAction(
         status: newStatus,
     };
     
-    // Only update the final amount from Stage 2 onwards
-    if (stageIndex > 1 && action === 'approve') {
-        updateData.finalApprovedAmount = data.amount;
+    if (action === 'approve') {
+        // Find the last stage in the workflow
+        const lastStage = Math.max(...workflow, 0);
+        // Only update final amount if this is the last approval stage
+        if (stageIndex + 1 === lastStage) {
+            updateData.finalApprovedAmount = data.amount;
+        }
     }
 
     await claimRef.update(updateData);
@@ -297,7 +306,7 @@ export async function processIncentiveClaimAction(
         });
     }
 
-    if (action === 'approve' && stageIndex === 3) { // Final approval
+    if (newStatus === 'Accepted' && claim.userEmail) {
         if (claim.userEmail) {
             await sendEmail({
                 to: claim.userEmail,
@@ -320,7 +329,6 @@ export async function processIncentiveClaimAction(
             });
         }
         
-        // If it's a research paper, add it to the papers collection for profiles.
         if (claim.claimType === 'Research Papers') {
             await addPaperFromApprovedClaim(claim);
         }

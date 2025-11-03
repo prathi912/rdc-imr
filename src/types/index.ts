@@ -504,6 +504,7 @@ export type SystemSettings = {
   allowedDomains?: string[]
   croAssignments?: CroAssignment[]
   incentiveApprovers?: ApproverSetting[];
+  incentiveApprovalWorkflows?: Record<string, number[]>;
   iqacEmail?: string;
   enabledIncentiveTypes?: Record<string, boolean>;
   imrMidTermReviewMonths?: number;
