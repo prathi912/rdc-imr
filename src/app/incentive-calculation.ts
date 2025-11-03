@@ -321,7 +321,6 @@ export async function calculateConferenceIncentive(
       } = claimData;
   
       const mode = conferenceMode?.trim().toLowerCase() || "";
-      const totalExpenses = (registrationFee || 0) + (travelFare || 0);
       let maxReimbursement = 0;
   
       const isPuConference =
