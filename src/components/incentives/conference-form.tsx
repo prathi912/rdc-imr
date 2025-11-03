@@ -1,8 +1,7 @@
 
-
 'use client';
 
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
@@ -17,10 +16,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc, doc, setDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, getDocs, query, where, orderBy, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle, Info, Calculator } from 'lucide-react';
@@ -51,7 +50,7 @@ const conferenceSchema = z
     conferenceDate: z.string().min(1, 'Conference date is required.'),
     presentationDate: z.string().min(1, 'Presentation date is required.'),
     registrationFeeProof: z.any().optional(),
-    participationCertificate: z.any().refine((files) => files?.length > 0, 'Participation certificate is required.').refine(files => files?.[0]?.type === 'application/pdf', 'Certificate must be a PDF file.').refine(files => files?.[0]?.size <= 5 * 1024 * 1024, 'File must be below 5MB.'),
+    participationCertificate: z.any().refine((files) => files?.length > 0, 'Participation certificate is required.').refine(files => files?.[0]?.type === 'application/pdf', 'File must be a PDF.').refine(files => files?.[0]?.size <= 5 * 1024 * 1024, 'File must be below 5MB.'),
     wonPrize: z.boolean().optional(),
     prizeDetails: z.string().optional(),
     prizeProof: z.any().optional(),
@@ -101,11 +100,13 @@ const fileToDataUrl = (file: File): Promise<string> => {
 export function ConferenceForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [eligibility, setEligibility] = useState<{ eligible: boolean; nextAvailableDate?: string }>({ eligible: true });
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [calculationBreakdown, setCalculationBreakdown] = useState<{ eligibleExpenses?: number, maxReimbursement?: number } | null>(null);
@@ -145,30 +146,9 @@ export function ConferenceForm() {
   });
 
   const formValues = form.watch();
-  const conferenceMode = form.watch('conferenceMode');
-  const conferenceType = form.watch('conferenceType');
-  const wonPrize = form.watch('wonPrize');
-  const organizerName = form.watch('organizerName');
-  const conferenceName = form.watch('conferenceName');
-  const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
-  const conferenceVenue = form.watch('conferenceVenue');
   
   const calculate = useCallback(async () => {
-    const { registrationFee, travelFare, conferenceMode, onlinePresentationOrder, conferenceType, presentationType, conferenceVenue, organizerName, conferenceName } = form.getValues();
-
-    const dataForCalc = { 
-        registrationFee, 
-        travelFare, 
-        conferenceMode, 
-        onlinePresentationOrder, 
-        conferenceType, 
-        presentationType, 
-        conferenceVenue,
-        organizerName,
-        conferenceName
-    };
-    
-    // Minimal validation to ensure calculation can run without full form validation
+    const dataForCalc = form.getValues();
     if (dataForCalc.conferenceMode) {
       const result = await calculateConferenceIncentive(dataForCalc);
       if (result.success) {
@@ -240,7 +220,44 @@ export function ConferenceForm() {
       };
       checkEligibility();
     }
-  }, []);
+    const claimId = searchParams.get('claimId');
+    if (!claimId) {
+        setIsLoadingDraft(false);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const claimId = searchParams.get('claimId');
+    if (claimId && user) {
+        const fetchDraft = async () => {
+            setIsLoadingDraft(true);
+            try {
+                const claimRef = doc(db, 'incentiveClaims', claimId);
+                const claimSnap = await getDoc(claimRef);
+                if (claimSnap.exists()) {
+                    const draftData = claimSnap.data() as IncentiveClaim;
+                     form.reset({
+                        ...draftData,
+                        govtFundingRequestProof: undefined,
+                        abstractUpload: undefined,
+                        registrationFeeProof: undefined,
+                        participationCertificate: undefined,
+                        prizeProof: undefined,
+                        travelReceipts: undefined,
+                        flightTickets: undefined,
+                    });
+                } else {
+                    toast({ variant: 'destructive', title: 'Draft Not Found' });
+                }
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Error Loading Draft' });
+            } finally {
+                setIsLoadingDraft(false);
+            }
+        };
+        fetchDraft();
+    }
+  }, [searchParams, user, form, toast]);
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -325,10 +342,14 @@ export function ConferenceForm() {
         if (!result.success) {
             throw new Error(result.error);
         }
+        
+        const claimId = searchParams.get('claimId') || result.claimId;
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/conference?claimId=${result.claimId}`);
+          if (!searchParams.get('claimId')) {
+            router.push(`/dashboard/incentive-claim/conference?claimId=${claimId}`);
+          }
         } else {
           toast({ title: 'Success', description: 'Your incentive claim has been submitted.' });
           router.push('/dashboard/incentive-claim');
@@ -342,8 +363,14 @@ export function ConferenceForm() {
     }
   }
 
+  const { conferenceMode, conferenceType, wonPrize, organizerName, conferenceName, travelMode, conferenceVenue } = form.watch();
+  const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
   const isFormDisabled = (!eligibility.eligible && isPuConference) || isSubmitting;
 
+
+  if (isLoadingDraft) {
+    return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
+  }
 
   return (
     <Card>
@@ -407,8 +434,8 @@ export function ConferenceForm() {
                             {conferenceMode === 'Offline' && <FormField name="presentationType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Presentation Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Oral">Oral</SelectItem><SelectItem value="Poster">Poster</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />}
                         </div>
                          <FormField control={form.control} name="conferenceVenue" render={({ field }) => ( <FormItem><FormLabel>Conference Venue/Location</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={!conferenceType || isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select venue" /></SelectTrigger></FormControl><SelectContent>{(conferenceVenueOptions[conferenceType as keyof typeof conferenceVenueOptions] || []).map(venue => (<SelectItem key={venue} value={venue}>{venue}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                        <FormField name="abstractUpload" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Full Abstract (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormDescription>Below 5 MB</FormDescription><FormMessage /></FormItem> )} />
-                        <FormField name="participationCertificate" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Participation/Presentation Certificate (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormDescription>Below 5 MB</FormDescription><FormMessage /></FormItem> )} />
+                        <FormField name="abstractUpload" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Full Abstract (PDF, Below 5MB)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="participationCertificate" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Participation/Presentation Certificate (PDF, Below 5MB)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <FormField control={form.control} name="totalAuthors" render={({ field }) => ( <FormItem><FormLabel>Total No. of Authors</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorCountOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
                           <FormField control={form.control} name="authorType" render={({ field }) => ( <FormItem><FormLabel>Author Type</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}><FormControl><SelectTrigger><SelectValue placeholder="-- Please Select --" /></SelectTrigger></FormControl><SelectContent>{authorTypeOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem> )}/>
@@ -417,7 +444,7 @@ export function ConferenceForm() {
                 </div>
                  <div>
                     <h3 className="font-semibold text-sm -mb-2">EXPENSE &amp; TRAVEL DETAILS</h3>
-                    <Separator className="mt-4"/><div className="space-y-4 mt-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField name="registrationFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Registration Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} min="0" disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="registrationFeeProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Registration Fee Payment</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormDescription>PDF Below 5 MB</FormDescription><FormMessage /></FormItem> )} /></div>{conferenceMode === 'Offline' && (<div className="space-y-4"><FormField name="travelPlaceVisited" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Place Visited</FormLabel><FormControl><Input {...field} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="travelMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Mode</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select travel mode" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Bus">Bus</SelectItem><SelectItem value="Train">Train</SelectItem><SelectItem value="Air">Air</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} /><FormField name="travelFare" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Fare Incurred (INR)</FormLabel><FormControl><Input type="number" {...field} min="0" disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="travelReceipts" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach All Tickets/Travel Receipts</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormDescription>PDF Below 5 MB</FormDescription><FormMessage /></FormItem> )} /></div>)}{conferenceVenue && conferenceVenue !== 'India' && (<FormField name="govtFundingRequestProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Govt. Funding Request</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormDescription>PDF Below 5 MB. Required for conferences outside India.</FormDescription><FormMessage /></FormItem> )} />)}</div>
+                    <Separator className="mt-4"/><div className="space-y-4 mt-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField name="registrationFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Registration Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} min="0" disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="registrationFeeProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Registration Fee Payment (PDF, Below 5MB)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} /></div>{conferenceMode === 'Offline' && (<div className="space-y-4"><FormField name="travelPlaceVisited" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Place Visited</FormLabel><FormControl><Input {...field} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="travelMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Mode</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select travel mode" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Bus">Bus</SelectItem><SelectItem value="Train">Train</SelectItem><SelectItem value="Air">Air</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} /><FormField name="travelFare" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Fare Incurred (INR)</FormLabel><FormControl><Input type="number" {...field} min="0" disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="travelReceipts" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach All Tickets/Travel Receipts (PDF, Below 5MB)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} /></div>)}{conferenceVenue && conferenceVenue !== 'India' && (<FormField name="govtFundingRequestProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Govt. Funding Request (PDF, Below 5MB)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} accept="application/pdf" /></FormControl><FormDescription>Required for conferences outside India.</FormDescription><FormMessage /></FormItem> )} />)}</div>
                     
                 </div>
                 <div>

@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -39,6 +38,7 @@ import { calculateResearchPaperIncentive } from "@/app/incentive-calculation"
 import { submitIncentiveClaim } from "@/app/incentive-approval-actions"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
 import { Badge } from "../ui/badge"
+import { findUserByMisId } from "@/app/userfinding"
 
 
 const MAX_FILES = 10
@@ -302,18 +302,6 @@ function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit
     );
 }
 
-const SPECIAL_POLICY_FACULTIES = [
-    "Faculty of Applied Sciences",
-    "Faculty of Medicine",
-    "Faculty of Homoeopathy",
-    "Faculty of Ayurved",
-    "Faculty of Nursing",
-    "Faculty of Pharmacy",
-    "Faculty of Physiotherapy",
-    "Faculty of Public Health",
-    "Faculty of Engineering & Technology"
-];
-
 export function ResearchPaperForm() {
   const { toast } = useToast()
   const router = useRouter()
@@ -412,8 +400,7 @@ export function ResearchPaperForm() {
     if (!claimId) {
         setIsLoadingDraft(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [append, form, searchParams])
 
   useEffect(() => {
     const claimId = searchParams.get('claimId');
@@ -483,7 +470,6 @@ export function ResearchPaperForm() {
   const getAvailableRoles = (currentAuthor?: Author) => {
     if (publicationType === 'Scopus Indexed Conference Proceedings') {
         const isCurrentAuthorPresenting = currentAuthor && (currentAuthor.role === 'Presenting Author' || currentAuthor.role === 'First & Presenting Author');
-        // If a presenting author exists and it's not the current one, disable presenting roles
         if (presentingAuthorExists && !isCurrentAuthorPresenting) {
             return conferenceAuthorRoles.filter(role => role !== 'Presenting Author' && role !== 'First & Presenting Author');
         }
@@ -1295,6 +1281,7 @@ export function ResearchPaperForm() {
                         <FormLabel className="text-base">
                           Is "Parul University" name present in the publication?
                         </FormLabel>
+                         <FormDescription>If not, the final incentive amount will be reduced by 50%.</FormDescription>
                       </div>
                       <FormControl>
                         <Checkbox checked={field.value} onCheckedChange={field.onChange} />
