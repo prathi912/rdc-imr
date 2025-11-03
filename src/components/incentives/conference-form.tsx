@@ -33,14 +33,14 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle, Info } from 'lucide-react';
+import { Loader2, AlertCircle, Info, Calculator } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { calculateConferenceIncentive } from '@/app/incentive-calculation';
@@ -121,6 +121,7 @@ export function ConferenceForm() {
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [eligibility, setEligibility] = useState<{ eligible: boolean; nextAvailableDate?: string }>({ eligible: true });
+  const [isCalculating, setIsCalculating] = useState(false);
   
   const form = useForm<ConferenceFormValues>({
     resolver: zodResolver(conferenceSchema),
@@ -156,21 +157,19 @@ export function ConferenceForm() {
     },
   });
   
-  const formValues = form.watch();
-
-   const calculate = useCallback(async () => {
-        const result = await calculateConferenceIncentive(formValues);
-        if (result.success) {
-            setCalculatedIncentive(result.amount ?? null);
-        } else {
-            console.error("Incentive calculation failed:", result.error);
-            setCalculatedIncentive(null);
-        }
-    }, [formValues]);
-
-  useEffect(() => {
-    calculate();
-  }, [calculate]);
+  const handleCalculate = async () => {
+    setIsCalculating(true);
+    const formValues = form.getValues();
+    const result = await calculateConferenceIncentive(formValues);
+    if (result.success) {
+        setCalculatedIncentive(result.amount ?? null);
+    } else {
+        console.error("Incentive calculation failed:", result.error);
+        toast({ variant: 'destructive', title: 'Calculation Error', description: result.error || 'Could not calculate incentive.' });
+        setCalculatedIncentive(null);
+    }
+    setIsCalculating(false);
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -381,18 +380,30 @@ export function ConferenceForm() {
                  <div>
                     <h3 className="font-semibold text-sm -mb-2">EXPENSE &amp; TRAVEL DETAILS</h3>
                     <Separator className="mt-4"/><div className="space-y-4 mt-4"><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><FormField name="registrationFee" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Registration Fee (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 5000" {...field} min="0" disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="registrationFeeProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Registration Fee Payment</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /></div>{conferenceMode === 'Offline' && (<div className="space-y-4"><FormField name="travelPlaceVisited" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Place Visited</FormLabel><FormControl><Input {...field} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="travelMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Mode</FormLabel><Select onValueChange={field.onChange} value={field.value} disabled={isFormDisabled}><FormControl><SelectTrigger><SelectValue placeholder="Select travel mode" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Bus">Bus</SelectItem><SelectItem value="Train">Train</SelectItem><SelectItem value="Air">Air</SelectItem><SelectItem value="Other">Other</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} /><FormField name="travelFare" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Travel Fare Incurred (INR)</FormLabel><FormControl><Input type="number" {...field} min="0" disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="travelReceipts" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach All Tickets/Travel Receipts</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /></div>)}{conferenceVenue && conferenceVenue !== 'India' && (<FormField name="govtFundingRequestProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Govt. Funding Request</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} /></FormControl><FormDescription>Required for conferences outside India.</FormDescription><FormMessage /></FormItem> )} />)}</div>
-                     {calculatedIncentive !== null && calculatedIncentive > 0 && (
-                        <div className="p-4 bg-secondary rounded-md">
-                            <p className="text-sm font-medium">Tentative Eligible Reimbursement Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
-                            <p className="text-xs text-muted-foreground">This is the maximum reimbursable amount based on policy. Actual amount is subject to verification.</p>
-                        </div>
-                    )}
-                 </div>
+                    
+                </div>
                 <div>
                     <h3 className="font-semibold text-sm -mb-2">DECLARATIONS</h3>
                     <Separator className="mt-4"/><div className="space-y-4 mt-4"><FormField name="wasPresentingAuthor" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Were you the presenting author?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} /></FormControl></div><FormMessage /></FormItem> )} /><FormField name="isPuNamePresent" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Is "Parul University" name present in the paper?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} /></FormControl></div><FormMessage /></FormItem> )} /><FormField name="wonPrize" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Did your paper win a prize?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} /></FormControl></div><FormMessage /></FormItem> )} />{wonPrize && (<div className="space-y-4 pl-4 border-l-2"><FormField name="prizeDetails" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Prize Details</FormLabel><FormControl><Input placeholder="e.g., Best Paper Award" {...field} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /><FormField name="prizeProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Prize Certificate (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} disabled={isFormDisabled} /></FormControl><FormMessage /></FormItem> )} /></div>)}<FormField name="attendedOtherConference" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Have you attended any other conference this year?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} /></FormControl></div><FormMessage /></FormItem> )} /><FormField control={form.control} name="conferenceSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isFormDisabled} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier & Certified that I have availed only this conference in the calendar year.</p></div></FormItem> )} /></div>
                 </div>
             </div>
+            
+             <div className="p-4 bg-secondary rounded-md space-y-2 mt-6">
+                <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium">Tentative Eligible Reimbursement Amount:</p>
+                    <Button type="button" onClick={handleCalculate} variant="outline" size="sm" disabled={isCalculating}>
+                        {isCalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
+                        Calculate
+                    </Button>
+                </div>
+                {calculatedIncentive !== null && (
+                    <>
+                        <p className="font-bold text-2xl text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-muted-foreground">This is the maximum reimbursable amount based on policy. Actual amount is subject to verification.</p>
+                    </>
+                )}
+            </div>
+
           </CardContent>
           <CardFooter className="flex justify-between">
             <Button
