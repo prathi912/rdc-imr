@@ -11,6 +11,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -144,12 +145,32 @@ export function ConferenceForm() {
   });
 
   const formValues = form.watch();
-
+  const conferenceMode = form.watch('conferenceMode');
+  const conferenceType = form.watch('conferenceType');
+  const conferenceVenue = form.watch('conferenceVenue');
+  const wonPrize = form.watch('wonPrize');
+  const organizerName = form.watch('organizerName');
+  const conferenceName = form.watch('conferenceName');
+  const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
+  
   const calculate = useCallback(async () => {
-    // Manually trigger validation for the fields needed for calculation
-    const isValid = await form.trigger(['registrationFee', 'travelFare', 'conferenceMode', 'onlinePresentationOrder', 'conferenceType', 'presentationType', 'conferenceVenue']);
-    if (isValid) {
-      const result = await calculateConferenceIncentive(formValues);
+    const { registrationFee, travelFare, conferenceMode, onlinePresentationOrder, conferenceType, presentationType, conferenceVenue, organizerName, conferenceName } = form.getValues();
+
+    const dataForCalc = { 
+        registrationFee, 
+        travelFare, 
+        conferenceMode, 
+        onlinePresentationOrder, 
+        conferenceType, 
+        presentationType, 
+        conferenceVenue,
+        organizerName,
+        conferenceName
+    };
+    
+    // Minimal validation to ensure calculation can run without full form validation
+    if (dataForCalc.conferenceMode) {
+      const result = await calculateConferenceIncentive(dataForCalc);
       if (result.success) {
         setCalculatedIncentive(result.amount ?? null);
         setCalculationBreakdown({
@@ -162,16 +183,19 @@ export function ConferenceForm() {
         setCalculationBreakdown(null);
       }
     } else {
-      setCalculatedIncentive(null);
-      setCalculationBreakdown(null);
+        setCalculatedIncentive(null);
+        setCalculationBreakdown(null);
     }
-  }, [form, formValues]);
+  }, [form]);
 
   useEffect(() => {
     const subscription = form.watch((value, { name, type }) => {
-      if (type === 'change') {
-        calculate();
-      }
+        const fieldsForRecalculation = [
+            'registrationFee', 'travelFare', 'conferenceMode', 'onlinePresentationOrder', 'conferenceType', 'presentationType', 'conferenceVenue', 'organizerName', 'conferenceName'
+        ];
+        if (type === 'change' && fieldsForRecalculation.includes(name as string)) {
+            calculate();
+        }
     });
     return () => subscription.unsubscribe();
   }, [form, calculate]);
@@ -217,14 +241,6 @@ export function ConferenceForm() {
       checkEligibility();
     }
   }, []);
-
-  const conferenceType = form.watch('conferenceType');
-  const conferenceMode = form.watch('conferenceMode');
-  const conferenceVenue = form.watch('conferenceVenue');
-  const wonPrize = form.watch('wonPrize');
-  const organizerName = form.watch('organizerName');
-  const conferenceName = form.watch('conferenceName');
-  const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -448,3 +464,5 @@ export function ConferenceForm() {
     </Card>
   );
 }
+
+  
