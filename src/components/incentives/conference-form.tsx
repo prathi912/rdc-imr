@@ -1,34 +1,16 @@
 
+
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardFooter,
-} from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -37,7 +19,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc, doc, setDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle, Info, Calculator } from 'lucide-react';
@@ -59,13 +41,16 @@ const conferenceSchema = z
     travelFare: z.coerce.number().nonnegative("Fare cannot be negative.").optional(),
     wasPresentingAuthor: z.boolean().optional(),
     isPuNamePresent: z.boolean().optional(),
-    abstractUpload: z.any().optional(),
+    abstractUpload: z.any()
+        .refine((files) => files?.length > 0, 'An abstract is required.')
+        .refine(files => files?.[0]?.type === 'application/pdf', 'Abstract must be a PDF file.')
+        .refine(files => files?.[0]?.size <= 5 * 1024 * 1024, 'Abstract must be below 5MB.'),
     organizerName: z.string().min(2, 'Organizer name is required.'),
     eventWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     conferenceDate: z.string().min(1, 'Conference date is required.'),
     presentationDate: z.string().min(1, 'Presentation date is required.'),
     registrationFeeProof: z.any().optional(),
-    participationCertificate: z.any().refine((files) => files?.length > 0, 'Participation certificate is required.'),
+    participationCertificate: z.any().refine((files) => files?.length > 0, 'Participation certificate is required.').refine(files => files?.[0]?.type === 'application/pdf', 'Certificate must be a PDF file.').refine(files => files?.[0]?.size <= 5 * 1024 * 1024, 'File must be below 5MB.'),
     wonPrize: z.boolean().optional(),
     prizeDetails: z.string().optional(),
     prizeProof: z.any().optional(),
@@ -119,9 +104,11 @@ export function ConferenceForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
-  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [eligibility, setEligibility] = useState<{ eligible: boolean; nextAvailableDate?: string }>({ eligible: true });
   
+  const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
+  const [calculationBreakdown, setCalculationBreakdown] = useState<{ eligibleExpenses?: number, maxReimbursement?: number } | null>(null);
+
   const form = useForm<ConferenceFormValues>({
     resolver: zodResolver(conferenceSchema),
     defaultValues: {
@@ -158,29 +145,37 @@ export function ConferenceForm() {
 
   const formValues = form.watch();
 
-  const [calculationBreakdown, setCalculationBreakdown] = useState<{
-    eligibleExpenses?: number;
-    maxReimbursement?: number;
-  } | null>(null);
-
   const calculate = useCallback(async () => {
-    const result = await calculateConferenceIncentive(formValues);
-    if (result.success) {
-      setCalculatedIncentive(result.amount ?? null);
-      setCalculationBreakdown({
-        eligibleExpenses: result.eligibleExpenses,
-        maxReimbursement: result.maxReimbursement
-      });
+    // Manually trigger validation for the fields needed for calculation
+    const isValid = await form.trigger(['registrationFee', 'travelFare', 'conferenceMode', 'onlinePresentationOrder', 'conferenceType', 'presentationType', 'conferenceVenue']);
+    if (isValid) {
+      const result = await calculateConferenceIncentive(formValues);
+      if (result.success) {
+        setCalculatedIncentive(result.amount ?? null);
+        setCalculationBreakdown({
+          eligibleExpenses: result.eligibleExpenses,
+          maxReimbursement: result.maxReimbursement
+        });
+      } else {
+        console.error("Incentive calculation failed:", result.error);
+        setCalculatedIncentive(null);
+        setCalculationBreakdown(null);
+      }
     } else {
-      console.error("Incentive calculation failed:", result.error);
       setCalculatedIncentive(null);
       setCalculationBreakdown(null);
     }
-  }, [formValues]);
+  }, [form, formValues]);
 
   useEffect(() => {
-    calculate();
-  }, [calculate]);
+    const subscription = form.watch((value, { name, type }) => {
+      if (type === 'change') {
+        calculate();
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, calculate]);
+
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -190,7 +185,6 @@ export function ConferenceForm() {
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
 
-      // Check claim history for eligibility
       const checkEligibility = async () => {
           const claimsRef = collection(db, 'incentiveClaims');
           const q = query(
@@ -225,9 +219,7 @@ export function ConferenceForm() {
   }, []);
 
   const conferenceType = form.watch('conferenceType');
-  const conferenceVenue = form.watch('conferenceVenue');
   const conferenceMode = form.watch('conferenceMode');
-  const travelMode = form.watch('travelMode');
   const wonPrize = form.watch('wonPrize');
   const organizerName = form.watch('organizerName');
   const conferenceName = form.watch('conferenceName');
@@ -238,7 +230,6 @@ export function ConferenceForm() {
       toast({ variant: 'destructive', title: 'Error', description: 'User information not found. Please log in again.' });
       return;
     }
-    // Re-check profile completeness on submission
     if (status === 'Pending' && (!user.bankDetails || !user.orcidId || !user.misId)) {
         toast({
             variant: 'destructive',
@@ -251,8 +242,7 @@ export function ConferenceForm() {
     setIsSubmitting(true);
     try {
         const data = form.getValues();
-        const claimId = doc(collection(db, 'incentiveClaims')).id;
-
+        
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
             if (!file || !user) return undefined;
             const dataUrl = await fileToDataUrl(file);
@@ -261,9 +251,42 @@ export function ConferenceForm() {
             if (!result.success || !result.url) { throw new Error(result.error || `File upload failed for ${folderName}`); }
             return result.url;
         };
+        
+        const {
+            govtFundingRequestProof,
+            abstractUpload,
+            registrationFeeProof,
+            participationCertificate,
+            prizeProof,
+            travelReceipts,
+            flightTickets,
+            ...restOfData
+        } = data;
+
+        const [
+            govtFundingRequestProofUrl,
+            abstractUrl,
+            registrationFeeProofUrl,
+            participationCertificateUrl,
+            prizeProofUrl,
+            travelReceiptsUrl,
+        ] = await Promise.all([
+            uploadFileHelper(govtFundingRequestProof?.[0], 'conference-funding-proof'),
+            uploadFileHelper(abstractUpload?.[0], 'conference-abstract'),
+            uploadFileHelper(registrationFeeProof?.[0], 'conference-reg-proof'),
+            uploadFileHelper(participationCertificate?.[0], 'conference-cert'),
+            uploadFileHelper(prizeProof?.[0], 'conference-prize-proof'),
+            uploadFileHelper(travelReceipts?.[0], 'conference-travel-receipts'),
+        ]);
 
         const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
-            ...data,
+            ...restOfData,
+            govtFundingRequestProofUrl,
+            abstractUrl,
+            registrationFeeProofUrl,
+            participationCertificateUrl,
+            prizeProofUrl,
+            travelReceiptsUrl,
             calculatedIncentive,
             misId: user.misId || null,
             orcidId: user.orcidId || null,
@@ -276,23 +299,10 @@ export function ConferenceForm() {
             status,
             submissionDate: new Date().toISOString(),
             bankDetails: user.bankDetails || null,
+            authorType: data.authorType,
+            totalAuthors: data.totalAuthors,
         };
-
-        const govtFundingRequestProofUrl = await uploadFileHelper(data.govtFundingRequestProof?.[0], 'conference-funding-proof');
-        const abstractUrl = await uploadFileHelper(data.abstractUpload?.[0], 'conference-abstract');
-        const registrationFeeProofUrl = await uploadFileHelper(data.registrationFeeProof?.[0], 'conference-reg-proof');
-        const participationCertificateUrl = await uploadFileHelper(data.participationCertificate?.[0], 'conference-cert');
-        const prizeProofUrl = await uploadFileHelper(data.prizeProof?.[0], 'conference-prize-proof');
-        const travelReceiptsUrl = await uploadFileHelper(data.travelReceipts?.[0], 'conference-travel-receipts');
-        const flightTicketsUrl = await uploadFileHelper(data.flightTickets?.[0], 'conference-flight-tickets');
-
-        if (govtFundingRequestProofUrl) claimData.govtFundingRequestProofUrl = govtFundingRequestProofUrl;
-        if (abstractUrl) claimData.abstractUrl = abstractUrl;
-        if (registrationFeeProofUrl) claimData.registrationFeeProofUrl = registrationFeeProofUrl;
-        if (participationCertificateUrl) claimData.participationCertificateUrl = participationCertificateUrl;
-        if (prizeProofUrl) claimData.prizeProofUrl = prizeProofUrl;
-        if (travelReceiptsUrl) claimData.travelReceiptsUrl = travelReceiptsUrl;
-
+        
         const result = await submitIncentiveClaim(claimData);
 
         if (!result.success) {
@@ -399,7 +409,7 @@ export function ConferenceForm() {
                 </div>
             </div>
             
-            <div className="p-4 bg-secondary rounded-md space-y-2 mt-6">
+             <div className="p-4 bg-secondary rounded-md space-y-2 mt-6">
               <p className="text-sm font-medium">Tentative Eligible Reimbursement Amount:</p>
               {calculatedIncentive !== null ? (
                 <>
