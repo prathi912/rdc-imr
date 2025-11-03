@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -305,95 +304,95 @@ export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, 
 // --- Conference Calculation ---
 
 export async function calculateConferenceIncentive(
-    claimData: Partial<IncentiveClaim>
-  ): Promise<{ success: boolean; amount?: number; error?: string }> {
-    try {
-      const {
-        conferenceType,
-        conferenceVenue,
-        presentationType,
-        conferenceMode,
-        registrationFee,
-        travelFare,
-        onlinePresentationOrder,
-        organizerName,
-        conferenceName,
-      } = claimData;
-  
-      const mode = conferenceMode?.trim().toLowerCase() || "";
-      let maxReimbursement = 0;
-  
-      const isPuConference =
-        organizerName?.toLowerCase().includes("parul university") ||
-        conferenceName?.toLowerCase().includes("picet");
-  
-      if (isPuConference) {
-        maxReimbursement = (registrationFee || 0) * 0.75;
-      } else if (mode === "online") {
-        const regFee = registrationFee || 0;
-        switch (onlinePresentationOrder) {
-          case "First":
-            maxReimbursement = Math.min(regFee * 0.75, 15000);
-            break;
-          case "Second":
-            maxReimbursement = Math.min(regFee * 0.6, 10000);
-            break;
-          case "Third":
-            maxReimbursement = Math.min(regFee * 0.5, 7000);
-            break;
-          case "Additional":
-            maxReimbursement = Math.min(regFee * 0.3, 2000);
-            break;
-        }
-      } else if (mode === "offline") {
-        if (conferenceType === "International") {
-          switch (conferenceVenue) {
-            case "Indian Subcontinent":
-              maxReimbursement = 30000;
-              break;
-            case "South Korea, Japan, Australia and Middle East":
-              maxReimbursement = 45000;
-              break;
-            case "Europe":
-              maxReimbursement = 60000;
-              break;
-            case "African/South American/North American":
-              maxReimbursement = 75000;
-              break;
-            case "India":
-              maxReimbursement =
-                presentationType === "Oral" ? 20000 : 15000;
-              break;
-            case "Other":
-              maxReimbursement = 75000;
-              break;
-          }
-        } else if (conferenceType === "National") {
-          maxReimbursement =
-            presentationType === "Oral" ? 12000 : 10000;
-        } else if (conferenceType === "Regional/State") {
-          maxReimbursement = 7500;
-        }
+  claimData: Partial<IncentiveClaim>
+): Promise<{ success: boolean; amount?: number; error?: string }> {
+  try {
+    const {
+      conferenceType,
+      conferenceVenue,
+      presentationType,
+      conferenceMode,
+      registrationFee,
+      travelFare,
+      onlinePresentationOrder,
+      organizerName,
+      conferenceName,
+    } = claimData;
+
+    const mode = conferenceMode?.trim().toLowerCase() || "";
+    let maxReimbursement = 0;
+
+    const isPuConference =
+      organizerName?.toLowerCase().includes("parul university") ||
+      conferenceName?.toLowerCase().includes("picet");
+
+    if (isPuConference) {
+      maxReimbursement = (registrationFee || 0) * 0.75;
+    } else if (mode === "online") {
+      const regFee = registrationFee || 0;
+      switch (onlinePresentationOrder) {
+        case "First":
+          maxReimbursement = Math.min(regFee * 0.75, 15000);
+          break;
+        case "Second":
+          maxReimbursement = Math.min(regFee * 0.6, 10000);
+          break;
+        case "Third":
+          maxReimbursement = Math.min(regFee * 0.5, 7000);
+          break;
+        case "Additional":
+          maxReimbursement = Math.min(regFee * 0.3, 2000);
+          break;
       }
-  
-      const eligibleExpenses =
-        mode === "offline"
-          ? (registrationFee || 0) + (travelFare || 0)
-          : registrationFee || 0;
-  
-      const reimbursableAmount = Math.min(eligibleExpenses, maxReimbursement);
-  
-      return { success: true, amount: reimbursableAmount };
-    } catch (error: any) {
-      console.error("Error calculating conference incentive:", error);
-      return {
-        success: false,
-        error:
-          error.message ||
-          "An unknown error occurred during calculation.",
-      };
+    } else if (mode === "offline") {
+      if (conferenceType === "International") {
+        switch (conferenceVenue) {
+          case "Indian Subcontinent":
+            maxReimbursement = 30000;
+            break;
+          case "South Korea, Japan, Australia and Middle East":
+            maxReimbursement = 45000;
+            break;
+          case "Europe":
+            maxReimbursement = 60000;
+            break;
+          case "African/South American/North American":
+            maxReimbursement = 75000;
+            break;
+          case "India":
+            maxReimbursement =
+              presentationType === "Oral" ? 20000 : 15000;
+            break;
+          case "Other":
+            maxReimbursement = 75000;
+            break;
+        }
+      } else if (conferenceType === "National") {
+        maxReimbursement =
+          presentationType === "Oral" ? 12000 : 10000;
+      } else if (conferenceType === "Regional/State") {
+        maxReimbursement = 7500;
+      }
     }
+
+    const eligibleExpenses =
+      mode === "offline"
+        ? (registrationFee || 0) + (travelFare || 0)
+        : registrationFee || 0;
+
+    const reimbursableAmount = Math.min(eligibleExpenses, maxReimbursement);
+
+    return { success: true, amount: reimbursableAmount };
+  } catch (error: any) {
+    console.error("Error calculating conference incentive:", error);
+    return {
+      success: false,
+      error:
+        error.message ||
+        "An unknown error occurred during calculation.",
+    };
   }
+}
   
 
 // --- Membership Calculation ---
