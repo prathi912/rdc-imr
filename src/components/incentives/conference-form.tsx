@@ -220,6 +220,7 @@ export function ConferenceForm() {
 
   const conferenceType = form.watch('conferenceType');
   const conferenceMode = form.watch('conferenceMode');
+  const conferenceVenue = form.watch('conferenceVenue');
   const wonPrize = form.watch('wonPrize');
   const organizerName = form.watch('organizerName');
   const conferenceName = form.watch('conferenceName');
