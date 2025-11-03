@@ -449,5 +449,3 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
-
-    
