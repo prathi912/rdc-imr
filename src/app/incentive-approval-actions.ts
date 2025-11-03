@@ -147,6 +147,36 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
     }
 }
 
+export async function deleteIncentiveClaim(claimId: string, userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+        const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
+        const claimSnap = await claimRef.get();
+
+        if (!claimSnap.exists) {
+            return { success: false, error: "Claim not found." };
+        }
+
+        const claim = claimSnap.data() as IncentiveClaim;
+
+        if (claim.uid !== userId) {
+            return { success: false, error: "You do not have permission to delete this claim." };
+        }
+        
+        if (claim.status !== 'Draft') {
+            return { success: false, error: "Only draft claims can be deleted." };
+        }
+
+        await claimRef.delete();
+        await logActivity('INFO', 'Incentive claim draft deleted', { claimId, userId });
+        return { success: true };
+        
+    } catch (error: any) {
+        console.error('Error deleting incentive claim draft:', error);
+        await logActivity('ERROR', 'Failed to delete incentive claim draft', { claimId, userId, error: error.message });
+        return { success: false, error: error.message || 'An unexpected server error occurred.' };
+    }
+}
+
 
 async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
     if (claim.claimType !== 'Research Papers' || !claim.paperTitle || !claim.relevantLink) {

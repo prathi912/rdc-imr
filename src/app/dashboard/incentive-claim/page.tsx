@@ -12,7 +12,7 @@ import { db } from '@/lib/config';
 import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit, Eye, Info } from 'lucide-react';
+import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit, Eye, Info, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -32,7 +32,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { getSystemSettings } from '@/app/actions';
-import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { submitIncentiveClaim, deleteIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateBookIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
@@ -44,10 +44,12 @@ function UserClaimsList({
     claims, 
     claimType,
     onViewDetails,
+    onDeleteClaim
 }: { 
     claims: IncentiveClaim[], 
     claimType: 'draft' | 'other',
-    onViewDetails: (claim: IncentiveClaim) => void 
+    onViewDetails: (claim: IncentiveClaim) => void,
+    onDeleteClaim: (claimId: string) => void
 }) {
     if (claims.length === 0) {
         return (
@@ -116,12 +118,17 @@ function UserClaimsList({
                         </div>
                         <div className="flex items-center gap-2 self-end sm:self-center">
                             {claimType === 'draft' ? (
-                                <Button asChild variant="outline" size="sm">
-                                    <Link href={getClaimEditHref(claim)}>
-                                        <Edit className="mr-2 h-4 w-4"/>
-                                        Continue
-                                    </Link>
-                                </Button>
+                                <>
+                                    <Button asChild variant="outline" size="sm">
+                                        <Link href={getClaimEditHref(claim)}>
+                                            <Edit className="mr-2 h-4 w-4"/>
+                                            Continue
+                                        </Link>
+                                    </Button>
+                                    <Button variant="destructive" size="icon" onClick={() => onDeleteClaim(claim.id)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </>
                             ) : (
                                 <>
                                     <Button variant="outline" size="sm" onClick={() => onViewDetails(claim)}>
@@ -395,23 +402,27 @@ export default function IncentiveClaimPage() {
   const [coAuthorClaims, setCoAuthorClaims] = useState<IncentiveClaim[]>([]);
   const { toast } = useToast();
   const [selectedClaim, setSelectedClaim] = useState<IncentiveClaim | null>(null);
+  const [claimToDelete, setClaimToDelete] = useState<IncentiveClaim | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [membershipClaimInfo, setMembershipClaimInfo] = useState<{ canClaim: boolean; nextAvailableDate?: string }>({ canClaim: true });
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [activeTab, setActiveTab] = useState('apply');
   const isMobile = useIsMobile();
 
-  const fetchUserClaims = async (uid: string) => {
+  const fetchAllData = useCallback(async (uid: string) => {
       setLoading(true);
       try {
           const claimsCollection = collection(db, 'incentiveClaims');
-          const q = query(claimsCollection, where('uid', '==', uid), orderBy('submissionDate', 'desc'));
-          const claimSnapshot = await getDocs(q);
-          const claimList = claimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
-          setUserClaims(claimList);
+          
+          // User's own claims
+          const userClaimsQuery = query(claimsCollection, where('uid', '==', uid), orderBy('submissionDate', 'desc'));
+          const userClaimSnapshot = await getDocs(userClaimsQuery);
+          const userClaimList = userClaimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
+          setUserClaims(userClaimList);
 
           // Check for membership claim eligibility
-          const lastMembershipClaim = claimList
+          const lastMembershipClaim = userClaimList
             .filter(c => c.claimType === 'Membership of Professional Bodies' && c.status !== 'Draft' && c.status !== 'Rejected')
             .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())[0];
 
@@ -427,37 +438,26 @@ export default function IncentiveClaimPage() {
             }
           }
 
+          // Co-author claims
+          const coAuthorClaimsQuery = query(claimsRef, where('authorUids', 'array-contains', uid));
+          const coAuthorSnapshot = await getDocs(coAuthorClaimsQuery);
+          const coAuthorClaimList = coAuthorSnapshot.docs
+              .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
+              .filter(claim => claim.uid !== uid); // Ensure it's not the user's own claim
+          setCoAuthorClaims(coAuthorClaimList);
+
+          // System Settings
+          const settings = await getSystemSettings();
+          setSystemSettings(settings);
+
       } catch (error) {
-          console.error("Error fetching user claims:", error);
-          toast({ variant: 'destructive', title: "Error", description: "Could not fetch your claims." });
+          console.error("Error fetching data:", error);
+          toast({ variant: 'destructive', title: "Error", description: "Could not fetch your data." });
       } finally {
           setLoading(false);
       }
-  };
+  }, [toast]);
   
-  const fetchCoAuthorClaims = async (uid: string) => {
-    try {
-        const claimsRef = collection(db, 'incentiveClaims');
-        const q = query(claimsRef, where('authorUids', 'array-contains', uid));
-        const snapshot = await getDocs(q);
-        
-        const claims = snapshot.docs
-            .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
-            .filter(claim => claim.uid !== uid); // Ensure it's not the user's own claim
-        
-        setCoAuthorClaims(claims);
-    } catch (error) {
-        console.error("Error fetching co-author claims:", error);
-    }
-  };
-  
-  const fetchAllData = useCallback(async (uid: string) => {
-      fetchUserClaims(uid);
-      fetchCoAuthorClaims(uid);
-      const settings = await getSystemSettings();
-      setSystemSettings(settings);
-  }, []);
-
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -473,6 +473,26 @@ export default function IncentiveClaimPage() {
     setSelectedClaim(claim);
     setIsDetailsOpen(true);
   };
+  
+  const handleDeleteDraft = async () => {
+    if (!claimToDelete || !user) return;
+    setIsDeleting(true);
+    try {
+        const result = await deleteIncentiveClaim(claimToDelete.id, user.uid);
+        if (result.success) {
+            toast({ title: "Draft Deleted" });
+            fetchAllData(user.uid);
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error });
+        }
+    } catch(e) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Could not delete draft.' });
+    } finally {
+        setIsDeleting(false);
+        setClaimToDelete(null);
+    }
+  };
+
 
   const draftClaims = userClaims.filter(c => c.status === 'Draft');
   const otherClaims = userClaims.filter(c => c.status !== 'Draft');
@@ -606,13 +626,13 @@ export default function IncentiveClaimPage() {
             </div>
           </TabsContent>
            <TabsContent value="my-claims" className="mt-4">
-             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={otherClaims} claimType="other" onViewDetails={handleViewDetails} />}
+             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={otherClaims} claimType="other" onViewDetails={handleViewDetails} onDeleteClaim={() => {}}/>}
           </TabsContent>
            <TabsContent value="co-author" className="mt-4">
             {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} onClaimApplied={() => fetchAllData(user!.uid)} />}
           </TabsContent>
           <TabsContent value="draft" className="mt-4">
-             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" onViewDetails={handleViewDetails}/>}
+             {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" onViewDetails={handleViewDetails} onDeleteClaim={(id) => setClaimToDelete(userClaims.find(c => c.id === id) || null)}/>}
           </TabsContent>
         </Tabs>
       </div>
@@ -624,8 +644,22 @@ export default function IncentiveClaimPage() {
         currentUser={user}
         claimant={user} // On this page, the claimant is always the current user
     />
+     <AlertDialog open={!!claimToDelete} onOpenChange={() => setClaimToDelete(null)}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>This action will permanently delete this draft claim. This cannot be undone.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteDraft} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                    Delete
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
     </>
   );
 }
 
-    
