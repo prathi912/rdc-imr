@@ -156,20 +156,32 @@ export function ConferenceForm() {
       conferenceSelfDeclaration: false,
     },
   });
-  
-  const handleCalculate = async () => {
-    setIsCalculating(true);
-    const formValues = form.getValues();
-    const result = await calculateConferenceIncentive(formValues);
-    if (result.success) {
-        setCalculatedIncentive(result.amount ?? null);
-    } else {
-        console.error("Incentive calculation failed:", result.error);
-        toast({ variant: 'destructive', title: 'Calculation Error', description: result.error || 'Could not calculate incentive.' });
-        setCalculatedIncentive(null);
-    }
-    setIsCalculating(false);
-  };
+  // inside ConferenceForm (replace existing handleCalculate)
+const [calculationBreakdown, setCalculationBreakdown] = useState<{
+  eligibleExpenses?: number;
+  maxReimbursement?: number;
+} | null>(null);
+
+const handleCalculate = async () => {
+  setIsCalculating(true);
+  const formValues = form.getValues();
+
+  const result = await calculateConferenceIncentive(formValues);
+  if (result.success) {
+    // result.amount is the final reimbursable amount
+    setCalculatedIncentive(result.amount ?? null);
+    setCalculationBreakdown({
+      eligibleExpenses: result.eligibleExpenses ?? undefined,
+      maxReimbursement: result.maxReimbursement ?? undefined,
+    });
+  } else {
+    console.error("Incentive calculation failed:", result.error);
+    toast({ variant: 'destructive', title: 'Calculation Error', description: result.error || 'Could not calculate incentive.' });
+    setCalculatedIncentive(null);
+    setCalculationBreakdown(null);
+  }
+  setIsCalculating(false);
+};
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -388,21 +400,31 @@ export function ConferenceForm() {
                 </div>
             </div>
             
-             <div className="p-4 bg-secondary rounded-md space-y-2 mt-6">
-                <div className="flex justify-between items-center">
-                    <p className="text-sm font-medium">Tentative Eligible Reimbursement Amount:</p>
-                    <Button type="button" onClick={handleCalculate} variant="outline" size="sm" disabled={isCalculating}>
-                        {isCalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
-                        Calculate
-                    </Button>
-                </div>
-                {calculatedIncentive !== null && (
-                    <>
-                        <p className="font-bold text-2xl text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
-                        <p className="text-xs text-muted-foreground">This is the maximum reimbursable amount based on policy. Actual amount is subject to verification.</p>
-                    </>
-                )}
-            </div>
+            <div className="p-4 bg-secondary rounded-md space-y-2 mt-6">
+  <div className="flex justify-between items-center">
+    <p className="text-sm font-medium">Tentative Eligible Reimbursement Amount:</p>
+    <Button type="button" onClick={handleCalculate} variant="outline" size="sm" disabled={isCalculating}>
+      {isCalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
+      Calculate
+    </Button>
+  </div>
+
+  {calculatedIncentive !== null && (
+    <>
+      <p className="font-bold text-2xl text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
+      <p className="text-xs text-muted-foreground">This is the final reimbursable amount (minimum of your eligible expenses and the policy cap).</p>
+
+      {/* breakdown for transparency */}
+      {calculationBreakdown && (
+        <div className="mt-2 text-sm text-muted-foreground">
+          <div>Eligible expenses (reg + travel): ₹{(calculationBreakdown.eligibleExpenses ?? 0).toLocaleString('en-IN')}</div>
+          <div>Policy cap: ₹{(calculationBreakdown.maxReimbursement ?? 0).toLocaleString('en-IN')}</div>
+        </div>
+      )}
+    </>
+  )}
+</div>
+
 
           </CardContent>
           <CardFooter className="flex justify-between">
