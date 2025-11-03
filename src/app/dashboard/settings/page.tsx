@@ -43,6 +43,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import NextImage from 'next/image';
+import { Checkbox } from "@/components/ui/checkbox"
 
 const profileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters."),
@@ -635,6 +636,22 @@ export default function SettingsPage() {
     const newSettings = { ...currentSettings, [type]: enabled };
     await handleSystemSettingsSave({ ...systemSettings, enabledIncentiveTypes: newSettings });
   };
+
+  const handleWorkflowChange = async (claimType: string, stage: number, isChecked: boolean) => {
+    if (!systemSettings) return;
+    const currentWorkflows = systemSettings.incentiveApprovalWorkflows || {};
+    const currentStages = currentWorkflows[claimType] || [1, 2, 3, 4]; // Default to all if not set
+
+    let newStages;
+    if (isChecked) {
+        newStages = [...new Set([...currentStages, stage])].sort((a, b) => a - b);
+    } else {
+        newStages = currentStages.filter(s => s !== stage);
+    }
+    
+    const newWorkflows = { ...currentWorkflows, [claimType]: newStages };
+    await handleSystemSettingsSave({ ...systemSettings, incentiveApprovalWorkflows: newWorkflows });
+  };
   
   const handleImrMidTermReviewChange = async (months: number) => {
     if (!systemSettings) return;
@@ -780,6 +797,46 @@ export default function SettingsPage() {
                             </div>
                         ))}
                     </div>
+                </div>
+
+                <div className="space-y-4 rounded-lg border p-4">
+                    <div className="flex items-center gap-2">
+                        <Award className="h-5 w-5" />
+                        <Label className="text-base">Incentive Approval Workflow</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                       Select which approval stages are required for each claim type. The first selected stage will be the starting point.
+                    </p>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Claim Type</TableHead>
+                                <TableHead className="text-center">Stage 1</TableHead>
+                                <TableHead className="text-center">Stage 2</TableHead>
+                                <TableHead className="text-center">Stage 3</TableHead>
+                                <TableHead className="text-center">Stage 4</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {incentiveClaimTypes.map(type => {
+                                const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4];
+                                return (
+                                    <TableRow key={type}>
+                                        <TableCell className="font-medium">{type}</TableCell>
+                                        {[1, 2, 3, 4].map(stage => (
+                                            <TableCell key={stage} className="text-center">
+                                                <Checkbox
+                                                    checked={workflow.includes(stage)}
+                                                    onCheckedChange={(checked) => handleWorkflowChange(type, stage, !!checked)}
+                                                    disabled={isSavingSettings}
+                                                />
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
                 </div>
               
               <div className="space-y-4 rounded-lg border p-4">
