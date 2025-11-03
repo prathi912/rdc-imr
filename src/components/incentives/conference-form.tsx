@@ -33,7 +33,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
@@ -121,7 +121,6 @@ export function ConferenceForm() {
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [eligibility, setEligibility] = useState<{ eligible: boolean; nextAvailableDate?: string }>({ eligible: true });
-  const [isCalculating, setIsCalculating] = useState(false);
   
   const form = useForm<ConferenceFormValues>({
     resolver: zodResolver(conferenceSchema),
@@ -156,32 +155,32 @@ export function ConferenceForm() {
       conferenceSelfDeclaration: false,
     },
   });
-  // inside ConferenceForm (replace existing handleCalculate)
-const [calculationBreakdown, setCalculationBreakdown] = useState<{
-  eligibleExpenses?: number;
-  maxReimbursement?: number;
-} | null>(null);
 
-const handleCalculate = async () => {
-  setIsCalculating(true);
-  const formValues = form.getValues();
+  const formValues = form.watch();
 
-  const result = await calculateConferenceIncentive(formValues);
-  if (result.success) {
-    // result.amount is the final reimbursable amount
-    setCalculatedIncentive(result.amount ?? null);
-    setCalculationBreakdown({
-      eligibleExpenses: result.eligibleExpenses ?? undefined,
-      maxReimbursement: result.maxReimbursement ?? undefined,
-    });
-  } else {
-    console.error("Incentive calculation failed:", result.error);
-    toast({ variant: 'destructive', title: 'Calculation Error', description: result.error || 'Could not calculate incentive.' });
-    setCalculatedIncentive(null);
-    setCalculationBreakdown(null);
-  }
-  setIsCalculating(false);
-};
+  const [calculationBreakdown, setCalculationBreakdown] = useState<{
+    eligibleExpenses?: number;
+    maxReimbursement?: number;
+  } | null>(null);
+
+  const calculate = useCallback(async () => {
+    const result = await calculateConferenceIncentive(formValues);
+    if (result.success) {
+      setCalculatedIncentive(result.amount ?? null);
+      setCalculationBreakdown({
+        eligibleExpenses: result.eligibleExpenses,
+        maxReimbursement: result.maxReimbursement
+      });
+    } else {
+      console.error("Incentive calculation failed:", result.error);
+      setCalculatedIncentive(null);
+      setCalculationBreakdown(null);
+    }
+  }, [formValues]);
+
+  useEffect(() => {
+    calculate();
+  }, [calculate]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -401,30 +400,21 @@ const handleCalculate = async () => {
             </div>
             
             <div className="p-4 bg-secondary rounded-md space-y-2 mt-6">
-  <div className="flex justify-between items-center">
-    <p className="text-sm font-medium">Tentative Eligible Reimbursement Amount:</p>
-    <Button type="button" onClick={handleCalculate} variant="outline" size="sm" disabled={isCalculating}>
-      {isCalculating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Calculator className="mr-2 h-4 w-4" />}
-      Calculate
-    </Button>
-  </div>
-
-  {calculatedIncentive !== null && (
-    <>
-      <p className="font-bold text-2xl text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
-      <p className="text-xs text-muted-foreground">This is the final reimbursable amount (minimum of your eligible expenses and the policy cap).</p>
-
-      {/* breakdown for transparency */}
-      {calculationBreakdown && (
-        <div className="mt-2 text-sm text-muted-foreground">
-          <div>Eligible expenses (reg + travel): ₹{(calculationBreakdown.eligibleExpenses ?? 0).toLocaleString('en-IN')}</div>
-          <div>Policy cap: ₹{(calculationBreakdown.maxReimbursement ?? 0).toLocaleString('en-IN')}</div>
-        </div>
-      )}
-    </>
-  )}
-</div>
-
+              <p className="text-sm font-medium">Tentative Eligible Reimbursement Amount:</p>
+              {calculatedIncentive !== null ? (
+                <>
+                  <p className="font-bold text-2xl text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
+                  {calculationBreakdown && (
+                    <div className="text-xs text-muted-foreground">
+                        <div>Eligible expenses (reg + travel): ₹{(calculationBreakdown.eligibleExpenses ?? 0).toLocaleString('en-IN')}</div>
+                        <div>Policy cap: ₹{(calculationBreakdown.maxReimbursement ?? 0).toLocaleString('en-IN')}</div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-muted-foreground">Fill out the form to see an estimate.</p>
+              )}
+            </div>
 
           </CardContent>
           <CardFooter className="flex justify-between">
