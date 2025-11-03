@@ -20,7 +20,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle, Info, Calculator } from 'lucide-react';
@@ -147,11 +147,11 @@ export function ConferenceForm() {
   const formValues = form.watch();
   const conferenceMode = form.watch('conferenceMode');
   const conferenceType = form.watch('conferenceType');
-  const conferenceVenue = form.watch('conferenceVenue');
   const wonPrize = form.watch('wonPrize');
   const organizerName = form.watch('organizerName');
   const conferenceName = form.watch('conferenceName');
   const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
+  const conferenceVenue = form.watch('conferenceVenue');
   
   const calculate = useCallback(async () => {
     const { registrationFee, travelFare, conferenceMode, onlinePresentationOrder, conferenceType, presentationType, conferenceVenue, organizerName, conferenceName } = form.getValues();
@@ -464,5 +464,3 @@ export function ConferenceForm() {
     </Card>
   );
 }
-
-  
