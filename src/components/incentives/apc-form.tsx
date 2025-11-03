@@ -16,10 +16,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, Author } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { findUserByMisId } from '@/app/userfinding';
@@ -35,7 +35,7 @@ const authorSchema = z.object({
     name: z.string().min(2, 'Author name is required.'),
     email: z.string().email('Invalid email format.'),
     uid: z.string().optional().nullable(),
-    role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
+    role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', "Presenting Author", "First & Presenting Author"]),
     isExternal: z.boolean(),
     status: z.enum(['approved', 'pending', 'Applied'])
 });
@@ -104,12 +104,14 @@ const SPECIAL_POLICY_FACULTIES = [
 export function ApcForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   
   const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
   const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
@@ -199,7 +201,40 @@ export function ApcForm() {
         });
       }
     }
-  }, [append, form]);
+    const claimId = searchParams.get('claimId');
+    if (!claimId) {
+        setIsLoadingDraft(false);
+    }
+  }, [append, form, searchParams]);
+  
+  useEffect(() => {
+    const claimId = searchParams.get('claimId');
+    if (claimId && user) {
+        const fetchDraft = async () => {
+            setIsLoadingDraft(true);
+            try {
+                const claimRef = doc(db, 'incentiveClaims', claimId);
+                const claimSnap = await getDoc(claimRef);
+                if (claimSnap.exists()) {
+                    const draftData = claimSnap.data() as IncentiveClaim;
+                    form.reset({
+                        ...draftData,
+                        apcApcWaiverProof: undefined,
+                        apcPublicationProof: undefined,
+                        apcInvoiceProof: undefined,
+                    });
+                } else {
+                    toast({ variant: 'destructive', title: 'Draft Not Found' });
+                }
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Error Loading Draft' });
+            } finally {
+                setIsLoadingDraft(false);
+            }
+        };
+        fetchDraft();
+    }
+  }, [searchParams, user, form, toast]);
   
   const watchAuthors = form.watch('authors');
   const firstAuthorExists = useMemo(() => 
@@ -407,10 +442,12 @@ export function ApcForm() {
         if (!result.success) {
             throw new Error(result.error);
         }
+        
+        const claimId = searchParams.get('claimId') || result.claimId;
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/apc?claimId=${result.claimId}`);
+          router.push(`/dashboard/incentive-claim/apc?claimId=${claimId}`);
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for APC has been submitted.' });
           router.push('/dashboard/incentive-claim');
@@ -421,6 +458,10 @@ export function ApcForm() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (isLoadingDraft) {
+    return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
   }
 
   return (
@@ -490,10 +531,10 @@ export function ApcForm() {
                             </div>
                             <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
                                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-                                <SelectContent>{getAvailableRoles(field).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                                <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
                             {field.email.toLowerCase() !== user?.email.toLowerCase() && (
-                              <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => removeAuthor(index)}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button> 
+                              <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => remove(index)}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button> 
                             )}
                         </div>
                     ))}
@@ -535,7 +576,7 @@ export function ApcForm() {
                 <FormField name="apcIssnNo" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISSN No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcSciImpactFactor" control={form.control} render={({ field }) => ( <FormItem><FormLabel>SCI Impact Factor</FormLabel><FormControl><Input type="number" step="any" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="apcPuNameInPublication" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Is "PU" name present in the publication?</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
-                <FormField name="apcPublicationProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of Publication Attached</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="apcPublicationProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attachment Proof of publication (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
             </div>
 
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">

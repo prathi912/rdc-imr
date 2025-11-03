@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -13,10 +14,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -48,11 +49,13 @@ const fileToDataUrl = (file: File): Promise<string> => {
 export function MembershipForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   
   const form = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipSchema),
@@ -87,7 +90,39 @@ export function MembershipForm() {
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
     }
-  }, []);
+     const claimId = searchParams.get('claimId');
+    if (!claimId) {
+        setIsLoadingDraft(false);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const claimId = searchParams.get('claimId');
+    if (claimId && user) {
+        const fetchDraft = async () => {
+            setIsLoadingDraft(true);
+            try {
+                const claimRef = doc(db, 'incentiveClaims', claimId);
+                const claimSnap = await getDoc(claimRef);
+                if (claimSnap.exists()) {
+                    const draftData = claimSnap.data() as IncentiveClaim;
+                    form.reset({
+                        ...draftData,
+                        membershipProof: undefined, // Files can't be pre-filled
+                    });
+                } else {
+                    toast({ variant: 'destructive', title: 'Draft Not Found' });
+                }
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Error Loading Draft' });
+            } finally {
+                setIsLoadingDraft(false);
+            }
+        };
+        fetchDraft();
+    }
+  }, [searchParams, user, form, toast]);
+
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -147,9 +182,13 @@ export function MembershipForm() {
             throw new Error(result.error);
         }
 
+        const claimId = searchParams.get('claimId') || result.claimId;
+
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/membership?claimId=${result.claimId}`);
+          if (!searchParams.get('claimId')) {
+            router.push(`/dashboard/incentive-claim/membership?claimId=${claimId}`);
+          }
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for membership has been submitted.' });
           router.push('/dashboard/incentive-claim');
@@ -161,6 +200,10 @@ export function MembershipForm() {
     } finally {
         setIsSubmitting(false);
     }
+  }
+
+  if (isLoadingDraft) {
+    return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
   }
 
   return (

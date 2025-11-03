@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -16,10 +17,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
 import { findUserByMisId } from '@/app/userfinding';
@@ -37,7 +38,7 @@ const bookSchema = z
         name: z.string().min(2, 'Author name is required.'),
         email: z.string().email('Invalid email format.'),
         uid: z.string().optional().nullable(),
-        role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author']),
+        role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', 'Presenting Author', 'First & Presenting Author']),
         isExternal: z.boolean(),
         status: z.enum(['approved', 'pending', 'Applied']),
     })).min(1, 'At least one author is required.')
@@ -138,6 +139,9 @@ function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => v
         );
     };
 
+    const bookProofFile = data.bookProof?.[0] as File | undefined;
+    const scopusProofFile = data.scopusProof?.[0] as File | undefined;
+
     return (
         <Card>
             <CardHeader>
@@ -173,8 +177,8 @@ function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => v
                 {renderDetail("Electronic ISBN", data.isbnElectronic)}
                 {renderDetail("Publisher Website", data.publisherWebsite)}
                 {renderDetail("Publication Order in Year", data.publicationOrderInYear)}
-                {renderDetail("Proof of Publication", data.bookProof?.[0]?.name)}
-                {renderDetail("Scopus Proof", data.scopusProof?.[0]?.name)}
+                {renderDetail("Proof of Publication", bookProofFile?.name)}
+                {renderDetail("Scopus Proof", scopusProofFile?.name)}
             </CardContent>
         </Card>
     );
@@ -183,6 +187,7 @@ function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => v
 export function BookForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
@@ -195,6 +200,7 @@ export function BookForm() {
   const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
   const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
 
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
@@ -271,8 +277,39 @@ export function BookForm() {
         });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+     const claimId = searchParams.get('claimId');
+    if (!claimId) {
+        setIsLoadingDraft(false);
+    }
+  }, [append, form, searchParams]);
+  
+  useEffect(() => {
+    const claimId = searchParams.get('claimId');
+    if (claimId && user) {
+        const fetchDraft = async () => {
+            setIsLoadingDraft(true);
+            try {
+                const claimRef = doc(db, 'incentiveClaims', claimId);
+                const claimSnap = await getDoc(claimRef);
+                if (claimSnap.exists()) {
+                    const draftData = claimSnap.data() as IncentiveClaim;
+                    form.reset({
+                        ...draftData,
+                        bookProof: undefined, // Files can't be pre-filled
+                        scopusProof: undefined,
+                    });
+                } else {
+                    toast({ variant: 'destructive', title: 'Draft Not Found' });
+                }
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Error Loading Draft' });
+            } finally {
+                setIsLoadingDraft(false);
+            }
+        };
+        fetchDraft();
+    }
+  }, [searchParams, user, form, toast]);
 
   const bookApplicationType = form.watch('bookApplicationType');
   const publicationMode = form.watch('publicationMode');
@@ -293,7 +330,10 @@ export function BookForm() {
 
 
   async function handleSave(status: 'Draft' | 'Pending') {
-    if (!user || !user.faculty) return;
+    if (!user || !user.faculty) {
+      toast({ variant: 'destructive', title: 'Error', description: 'User information not found. Please log in again.' });
+      return;
+    }
     if (status === 'Pending' && bankDetailsMissing) {
         toast({
             variant: 'destructive',
@@ -356,10 +396,14 @@ export function BookForm() {
         if (!result.success || !result.claimId) {
             throw new Error(result.error);
         }
+
+        const claimId = searchParams.get('claimId') || result.claimId;
         
         if (status === 'Draft') {
             toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-            router.push(`/dashboard/incentive-claim/book?claimId=${result.claimId}`);
+            if (!searchParams.get('claimId')) {
+                router.push(`/dashboard/incentive-claim/book?claimId=${claimId}`);
+            }
         } else {
             toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
             router.push('/dashboard/incentive-claim');
@@ -441,6 +485,10 @@ export function BookForm() {
     };
 
 
+  if (isLoadingDraft) {
+    return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
+  }
+
   if (currentStep === 2) {
     return (
         <Card>
@@ -495,10 +543,10 @@ export function BookForm() {
                                 <FormField
                                     control={form.control}
                                     name={`authors.${index}.role`}
-                                    render={({ field }) => (
+                                    render={({ field: roleField }) => (
                                         <FormItem>
                                             <FormLabel>Role</FormLabel>
-                                            <Select onValueChange={field.onChange} value={field.value}>
+                                            <Select onValueChange={roleField.onChange} value={roleField.value}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl>
                                                 <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                                             </Select>
@@ -526,9 +574,9 @@ export function BookForm() {
                             </Button>
                         </div>
                         {foundCoPi && (
-                            <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                            <div className="flex items-center justify-between p-2 border rounded-md mt-2 bg-muted/50">
                                 <div>
-                                    <p>{foundCoPi.name}</p>
+                                    <p className="text-sm">{foundCoPi.name}</p>
                                     {!foundCoPi.uid && <p className="text-xs text-muted-foreground">Not registered, but found in staff data.</p>}
                                 </div>
                                 <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>

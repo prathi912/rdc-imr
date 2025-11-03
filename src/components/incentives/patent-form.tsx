@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -15,10 +16,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, doc, setDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, PatentInventor } from '@/types';
 import { uploadFileToServer, checkPatentUniqueness } from '@/app/actions';
 import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
@@ -102,6 +103,7 @@ const fileToDataUrl = (file: File): Promise<string> => {
 export function PatentForm() {
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
@@ -111,6 +113,7 @@ export function PatentForm() {
   const [isSearching, setIsSearching] = useState(false);
   const [foundUser, setFoundUser] = useState<PatentInventor | null>(null);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   
   const form = useForm<PatentFormValues>({
     resolver: zodResolver(patentSchema),
@@ -161,8 +164,44 @@ export function PatentForm() {
         appendInventor({ name: parsedUser.name, misId: parsedUser.misId, uid: parsedUser.uid });
       }
     }
-  }, [appendInventor, form]);
+    const claimId = searchParams.get('claimId');
+    if (!claimId) {
+        setIsLoadingDraft(false);
+    }
+  }, [appendInventor, form, searchParams]);
   
+  useEffect(() => {
+    const claimId = searchParams.get('claimId');
+    if (claimId && user) {
+        const fetchDraft = async () => {
+            setIsLoadingDraft(true);
+            try {
+                const claimRef = doc(db, 'incentiveClaims', claimId);
+                const claimSnap = await getDoc(claimRef);
+                if (claimSnap.exists()) {
+                    const draftData = claimSnap.data() as IncentiveClaim;
+                    form.reset({
+                        ...draftData,
+                        filingDate: draftData.filingDate ? parseISO(draftData.filingDate) : undefined,
+                        publicationDate: draftData.publicationDate ? parseISO(draftData.publicationDate) : undefined,
+                        grantDate: draftData.grantDate ? parseISO(draftData.grantDate) : undefined,
+                        patentForm1: undefined,
+                        patentApprovalProof: undefined,
+                        patentGovtReceipt: undefined,
+                    });
+                } else {
+                    toast({ variant: 'destructive', title: 'Draft Not Found' });
+                }
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Error Loading Draft' });
+            } finally {
+                setIsLoadingDraft(false);
+            }
+        };
+        fetchDraft();
+    }
+  }, [searchParams, user, form, toast]);
+
   const handleSearchUser = async () => {
     if (!searchTerm) return;
     setIsSearching(true);
@@ -226,7 +265,7 @@ export function PatentForm() {
         const data = form.getValues();
         
         // Uniqueness check
-        const uniquenessCheck = await checkPatentUniqueness(data.patentTitle, data.patentApplicationNumber);
+        const uniquenessCheck = await checkPatentUniqueness(data.patentTitle, data.patentApplicationNumber, searchParams.get('claimId') || undefined);
         if (!uniquenessCheck.isUnique) {
             toast({ variant: 'destructive', title: 'Duplicate Entry', description: uniquenessCheck.message, duration: 8000 });
             setIsSubmitting(false);
@@ -275,13 +314,17 @@ export function PatentForm() {
         
         const result = await submitIncentiveClaim(claimData as Omit<IncentiveClaim, 'id' | 'claimId'>);
 
-        if (!result.success) {
+        if (!result.success || !result.claimId) {
             throw new Error(result.error);
         }
 
+        const claimId = searchParams.get('claimId') || result.claimId;
+
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/patent?claimId=${result.claimId}`);
+          if(!searchParams.get('claimId')) {
+            router.push(`/dashboard/incentive-claim/patent?claimId=${claimId}`);
+          }
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for patent has been submitted.' });
           router.push('/dashboard/incentive-claim');
@@ -293,6 +336,10 @@ export function PatentForm() {
     } finally {
         setIsSubmitting(false);
     }
+  }
+
+  if (isLoadingDraft) {
+    return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
   }
 
   return (
@@ -315,7 +362,7 @@ export function PatentForm() {
                 <Info className="h-4 w-4" />
                 <AlertTitle>Important Notes on Patent Incentives</AlertTitle>
                 <AlertDescription>
-                    <ol className="list-decimal list-inside space-y-1 mt-2 text-xs">
+                    <ul className="list-disc list-inside space-y-1 mt-2 text-xs">
                         <li>No incentives shall be offered for the grant of Industrial Designs, Trademarks or Copyrights.</li>
                         <li>Financial and technical support shall be provided by the IPR Cell for the protection of any form of intellectual property by filing of applications subject to the condition that 'Parul University' is the sole/Joint applicant.</li>
                         <li>The above specified support shall be provided for filing applications within India only.</li>
@@ -445,7 +492,7 @@ export function PatentForm() {
 
           </CardContent>
           <CardFooter className="flex justify-between">
-             <Button
+            <Button
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
