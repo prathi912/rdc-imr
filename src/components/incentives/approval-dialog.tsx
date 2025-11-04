@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -41,7 +42,7 @@ const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
 const createApprovalSchema = (isChecklistEnabled: boolean) => z.object({
   action: z.enum(['approve', 'reject', 'verify']),
-  amount: z.coerce.number().positive("Amount must be a positive number.").optional(),
+  amount: z.coerce.number().optional(),
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
 }).refine(data => {
@@ -56,11 +57,11 @@ const createApprovalSchema = (isChecklistEnabled: boolean) => z.object({
 .refine(data => {
     // Amount is ALWAYS required when approving, at ANY stage.
     if (data.action === 'approve') {
-        return data.amount !== undefined && data.amount > 0;
+        return data.amount !== undefined;
     }
     return true;
 }, {
-  message: 'Approved amount must be a positive number when approving.',
+  message: 'Approved amount is required when approving.',
   path: ['amount'],
 }).refine(data => {
     if (data.action === 'reject') {
