@@ -39,7 +39,7 @@ interface ApprovalDialogProps {
 
 const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
-const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) => z.object({
+const createApprovalSchema = (isChecklistEnabled: boolean) => z.object({
   action: z.enum(['approve', 'reject', 'verify']),
   amount: z.coerce.number().positive("Amount must be a positive number.").optional(),
   comments: z.string().optional(),
@@ -54,6 +54,7 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
     path: ['action'],
 })
 .refine(data => {
+    // Amount is ALWAYS required when approving, at ANY stage.
     if (data.action === 'approve') {
         return data.amount !== undefined && data.amount > 0;
     }
@@ -255,7 +256,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     };
     const fieldsToVerify = getFieldsToVerify();
     
-    const approvalSchema = createApprovalSchema(stageIndex, isChecklistEnabled);
+    const approvalSchema = createApprovalSchema(isChecklistEnabled);
     const formSchemaWithVerification = approvalSchema.refine(data => {
         if (!isChecklistEnabled) return true;
         // Check if every required field has a boolean value (true or false)
