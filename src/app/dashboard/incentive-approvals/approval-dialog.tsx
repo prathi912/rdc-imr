@@ -59,7 +59,7 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
     }
     return true;
 }, {
-  message: 'Approved amount is required when approving.',
+  message: 'Approved amount must be a positive number for this stage.',
   path: ['amount'],
 }).refine(data => {
     if (data.action === 'reject') {
@@ -269,10 +269,10 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         if (stageIndex > 0 && claim.approvals) {
             // Find the most recent approval before the current stage
             const previousApprovals = claim.approvals
-                .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved' && a.approvedAmount > 0)
+                .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved')
                 .sort((a, b) => b!.stage - a!.stage);
 
-            if (previousApprovals.length > 0) {
+            if (previousApprovals.length > 0 && previousApprovals[0]!.approvedAmount > 0) {
                 return { defaultAmount: previousApprovals[0]!.approvedAmount, isAutoCalculated: false };
             }
         }
@@ -336,10 +336,10 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const previousApprovals = (claim.approvals || []).filter(a => a?.stage < stageIndex + 1);
     
-    
+    const currentUser = approver;
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
-    const isViewerAdminOrApprover = approver?.role === 'Super-admin' || approver?.role === 'admin' || approver?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
 
 
     return (
@@ -369,13 +369,13 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         <p className={`font-semibold ${approval.status === 'Approved' ? 'text-green-600' : 'text-red-600'}`}>{approval.status}</p>
                                     </div>
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                                        <p>
-                                            <strong className="text-muted-foreground">Comments:</strong>{' '}
+                                        <p className="text-muted-foreground">
+                                            <strong className="text-foreground">Comments:</strong>{' '}
                                             {approval.comments || 'N/A'}
                                         </p>
                                         {approval.status === 'Approved' && (
-                                            <p className="mt-1 sm:mt-0">
-                                                <strong className="text-muted-foreground">Approved Amount:</strong>{' '}
+                                            <p className="mt-1 sm:mt-0 text-muted-foreground">
+                                                <strong className="text-foreground">Approved Amount:</strong>{' '}
                                                 ₹{approval.approvedAmount.toLocaleString('en-IN')}
                                             </p>
                                         )}
@@ -384,6 +384,13 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                 )
                             ))}
                             <Separator />
+                        </div>
+                    )}
+
+                    {claim.calculatedIncentive !== undefined && claim.calculatedIncentive !== null && (
+                         <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-md text-center">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Tentatively Eligible Incentive Amount:</p>
+                            <p className="font-bold text-2xl text-blue-600 dark:text-blue-400 mt-1">₹{claim.calculatedIncentive.toLocaleString('en-IN')}</p>
                         </div>
                     )}
 
@@ -425,7 +432,6 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                             <FormMessage />
                                         </FormItem>
                                     )}
-                                />
                             )}
                              {action !== 'verify' && (
                                 <FormField
