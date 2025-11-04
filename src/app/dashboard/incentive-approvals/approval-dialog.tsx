@@ -457,6 +457,3 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         </Dialog>
     );
 }
-
-
-    
