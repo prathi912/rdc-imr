@@ -333,8 +333,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const previousApprovals = (claim.approvals || []).filter(a => a?.stage < stageIndex + 1);
     
-    const hasProfileLink = claimant && claimant.misId;
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
+    const hasProfileLink = claimant && claimant.misId;
     const isViewerAdminOrApprover = approver?.role === 'Super-admin' || approver?.role === 'admin' || approver?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
 
 
@@ -457,3 +457,6 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         </Dialog>
     );
 }
+
+
+    
