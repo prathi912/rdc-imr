@@ -57,7 +57,7 @@ export default function IncentiveApprovalsPage() {
             const [pendingSnapshot, allClaimsSnapshot, usersSnapshot] = await Promise.all([
                 getDocs(pendingClaimsQuery),
                 getDocs(allClaimsQuery),
-                getDocs(usersSnapshot)
+                getDocs(usersQuery)
             ]);
 
             setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
@@ -371,4 +371,3 @@ export default function IncentiveApprovalsPage() {
         </>
     );
 }
-
