@@ -37,6 +37,7 @@ export default function IncentiveApprovalsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [claimTypeFilter, setClaimTypeFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
+    const [activeTab, setActiveTab] = useState('pending');
 
     const fetchClaimsAndUsers = useCallback(async (currentUser: User, stage: number) => {
         setLoading(true);
@@ -44,7 +45,7 @@ export default function IncentiveApprovalsPage() {
             const claimsCollection = collection(db, 'incentiveClaims');
             const usersQuery = query(collection(db, 'users'));
             
-            const statusToFetch = stage === 0 ? 'Pending' : `Pending Stage ${stage + 1} Approval`;
+            const statusToFetch = `Pending Stage ${stage + 1} Approval`;
             
             const pendingClaimsQuery = query(
                 claimsCollection, 
@@ -52,22 +53,21 @@ export default function IncentiveApprovalsPage() {
                 orderBy('submissionDate', 'desc')
             );
 
-            const allClaimsQuery = query(claimsCollection, orderBy('submissionDate', 'desc'));
+            // History should include all claims the user has acted upon at their stage
+            const historyQuery = query(
+              claimsCollection, 
+              where(`approvals.${stage}.approverUid`, '==', currentUser.uid),
+              orderBy('submissionDate', 'desc')
+            );
             
-            const [pendingSnapshot, allClaimsSnapshot, usersSnapshot] = await Promise.all([
+            const [pendingSnapshot, historySnapshot, usersSnapshot] = await Promise.all([
                 getDocs(pendingClaimsQuery),
-                getDocs(allClaimsQuery),
+                getDocs(historyQuery),
                 getDocs(usersQuery)
             ]);
 
             setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
-            
-            const allClaims = allClaimsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
-            const userHistory = allClaims.filter(claim => 
-                claim.approvals?.some(approval => approval?.approverUid === currentUser.uid && approval.stage === stage + 1)
-            );
-            setHistoryClaims(userHistory);
-
+            setHistoryClaims(historySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
             setAllUsers(usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as User)));
 
         } catch (error) {
@@ -275,6 +275,11 @@ export default function IncentiveApprovalsPage() {
           })}
       </div>
     );
+    
+    const tabs = [
+        { value: "pending", label: `Pending For My Approval (${filteredPendingClaims.length})`, content: renderTable(filteredPendingClaims), mobileContent: renderCards(filteredPendingClaims), count: filteredPendingClaims.length },
+        { value: "history", label: `My History (${filteredHistoryClaims.length})`, content: renderTable(filteredHistoryClaims, true), mobileContent: renderCards(filteredHistoryClaims, true), count: filteredHistoryClaims.length }
+    ];
 
     return (
         <>
@@ -300,43 +305,30 @@ export default function IncentiveApprovalsPage() {
                     </Select>
                 </div>
                 <div className="mt-4">
-                     <Tabs defaultValue="pending">
+                     <Tabs defaultValue="pending" value={activeTab} onValueChange={setActiveTab}>
                         <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="pending">Pending ({filteredPendingClaims.length})</TabsTrigger>
-                            <TabsTrigger value="history">History ({filteredHistoryClaims.length})</TabsTrigger>
+                            {tabs.map(tab => (
+                                <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+                            ))}
                         </TabsList>
-                        <TabsContent value="pending" className="mt-4">
-                            <Card>
-                                <CardContent className="pt-6">
-                                    {filteredPendingClaims.length > 0 ? (
-                                      <>
-                                        {renderTable(filteredPendingClaims)}
-                                        {renderCards(filteredPendingClaims)}
-                                      </>
-                                    ) : (
-                                        <div className="text-center py-12 text-muted-foreground">
-                                            <p>There are no claims awaiting your approval at this stage.</p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                        <TabsContent value="history" className="mt-4">
-                            <Card>
-                                <CardContent className="pt-6">
-                                    {filteredHistoryClaims.length > 0 ? (
-                                      <>
-                                        {renderTable(filteredHistoryClaims, true)}
-                                        {renderCards(filteredHistoryClaims, true)}
-                                      </>
-                                    ) : (
-                                        <div className="text-center py-12 text-muted-foreground">
-                                            <p>You have not processed any claims yet.</p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+                        {tabs.map(tab => (
+                            <TabsContent key={tab.value} value={tab.value} className="mt-4">
+                                <Card>
+                                    <CardContent className="pt-6">
+                                        {tab.count > 0 ? (
+                                        <>
+                                            {tab.content}
+                                            {tab.mobileContent}
+                                        </>
+                                        ) : (
+                                            <div className="text-center py-12 text-muted-foreground">
+                                                <p>There are no claims in this category.</p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        ))}
                     </Tabs>
                 </div>
             </div>
@@ -347,15 +339,11 @@ export default function IncentiveApprovalsPage() {
                         open={isDetailsOpen} 
                         onOpenChange={setIsDetailsOpen} 
                         currentUser={user}
-                        claimant={allUsers.find(u => u.uid === selectedClaim.uid) || null}
-                        onTakeAction={() => {
-                            if (selectedClaim.status === `Pending Stage ${approvalStage + 1} Approval` || (approvalStage === 0 && selectedClaim.status === 'Pending')) {
-                                setIsDetailsOpen(false);
-                                handleOpenApproval(selectedClaim);
-                            } else {
-                                toast({ variant: 'default', title: 'Action Not Available', description: 'This claim is not at your current approval stage.' });
-                            }
-                        }}
+                        claimant={allUsers.find(u => u.uid === selectedClaim?.uid) || null}
+                        onTakeAction={!historyClaims.some(c => c.id === selectedClaim.id) ? () => {
+                            setIsDetailsOpen(false);
+                            handleOpenApproval(selectedClaim);
+                        } : undefined}
                     />
                     <ApprovalDialog 
                         claim={selectedClaim} 
