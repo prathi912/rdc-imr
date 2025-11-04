@@ -55,11 +55,11 @@ const createApprovalSchema = (isChecklistEnabled: boolean) => z.object({
 })
 .refine(data => {
     if (data.action === 'approve') {
-        return data.amount !== undefined && data.amount >= 0;
+        return data.amount !== undefined && data.amount > 0;
     }
     return true;
 }, {
-  message: 'Approved amount must be provided when approving.',
+  message: 'Approved amount must be a positive number when approving.',
   path: ['amount'],
 }).refine(data => {
     if (data.action === 'reject') {
@@ -232,8 +232,10 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
+    // Checklist for stage 1 (index 0) and stage 2 (index 1) of Research Papers
     const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1));
     
+    // Dynamically determine which fields need verification based on the claim's data
     const getFieldsToVerify = () => {
         if (!isResearchPaperClaim) return [];
 
@@ -256,6 +258,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const approvalSchema = createApprovalSchema(isChecklistEnabled);
     const formSchemaWithVerification = approvalSchema.refine(data => {
         if (!isChecklistEnabled) return true;
+        // Check if every required field has a boolean value (true or false)
         return fieldsToVerify.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
     }, {
         message: 'You must verify all visible fields (mark as correct or incorrect).',
@@ -264,8 +267,9 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const { defaultAmount, isAutoCalculated } = (() => {
         if (stageIndex > 0 && claim.approvals) {
+            // Find the most recent approval before the current stage
             const previousApprovals = claim.approvals
-                .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved' && a.approvedAmount >= 0)
+                .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved' && a.approvedAmount > 0)
                 .sort((a, b) => b!.stage - a!.stage);
 
             if (previousApprovals.length > 0) {
@@ -335,7 +339,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
-    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+    const isViewerAdminOrApprover = approver?.role === 'Super-admin' || approver?.role === 'admin' || approver?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
 
 
     return (
