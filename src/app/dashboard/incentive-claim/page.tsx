@@ -439,7 +439,7 @@ export default function IncentiveClaimPage() {
           }
 
           // Co-author claims
-          const coAuthorClaimsQuery = query(claimsRef, where('authorUids', 'array-contains', uid));
+          const coAuthorClaimsQuery = query(claimsCollection, where('authorUids', 'array-contains', uid));
           const coAuthorSnapshot = await getDocs(coAuthorClaimsQuery);
           const coAuthorClaimList = coAuthorSnapshot.docs
               .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
@@ -662,4 +662,3 @@ export default function IncentiveClaimPage() {
     </>
   );
 }
-
