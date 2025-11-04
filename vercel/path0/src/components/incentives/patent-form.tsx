@@ -24,8 +24,8 @@ import { uploadFileToServer, checkPatentUniqueness } from '@/app/actions';
 import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { findUserByMisId } from '@/app/userfinding';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Calendar } from '../ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
