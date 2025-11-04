@@ -350,7 +350,7 @@ export async function processIncentiveClaimAction(
                             We are pleased to inform you that your incentive claim for "<strong style="color:#ffffff;">${claimTitle}</strong>" has been successfully approved by all committees.
                         </p>
                         <p style="color:#e0e0e0;">
-                            The final approved incentive amount is <strong style="color:#ffffff;">₹${data.amount?.toLocaleString('en-IN') || 'N/A'}</strong>. The amount will be processed by the accounts department shortly.
+                            The final approved incentive amount is <strong style="color:#ffffff;">₹${(data.amount || 0).toLocaleString('en-IN')}</strong>. The amount will be processed by the accounts department shortly.
                         </p>
                         <p style="color:#e0e0e0;">Congratulations on your achievement!</p>
                         ${EMAIL_STYLES.footer}
