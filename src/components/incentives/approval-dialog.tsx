@@ -55,7 +55,6 @@ const createApprovalSchema = (isChecklistEnabled: boolean) => z.object({
     path: ['action'],
 })
 .refine(data => {
-    // Amount is ALWAYS required when approving, at ANY stage.
     if (data.action === 'approve') {
         return data.amount !== undefined;
     }
