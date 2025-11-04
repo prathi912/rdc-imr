@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Eye, ArrowUpDown } from 'lucide-react';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
-import { ApprovalDialog } from './approval-dialog';
+import { ApprovalDialog } from '@/components/incentives/approval-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';

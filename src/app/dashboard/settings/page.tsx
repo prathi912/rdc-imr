@@ -438,10 +438,11 @@ export default function SettingsPage() {
       setIsSubmittingBank(false)
     }
   }
+  
 
   async function onPasswordSubmit(data: PasswordFormValues) {
     setIsSubmittingPassword(true)
-    const currentUser = auth.currentUser
+
     if (!currentUser || !currentUser.email) {
       toast({
         variant: "destructive",
