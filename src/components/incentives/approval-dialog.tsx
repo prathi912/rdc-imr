@@ -339,10 +339,13 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
-    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+    const isViewerAdminOrApprover =
+    approver?.role === 'Super-admin' ||
+    approver?.role === 'admin' ||
+    approver?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+  
 
-
-    return (
+    return (    
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
