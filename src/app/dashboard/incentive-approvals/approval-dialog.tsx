@@ -41,7 +41,7 @@ const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
 const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) => z.object({
   action: z.enum(['approve', 'reject', 'verify']),
-  amount: z.coerce.number().positive("Amount cannot be in negative.").optional(),
+  amount: z.coerce.number().optional(),
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
 }).refine(data => {
@@ -54,12 +54,12 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
     path: ['action'],
 })
 .refine(data => {
-    if (stageIndex > 1 && data.action === 'approve') {
-        return data.amount !== undefined && data.amount > 0;
+    if (data.action === 'approve') {
+        return data.amount !== undefined;
     }
     return true;
 }, {
-  message: 'Approved amount must be a positive number for this stage.',
+  message: 'Approved amount is required when approving.',
   path: ['amount'],
 }).refine(data => {
     if (data.action === 'reject') {
@@ -368,10 +368,18 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         <p className="font-semibold">Stage {approval.stage}: {approval.approverName}</p>
                                         <p className={`font-semibold ${approval.status === 'Approved' ? 'text-green-600' : 'text-red-600'}`}>{approval.status}</p>
                                     </div>
-                                    <p><strong className="text-muted-foreground">Comments:</strong> {approval.comments || 'N/A'}</p>
-                                    {approval.status === 'Approved' && approval.stage > 1 && (
-                                        <p><strong className="text-muted-foreground">Approved Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
-                                    )}
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                                        <p>
+                                            <strong className="text-muted-foreground">Comments:</strong>{' '}
+                                            {approval.comments || 'N/A'}
+                                        </p>
+                                        {approval.status === 'Approved' && (
+                                            <p className="mt-1 sm:mt-0">
+                                                <strong className="text-muted-foreground">Approved Amount:</strong>{' '}
+                                                ₹{approval.approvedAmount.toLocaleString('en-IN')}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
                                 )
                             ))}
@@ -403,7 +411,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {action === 'approve' && stageIndex > 1 && (
+                            {action === 'approve' && (
                                 <FormField
                                     name="amount"
                                     control={form.control}

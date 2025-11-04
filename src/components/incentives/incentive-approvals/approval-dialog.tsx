@@ -368,10 +368,19 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         <p className="font-semibold">Stage {approval.stage}: {approval.approverName}</p>
                                         <p className={`font-semibold ${approval.status === 'Approved' ? 'text-green-600' : 'text-red-600'}`}>{approval.status}</p>
                                     </div>
-                                    <p><strong className="text-muted-foreground">Comments:</strong> {approval.comments || 'N/A'}</p>
-                                    {approval.status === 'Approved' && approval.stage > 1 && (
-                                        <p><strong className="text-muted-foreground">Approved Amount:</strong> ₹{approval.approvedAmount.toLocaleString('en-IN')}</p>
-                                    )}
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+  <p>
+    <strong className="text-muted-foreground">Comments:</strong>{' '}
+    {approval.comments || 'N/A'}
+  </p>
+  {approval.status === 'Approved' && (
+    <p className="mt-1 sm:mt-0">
+      <strong className="text-muted-foreground">Approved Amount:</strong>{' '}
+      ₹{approval.approvedAmount.toLocaleString('en-IN')}
+    </p>
+  )}
+</div>
+
                                 </div>
                                 )
                             ))}
