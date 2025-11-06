@@ -457,7 +457,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <CardTitle>Applicant Registrations ({interests.length})</CardTitle>
                     <div className="flex items-center gap-2">
-                         {unscheduledApplicantsExist && (
+                         {unscheduledApplicantsExist && currentUser.designation !== 'Head of Goa Campus' && (
                             <Button onClick={() => setIsScheduleDialogOpen(true)}>
                                 <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
                             </Button>
