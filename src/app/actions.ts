@@ -35,6 +35,7 @@ import type * as z from "zod"
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
+import { generateGoogleMeetLink } from "./google-meet-actions"
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -728,7 +729,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
 
 export async function scheduleMeeting(
   projectsToSchedule: { id: string; pi_uid: string; title: string; pi_email?: string }[],
-  meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[] },
+  meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[], mode: 'Online' | 'Offline' },
   isMidTermReview: boolean = false,
 ) {
   try {
@@ -742,6 +743,20 @@ export async function scheduleMeeting(
     const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting"
     const subjectPrefix = isMidTermReview ? "Mid-term Review" : "IMR Meeting"
 
+    let finalVenue = meetingDetails.venue;
+    if (meetingDetails.mode === 'Online') {
+      const meetLink = await generateGoogleMeetLink({
+        summary: `IMR Meeting: ${projectsToSchedule.map(p => p.title).join(', ')}`,
+        description: 'IMR Project Evaluation Meeting',
+        startDateTime: new Date(`${meetingDetails.date}T${meetingDetails.time}`).toISOString(),
+        endDateTime: new Date(new Date(`${meetingDetails.date}T${meetingDetails.time}`).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
+      });
+      if (!meetLink) {
+        throw new Error("Could not generate Google Meet link.");
+      }
+      finalVenue = meetLink;
+    }
+
     for (const projectData of projectsToSchedule) {
       const projectRef = adminDb.collection("projects").doc(projectData.id)
 
@@ -749,7 +764,8 @@ export async function scheduleMeeting(
         meetingDetails: {
           date: meetingDetails.date,
           time: meetingDetails.time,
-          venue: meetingDetails.venue,
+          venue: finalVenue,
+          mode: meetingDetails.mode,
           assignedEvaluators: meetingDetails.evaluatorUids,
         },
       };
@@ -783,7 +799,11 @@ export async function scheduleMeeting(
               </p>
               <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
-              <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
+              <p><strong style="color: #ffffff;">
+                ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
+              </strong> 
+                ${meetingDetails.mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+              </p>
               <p style="color: #cccccc;">
                 Please prepare for your presentation. You can view more details on the 
                 <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectData.id}" style="color: #64b5f6; text-decoration: underline;">
@@ -820,35 +840,20 @@ export async function scheduleMeeting(
           })
 
           if (evaluator.email) {
-              const emailHtml = isMidTermReview
-              ? `
+              const emailHtml = `
                   <div ${EMAIL_STYLES.background}>
                       ${EMAIL_STYLES.logo}
                       <p style="color: #ffffff;">Dear ${evaluator.name},</p>
                       <p style="color: #e0e0e0;">
-                          You have been assigned to an <strong style="color:#ffffff;">IMR Mid-term Review Meeting</strong> committee. Your presence is kindly requested.
+                          You have been assigned to an <strong style="color:#ffffff;">${meetingType}</strong> committee with the following details. You are requested to be present.
                       </p>
                       <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
                       <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
-                      <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
-                      <p style="color: #e0e0e0;">The following projects are scheduled for review:</p>
-                      <ul style="list-style-type: none; padding-left: 0;">
-                          ${projectTitles}
-                      </ul>
-                      <p style="color: #cccccc;">Thank you for your contribution to the research ecosystem at Parul University.</p>
-                      ${EMAIL_STYLES.footer}
-                  </div>
-              `
-              : `
-                  <div ${EMAIL_STYLES.background}>
-                      ${EMAIL_STYLES.logo}
-                      <p style="color: #ffffff;">Dear ${evaluator.name},</p>
-                      <p style="color: #e0e0e0;">
-                          You have been assigned to an <strong style="color:#ffffff;">IMR Evaluation Meeting</strong> committee with the following details. You are requested to be present.
+                      <p><strong style="color: #ffffff;">
+                        ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
+                      </strong> 
+                        ${meetingDetails.mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
                       </p>
-                      <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
-                      <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
-                      <p><strong style="color: #ffffff;">Venue:</strong> ${meetingDetails.venue}</p>
                       <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
                       <ul style="list-style-type: none; padding-left: 0;">
                           ${projectTitles}
@@ -1927,3 +1932,6 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
 
 
 
+
+
+    

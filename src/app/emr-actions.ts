@@ -11,6 +11,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import type * as z from 'zod';
 import { addDays, setHours, setMinutes, setSeconds } from "date-fns";
 import * as XLSX from 'xlsx';
+import { generateGoogleMeetLink } from "./google-meet-actions";
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -273,11 +274,11 @@ export async function registerEmrInterest(
 
 export async function scheduleEmrMeeting(
   callId: string,
-  meetingDetails: { date: string; time: string; venue: string; pptDeadline: string; evaluatorUids: string[] },
+  meetingDetails: { date: string; time: string; venue: string; pptDeadline: string; evaluatorUids: string[], mode: 'Online' | 'Offline' },
   applicantUids: string[],
 ) {
   try {
-    const { date, time, venue, pptDeadline, evaluatorUids } = meetingDetails
+    const { date, time, venue, pptDeadline, evaluatorUids, mode } = meetingDetails
     const timeZone = "Asia/Kolkata"
 
     if (!evaluatorUids || evaluatorUids.length === 0) {
@@ -297,8 +298,21 @@ export async function scheduleEmrMeeting(
     const meetingDateTimeString = `${date}T${time}:00`
     const pptDeadlineString = pptDeadline
 
+     let finalVenue = venue;
+    if (mode === 'Online') {
+      const meetLink = await generateGoogleMeetLink({
+        summary: `EMR Meeting: ${call.title}`,
+        description: `EMR Presentation for ${call.title}`,
+        startDateTime: new Date(`${date}T${time}`).toISOString(),
+        endDateTime: new Date(new Date(`${date}T${time}`).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
+      });
+      if (!meetLink) {
+        throw new Error("Could not generate Google Meet link.");
+      }
+      finalVenue = meetLink;
+    }
+
     for (const userId of applicantUids) {
-      // Find the interest document for this user and call
       const interestsRef = adminDb.collection("emrInterests")
       const q = interestsRef.where("callId", "==", callId).where("userId", "==", userId)
       const interestSnapshot = await q.get()
@@ -331,7 +345,9 @@ export async function scheduleEmrMeeting(
               </p>
               <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
-              <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
+              <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
+                ${mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+              </p>
               <p style="color: #e0e0e0;">
                 Please upload your presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(pptDeadlineString, timeZone, "PPpp (z)")}</strong>.
               </p>
@@ -379,7 +395,9 @@ export async function scheduleEmrMeeting(
                     <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
                     <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
                     <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
-                    <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
+                    <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
+                       ${mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+                    </p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Projects Portal.</p>
                     ${EMAIL_STYLES.footer}
                 </div>
@@ -1407,3 +1425,6 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
     }
 }
 
+
+
+    
