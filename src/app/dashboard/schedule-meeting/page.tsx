@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -25,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { scheduleMeeting, getSystemSettings } from '@/app/actions';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -39,6 +41,11 @@ const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
   time: z.string().min(1, 'Meeting time is required.'),
   evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
+  mode: z.enum(['Offline', 'Online'], { required_error: 'Please select a meeting mode.' }),
+  venue: z.string().optional(),
+}).refine(data => data.mode === 'Online' || (data.venue && data.venue.length > 0), {
+    message: 'Venue is required for offline meetings.',
+    path: ['venue'],
 });
 
 function ProjectListTable({ 
@@ -162,6 +169,8 @@ export default function ScheduleMeetingPage() {
     defaultValues: {
       time: '',
       evaluatorUids: [],
+      mode: 'Offline',
+      venue: 'RDC Committee Room, PIMSR',
     },
   });
 
@@ -212,7 +221,6 @@ export default function ScheduleMeetingPage() {
     const grantStartDate = p.grant?.phases?.[0]?.disbursementDate || p.projectStartDate;
     if (!grantStartDate) return false;
     
-    // Check if a mid-term review has already been conducted by checking for a meeting date after the grant start date.
     const hasHadMidTermReview = p.meetingDetails?.date && isAfter(parseISO(p.meetingDetails.date), parseISO(grantStartDate));
 
     return isAfter(thresholdDate, parseISO(grantStartDate)) && !hasHadMidTermReview;
@@ -249,7 +257,8 @@ export default function ScheduleMeetingPage() {
     const meetingDetails = {
       date: format(data.date, 'yyyy-MM-dd'),
       time: data.time,
-      venue: "RDC Committee Room, PIMSR",
+      venue: data.mode === 'Online' ? 'Google Meet' : data.venue || '',
+      mode: data.mode,
       evaluatorUids: data.evaluatorUids,
     };
     
@@ -277,6 +286,7 @@ export default function ScheduleMeetingPage() {
   };
   
   const usersMap = new Map(allUsers.map(u => [u.uid, u]));
+  const meetingMode = form.watch('mode');
 
   if (loading) {
     return (
@@ -344,45 +354,38 @@ export default function ScheduleMeetingPage() {
                 <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <FormField
-                        control={form.control}
-                        name="date"
-                        render={({ field }) => (
+                    <FormField name="date" control={form.control} render={({ field }) => ( 
                         <FormItem className="flex flex-col">
                             <FormLabel>Meeting Date</FormLabel>
-                            <Popover>
-                            <PopoverTrigger asChild>
-                                <FormControl>
-                                <Button
-                                    variant={"outline"}
-                                    className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                >
-                                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                                </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                                <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus />
-                            </PopoverContent>
-                            </Popover>
+                            <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2015} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus /></PopoverContent></Popover>
                             <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="time"
-                        render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Meeting Time</FormLabel>
+                        </FormItem> 
+                    )} />
+                    <FormField name="time" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    
+                    <FormField name="mode" control={form.control} render={({ field }) => (
+                        <FormItem className="space-y-3">
+                            <FormLabel>Meeting Mode</FormLabel>
                             <FormControl>
-                            <Input type="time" {...field} />
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4">
+                                    <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Offline" /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem>
+                                    <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Online" /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem>
+                                </RadioGroup>
                             </FormControl>
                             <FormMessage />
                         </FormItem>
-                        )}
-                    />
+                    )} />
+                    
+                    {meetingMode === 'Offline' && (
+                        <FormField name="venue" control={form.control} render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Venue</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                    )}
+                    
                     <FormField
                         control={form.control}
                         name="evaluatorUids"
