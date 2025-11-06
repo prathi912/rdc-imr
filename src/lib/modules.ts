@@ -37,7 +37,7 @@ const facultyDefaults = [...coreModules, ...facultyCoreModules, "incentive-claim
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics", "incentive-claim"]
 const iqacDefaults = [...coreModules, "all-projects", "analytics"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "emr-management", "manage-incentive-claims"]
-const superAdminDefaults = [...adminDefaults, "module-management", "bulk-upload-emr", "bulk-upload-incentives"]
+const superAdminDefaults = [...adminDefaults, "module-management"]
 
 // Default modules for special designations who are otherwise 'faculty' role
 const principalDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"]

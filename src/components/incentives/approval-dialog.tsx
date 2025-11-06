@@ -54,12 +54,13 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
     path: ['action'],
 })
 .refine(data => {
-    if (stageIndex > 1 && data.action === 'approve') {
-        return data.amount !== undefined && data.amount > 0;
+    // Amount is ALWAYS required when approving, at ANY stage.
+    if (data.action === 'approve') {
+        return data.amount !== undefined;
     }
     return true;
 }, {
-  message: 'Approved amount must be a positive number for this stage.',
+  message: 'Approved amount is required for this stage.',
   path: ['amount'],
 }).refine(data => {
     if (data.action === 'reject') {
@@ -232,10 +233,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
-    // Checklist for stage 1 (index 0) and stage 2 (index 1) of Research Papers
     const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1));
     
-    // Dynamically determine which fields need verification based on the claim's data
     const getFieldsToVerify = () => {
         if (!isResearchPaperClaim) return [];
 
@@ -258,7 +257,6 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const approvalSchema = createApprovalSchema(stageIndex, isChecklistEnabled);
     const formSchemaWithVerification = approvalSchema.refine(data => {
         if (!isChecklistEnabled) return true;
-        // Check if every required field has a boolean value (true or false)
         return fieldsToVerify.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
     }, {
         message: 'You must verify all visible fields (mark as correct or incorrect).',
@@ -267,16 +265,15 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const { defaultAmount, isAutoCalculated } = (() => {
         if (stageIndex > 0 && claim.approvals) {
-            // Find the most recent approval before the current stage
             const previousApprovals = claim.approvals
-                .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved' && a.approvedAmount > 0)
+                .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved')
                 .sort((a, b) => b!.stage - a!.stage);
 
-            if (previousApprovals.length > 0) {
+            if (previousApprovals.length > 0 && previousApprovals[0]!.approvedAmount > 0) {
                 return { defaultAmount: previousApprovals[0]!.approvedAmount, isAutoCalculated: false };
             }
         }
-        return { defaultAmount: claim.calculatedIncentive || 0, isAutoCalculated: true };
+        return { defaultAmount: claim.calculatedIncentive, isAutoCalculated: true };
     })();
     
     const getDefaultAction = () => {
@@ -287,7 +284,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const form = useForm<ApprovalFormData>({
         resolver: zodResolver(formSchemaWithVerification),
         defaultValues: {
-            amount: defaultAmount,
+            amount: defaultAmount || 0,
             verifiedFields: {},
             action: getDefaultAction(),
         }
@@ -296,7 +293,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     useEffect(() => {
         if (isOpen) {
             form.reset({
-                amount: defaultAmount,
+                amount: defaultAmount || 0,
                 verifiedFields: {},
                 action: getDefaultAction(),
                 comments: '',
@@ -336,16 +333,15 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const previousApprovals = (claim.approvals || []).filter(a => a?.stage < stageIndex + 1);
     
-    
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
     const isViewerAdminOrApprover =
-    approver?.role === 'Super-admin' ||
-    approver?.role === 'admin' ||
-    approver?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
-  
+  approver?.role === 'Super-admin' ||
+  approver?.role === 'admin' ||
+  approver?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
 
-    return (    
+
+    return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
@@ -371,23 +367,29 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         <p className="font-semibold">Stage {approval.stage}: {approval.approverName}</p>
                                         <p className={`font-semibold ${approval.status === 'Approved' ? 'text-green-600' : 'text-red-600'}`}>{approval.status}</p>
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-  <p>
-    <strong className="text-muted-foreground">Comments:</strong>{' '}
-    {approval.comments || 'N/A'}
-  </p>
-  {approval.status === 'Approved' && (
-    <p className="mt-1 sm:mt-0">
-      <strong className="text-muted-foreground">Approved Amount:</strong>{' '}
-      ₹{approval.approvedAmount.toLocaleString('en-IN')}
-    </p>
-  )}
-</div>
-
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                                          <p>
+                                            <strong className="text-muted-foreground">Comments:</strong>{' '}
+                                            {approval.comments || 'N/A'}
+                                          </p>
+                                          {approval.status === 'Approved' && (
+                                            <p className="mt-1 sm:mt-0">
+                                              <strong className="text-muted-foreground">Approved Amount:</strong>{' '}
+                                              ₹{approval.approvedAmount.toLocaleString('en-IN')}
+                                            </p>
+                                          )}
+                                      </div>
                                 </div>
                                 )
                             ))}
                             <Separator />
+                        </div>
+                    )}
+                    
+                     {stageIndex === 0 && claim.calculatedIncentive !== undefined && claim.calculatedIncentive !== null && (
+                        <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-md text-center">
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Tentatively Eligible Incentive Amount:</p>
+                            <p className="font-bold text-2xl text-blue-600 dark:text-blue-400 mt-1">₹{claim.calculatedIncentive.toLocaleString('en-IN')}</p>
                         </div>
                     )}
 
@@ -415,7 +417,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {action === 'approve' && stageIndex > 1 && (
+                            {action === 'approve' && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
@@ -423,13 +425,12 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         <FormItem>
                                             <div className="flex items-center gap-2">
                                                 <FormLabel>Approved Amount (INR)</FormLabel>
-                                                {isAutoCalculated && <span className="text-xs text-muted-foreground">(Auto-calculated)</span>}
+                                                {isAutoCalculated && stageIndex === 0 && <span className="text-xs text-muted-foreground">(Tentative)</span>}
                                             </div>
                                             <FormControl><Input type="number" {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
-                                />
                             )}
                              {action !== 'verify' && (
                                 <FormField

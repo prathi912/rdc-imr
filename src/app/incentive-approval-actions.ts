@@ -204,7 +204,6 @@ async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
                 email: claim.userEmail,
                 name: claim.userName,
                 role: 'Co-Author', // Default role, can be adjusted if more info is available
-                isExternal: false,
                 status: 'approved',
             });
         }
