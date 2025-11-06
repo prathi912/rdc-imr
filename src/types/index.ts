@@ -499,6 +499,10 @@ export type ApproverSetting = {
     signatureUrl?: string;
 };
 
+export type TemplateUrls = {
+  [key: string]: string;
+};
+
 export type SystemSettings = {
   is2faEnabled: boolean
   allowedDomains?: string[]
@@ -511,6 +515,7 @@ export type SystemSettings = {
   imrEvaluationDays?: number;
   utilizationNotificationEmail?: string;
   dndEmail?: string;
+  templateUrls?: TemplateUrls;
 }
 
 export type LoginOtp = {

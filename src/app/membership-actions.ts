@@ -6,8 +6,9 @@ import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import { getTemplateContent } from '@/lib/template-manager';
 import { format } from 'date-fns';
+import { getSystemSettings } from './actions';
+import { getTemplateContentFromUrl } from '@/lib/template-manager';
 
 
 export async function generateMembershipIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
@@ -26,11 +27,17 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
     }
     const user = userSnap.data() as User;
     
-    const templateName = 'INCENTIVE_MEMBERSHIP.docx';
+    const settings = await getSystemSettings();
+    const templateUrl = settings.templateUrls?.['INCENTIVE_MEMBERSHIP'];
+
+    if (!templateUrl) {
+      return { success: false, error: 'Membership incentive template URL is not configured in system settings.' };
+    }
+
+    const content = await getTemplateContentFromUrl(templateUrl);
     
-    const content = getTemplateContent(templateName);
     if (!content) {
-        return { success: false, error: `Template file ${templateName} not found or couldn't be loaded.` };
+        return { success: false, error: `Template file could not be loaded from the URL.` };
     }
 
     const zip = new PizZip(content);
@@ -79,8 +86,4 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
     const base64 = buf.toString('base64');
 
     return { success: true, fileData: base64 };
-  } catch (error: any) {
-    console.error('Error generating membership incentive form:', error);
-    return { success: false, error: error.message || 'Failed to generate the form.' };
-  }
-}
+  } catch (error: any
