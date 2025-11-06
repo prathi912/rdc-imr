@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { User } from '@/types';
 import { runChatAgent } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
 
 type Message = {
   id: string;
@@ -39,11 +40,24 @@ export default function AiChatPage() {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setSessionUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+       if (!parsedUser.allowedModules?.includes('ai-chat')) {
+        toast({
+          title: 'Access Denied',
+          description: "You don't have permission to view this page.",
+          variant: 'destructive',
+        });
+        router.replace('/dashboard');
+        return;
+      }
+      setSessionUser(parsedUser);
+    } else {
+        router.replace('/login');
     }
     
     const savedMessages = sessionStorage.getItem('chatMessages');
@@ -57,7 +71,7 @@ export default function AiChatPage() {
       };
       setMessages([welcomeMessage]);
     }
-  }, []);
+  }, [router, toast]);
 
   useEffect(() => {
     // Save messages to session storage whenever they change, but only if a session is active
@@ -167,6 +181,10 @@ export default function AiChatPage() {
         setIsLoading(false);
     }
   };
+
+  if (!sessionUser) {
+    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin"/></div>
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">

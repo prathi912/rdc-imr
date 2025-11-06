@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 export default function MyEvaluationsPage() {
   const [evaluatedProjects, setEvaluatedProjects] = useState<Project[]>([]);
@@ -18,13 +20,26 @@ export default function MyEvaluationsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const { toast } = useToast();
+  const router = useRouter();
 
   useEffect(() => {
      const storedUser = localStorage.getItem('user');
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+         if (!parsedUser.allowedModules?.includes('my-evaluations')) {
+            toast({
+            title: 'Access Denied',
+            description: "You don't have permission to view this page.",
+            variant: 'destructive',
+            });
+            router.replace('/dashboard');
+            return;
+        }
+        setUser(parsedUser);
+      } else {
+          router.replace('/login');
       }
-  }, []);
+  }, [router, toast]);
 
   useEffect(() => {
     if (!user) return;
@@ -67,6 +82,11 @@ export default function MyEvaluationsPage() {
       p.pi.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [evaluatedProjects, searchTerm]);
+  
+  if (!user) {
+    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin"/></div>
+  }
+
 
   return (
     <div className="container mx-auto py-10">
@@ -80,7 +100,7 @@ export default function MyEvaluationsPage() {
         />
       </div>
       <div className="mt-4">
-        {loading || !user ? (
+        {loading ? (
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-4">

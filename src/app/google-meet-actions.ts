@@ -15,9 +15,9 @@ interface GenerateMeetLinkArgs {
 
 // The correct scope for creating a meeting space with the Meet API.
 const SCOPES = ['https://www.googleapis.com/auth/meetings.space.created'];
-const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
+const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
 // The private key must be formatted correctly to handle newline characters from environment variables.
-const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+const FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function generateGoogleMeetLink({
   summary,
@@ -25,7 +25,7 @@ export async function generateGoogleMeetLink({
   startDateTime,
   endDateTime,
 }: GenerateMeetLinkArgs): Promise<{ link: string | null; error?: string }> {
-  if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+  if (!FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) {
     const errorMsg = "Google Meet API credentials are not set in environment variables.";
     console.error(errorMsg);
     return { link: null, error: errorMsg };
@@ -33,8 +33,8 @@ export async function generateGoogleMeetLink({
 
   try {
     const auth = new JWT({
-      email: GOOGLE_CLIENT_EMAIL,
-      key: GOOGLE_PRIVATE_KEY,
+      email: FIREBASE_CLIENT_EMAIL,
+      key: FIREBASE_PRIVATE_KEY,
       scopes: SCOPES,
     });
 

@@ -10,18 +10,39 @@ import type { Project, User } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2 } from 'lucide-react';
 
 export default function PendingReviewsPage() {
   const [pendingProjects, setPendingProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+       if (!parsedUser.allowedModules?.includes('pending-reviews')) {
+        toast({
+          title: 'Access Denied',
+          description: "You don't have permission to view this page.",
+          variant: 'destructive',
+        });
+        router.replace('/dashboard');
+        return;
+      }
+      setCurrentUser(parsedUser);
+    } else {
+        router.replace('/login');
     }
+  }, [router, toast]);
+
+  useEffect(() => {
+    if (!currentUser) return;
 
     async function getPendingProjects() {
       try {
@@ -44,7 +65,7 @@ export default function PendingReviewsPage() {
       }
     }
     getPendingProjects();
-  }, []);
+  }, [currentUser]);
 
   const filteredProjects = useMemo(() => {
     if (!searchTerm) return pendingProjects;
@@ -53,6 +74,10 @@ export default function PendingReviewsPage() {
       p.pi.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [pendingProjects, searchTerm]);
+  
+  if (!currentUser) {
+    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin"/></div>
+  }
 
   return (
     <div className="container mx-auto py-10">
@@ -66,7 +91,7 @@ export default function PendingReviewsPage() {
         />
       </div>
       <div className="mt-4">
-         {loading || !currentUser ? (
+         {loading ? (
           <Card>
             <CardContent className="pt-6">
               <div className="space-y-4">

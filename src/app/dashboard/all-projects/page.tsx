@@ -359,14 +359,23 @@ export default function AllProjectsPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser);
+      if (!parsedUser.allowedModules?.includes('all-projects')) {
+        toast({
+          title: 'Access Denied',
+          description: "You don't have permission to view this page.",
+          variant: 'destructive',
+        });
+        router.replace('/dashboard');
+        return;
+      }
       setUser(parsedUser);
        if (parsedUser.role === 'CRO' || parsedUser.role === 'Super-admin' || parsedUser.role === 'admin') {
          setFacultyFilter(searchParams.get('faculty')?.split(',').filter(Boolean) || []);
        }
     } else {
-      setLoading(false);
+        router.replace('/login');
     }
-  }, [searchParams]);
+  }, [router, searchParams, toast]);
   
   useEffect(() => {
       setSelectedExportColumns(activeTab === 'imr' ? IMR_EXPORT_COLUMNS.map(c => c.id) : EMR_EXPORT_COLUMNS.map(c => c.id));
@@ -374,8 +383,10 @@ export default function AllProjectsPage() {
   }, [activeTab, updateUrlParams]);
 
   useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+    if(user) {
+        fetchAllData();
+    }
+  }, [user, fetchAllData]);
   
   const hasAdminView = ['Super-admin', 'admin', 'CRO', 'IQAC'].includes(user?.role || '') || user?.designation === 'Principal' || user?.designation === 'HOD';
   const canEditCoPis = user?.role === 'Super-admin';
@@ -496,6 +507,10 @@ export default function AllProjectsPage() {
   };
 
 
+  if (!user) {
+    return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin"/></div>
+  }
+
   return (
     <>
     <div className="container mx-auto py-10">
@@ -523,10 +538,7 @@ export default function AllProjectsPage() {
                                     <Input type="date" value={exportDateRange?.to ? format(exportDateRange.to, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, to: e.target.value ? parseISO(e.target.value) : undefined }))} />
                                     </div>
                                 ) : (
-                                    <Popover>
-                                        <PopoverTrigger asChild><Button id="date" variant={"outline"} className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{exportDateRange?.from ? (exportDateRange.to ? (`${format(exportDateRange.from, "LLL dd, y")} - ${format(exportDateRange.to, "LLL dd, y")}`) : format(exportDateRange.from, "LLL dd, y")) : (<span>Pick a date range</span>)}</Button></PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2015} toYear={new Date().getFullYear()} initialFocus mode="range" defaultMonth={exportDateRange?.from} selected={exportDateRange} onSelect={setExportDateRange} /></PopoverContent>
-                                    </Popover>
+                                    <Popover><PopoverTrigger asChild><Button id="date" variant={"outline"} className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{exportDateRange?.from ? (exportDateRange.to ? (`${format(exportDateRange.from, "LLL dd, y")} - ${format(exportDateRange.to, "LLL dd, y")}`) : format(exportDateRange.from, "LLL dd, y")) : (<span>Pick a date range</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2015} toYear={new Date().getFullYear()} initialFocus mode="range" defaultMonth={exportDateRange?.from} selected={exportDateRange} onSelect={setExportDateRange} /></PopoverContent></Popover>
                                 )}
                             </div>
                         )}

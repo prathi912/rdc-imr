@@ -11,11 +11,12 @@ import { db } from '@/lib/config';
 import { collection, query, where, getDocs, onSnapshot, or, orderBy, Timestamp } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, getYear, subDays, startOfDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Award, Download, Users } from 'lucide-react';
+import { Award, Download, Users, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { toPng } from 'html-to-image';
+import { useRouter } from 'next/navigation';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
@@ -57,6 +58,7 @@ export default function AnalyticsPage() {
   const [submissionsByYearType, setSubmissionsByYearType] = useState<'submissions' | 'sanctions'>('submissions');
   const [projectsByGroupType, setProjectsByGroupType] = useState<'imr' | 'emr'>('imr');
   const { toast } = useToast();
+  const router = useRouter();
   
   const statusChartRef = useRef<HTMLDivElement>(null);
   const submissionsTimeChartRef = useRef<HTMLDivElement>(null);
@@ -91,14 +93,23 @@ export default function AnalyticsPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
+         if (!parsedUser.allowedModules?.includes('analytics')) {
+            toast({
+            title: 'Access Denied',
+            description: "You don't have permission to view this page.",
+            variant: 'destructive',
+            });
+            router.replace('/dashboard');
+            return;
+        }
         setUser(parsedUser);
         if (parsedUser.role === 'CRO' && parsedUser.faculties && parsedUser.faculties.length > 0) {
             setFacultyFilter(parsedUser.faculties[0]);
         }
     } else {
-        setLoading(false);
+        router.replace('/login');
     }
-  }, []);
+  }, [router, toast]);
 
   useEffect(() => {
     if (!user) return;
@@ -389,7 +400,7 @@ export default function AnalyticsPage() {
     return 'Visualize project data and submission trends across the university.';
   }
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="container mx-auto py-10">
         <PageHeader title="Analytics" description="Loading data..." />
