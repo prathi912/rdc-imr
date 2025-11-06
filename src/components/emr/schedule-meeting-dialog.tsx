@@ -3,7 +3,7 @@
 // src/components/emr/schedule-meeting-dialog.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import * as z from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,9 +19,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { format, parseISO, startOfToday, isToday, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Calendar, ChevronDown, Loader2 } from 'lucide-react';
+import { Calendar, ChevronDown, Loader2, Info } from 'lucide-react';
 import { scheduleEmrMeeting } from '@/app/emr-actions';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface ScheduleMeetingDialogProps {
     call: FundingCall;
@@ -93,7 +94,23 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
         }
     });
 
+    const selectedApplicantUids = applicantsForm.watch('applicantUids');
+
+    const hasGoaCampusPi = useMemo(() => {
+        return selectedApplicantUids.some(uid => {
+            const user = allUsers.find(u => u.uid === uid);
+            return user?.campus === 'Goa';
+        });
+    }, [selectedApplicantUids, allUsers]);
+
     const meetingMode = scheduleForm.watch('mode');
+
+    useEffect(() => {
+        if (hasGoaCampusPi) {
+            scheduleForm.setValue('mode', 'Online');
+        }
+    }, [hasGoaCampusPi, scheduleForm]);
+    
     useEffect(() => {
         if (meetingMode === 'Online') {
             scheduleForm.setValue('venue', '');
@@ -221,9 +238,18 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                              <FormField name="mode" control={scheduleForm.control} render={({ field }) => (
                                 <FormItem className="space-y-3">
                                     <FormLabel>Meeting Mode</FormLabel>
+                                    {hasGoaCampusPi && (
+                                        <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700">
+                                            <Info className="h-4 w-4 text-blue-600" />
+                                            <AlertTitle>Online Mode Enforced</AlertTitle>
+                                            <AlertDescription className="text-blue-700 dark:text-blue-300">
+                                                An online meeting is required as one or more selected applicants are from the Goa campus.
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
                                     <FormControl>
                                         <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4">
-                                            <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Offline" /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem>
+                                            <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Offline" disabled={hasGoaCampusPi} /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem>
                                             <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Online" /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem>
                                         </RadioGroup>
                                     </FormControl>

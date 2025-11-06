@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -37,6 +37,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
@@ -186,6 +188,31 @@ export default function ScheduleMeetingPage() {
     },
   });
   
+  const selectedPids = useMemo(() => new Set(selectedProjects), [selectedProjects]);
+
+  const hasGoaCampusPi = useMemo(() => {
+    return allProjects.some(p => 
+        selectedPids.has(p.id) && 
+        allUsers.find(u => u.uid === p.pi_uid)?.campus === 'Goa'
+    );
+  }, [selectedPids, allProjects, allUsers]);
+
+  const meetingMode = form.watch('mode');
+
+  useEffect(() => {
+      if (hasGoaCampusPi) {
+          form.setValue('mode', 'Online');
+      }
+  }, [hasGoaCampusPi, form]);
+  
+  useEffect(() => {
+    if (meetingMode === 'Online') {
+      form.setValue('venue', '');
+    } else {
+      form.setValue('venue', 'RDC Committee Room, PIMSR');
+    }
+  }, [meetingMode, form]);
+
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -199,16 +226,6 @@ export default function ScheduleMeetingPage() {
         router.replace('/login');
     }
   }, [router, toast]);
-
-  const meetingMode = form.watch('mode');
-  useEffect(() => {
-    if (meetingMode === 'Online') {
-      form.setValue('venue', '');
-    } else {
-      form.setValue('venue', 'RDC Committee Room, PIMSR');
-    }
-  }, [meetingMode, form]);
-
 
   const fetchRequiredData = useCallback(async () => {
     setLoading(true);
@@ -403,9 +420,18 @@ export default function ScheduleMeetingPage() {
                     <FormField name="mode" control={form.control} render={({ field }) => (
                         <FormItem className="space-y-3">
                             <FormLabel>Meeting Mode</FormLabel>
+                             {hasGoaCampusPi && (
+                                <Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700">
+                                    <Info className="h-4 w-4 text-blue-600" />
+                                    <AlertTitle>Online Mode Enforced</AlertTitle>
+                                    <AlertDescription className="text-blue-700 dark:text-blue-300">
+                                        An online meeting is required as one or more selected PIs are from the Goa campus.
+                                    </AlertDescription>
+                                </Alert>
+                            )}
                             <FormControl>
                                 <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4">
-                                    <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Offline" /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem>
+                                    <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Offline" disabled={hasGoaCampusPi} /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem>
                                     <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Online" /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem>
                                 </RadioGroup>
                             </FormControl>
