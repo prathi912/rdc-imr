@@ -1,5 +1,4 @@
 
-
 // src/components/emr/schedule-meeting-dialog.tsx
 'use client';
 
@@ -28,6 +27,7 @@ interface ScheduleMeetingDialogProps {
     call: FundingCall;
     interests: EmrInterest[];
     allUsers: User[];
+    currentUser: User;
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
     onActionComplete: () => void;
@@ -71,7 +71,7 @@ const applicantsSchema = z.object({
     applicantUids: z.array(z.string()).min(1, 'Please select at least one applicant.'),
 });
 
-export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpenChange, onActionComplete }: ScheduleMeetingDialogProps) {
+export function ScheduleMeetingDialog({ call, interests, allUsers, currentUser, isOpen, onOpenChange, onActionComplete }: ScheduleMeetingDialogProps) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -170,7 +170,16 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
     };
     
     const usersWithInterest = interests.filter(i => i.callId === call.id && !i.meetingSlot);
-    const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !usersWithInterest.some(interest => interest.userId === u.uid));
+    const availableEvaluators = allUsers.filter(u => {
+        const isAdminRole = ['Super-admin', 'admin', 'CRO'].includes(u.role);
+        const isNotAnApplicant = !usersWithInterest.some(interest => interest.userId === u.uid);
+        
+        if (currentUser.designation === 'Head of Goa Campus') {
+            return isAdminRole && isNotAnApplicant && u.campus === 'Goa';
+        }
+        
+        return isAdminRole && isNotAnApplicant;
+    });
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
