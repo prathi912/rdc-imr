@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import type React from "react"
@@ -77,7 +76,7 @@ import { GrantManagement } from "./grant-management"
 import { EvaluationForm } from "./evaluation-form"
 import { EvaluationsSummary } from "./evaluations-summary"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
+import { Textarea } from "../ui/textarea"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -430,7 +429,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const isAdmin = user && ["Super-admin", "admin", "CRO"].includes(user.role)
   const isSuperAdmin = user?.role === "Super-admin"
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid)
-  const canViewDocuments = isPI || isCoPi || isAdmin || isAssignedEvaluator
+  const isHeadOfGoaCampus = user?.designation === 'Head of Goa Campus';
+  const canViewDocuments = (isPI || isCoPi || isAdmin || isAssignedEvaluator) && !isHeadOfGoaCampus;
+
 
   const canViewCoPiCVs = useMemo(() => {
     if (!user) return false
@@ -847,7 +848,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
   };
 
-  const canViewEvaluations = isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive);
+  const canViewEvaluations = (isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive)) && !isHeadOfGoaCampus;
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
 
   return (

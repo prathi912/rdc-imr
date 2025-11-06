@@ -646,6 +646,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 call={call}
                 interests={interests}
                 allUsers={allUsers}
+                currentUser={currentUser}
              />
              <AttendanceDialog
                 isOpen={isAttendanceDialogOpen}

@@ -659,7 +659,7 @@ export default function ManageUsersPage() {
                                     </DropdownMenuPortal>
                                 </DropdownMenuSub>
                                 {user.designation === 'Head of Goa Campus' ? (
-                                    <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty', { designation: 'faculty' })}>
+                                    <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty', { designation: 'faculty', campus: 'Goa' })}>
                                         Dismiss as Head of Goa Campus
                                     </DropdownMenuItem>
                                 ) : (

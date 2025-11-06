@@ -53,6 +53,11 @@ export function EvaluationsSummary({ project, evaluations, currentUser }: Evalua
     const summaryText = Object.entries(recommendationCounts)
         .map(([key, value]) => `${value} ${key}`)
         .join(', ');
+        
+    // The "Head of Goa Campus" role should not see this component at all.
+    if (currentUser.designation === 'Head of Goa Campus') {
+        return null;
+    }
 
   return (
     <Card className="mt-8">
