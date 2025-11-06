@@ -64,6 +64,7 @@
     "firebase": "^10.14.1",
     "firebase-admin": "^12.6.0",
     "genkit": "^1.8.0",
+    "googleapis": "^140.0.1",
     "html-to-image": "^1.11.11",
     "input-otp": "^1.2.4",
     "jszip": "^3.10.1",
