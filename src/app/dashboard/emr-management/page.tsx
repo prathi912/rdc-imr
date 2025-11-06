@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { format, isAfter, parseISO } from 'date-fns';
 import { Eye, Download, Edit, Send, CheckCircle, XCircle, Loader2 } from 'lucide-react';
@@ -181,6 +182,26 @@ export default function EmrManagementOverviewPage() {
     const [isAnnounceDialogOpen, setIsAnnounceDialogOpen] = useState(false);
     const [isAnnouncing, setIsAnnouncing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const router = useRouter();
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            const parsedUser = JSON.parse(storedUser);
+             if (!parsedUser.allowedModules?.includes('emr-management')) {
+                toast({
+                title: 'Access Denied',
+                description: "You don't have permission to view this page.",
+                variant: 'destructive',
+                });
+                router.replace('/dashboard');
+                return;
+            }
+            setUser(parsedUser);
+        } else {
+            router.replace('/login');
+        }
+    }, [router, toast]);
 
     const fetchData = useCallback(() => {
         setLoading(true);
@@ -215,13 +236,11 @@ export default function EmrManagementOverviewPage() {
     }, [toast]);
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
+        if(user) {
+            const unsubscribe = fetchData();
+            return () => unsubscribe();
         }
-        const unsubscribe = fetchData();
-        return () => unsubscribe();
-    }, [fetchData]);
+    }, [fetchData, user]);
 
     const getStatusBadge = (call: FundingCall) => {
         const now = new Date();
@@ -264,7 +283,6 @@ export default function EmrManagementOverviewPage() {
         if (!searchTerm) return calls;
         const lowercasedFilter = searchTerm.toLowerCase();
         
-        // Find call IDs where an applicant's name matches
         const matchingCallIds = new Set(
             interests
                 .filter(interest => interest.userName.toLowerCase().includes(lowercasedFilter))
@@ -279,6 +297,24 @@ export default function EmrManagementOverviewPage() {
     }, [calls, interests, searchTerm]);
 
     const isSuperAdmin = user?.role === 'Super-admin';
+
+    if (!user || loading) {
+        return (
+            <div className="container mx-auto py-10">
+                <PageHeader title="Extramural Research (EMR)" description="Manage funding calls and view submission logs." />
+                <div className="mt-8">
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-6 w-1/4" />
+                        </CardHeader>
+                        <CardContent>
+                             <Skeleton className="h-48 w-full" />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>
@@ -405,3 +441,5 @@ export default function EmrManagementOverviewPage() {
         </>
     );
 }
+
+    

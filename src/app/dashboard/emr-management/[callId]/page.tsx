@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -23,6 +22,26 @@ export default function EmrManagementPage() {
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            const parsedUser = JSON.parse(storedUser);
+            if (!parsedUser.allowedModules?.includes('emr-management')) {
+                toast({
+                    title: 'Access Denied',
+                    description: "You don't have permission to view this page.",
+                    variant: 'destructive',
+                });
+                router.replace('/dashboard');
+                return;
+            }
+            setCurrentUser(parsedUser);
+        } else {
+            router.replace('/login');
+        }
+    }, [router, toast]);
+
 
     const fetchData = useCallback(async () => {
         if (!callId) return;
@@ -60,12 +79,10 @@ export default function EmrManagementPage() {
 
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setCurrentUser(JSON.parse(storedUser));
+        if(currentUser) {
+            fetchData();
         }
-        fetchData();
-    }, [fetchData]);
+    }, [fetchData, currentUser]);
 
     if (loading || !call || !currentUser) {
         return (
@@ -99,3 +116,4 @@ export default function EmrManagementPage() {
     );
 }
 
+    

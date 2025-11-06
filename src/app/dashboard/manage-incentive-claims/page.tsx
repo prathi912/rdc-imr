@@ -68,7 +68,7 @@ export default function ManageIncentiveClaimsPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       const parsedUser = JSON.parse(storedUser) as User;
-      if (parsedUser.role !== 'Super-admin' && parsedUser.role !== 'admin' && parsedUser.role !== 'CRO') {
+      if (!parsedUser.allowedModules?.includes('manage-incentive-claims')) {
         toast({ variant: 'destructive', title: 'Access Denied', description: 'You do not have permission to view this page.' });
         router.replace('/dashboard');
         return;
@@ -113,8 +113,10 @@ export default function ManageIncentiveClaimsPage() {
   }, [toast, currentUser]);
 
   useEffect(() => {
-    fetchClaimsAndUsers();
-  }, [fetchClaimsAndUsers]);
+    if(currentUser) {
+        fetchClaimsAndUsers();
+    }
+  }, [currentUser, fetchClaimsAndUsers]);
   
   const getClaimTitle = (claim: IncentiveClaim): string => {
     return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
@@ -156,8 +158,9 @@ export default function ManageIncentiveClaimsPage() {
     let claimsForTab = tabClaims[activeTab as keyof typeof tabClaims] || [];
     
     claimsForTab.sort((a, b) => {
-        const aValue = a[sortConfig.key as keyof IncentiveClaim] || '';
-        const bValue = b[sortConfig.key as keyof IncentiveClaim] || '';
+        const key = sortConfig.key as keyof IncentiveClaim;
+        let aValue = a[key] || '';
+        let bValue = b[key] || '';
         if (aValue < bValue) {
             return sortConfig.direction === 'ascending' ? -1 : 1;
         }
@@ -547,3 +550,5 @@ function GeneratePaymentSheetDialog({ isOpen, onOpenChange, claims, allUsers }: 
         </Dialog>
     );
 }
+
+    

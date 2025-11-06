@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -10,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MoreHorizontal, ArrowUpDown, ChevronDown, ShieldCheck, Loader2, Library, Users2, Ban, Bell } from "lucide-react";
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -317,6 +317,7 @@ export default function ManageUsersPage() {
   const [userToManageModules, setUserToManageModules] = useState<User | null>(null);
   const [userToManageNotifications, setUserToManageNotifications] = useState<User | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'name', direction: 'ascending' });
@@ -326,9 +327,21 @@ export default function ManageUsersPage() {
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      if (!parsedUser.allowedModules?.includes('manage-users')) {
+        toast({
+          title: 'Access Denied',
+          description: "You don't have permission to view this page.",
+          variant: 'destructive',
+        });
+        router.replace('/dashboard');
+        return;
+      }
+      setCurrentUser(parsedUser);
+    } else {
+        router.replace('/login');
     }
-  }, []);
+  }, [router, toast]);
 
   const fetchUsersAndClaims = useCallback(async () => {
     setLoading(true);
@@ -357,8 +370,10 @@ export default function ManageUsersPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchUsersAndClaims();
-  }, [fetchUsersAndClaims]);
+    if (currentUser) {
+        fetchUsersAndClaims();
+    }
+  }, [currentUser, fetchUsersAndClaims]);
   
   const usersWithClaims = useMemo(() => {
     return users.map(user => ({
@@ -429,7 +444,7 @@ export default function ManageUsersPage() {
 
   const handleRoleChange = useCallback(async (uid: string, newRole: User['role'], extraData?: Record<string, any>) => {
     try {
-      const userDocRef = doc(db, 'users', uid);
+      const userDocRef = doc(db, 'users', user.uid);
       
       const newDesignation = newRole === 'Super-admin' ? 'Super-admin' : (extraData?.designation || 'faculty');
       const defaultModules = getDefaultModulesForRole(newRole, newDesignation);
@@ -477,7 +492,7 @@ export default function ManageUsersPage() {
     setIsBulkSubmitting(false);
   };
   
-  if (loading) {
+  if (loading || !currentUser) {
     return (
       <div className="container mx-auto py-10">
         <PageHeader title="Manage Users" description="View and manage user roles and permissions." />
@@ -751,3 +766,5 @@ export default function ManageUsersPage() {
     </div>
   );
 }
+
+    
