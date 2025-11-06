@@ -93,6 +93,15 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
         }
     });
 
+    const meetingMode = scheduleForm.watch('mode');
+    useEffect(() => {
+        if (meetingMode === 'Online') {
+            scheduleForm.setValue('venue', '');
+        } else {
+            scheduleForm.setValue('venue', 'RDC Committee Room, PIMSR');
+        }
+    }, [meetingMode, scheduleForm]);
+
     useEffect(() => {
         if (isOpen) {
             scheduleForm.reset({
@@ -145,7 +154,6 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
     
     const usersWithInterest = interests.filter(i => i.callId === call.id && !i.meetingSlot);
     const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !usersWithInterest.some(interest => interest.userId === u.uid));
-    const meetingMode = scheduleForm.watch('mode');
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>

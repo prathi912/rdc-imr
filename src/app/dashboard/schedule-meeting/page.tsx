@@ -144,6 +144,7 @@ function ProjectListTable({
                                             ) : (
                                                 project.pi
                                             )}
+                                            {piUser?.campus && piUser.campus !== 'Vadodara' && ` (${piUser.campus})`}
                                         </div>
                                         <div className="text-xs text-muted-foreground">
                                         {piUser?.department || project.departmentName}, {piUser?.institute || project.institute}
@@ -198,6 +199,15 @@ export default function ScheduleMeetingPage() {
         router.replace('/login');
     }
   }, [router, toast]);
+
+  const meetingMode = form.watch('mode');
+  useEffect(() => {
+    if (meetingMode === 'Online') {
+      form.setValue('venue', '');
+    } else {
+      form.setValue('venue', 'RDC Committee Room, PIMSR');
+    }
+  }, [meetingMode, form]);
 
 
   const fetchRequiredData = useCallback(async () => {
@@ -314,7 +324,6 @@ export default function ScheduleMeetingPage() {
   };
   
   const usersMap = new Map(allUsers.map(u => [u.uid, u]));
-  const meetingMode = form.watch('mode');
 
   if (loading || !user) {
     return (
