@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, createRef } from 'react';
@@ -300,7 +299,7 @@ function ViewDescriptionDialog({ call }: { call: FundingCall }) {
     );
 }
 
-export function EmrCalendar({ user }: EmrCalendarProps) {
+function EmrCalendar({ user }: EmrCalendarProps) {
     const { toast } = useToast();
     const [calls, setCalls] = useState<FundingCall[]>([]);
     const [userInterests, setUserInterests] = useState<EmrInterest[]>([]);
@@ -596,3 +595,26 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
         </div>
     );
 }
+
+export default function EmrCalendarPage() {
+    const [user, setUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
+        }
+    }, []);
+
+    if (!user) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+        );
+    }
+    
+    return <EmrCalendar user={user} />;
+}
+
+    
