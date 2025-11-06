@@ -54,7 +54,7 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
     path: ['action'],
 })
 .refine(data => {
-    if (stageIndex > 1 && data.action === 'approve') {
+    if (stageIndex >= 1 && data.action === 'approve') {
         return data.amount !== undefined && data.amount > 0;
     }
     return true;
@@ -415,7 +415,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {action === 'approve' && stageIndex > 1 && (
+                            {action === 'approve' && stageIndex >= 1 && (
                                 <FormField
                                     name="amount"
                                     control={form.control}

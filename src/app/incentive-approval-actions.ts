@@ -302,10 +302,8 @@ export async function processIncentiveClaimAction(
     };
     
     if (action === 'approve') {
-        // Find the last stage in the workflow
-        const lastStage = Math.max(...workflow, 0);
-        // Only update final amount if this is the last approval stage
-        if (stageIndex + 1 === lastStage) {
+        // For stages 2, 3, 4 (stageIndex 1, 2, 3), the approver finalizes the amount
+        if (stageIndex >= 1) {
             updateData.finalApprovedAmount = data.amount;
         }
     }

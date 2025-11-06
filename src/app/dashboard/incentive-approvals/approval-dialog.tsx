@@ -431,6 +431,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                             <FormMessage />
                                         </FormItem>
                                     )}
+                                />
                             )}
                              {action !== 'verify' && (
                                 <FormField
