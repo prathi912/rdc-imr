@@ -227,6 +227,7 @@ export function ProjectList({ projects, currentUser, allUsers = [] }: ProjectLis
                         {piUser && (
                             <div className="text-xs text-muted-foreground">
                                 {piUser.designation}, {piUser.institute}
+                                {piUser.campus && piUser.campus !== 'Vadodara' && ` (${piUser.campus})`}
                             </div>
                         )}
                     </TableCell>
