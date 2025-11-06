@@ -655,13 +655,18 @@ export default function ManageUsersPage() {
                                                    {role.charAt(0).toUpperCase() + role.slice(1)}
                                                 </DropdownMenuItem>
                                             ))}
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin', { designation: 'Head of Goa Campus', campus: 'Goa'})}>
-                                                Assign as Head of Goa Campus
-                                            </DropdownMenuItem>
                                         </DropdownMenuSubContent>
                                     </DropdownMenuPortal>
                                 </DropdownMenuSub>
+                                {user.designation === 'Head of Goa Campus' ? (
+                                    <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty', { designation: 'faculty' })}>
+                                        Dismiss as Head of Goa Campus
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin', { designation: 'Head of Goa Campus', campus: 'Goa'})}>
+                                        Assign as Head of Goa Campus
+                                    </DropdownMenuItem>
+                                )}
                               </>
                             )}
                             {isCurrentUserSuperAdmin && user.role === 'CRO' && (
