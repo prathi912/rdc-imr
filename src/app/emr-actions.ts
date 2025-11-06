@@ -11,7 +11,6 @@ import { formatInTimeZone } from "date-fns-tz";
 import type * as z from 'zod';
 import { addDays, setHours, setMinutes, setSeconds } from "date-fns";
 import * as XLSX from 'xlsx';
-import { generateGoogleMeetLink } from "@/app/google-meet-actions";
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -298,20 +297,6 @@ export async function scheduleEmrMeeting(
     const meetingDateTimeString = `${date}T${time}:00`
     const pptDeadlineString = pptDeadline
 
-     let finalVenue = venue;
-    if (mode === 'Online') {
-      const meetResult = await generateGoogleMeetLink({
-        summary: `EMR Meeting: ${call.title}`,
-        description: `EMR Presentation for ${call.title}`,
-        startDateTime: new Date(`${date}T${time}`).toISOString(),
-        endDateTime: new Date(new Date(`${date}T${time}`).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
-      });
-       if (!meetResult.link) {
-        throw new Error(meetResult.error || "Could not generate Google Meet link.");
-      }
-      finalVenue = meetResult.link;
-    }
-
     for (const userId of applicantUids) {
       const interestsRef = adminDb.collection("emrInterests")
       const q = interestsRef.where("callId", "==", callId).where("userId", "==", userId)
@@ -346,7 +331,7 @@ export async function scheduleEmrMeeting(
               <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
               <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
-                ${mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+                ${mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
               </p>
               <p style="color: #e0e0e0;">
                 Please upload your presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(pptDeadlineString, timeZone, "PPpp (z)")}</strong>.
@@ -396,7 +381,7 @@ export async function scheduleEmrMeeting(
                     <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
                     <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
                     <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
-                       ${mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+                       ${mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
                     </p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Projects Portal.</p>
                     ${EMAIL_STYLES.footer}
@@ -1428,3 +1413,4 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
 
 
     
+

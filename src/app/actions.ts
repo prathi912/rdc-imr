@@ -35,7 +35,6 @@ import type * as z from "zod"
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
-import { generateGoogleMeetLink } from "@/app/google-meet-actions"
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -729,7 +728,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
 
 export async function scheduleMeeting(
   projectsToSchedule: { id: string; pi_uid: string; title: string; pi_email?: string }[],
-  meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[], mode: 'Online' | 'Offline' },
+  meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[]; mode: 'Online' | 'Offline' },
   isMidTermReview: boolean = false,
 ) {
   try {
@@ -743,20 +742,6 @@ export async function scheduleMeeting(
     const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting"
     const subjectPrefix = isMidTermReview ? "Mid-term Review" : "IMR Meeting"
 
-    let finalVenue = meetingDetails.venue;
-    if (meetingDetails.mode === 'Online') {
-      const meetResult = await generateGoogleMeetLink({
-        summary: `IMR Meeting: ${projectsToSchedule.map(p => p.title).join(', ')}`,
-        description: 'IMR Project Evaluation Meeting',
-        startDateTime: new Date(`${meetingDetails.date}T${meetingDetails.time}`).toISOString(),
-        endDateTime: new Date(new Date(`${meetingDetails.date}T${meetingDetails.time}`).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
-      });
-      if (!meetResult.link) {
-        throw new Error(meetResult.error || "Could not generate Google Meet link.");
-      }
-      finalVenue = meetResult.link;
-    }
-
     for (const projectData of projectsToSchedule) {
       const projectRef = adminDb.collection("projects").doc(projectData.id)
 
@@ -764,7 +749,7 @@ export async function scheduleMeeting(
         meetingDetails: {
           date: meetingDetails.date,
           time: meetingDetails.time,
-          venue: finalVenue,
+          venue: meetingDetails.venue,
           mode: meetingDetails.mode,
           assignedEvaluators: meetingDetails.evaluatorUids,
         },
@@ -802,7 +787,7 @@ export async function scheduleMeeting(
               <p><strong style="color: #ffffff;">
                 ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
               </strong> 
-                ${meetingDetails.mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+                ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
               </p>
               <p style="color: #cccccc;">
                 Please prepare for your presentation. You can view more details on the 
@@ -852,7 +837,7 @@ export async function scheduleMeeting(
                       <p><strong style="color: #ffffff;">
                         ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
                       </strong> 
-                        ${meetingDetails.mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+                        ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
                       </p>
                       <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
                       <ul style="list-style-type: none; padding-left: 0;">
@@ -1715,7 +1700,7 @@ export async function generateOfficeNotingForm(
     const coPiData: { [key: string]: string } = {}
     const coPiNames = project.coPiDetails?.map((c) => c.name) || []
     for (let i = 0; i < 4; i++) {
-      coPiData[`co-pi${i + 1}`] = coPiNames[i] || ""
+      coPiData[`co-pi${i + 1}`] = coPiNames[i] || "N/A"
     }
 
     const phaseData: { [key: string]: string } = {}
@@ -1730,20 +1715,19 @@ export async function generateOfficeNotingForm(
     }
 
     const data = {
-      pi_name: project.pi,
+      pi_name: project.pi || "N/A",
       pi_designation: piUser?.designation || "N/A",
-      pi_department: piUser?.department || project.departmentName || "N/A",
+      pi_department: `${piUser?.designation || "N/A"}, ${piUser?.department || "N/A"}`,
       pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || "N/A",
-      pi_email: project.pi_email,
+      pi_email: project.pi_email || "N/A",
       ...coPiData,
-      copi_designation: coPi1User?.designation || "N/A",
-      copi_department: coPi1User?.department || "N/A",
-      project_title: project.title,
-      project_duration: formData.projectDuration,
+      copi_designation: `${coPi1User?.designation || "N/A"}, ${coPi1User?.department || "N/A"}`,
+      project_title: project.title || "N/A",
+      project_duration: formData.projectDuration || "N/A",
       ...phaseData,
       total_amount: totalAmount.toLocaleString("en-IN"),
       presentation_date: project.meetingDetails?.date
-        ? formatInTimeZone(`${project.meetingDetails.date}T00:00:00`, "Asia/Kolkata", "dd/MM/yyyy")
+        ? format(parseISO(project.meetingDetails.date), "dd/MM/yyyy")
         : "N/A",
       presentation_time: project.meetingDetails?.time || "N/A",
       date: format(new Date(), 'dd/MM/yyyy'),
@@ -1935,3 +1919,4 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
 
 
     
+
