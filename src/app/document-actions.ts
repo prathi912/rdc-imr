@@ -18,6 +18,7 @@ import { getSystemSettings } from './actions';
 import { generateBookIncentiveForm } from './incentive-actions';
 import { generateMembershipIncentiveForm } from './membership-actions';
 import { generatePatentIncentiveForm } from './patent-actions';
+import { generateConferenceIncentiveForm } from './conference-actions';
 
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -183,13 +184,13 @@ export async function generateIncentivePaymentSheet(
 ): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const claimsRef = adminDb.collection('incentiveClaims');
-    const q = claimsRef.where(admin.firestore.FieldPath.documentId(), 'in', claimIds);
+    const q = claimsRef.where(adminDb.firestore.FieldPath.documentId(), 'in', claimIds);
     const claimsSnapshot = await q.get();
     const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
 
     const userIds = [...new Set(claims.map(c => c.uid))];
     const usersRef = adminDb.collection('users');
-    const usersQuery = usersRef.where(admin.firestore.FieldPath.documentId(), 'in', userIds);
+    const usersQuery = usersRef.where(adminDb.firestore.FieldPath.documentId(), 'in', userIds);
     const usersSnapshot = await usersQuery.get();
     const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
 
@@ -281,6 +282,9 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
                 break;
             case 'Patents':
                 result = await generatePatentIncentiveForm(claimId);
+                break;
+            case 'Conference Presentations':
+                result = await generateConferenceIncentiveForm(claimId);
                 break;
             default:
                 console.warn(`No specific office noting generator found for claim type: ${claim.claimType}. Claim ID: ${claimId}`);
@@ -580,7 +584,7 @@ export async function generateOfficeNotingForm(
       return { success: false, error: "Failed to render the document template." }
     }
 
-    const buf = doc.getZip().generate({ type: "nodebuffer" })
+    const buf = doc.getZip().generate({ type: 'nodebuffer' })
     const base64 = buf.toString("base64")
 
     if (project.status === "Recommended") {
@@ -601,5 +605,3 @@ export async function generateOfficeNotingForm(
     return { success: false, error: error.message || "Failed to generate the form." }
   }
 }
-
-    
