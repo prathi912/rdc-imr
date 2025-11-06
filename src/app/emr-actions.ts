@@ -11,7 +11,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import type * as z from 'zod';
 import { addDays, setHours, setMinutes, setSeconds } from "date-fns";
 import * as XLSX from 'xlsx';
-import { generateGoogleMeetLink } from "./google-meet-actions";
+import { generateGoogleMeetLink } from "@/app/google-meet-actions";
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"

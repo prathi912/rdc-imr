@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
@@ -10,6 +11,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import type * as z from 'zod';
 import { addDays, setHours, setMinutes, setSeconds } from "date-fns";
 import * as XLSX from 'xlsx';
+import { generateGoogleMeetLink } from "@/app/google-meet-actions";
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -91,47 +93,50 @@ export async function uploadFileToServer(
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     if (!fileDataUrl || typeof fileDataUrl !== "string") {
-      throw new Error("Invalid file data URL provided.")
+      throw new Error("Invalid file data URL provided.");
     }
 
-    const bucket = adminStorage.bucket()
-    const file = bucket.file(path)
+    const bucket = adminStorage.bucket();
+    const file = bucket.file(path);
 
-    // Extract mime type and base64 data from data URL
-    const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/)
+    const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/);
     if (!match || match.length < 3) {
-      throw new Error("Invalid data URL format.")
+      throw new Error("Invalid data URL format.");
     }
 
-    const mimeType = match[1]
-    const base64Data = match[2]
+    const mimeType = match[1];
+    const base64Data = match[2];
 
     if (!mimeType || !base64Data) {
-      throw new Error("Could not extract file data from data URL.")
+      throw new Error("Could not extract file data from data URL.");
     }
 
-    const buffer = Buffer.from(base64Data, "base64")
+    const buffer = Buffer.from(base64Data, "base64");
 
-    // Upload the file buffer
+    // The modern, correct way to upload and get a public URL
     await file.save(buffer, {
       metadata: {
         contentType: mimeType,
       },
-      public: true, // Make the file public
-    })
+    });
 
+    // Make the file public
+    await file.makePublic();
+    
     // Get the public URL
-    const downloadUrl = file.publicUrl()
+    const publicUrl = file.publicUrl();
 
-    console.log(`File uploaded successfully to ${path}, URL: ${downloadUrl}`)
+    console.log(`File uploaded successfully to ${path}, URL: ${publicUrl}`);
 
-    return { success: true, url: downloadUrl }
+    return { success: true, url: publicUrl };
+
   } catch (error: any) {
-    console.error("Error uploading file via admin:", error)
-    await logActivity("ERROR", "File upload failed", { path, error: error.message, stack: error.stack })
-    return { success: false, error: error.message || "Failed to upload file." }
+    console.error("Error uploading file via admin:", error);
+    await logActivity("ERROR", "File upload failed", { path, error: error.message, stack: error.stack });
+    return { success: false, error: error.message || "Failed to upload file." };
   }
 }
+
 
 export async function registerEmrInterest(
   callId: string,
@@ -269,11 +274,11 @@ export async function registerEmrInterest(
 
 export async function scheduleEmrMeeting(
   callId: string,
-  meetingDetails: { date: string; time: string; venue: string; pptDeadline: string; evaluatorUids: string[] },
+  meetingDetails: { date: string; time: string; venue: string; pptDeadline: string; evaluatorUids: string[], mode: 'Online' | 'Offline' },
   applicantUids: string[],
 ) {
   try {
-    const { date, time, venue, pptDeadline, evaluatorUids } = meetingDetails
+    const { date, time, venue, pptDeadline, evaluatorUids, mode } = meetingDetails
     const timeZone = "Asia/Kolkata"
 
     if (!evaluatorUids || evaluatorUids.length === 0) {
@@ -293,8 +298,21 @@ export async function scheduleEmrMeeting(
     const meetingDateTimeString = `${date}T${time}:00`
     const pptDeadlineString = pptDeadline
 
+     let finalVenue = venue;
+    if (mode === 'Online') {
+      const meetLink = await generateGoogleMeetLink({
+        summary: `EMR Meeting: ${call.title}`,
+        description: `EMR Presentation for ${call.title}`,
+        startDateTime: new Date(`${date}T${time}`).toISOString(),
+        endDateTime: new Date(new Date(`${date}T${time}`).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
+      });
+      if (!meetLink) {
+        throw new Error("Could not generate Google Meet link.");
+      }
+      finalVenue = meetLink;
+    }
+
     for (const userId of applicantUids) {
-      // Find the interest document for this user and call
       const interestsRef = adminDb.collection("emrInterests")
       const q = interestsRef.where("callId", "==", callId).where("userId", "==", userId)
       const interestSnapshot = await q.get()
@@ -327,7 +345,9 @@ export async function scheduleEmrMeeting(
               </p>
               <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
-              <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
+              <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
+                ${mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+              </p>
               <p style="color: #e0e0e0;">
                 Please upload your presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(pptDeadlineString, timeZone, "PPpp (z)")}</strong>.
               </p>
@@ -375,7 +395,9 @@ export async function scheduleEmrMeeting(
                     <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
                     <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
                     <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
-                    <p><strong style="color: #ffffff;">Venue:</strong> ${venue}</p>
+                    <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
+                       ${mode === 'Online' ? `<a href="${finalVenue}" style="color: #64b5f6; text-decoration: underline;">${finalVenue}</a>` : finalVenue}
+                    </p>
                     <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Projects Portal.</p>
                     ${EMAIL_STYLES.footer}
                 </div>
@@ -732,13 +754,17 @@ export async function createFundingCall(
 
 export async function announceEmrCall(callId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const allStaffEmail = process.env.ALL_STAFF_EMAIL
-    if (!allStaffEmail) {
+    const vadodaraEmail = process.env.ALL_STAFF_EMAIL_VADODARA;
+    const goaEmail = process.env.ALL_STAFF_EMAIL_GOA;
+
+    if (!vadodaraEmail || !goaEmail) {
       return {
         success: false,
-        error: "The 'All Staff' email address is not configured on the server. Please add it to the .env file.",
+        error: "One or more staff email addresses are not configured on the server. Please add them to the .env file.",
       }
     }
+    
+    const allStaffEmails = [vadodaraEmail, goaEmail].join(',');
 
     const callRef = adminDb.collection("fundingCalls").doc(callId)
     const callSnap = await callRef.get()
@@ -789,7 +815,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     `
 
     await sendEmailUtility({
-      to: allStaffEmail,
+      to: allStaffEmails,
       subject: `New Funding Call: ${call.title}`,
       from: "rdc",
       attachments: emailAttachments,
@@ -1104,6 +1130,7 @@ export async function bulkUploadEmrProjects(projectsData: EmrUploadData[]): Prom
         coPiDetails: coPiDetails,
         coPiUids,
         coPiNames,
+        coPiEmails,
         agency: row["Funding Agency"],
         durationAmount: `Amount: ${row["Total Amount"]?.toLocaleString("en-IN")} | Duration: ${row["Duration of Project"]}`,
         isBulkUploaded: true,
@@ -1235,23 +1262,61 @@ export async function updateEmrInterestDetails(
     }
 }
 
-export async function signAndUploadEndorsement(interestId: string, signedEndorsementUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
+export async function signAndUploadEndorsement(interestId: string, signedEndorsementDataUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
     try {
-        if (!interestId || !signedEndorsementUrl) {
+        if (!interestId || !signedEndorsementDataUrl) {
             return { success: false, error: "Interest ID and signed endorsement form URL are required." };
         }
+        
         const interestRef = adminDb.collection('emrInterests').doc(interestId);
+        const interestSnap = await interestRef.get();
+        if (!interestSnap.exists) {
+            return { success: false, error: "Interest registration not found." };
+        }
+        const interest = interestSnap.data() as EmrInterest;
+        
+        const path = `emr-endorsements/${interest.callId}/${interest.userId}/signed_${fileName}`;
+        const uploadResult = await uploadFileToServer(signedEndorsementDataUrl, path);
+
+        if (!uploadResult.success || !uploadResult.url) {
+            throw new Error(uploadResult.error || "Failed to upload signed endorsement form.");
+        }
+        
         await interestRef.update({
-            signedEndorsementUrl: signedEndorsementUrl,
+            signedEndorsementUrl: uploadResult.url,
             status: 'Endorsement Signed',
             endorsementSignedAt: new Date().toISOString()
         });
         
-        const interestSnap = await interestRef.get();
-        if (interestSnap.exists) {
-            const interest = interestSnap.data() as EmrInterest;
-            await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
-            // You can add email notification logic here if needed, similar to other functions.
+        await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
+        
+        if (interest.userEmail) {
+            // Fetch the call title to ensure it's in the email
+            const callRef = adminDb.collection("fundingCalls").doc(interest.callId);
+            const callSnap = await callRef.get();
+            const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : interest.callTitle || 'N/A';
+
+            const emailHtml = `
+                <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
+                    <p style="color:#ffffff;">Dear ${interest.userName},</p>
+                    <p style="color:#e0e0e0;">Your endorsement form for the EMR call "<strong style="color:#ffffff;">${callTitle}</strong>" has been signed and uploaded by the RDC.</p>
+                    <p style="color:#e0e0e0;">You can now proceed to submit the application to the funding agency. Once submitted, please log the submission details on the portal.</p>
+                    <p style="color:#cccccc;">The signed document is attached for your records and can also be viewed in your EMR application details on the portal.</p>
+                    ${EMAIL_STYLES.footer}
+                </div>
+            `;
+            await sendEmailUtility({
+                to: interest.userEmail,
+                cc: interest.coPiEmails,
+                subject: `Your EMR Endorsement Form is Ready`,
+                html: emailHtml,
+                from: 'default',
+                attachments: [{
+                    filename: `Signed_Endorsement_${interest.userName.replace(/\s/g, '_')}.pdf`,
+                    path: uploadResult.url
+                }]
+            });
         }
 
         return { success: true };
@@ -1359,3 +1424,7 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
         return { success: false, error: "Failed to update attendance." };
     }
 }
+
+
+
+    
