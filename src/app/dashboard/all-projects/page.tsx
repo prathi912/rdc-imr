@@ -41,6 +41,7 @@ import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMe
 
 
 const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval', 'Sanctioned'];
+const CAMPUSES = ['Vadodara', 'Goa', 'Ahmedabad', 'Rajkot'];
 
 const IMR_EXPORT_COLUMNS = [
   { id: 'title', label: 'Project Title' },
@@ -55,6 +56,7 @@ const IMR_EXPORT_COLUMNS = [
   { id: 'faculty', label: 'Faculty' },
   { id: 'institute', label: 'Institute' },
   { id: 'departmentName', label: 'Department' },
+  { id: 'campus', label: 'Campus' },
   { id: 'status', label: 'Status' },
   { id: 'coPiNames', label: 'Co-PI Names' },
 ];
@@ -66,6 +68,7 @@ const EMR_EXPORT_COLUMNS = [
     { id: 'piEmail', label: 'PI Email' },
     { id: 'piInstitute', label: 'PI Institute' },
     { id: 'piDepartment', label: 'PI Department' },
+    { id: 'campus', label: 'Campus' },
     { id: 'coPiNames', label: 'Co-PI Names' },
     { id: 'status', label: 'Status' },
     { id: 'sanctionDate', label: 'Sanction Date' },
@@ -275,6 +278,7 @@ export default function AllProjectsPage() {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
   const [facultyFilter, setFacultyFilter] = useState<string[]>(searchParams.get('faculty')?.split(',').filter(Boolean) || []);
+  const [campusFilter, setCampusFilter] = useState(searchParams.get('campus') || 'all');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'imr');
 
   const isMobile = useIsMobile();
@@ -284,7 +288,7 @@ export default function AllProjectsPage() {
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(IMR_EXPORT_COLUMNS.map(c => c.id));
   const [projectToEdit, setProjectToEdit] = useState<EmrInterest | null>(null);
   
-  const updateUrlParams = useCallback((newValues: { q?: string; status?: string; faculty?: string, tab?: string }) => {
+  const updateUrlParams = useCallback((newValues: { q?: string; status?: string; faculty?: string, campus?: string, tab?: string }) => {
     const params = new URLSearchParams(searchParams.toString());
     Object.entries(newValues).forEach(([key, value]) => {
       if (value) {
@@ -316,33 +320,25 @@ export default function AllProjectsPage() {
         const isHod = user?.designation === 'HOD';
         const isGoaHead = user?.designation === 'Head of Goa Campus';
 
-        let imrQuery;
-        let emrQuery;
+        let imrConstraints: any[] = [orderBy('submissionDate', 'desc')];
+        let emrConstraints: any[] = [where('isBulkUploaded', '==', true)];
 
-        if (isSuperAdmin || isAdmin || isIqac) {
-            imrQuery = query(projectsCol, orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('isBulkUploaded', '==', true));
-        } else if (isCro && user.faculties && user.faculties.length > 0) {
-            imrQuery = query(projectsCol, where('faculty', 'in', user.faculties), orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('faculty', 'in', user.faculties), where('isBulkUploaded', '==', true));
+        if (isCro && user.faculties && user.faculties.length > 0) {
+            imrConstraints.unshift(where('faculty', 'in', user.faculties));
+            emrConstraints.unshift(where('faculty', 'in', user.faculties));
         } else if (isGoaHead) {
-            imrQuery = query(projectsCol, where('campus', '==', 'Goa'), orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('campus', '==', 'Goa'), where('isBulkUploaded', '==', true));
+            imrConstraints.unshift(where('campus', '==', 'Goa'));
+            emrConstraints.unshift(where('campus', '==', 'Goa'));
         } else if (isPrincipal && user.institute) {
-            imrQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('faculty', '==', user.faculty), where('isBulkUploaded', '==', true)); // Assuming institute is tied to faculty
+            imrConstraints.unshift(where('institute', '==', user.institute));
+            emrConstraints.unshift(where('faculty', '==', user.faculty));
         } else if (isHod && user.department && user.institute) {
-             imrQuery = query(
-                projectsCol, 
-                where('departmentName', '==', user.department), 
-                where('institute', '==', user.institute),
-                orderBy('submissionDate', 'desc')
-            );
-            emrQuery = query(emrInterestsCol, where('department', '==', user.department), where('isBulkUploaded', '==', true));
-        } else {
-            imrQuery = query(projectsCol, where('pi_uid', '==', user.uid), orderBy('submissionDate', 'desc'));
-            emrQuery = query(emrInterestsCol, where('userId', '==', user.uid), where('isBulkUploaded', '==', true));
+             imrConstraints.unshift(where('departmentName', '==', user.department), where('institute', '==', user.institute));
+             emrConstraints.unshift(where('department', '==', user.department));
         }
+        
+        const imrQuery = query(projectsCol, ...imrConstraints);
+        const emrQuery = query(emrInterestsCol, ...emrConstraints);
 
         const [imrSnapshot, emrSnapshot] = await Promise.all([
             getDocs(imrQuery),
@@ -412,6 +408,7 @@ export default function AllProjectsPage() {
           return false;
         }
       }
+      if (campusFilter !== 'all' && project.campus !== campusFilter) return false;
       if (facultyFilter.length > 0 && !facultyFilter.includes(project.faculty)) return false;
       if (!searchTerm) return true;
       
@@ -427,17 +424,18 @@ export default function AllProjectsPage() {
         (installmentRefNumbers && installmentRefNumbers.toLowerCase().includes(lowerCaseSearch))
       );
     });
-  }, [allImrProjects, searchTerm, statusFilter, facultyFilter]);
+  }, [allImrProjects, searchTerm, statusFilter, facultyFilter, campusFilter]);
   
   const filteredEmrProjects = useMemo(() => {
       return allEmrProjects.filter(project => {
+          if (campusFilter !== 'all' && project.campus !== campusFilter) return false;
           if (facultyFilter.length > 0 && project.faculty && !facultyFilter.includes(project.faculty)) return false;
           if (!searchTerm) return true;
           const lowerCaseSearch = searchTerm.toLowerCase();
           const title = project.callTitle || '';
           return title.toLowerCase().includes(lowerCaseSearch) || project.userName.toLowerCase().includes(lowerCaseSearch) || (project.agency || '').toLowerCase().includes(lowerCaseSearch);
       })
-  }, [allEmrProjects, searchTerm, facultyFilter]);
+  }, [allEmrProjects, searchTerm, facultyFilter, campusFilter]);
 
   let pageTitle = "All Projects";
   let pageDescription = "Browse and manage all projects in the system.";
@@ -475,7 +473,7 @@ export default function AllProjectsPage() {
       const row: { [key: string]: any } = {};
       selectedExportColumns.forEach(colId => {
         const column = IMR_EXPORT_COLUMNS.find(c => c.id === colId);
-        if (column) row[column.label] = { title: p.title, type: p.type, submissionDate: new Date(p.submissionDate).toLocaleDateString(), abstract: p.abstract, pi: p.pi, pi_email: p.pi_email, pi_phoneNumber: p.pi_phoneNumber, misId: userDetails?.misId, designation: userDetails?.designation, faculty: p.faculty, institute: p.institute, departmentName: p.departmentName, status: p.status, coPiNames: coPiNames || 'N/A' }[colId];
+        if (column) row[column.label] = { title: p.title, type: p.type, submissionDate: new Date(p.submissionDate).toLocaleDateString(), abstract: p.abstract, pi: p.pi, pi_email: p.pi_email, pi_phoneNumber: p.pi_phoneNumber, misId: userDetails?.misId, designation: userDetails?.designation, faculty: p.faculty, institute: p.institute, departmentName: p.departmentName, campus: p.campus || userDetails?.campus || 'Vadodara', status: p.status, coPiNames: coPiNames || 'N/A' }[colId];
       });
       return row;
     });
@@ -497,7 +495,7 @@ export default function AllProjectsPage() {
           const row: { [key: string]: any } = {};
           selectedExportColumns.forEach(colId => {
                const column = EMR_EXPORT_COLUMNS.find(c => c.id === colId);
-               if(column) row[column.label] = { callTitle: p.callTitle, agency: p.agency, piName: p.userName, piEmail: p.userEmail, piInstitute: userDetails?.institute, piDepartment: userDetails?.department, coPiNames: p.coPiNames?.join(', ') || 'N/A', status: p.status, sanctionDate: p.sanctionDate ? new Date(p.sanctionDate).toLocaleDateString() : 'N/A', durationAmount: p.durationAmount }[colId];
+               if(column) row[column.label] = { callTitle: p.callTitle, agency: p.agency, piName: p.userName, piEmail: p.userEmail, piInstitute: userDetails?.institute, piDepartment: userDetails?.department, campus: p.campus || userDetails?.campus || 'Vadodara', coPiNames: p.coPiNames?.join(', ') || 'N/A', status: p.status, sanctionDate: p.sanctionDate ? new Date(p.sanctionDate).toLocaleDateString() : 'N/A', durationAmount: p.durationAmount }[colId];
           });
           return row;
       });
@@ -577,6 +575,7 @@ export default function AllProjectsPage() {
                 <SelectContent><SelectItem value="all">All Statuses</SelectItem>{STATUSES.map(status => (<SelectItem key={status} value={status}>{status}</SelectItem>))}</SelectContent>
             </Select>
             {(user?.role === 'CRO' || user?.role === 'Super-admin' || user?.role === 'admin') && (
+              <>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="w-full sm:w-[280px] justify-between">
@@ -600,6 +599,11 @@ export default function AllProjectsPage() {
                         ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
+                <Select value={campusFilter} onValueChange={(value) => { setCampusFilter(value); updateUrlParams({ campus: value === 'all' ? undefined : value }); }}>
+                    <SelectTrigger className="w-full sm:w-[180px]"><SelectValue placeholder="Filter by campus" /></SelectTrigger>
+                    <SelectContent><SelectItem value="all">All Campuses</SelectItem>{CAMPUSES.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent>
+                </Select>
+              </>
             )}
         </div>
       </div>
@@ -691,3 +695,4 @@ export default function AllProjectsPage() {
     </>
   );
 }
+
