@@ -7,9 +7,9 @@ import type { EmrInterest, User, CoPiDetails, FundingCall, EmrEvaluation } from 
 import { FieldValue } from "firebase-admin/firestore";
 import path from 'path';
 import { sendEmail as sendEmailUtility } from "@/lib/email";
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, toDate } from "date-fns-tz";
 import type * as z from 'zod';
-import { addDays, setHours, setMinutes, setSeconds } from "date-fns";
+import { addDays, setHours, setMinutes, setSeconds, addHours } from "date-fns";
 import * as XLSX from 'xlsx';
 
 // --- Centralized Logging Service ---
@@ -297,6 +297,12 @@ export async function scheduleEmrMeeting(
     const meetingDateTimeString = `${date}T${time}:00`
     const pptDeadlineString = pptDeadline
 
+    const subjectOnlineIndicator = mode === 'Online' ? ' (Online)' : '';
+
+    const meetingDate = toDate(meetingDateTimeString, { timeZone });
+    const startTime = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
+    const endTime = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
+
     for (const userId of applicantUids) {
       const interestsRef = adminDb.collection("emrInterests")
       const q = interestsRef.where("callId", "==", callId).where("userId", "==", userId)
@@ -321,6 +327,8 @@ export async function scheduleEmrMeeting(
         isRead: false,
       })
 
+      const calendarLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`EMR Presentation: ${call.title}`)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(`Presentation for funding call: ${call.title}`)}&location=${encodeURIComponent(venue)}`;
+
       const emailHtml = `
           <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
@@ -333,7 +341,8 @@ export async function scheduleEmrMeeting(
               <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
                 ${mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
               </p>
-              <p style="color: #e0e0e0;">
+               ${mode === 'Online' ? `<a href="${calendarLink}" target="_blank" style="display: inline-block; background-color: #4285F4; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Save to Google Calendar</a>` : ''}
+              <p style="color: #e0e0e0; margin-top: 15px;">
                 Please upload your presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(pptDeadlineString, timeZone, "PPpp (z)")}</strong>.
               </p>
               ${EMAIL_STYLES.footer}
@@ -344,7 +353,7 @@ export async function scheduleEmrMeeting(
         emailPromises.push(
           sendEmailUtility({
             to: interest.userEmail,
-            subject: `Your EMR Presentation Slot for: ${call.title}`,
+            subject: `Your EMR Presentation Slot for: ${call.title}${subjectOnlineIndicator}`,
             html: emailHtml,
             from: "default",
           }),
@@ -368,11 +377,13 @@ export async function scheduleEmrMeeting(
             isRead: false,
           })
 
+          const calendarLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`EMR Evaluation: ${call.title}`)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(`Evaluation meeting for EMR call: ${call.title}`)}&location=${encodeURIComponent(venue)}`;
+
           if (evaluator.email) {
             emailPromises.push(
               sendEmailUtility({
                 to: evaluator.email,
-                subject: `EMR Evaluation Assignment: ${call.title}`,
+                subject: `EMR Evaluation Assignment: ${call.title}${subjectOnlineIndicator}`,
                 html: `
                 <div ${EMAIL_STYLES.background}>
                     ${EMAIL_STYLES.logo}
@@ -383,7 +394,8 @@ export async function scheduleEmrMeeting(
                     <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
                        ${mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
                     </p>
-                    <p style="color: #cccccc;">Please review the assigned presentations on the PU Research Projects Portal.</p>
+                    ${mode === 'Online' ? `<a href="${calendarLink}" target="_blank" style="display: inline-block; background-color: #4285F4; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Save to Google Calendar</a>` : ''}
+                    <p style="color: #cccccc; margin-top: 15px;">Please review the assigned presentations on the PU Research Projects Portal.</p>
                     ${EMAIL_STYLES.footer}
                 </div>
               `,
@@ -1413,4 +1425,5 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
 
 
     
+
 

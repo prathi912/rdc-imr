@@ -29,8 +29,8 @@ import type {
 import { sendEmail as sendEmailUtility } from "@/lib/email"
 import fs from "fs"
 import path from "path"
-import { addDays, setHours, setMinutes, setSeconds, isToday, format } from "date-fns"
-import { formatInTimeZone } from "date-fns-tz"
+import { addDays, setHours, setMinutes, setSeconds, isToday, format, parseISO, addHours } from "date-fns"
+import { formatInTimeZone, toDate } from "date-fns-tz"
 import type * as z from "zod"
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
@@ -741,6 +741,11 @@ export async function scheduleMeeting(
 
     const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting"
     const subjectPrefix = isMidTermReview ? "Mid-term Review" : "IMR Meeting"
+    const subjectOnlineIndicator = meetingDetails.mode === 'Online' ? ' (Online)' : '';
+
+    const meetingDate = toDate(meetingDateTimeString, { timeZone });
+    const startTime = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
+    const endTime = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
 
     for (const projectData of projectsToSchedule) {
       const projectRef = adminDb.collection("projects").doc(projectData.id)
@@ -771,10 +776,9 @@ export async function scheduleMeeting(
       })
 
       if (projectData.pi_email) {
-        await sendEmailUtility({
-          to: projectData.pi_email,
-          subject: `${subjectPrefix} Scheduled for Your Project: ${projectData.title}`,
-          html: `
+          const calendarLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${subjectPrefix}: ${projectData.title}`)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(`For project: ${projectData.title}`)}&location=${encodeURIComponent(meetingDetails.venue)}`;
+
+          const emailHtml = `
             <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
               <p style="color: #ffffff;">Dear Researcher,</p>
@@ -789,7 +793,8 @@ export async function scheduleMeeting(
               </strong> 
                 ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
               </p>
-              <p style="color: #cccccc;">
+              ${meetingDetails.mode === 'Online' ? `<a href="${calendarLink}" target="_blank" style="display: inline-block; background-color: #4285F4; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Save to Google Calendar</a>` : ''}
+              <p style="color: #cccccc; margin-top: 15px;">
                 Please prepare for your presentation. You can view more details on the 
                 <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectData.id}" style="color: #64b5f6; text-decoration: underline;">
                   PU Research Projects Portal
@@ -797,7 +802,11 @@ export async function scheduleMeeting(
               </p>
               ${EMAIL_STYLES.footer}
             </div>
-          `,
+          `;
+        await sendEmailUtility({
+          to: projectData.pi_email,
+          subject: `${subjectPrefix} Scheduled for Your Project: ${projectData.title}${subjectOnlineIndicator}`,
+          html: emailHtml,
           from: "default",
         })
       }
@@ -814,6 +823,8 @@ export async function scheduleMeeting(
       for (const evaluatorDocSnapshot of evaluatorDocs) {
         if (evaluatorDocSnapshot.exists) {
           const evaluator = evaluatorDocSnapshot.data() as User
+          
+           const calendarLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${meetingType} Committee`)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(`Reviewing projects including: ${projectsToSchedule[0].title}`)}&location=${encodeURIComponent(meetingDetails.venue)}`;
 
           const evaluatorNotificationRef = adminDb.collection("notifications").doc()
           batch.set(evaluatorNotificationRef, {
@@ -843,7 +854,8 @@ export async function scheduleMeeting(
                       <ul style="list-style-type: none; padding-left: 0;">
                           ${projectTitles}
                       </ul>
-                      <p style="color: #cccccc;">
+                       ${meetingDetails.mode === 'Online' ? `<a href="${calendarLink}" target="_blank" style="display: inline-block; background-color: #4285F4; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Save to Google Calendar</a>` : ''}
+                      <p style="color: #cccccc; margin-top: 15px;">
                           You can access your evaluation queue on the
                           <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="color: #64b5f6; text-decoration: underline;">
                            PU Research Projects Portal
@@ -855,7 +867,7 @@ export async function scheduleMeeting(
 
             await sendEmailUtility({
               to: evaluator.email,
-              subject: `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term Review' : 'New Submission'})`,
+              subject: `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term Review' : 'New Submission'})${subjectOnlineIndicator}`,
               html: emailHtml,
               from: "default",
             })
@@ -1919,4 +1931,5 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
 
 
     
+
 
