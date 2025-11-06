@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -86,4 +85,8 @@ export async function generateMembershipIncentiveForm(claimId: string): Promise<
     const base64 = buf.toString('base64');
 
     return { success: true, fileData: base64 };
-  } catch (error: any
+  } catch (error: any) {
+    console.error('Error generating membership incentive form:', error);
+    return { success: false, error: error.message || 'Failed to generate the form.' };
+  }
+}

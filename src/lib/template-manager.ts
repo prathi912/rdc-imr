@@ -1,3 +1,4 @@
+
 'use server';
 
 import fs from 'fs';
@@ -5,7 +6,7 @@ import path from 'path';
 
 // This function is now deprecated and will be removed in a future update.
 // Templates are now fetched from URLs specified in the system settings.
-export function getTemplateContent(templateName: string): Buffer | null {
+export async function getTemplateContent(templateName: string): Promise<Buffer | null> {
     const templatePath = path.join(process.cwd(), 'src', 'templates', templateName);
     if (fs.existsSync(templatePath)) {
         return fs.readFileSync(templatePath);
