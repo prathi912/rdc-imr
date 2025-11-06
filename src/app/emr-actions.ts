@@ -736,13 +736,17 @@ export async function createFundingCall(
 
 export async function announceEmrCall(callId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const allStaffEmail = process.env.ALL_STAFF_EMAIL
-    if (!allStaffEmail) {
+    const vadodaraEmail = process.env.ALL_STAFF_EMAIL_VADODARA;
+    const goaEmail = process.env.ALL_STAFF_EMAIL_GOA;
+
+    if (!vadodaraEmail || !goaEmail) {
       return {
         success: false,
-        error: "The 'All Staff' email address is not configured on the server. Please add it to the .env file.",
+        error: "One or more staff email addresses are not configured on the server. Please add them to the .env file.",
       }
     }
+    
+    const allStaffEmails = [vadodaraEmail, goaEmail].join(',');
 
     const callRef = adminDb.collection("fundingCalls").doc(callId)
     const callSnap = await callRef.get()
@@ -793,7 +797,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     `
 
     await sendEmailUtility({
-      to: allStaffEmail,
+      to: allStaffEmails,
       subject: `New Funding Call: ${call.title}`,
       from: "rdc",
       attachments: emailAttachments,
@@ -1402,3 +1406,4 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
         return { success: false, error: "Failed to update attendance." };
     }
 }
+
