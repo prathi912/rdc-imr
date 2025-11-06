@@ -3,10 +3,11 @@
 
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
-import { getTemplateContent } from '@/lib/template-manager';
+import { getTemplateContentFromUrl } from '@/lib/template-manager';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { format } from 'date-fns';
+import { getSystemSettings } from './actions';
 
 export async function generateResearchPaperIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
     try {
@@ -23,11 +24,18 @@ export async function generateResearchPaperIncentiveForm(claimId: string): Promi
             return { success: false, error: 'Claimant user profile not found.' };
         }
         const user = userSnap.data() as User;
+        
+        const settings = await getSystemSettings();
+        const templateUrl = settings.templateUrls?.['INCENTIVE_RESEARCH_PAPER'];
 
-        const templateName = 'INCENTIVE_RESEARCH_PAPER.docx';
-        const content = getTemplateContent(templateName);
+        if (!templateUrl) {
+            return { success: false, error: 'Research paper incentive template URL is not configured in system settings.' };
+        }
+
+        const content = await getTemplateContentFromUrl(templateUrl);
+
         if (!content) {
-            return { success: false, error: `Template file ${templateName} not found.` };
+            return { success: false, error: `Template file could not be loaded from the URL.` };
         }
 
         const zip = new PizZip(content);

@@ -6,8 +6,9 @@ import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import { getTemplateContent } from '@/lib/template-manager';
+import { getTemplateContentFromUrl } from '@/lib/template-manager';
 import { format } from 'date-fns';
+import { getSystemSettings } from './actions';
 
 export async function generateBookIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
@@ -34,11 +35,18 @@ export async function generateBookIncentiveForm(claimId: string): Promise<{ succ
     }
     const user = userSnap.data() as User;
     
+    const settings = await getSystemSettings();
     const templateName = claim.bookApplicationType === 'Book Chapter' 
-        ? 'INCENTIVE_BOOK_CHAPTER.docx' 
-        : 'INCENTIVE_BOOK_PUBLICATION.docx';
+        ? 'INCENTIVE_BOOK_CHAPTER' 
+        : 'INCENTIVE_BOOK_PUBLICATION';
     
-    const content = getTemplateContent(templateName);
+    const templateUrl = settings.templateUrls?.[templateName];
+
+    if (!templateUrl) {
+        return { success: false, error: `Template URL for ${templateName} not configured.` };
+    }
+    
+    const content = await getTemplateContentFromUrl(templateUrl);
     if (!content) {
         return { success: false, error: `Template file ${templateName} not found or couldn't be loaded.` };
     }

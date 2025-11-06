@@ -95,7 +95,7 @@ a.href = url;
     const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[] | React.ReactNode, fieldId?: keyof IncentiveClaim) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         
-        let displayValue: React.ReactNode;
+        let displayValue: React.ReactNode = String(value);
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
         } else if (Array.isArray(value)) {

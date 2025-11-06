@@ -5,8 +5,9 @@ import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
-import { getTemplateContent } from '@/lib/template-manager';
+import { getTemplateContentFromUrl } from '@/lib/template-manager';
 import { format } from 'date-fns';
+import { getSystemSettings } from './actions';
 
 export async function generateConferenceIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
@@ -24,11 +25,17 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
     }
     const user = userSnap.data() as User;
     
-    const templateName = 'INCENTIVE_CONFERENCE.docx';
+    const settings = await getSystemSettings();
+    const templateUrl = settings.templateUrls?.['INCENTIVE_CONFERENCE'];
+
+    if (!templateUrl) {
+      return { success: false, error: 'Conference incentive template URL is not configured in system settings.' };
+    }
+
+    const content = await getTemplateContentFromUrl(templateUrl);
     
-    const content = getTemplateContent(templateName);
     if (!content) {
-        return { success: false, error: `Template file ${templateName} not found or couldn't be loaded.` };
+        return { success: false, error: `Template file could not be loaded from the URL.` };
     }
 
     const zip = new PizZip(content);
