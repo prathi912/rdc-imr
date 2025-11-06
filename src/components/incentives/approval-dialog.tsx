@@ -41,7 +41,7 @@ const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
 const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) => z.object({
   action: z.enum(['approve', 'reject', 'verify']),
-  amount: z.coerce.number().positive("Amount cannot be in negative.").optional(),
+  amount: z.coerce.number().nonnegative("Amount cannot be negative.").optional(),
   comments: z.string().optional(),
   verifiedFields: verifiedFieldsSchema,
 }).refine(data => {
@@ -336,9 +336,9 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
     const isViewerAdminOrApprover =
-  approver?.role === 'Super-admin' ||
-  approver?.role === 'admin' ||
-  approver?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+      approver?.role === 'Super-admin' ||
+      approver?.role === 'admin' ||
+      approver?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
 
 
     return (
