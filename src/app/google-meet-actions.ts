@@ -13,6 +13,7 @@ interface GenerateMeetLinkArgs {
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
+// Replace escaped newlines from environment variables with actual newlines
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function generateGoogleMeetLink({
@@ -55,8 +56,6 @@ export async function generateGoogleMeetLink({
           },
         },
       },
-      // This setting allows participants to join without the host being present.
-      conferenceDataVersion: 1, 
     };
 
     const createdEvent = await calendar.events.insert({
