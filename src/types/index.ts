@@ -500,7 +500,14 @@ export type ApproverSetting = {
 };
 
 export type TemplateUrls = {
-  [key: string]: string;
+  INCENTIVE_RESEARCH_PAPER?: string;
+  INCENTIVE_PATENT?: string;
+  INCENTIVE_CONFERENCE?: string;
+  INCENTIVE_BOOK_PUBLICATION?: string;
+  INCENTIVE_BOOK_CHAPTER?: string;
+  INCENTIVE_MEMBERSHIP?: string;
+  IMR_RECOMMENDATION?: string;
+  IMR_INSTALLMENT_NOTING?: string;
 };
 
 export type SystemSettings = {

@@ -93,20 +93,19 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
     const evaluationsSnap = await evaluationsRef.get();
     const evaluations = evaluationsSnap.docs.map(doc => doc.data() as Evaluation);
     
-    const IMR_TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/IMR_RECOMMENDATION_TEMPLATE.docx";
+    const settings = await getSystemSettings();
+    const templateUrl = settings.templateUrls?.IMR_RECOMMENDATION;
 
-    let templateBuffer;
-    try {
-      const response = await fetch(IMR_TEMPLATE_URL, { cache: 'no-store' });
-      if (!response.ok) {
-        return { success: false, error: 'Recommendation form template not found on the server.' };
-      }
-      templateBuffer = Buffer.from(await response.arrayBuffer());
-    } catch (err) {
-      return { success: false, error: 'Error fetching recommendation form template.' };
+    if (!templateUrl) {
+      return { success: false, error: 'IMR Recommendation template URL is not configured in system settings.' };
     }
 
-    const zip = new PizZip(templateBuffer);
+    const content = await getTemplateContent(templateUrl);
+    if (!content) {
+      return { success: false, error: 'Recommendation form template not found on the server.' };
+    }
+
+    const zip = new PizZip(content);
     const doc = new Docxtemplater(zip, {
         paragraphLoop: true,
         linebreaks: true,
@@ -448,10 +447,17 @@ export async function generateInstallmentOfficeNoting(
     if (!projectSnap.exists) return { success: false, error: "Project not found." };
     const project = projectSnap.data() as Project;
 
-    const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/Template_Office_Note_IMR_Instalment.docx";
-    const response = await fetch(TEMPLATE_URL, { cache: 'no-store' });
-    if (!response.ok) throw new Error('Template not found.');
-    const content = Buffer.from(await response.arrayBuffer());
+    const settings = await getSystemSettings();
+    const templateUrl = settings.templateUrls?.IMR_INSTALLMENT_NOTING;
+
+    if (!templateUrl) {
+      return { success: false, error: 'IMR Installment Noting template URL is not configured in system settings.' };
+    }
+
+    const content = await getTemplateContent(templateUrl);
+    if (!content) {
+        throw new Error('Template not found.');
+    }
 
     const zip = new PizZip(content);
     const doc = new Docxtemplater(zip, {
@@ -525,12 +531,17 @@ export async function generateOfficeNotingForm(
       }
     }
 
-    const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/IMR_OFFICE_NOTING_TEMPLATE.docx";
-    const response = await fetch(TEMPLATE_URL);
-    if (!response.ok) {
+    const settings = await getSystemSettings();
+    const templateUrl = settings.templateUrls?.IMR_OFFICE_NOTING;
+
+    if (!templateUrl) {
+      return { success: false, error: 'IMR Office Noting template URL is not configured.' };
+    }
+
+    const content = await getTemplateContent(templateUrl);
+    if (!content) {
         return { success: false, error: "Office Notings form template not found on the server." };
     }
-    const content = Buffer.from(await response.arrayBuffer());
 
     const zip = new PizZip(content)
 

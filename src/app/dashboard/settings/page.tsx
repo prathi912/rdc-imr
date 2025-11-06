@@ -36,7 +36,7 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock, Mail, BellOff } from "lucide-react"
+import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock, Mail, BellOff, FileText } from "lucide-react"
 import { Combobox } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -443,6 +443,7 @@ export default function SettingsPage() {
   async function onPasswordSubmit(data: PasswordFormValues) {
     setIsSubmittingPassword(true)
 
+    const currentUser = auth.currentUser;
     if (!currentUser || !currentUser.email) {
       toast({
         variant: "destructive",
@@ -663,6 +664,23 @@ export default function SettingsPage() {
     if (!systemSettings) return;
     await handleSystemSettingsSave({ ...systemSettings, imrEvaluationDays: days });
   };
+  
+   const handleTemplateUrlChange = async (templateKey: keyof NonNullable<SystemSettings['templateUrls']>, url: string) => {
+    if (!systemSettings) return;
+    const newTemplateUrls = { ...systemSettings.templateUrls, [templateKey]: url };
+    await handleSystemSettingsSave({ ...systemSettings, templateUrls: newTemplateUrls });
+  };
+
+  const templateFields: { key: keyof NonNullable<SystemSettings['templateUrls']>, label: string }[] = [
+    { key: 'INCENTIVE_RESEARCH_PAPER', label: 'Incentive - Research Paper' },
+    { key: 'INCENTIVE_PATENT', label: 'Incentive - Patent' },
+    { key: 'INCENTIVE_CONFERENCE', label: 'Incentive - Conference' },
+    { key: 'INCENTIVE_BOOK_PUBLICATION', label: 'Incentive - Book Publication' },
+    { key: 'INCENTIVE_BOOK_CHAPTER', label: 'Incentive - Book Chapter' },
+    { key: 'INCENTIVE_MEMBERSHIP', label: 'Incentive - Membership' },
+    { key: 'IMR_RECOMMENDATION', label: 'IMR Recommendation Form' },
+    { key: 'IMR_INSTALLMENT_NOTING', label: 'IMR Installment Office Noting' },
+  ];
 
 
   const isAcademicInfoLocked = isCro || isPrincipal
@@ -720,6 +738,29 @@ export default function SettingsPage() {
               <CardDescription>Global settings for the application. Changes affect all users.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+               <div className="space-y-4 rounded-lg border p-4">
+                 <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    <Label className="text-base">Template Management</Label>
+                </div>
+                 <p className="text-sm text-muted-foreground">
+                    Provide the direct download URLs for the DOCX templates used to generate office notings and other documents.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                    {templateFields.map(({ key, label }) => (
+                         <div key={key} className="space-y-1">
+                            <Label htmlFor={`template-${key}`} className="text-sm">{label}</Label>
+                            <Input
+                                id={`template-${key}`}
+                                placeholder="https://..."
+                                defaultValue={systemSettings.templateUrls?.[key] || ''}
+                                onBlur={(e) => handleTemplateUrlChange(key, e.target.value)}
+                                disabled={isSavingSettings}
+                            />
+                        </div>
+                    ))}
+                </div>
+               </div>
               <div className="flex items-center justify-between rounded-lg border p-4">
                 <div className="space-y-0.5">
                   <Label className="text-base">Two-Factor Authentication (2FA)</Label>
@@ -841,19 +882,19 @@ export default function SettingsPage() {
                 </div>
               
               <div className="space-y-4 rounded-lg border p-4">
-                <div className="flex items-center gap-2">
-                    <BellOff className="h-5 w-5" />
-                    <Label className="text-base">Do Not Disturb (DND) Email</Label>
-                </div>
-                <p className="text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                      <BellOff className="h-5 w-5" />
+                      <Label className="text-base">Do Not Disturb (DND) Email</Label>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
                     The email address entered here will be excluded from all automated system email notifications.
-                </p>
-                <Input 
-                    placeholder="dnd.user@paruluniversity.ac.in"
-                    defaultValue={systemSettings.dndEmail || ''}
-                    onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })}
-                    disabled={isSavingSettings}
-                />
+                  </p>
+                  <Input 
+                      placeholder="dnd.user@paruluniversity.ac.in"
+                      defaultValue={systemSettings.dndEmail || ''}
+                      onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })}
+                      disabled={isSavingSettings}
+                  />
               </div>
 
               <div className="space-y-4">
