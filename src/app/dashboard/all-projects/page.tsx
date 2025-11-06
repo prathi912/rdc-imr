@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -313,6 +314,7 @@ export default function AllProjectsPage() {
         const isCro = user?.role === 'CRO';
         const isPrincipal = user?.designation === 'Principal';
         const isHod = user?.designation === 'HOD';
+        const isGoaHead = user?.designation === 'Head of Goa Campus';
 
         let imrQuery;
         let emrQuery;
@@ -323,6 +325,9 @@ export default function AllProjectsPage() {
         } else if (isCro && user.faculties && user.faculties.length > 0) {
             imrQuery = query(projectsCol, where('faculty', 'in', user.faculties), orderBy('submissionDate', 'desc'));
             emrQuery = query(emrInterestsCol, where('faculty', 'in', user.faculties), where('isBulkUploaded', '==', true));
+        } else if (isGoaHead) {
+            imrQuery = query(projectsCol, where('campus', '==', 'Goa'), orderBy('submissionDate', 'desc'));
+            emrQuery = query(emrInterestsCol, where('campus', '==', 'Goa'), where('isBulkUploaded', '==', true));
         } else if (isPrincipal && user.institute) {
             imrQuery = query(projectsCol, where('institute', '==', user.institute), orderBy('submissionDate', 'desc'));
             emrQuery = query(emrInterestsCol, where('faculty', '==', user.faculty), where('isBulkUploaded', '==', true)); // Assuming institute is tied to faculty
@@ -388,7 +393,7 @@ export default function AllProjectsPage() {
     }
   }, [user, fetchAllData]);
   
-  const hasAdminView = ['Super-admin', 'admin', 'CRO', 'IQAC'].includes(user?.role || '') || user?.designation === 'Principal' || user?.designation === 'HOD';
+  const hasAdminView = ['Super-admin', 'admin', 'CRO', 'IQAC'].includes(user?.role || '') || user?.designation === 'Principal' || user?.designation === 'HOD' || user?.designation === 'Head of Goa Campus';
   const canEditCoPis = user?.role === 'Super-admin';
 
   const allFaculties = useMemo(() => {
@@ -439,6 +444,7 @@ export default function AllProjectsPage() {
   
   if (user?.designation === 'Principal' && user?.institute) pageTitle = `Projects from ${user.institute}`;
   if (user?.designation === 'HOD' && user?.department) pageTitle = `Projects from ${user.department}`;
+  if (user?.designation === 'Head of Goa Campus') pageTitle = `Projects from Goa Campus`;
   if (user?.role === 'CRO' && facultyFilter.length === 1) pageTitle = `Projects from ${facultyFilter[0]}`;
   if (user?.role === 'CRO' && facultyFilter.length > 1) pageTitle = `Projects from multiple faculties`;
 

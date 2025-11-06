@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -444,9 +445,9 @@ export default function ManageUsersPage() {
 
   const handleRoleChange = useCallback(async (uid: string, newRole: User['role'], extraData?: Record<string, any>) => {
     try {
-      const userDocRef = doc(db, 'users', user.uid);
+      const userDocRef = doc(db, 'users', uid);
       
-      const newDesignation = newRole === 'Super-admin' ? 'Super-admin' : (extraData?.designation || 'faculty');
+      const newDesignation = extraData?.designation || (newRole === 'Super-admin' ? 'Super-admin' : 'faculty');
       const defaultModules = getDefaultModulesForRole(newRole, newDesignation);
       
       const updatePayload: Partial<User> = {
@@ -586,11 +587,7 @@ export default function ManageUsersPage() {
                 {sortedAndFilteredUsers.map((user) => {
                    const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
                    const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
-                   
-                   const isActionsDisabled = 
-                        (isCurrentUserLoggedIn && currentUser?.role !== 'Super-admin') || 
-                        (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
-
+                   const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
                    const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
 
                    return (
@@ -658,6 +655,10 @@ export default function ManageUsersPage() {
                                                    {role.charAt(0).toUpperCase() + role.slice(1)}
                                                 </DropdownMenuItem>
                                             ))}
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin', { designation: 'Head of Goa Campus', campus: 'Goa'})}>
+                                                Assign as Head of Goa Campus
+                                            </DropdownMenuItem>
                                         </DropdownMenuSubContent>
                                     </DropdownMenuPortal>
                                 </DropdownMenuSub>
@@ -766,5 +767,3 @@ export default function ManageUsersPage() {
     </div>
   );
 }
-
-    

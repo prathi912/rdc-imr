@@ -1,4 +1,5 @@
 
+
 // src/app/dashboard/emr-management/page.tsx
 'use client';
 
@@ -47,13 +48,16 @@ function EmrLogsTab({ user }: { user: User | null }) {
             const isCro = user.role === 'CRO';
             const isPrincipal = user.designation === 'Principal';
             const isHod = user.designation === 'HOD';
+            const isGoaHead = user.designation === 'Head of Goa Campus';
 
             if (isSuperAdminOrAdmin) {
                 logsQuery = baseQuery;
             } else if (isCro && user.faculties && user.faculties.length > 0) {
                 logsQuery = query(baseQuery, where('faculty', 'in', user.faculties));
+            } else if (isGoaHead) {
+                logsQuery = query(baseQuery, where('campus', '==', 'Goa'));
             } else if (isPrincipal && user.institute) {
-                logsQuery = query(baseQuery, where('faculty', 'in', user.faculties || [])); // Assuming Principals are tied to a faculty that contains their institute
+                logsQuery = query(baseQuery, where('faculty', 'in', user.faculties || []));
             } else if (isHod && user.department && user.institute) {
                 logsQuery = query(baseQuery, where('department', '==', user.department), where('faculty', '==', user.faculty));
             } else {
@@ -441,5 +445,3 @@ export default function EmrManagementOverviewPage() {
         </>
     );
 }
-
-    
