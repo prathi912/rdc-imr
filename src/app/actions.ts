@@ -745,16 +745,16 @@ export async function scheduleMeeting(
 
     let finalVenue = meetingDetails.venue;
     if (meetingDetails.mode === 'Online') {
-      const meetLink = await generateGoogleMeetLink({
+      const meetResult = await generateGoogleMeetLink({
         summary: `IMR Meeting: ${projectsToSchedule.map(p => p.title).join(', ')}`,
         description: 'IMR Project Evaluation Meeting',
         startDateTime: new Date(`${meetingDetails.date}T${meetingDetails.time}`).toISOString(),
         endDateTime: new Date(new Date(`${meetingDetails.date}T${meetingDetails.time}`).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
       });
-      if (!meetLink) {
-        throw new Error("Could not generate Google Meet link.");
+      if (!meetResult.link) {
+        throw new Error(meetResult.error || "Could not generate Google Meet link.");
       }
-      finalVenue = meetLink;
+      finalVenue = meetResult.link;
     }
 
     for (const projectData of projectsToSchedule) {

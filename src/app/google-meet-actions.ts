@@ -13,7 +13,6 @@ interface GenerateMeetLinkArgs {
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar'];
 const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
-// Replace escaped newlines from environment variables with actual newlines
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function generateGoogleMeetLink({
@@ -21,11 +20,12 @@ export async function generateGoogleMeetLink({
   description,
   startDateTime,
   endDateTime,
-}: GenerateMeetLinkArgs): Promise<string | null> {
+}: GenerateMeetLinkArgs): Promise<{ link: string | null; error?: string }> {
 
   if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY) {
-    console.error("Google Calendar API credentials are not set in environment variables.");
-    return null;
+    const errorMsg = "Google Calendar API credentials are not set in environment variables.";
+    console.error(errorMsg);
+    return { link: null, error: errorMsg };
   }
 
   try {
@@ -67,13 +67,14 @@ export async function generateGoogleMeetLink({
     
     const hangoutLink = createdEvent.data.hangoutLink;
     if (hangoutLink) {
-        return hangoutLink;
+        return { link: hangoutLink };
     }
     
-    return null;
+    return { link: null, error: 'Hangout link was not created by the API.' };
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating Google Meet link:', error);
-    return null;
+    // Return the specific error message from the API
+    return { link: null, error: error.message || 'An unknown error occurred during Google Meet link generation.' };
   }
 }

@@ -300,16 +300,16 @@ export async function scheduleEmrMeeting(
 
      let finalVenue = venue;
     if (mode === 'Online') {
-      const meetLink = await generateGoogleMeetLink({
+      const meetResult = await generateGoogleMeetLink({
         summary: `EMR Meeting: ${call.title}`,
         description: `EMR Presentation for ${call.title}`,
         startDateTime: new Date(`${date}T${time}`).toISOString(),
         endDateTime: new Date(new Date(`${date}T${time}`).getTime() + 60 * 60 * 1000).toISOString(), // 1 hour duration
       });
-      if (!meetLink) {
-        throw new Error("Could not generate Google Meet link.");
+       if (!meetResult.link) {
+        throw new Error(meetResult.error || "Could not generate Google Meet link.");
       }
-      finalVenue = meetLink;
+      finalVenue = meetResult.link;
     }
 
     for (const userId of applicantUids) {
