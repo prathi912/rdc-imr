@@ -52,11 +52,10 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
 }, {
     message: 'An action must be selected.',
     path: ['action'],
-})
-.refine(data => {
+}).refine(data => {
     // Amount is ALWAYS required when approving, at ANY stage.
     if (data.action === 'approve') {
-        return data.amount !== undefined;
+        return data.amount !== undefined && data.amount >= 0;
     }
     return true;
 }, {
@@ -269,7 +268,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                 .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved')
                 .sort((a, b) => b!.stage - a!.stage);
 
-            if (previousApprovals.length > 0 && previousApprovals[0]!.approvedAmount > 0) {
+            if (previousApprovals.length > 0 && previousApprovals[0]!.approvedAmount >= 0) {
                 return { defaultAmount: previousApprovals[0]!.approvedAmount, isAutoCalculated: false };
             }
         }
