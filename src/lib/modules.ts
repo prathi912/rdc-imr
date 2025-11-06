@@ -33,8 +33,8 @@ const coreModules = ["dashboard", "notifications", "settings", "emr-calendar"]
 const facultyCoreModules = ["new-submission", "my-projects"]
 const hierarchyCoreModules = ["analytics"]
 
-const facultyDefaults = [...coreModules, ...facultyCoreModules]
-const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics"]
+const facultyDefaults = [...coreModules, ...facultyCoreModules, "incentive-claim"]
+const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics", "incentive-claim"]
 const iqacDefaults = [...coreModules, "all-projects", "analytics"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "manage-users", "emr-management", "bulk-upload", "bulk-upload-papers", "manage-incentive-claims"]
 const superAdminDefaults = [...adminDefaults, "module-management", "bulk-upload-emr", "bulk-upload-incentives"]
@@ -42,8 +42,13 @@ const superAdminDefaults = [...adminDefaults, "module-management", "bulk-upload-
 // Default modules for special designations who are otherwise 'faculty' role
 const principalDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"]
 const hodDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"]
+const goaHeadDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"] // Read-only access
 
 export function getDefaultModulesForRole(role: User["role"], designation?: User["designation"]): string[] {
+  if (designation === "Head of Goa Campus") {
+    return goaHeadDefaults
+  }
+  
   if (role === "faculty") {
     if (designation === "Principal") {
       return principalDefaults

@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
 
-export default function ProfileLayout({ children }: { children: React.ReactNode }) {
+export default function GoaProfileLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -57,7 +57,7 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
       });
     }
   };
-  
+
   if (loading) {
     return (
         <div className="flex h-screen w-full items-center justify-center">
