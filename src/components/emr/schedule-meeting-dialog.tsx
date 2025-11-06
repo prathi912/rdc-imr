@@ -21,6 +21,7 @@ import { format, parseISO, startOfToday, isToday, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Calendar, ChevronDown, Loader2 } from 'lucide-react';
 import { scheduleEmrMeeting } from '@/app/emr-actions';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 interface ScheduleMeetingDialogProps {
     call: FundingCall;
@@ -32,11 +33,23 @@ interface ScheduleMeetingDialogProps {
 }
 
 const scheduleSchema = z.object({
-    date: z.date({ required_error: 'A meeting date is required.' }).min(startOfToday(), "Meeting date cannot be in the past."),
-    time: z.string().min(1, "Time is required."),
-    venue: z.string().min(3, 'Meeting venue is required.'),
-    pptDeadline: z.date({ required_error: 'A presentation deadline is required.'}),
-    evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
+  date: z.date({ required_error: 'A meeting date is required.' }).min(startOfToday(), "Meeting date cannot be in the past."),
+  time: z.string().min(1, "Time is required."),
+  pptDeadline: z.date({ required_error: 'A presentation deadline is required.'}),
+  evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
+  mode: z.enum(['Offline', 'Online'], { required_error: 'Please select a meeting mode.' }),
+  venue: z.string().optional(),
+}).refine(data => {
+    if (data.mode === 'Offline') {
+        return data.venue && data.venue.length > 0;
+    }
+    if (data.mode === 'Online') {
+        return data.venue && data.venue.startsWith('https://');
+    }
+    return true;
+}, {
+    message: 'A valid venue or meeting link is required for the selected mode.',
+    path: ['venue'],
 }).refine(data => {
     if (isToday(data.date)) {
         const now = new Date();
@@ -69,6 +82,7 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
             date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
             time: call.meetingDetails?.time || '',
             pptDeadline: call.meetingDetails?.pptDeadline ? parseISO(call.meetingDetails.pptDeadline) : undefined,
+            mode: 'Offline',
         },
     });
 
@@ -87,6 +101,7 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                 date: call.meetingDetails?.date ? parseISO(call.meetingDetails.date) : undefined,
                 time: call.meetingDetails?.time || '',
                 pptDeadline: call.meetingDetails?.pptDeadline ? parseISO(call.meetingDetails.pptDeadline) : undefined,
+                mode: 'Offline',
             });
             applicantsForm.reset({
                 applicantUids: [],
@@ -106,9 +121,10 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
             const meetingDetails = {
                 date: format(scheduleValues.date, 'yyyy-MM-dd'),
                 time: scheduleValues.time,
-                venue: scheduleValues.venue,
+                venue: scheduleValues.venue || '',
                 pptDeadline: scheduleValues.pptDeadline.toISOString(),
                 evaluatorUids: scheduleValues.evaluatorUids,
+                mode: scheduleValues.mode,
             };
             const result = await scheduleEmrMeeting(call.id, meetingDetails, applicantUids);
 
@@ -129,10 +145,11 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
     
     const usersWithInterest = interests.filter(i => i.callId === call.id && !i.meetingSlot);
     const availableEvaluators = allUsers.filter(u => ['Super-admin', 'admin', 'CRO'].includes(u.role) && !usersWithInterest.some(interest => interest.userId === u.uid));
+    const meetingMode = scheduleForm.watch('mode');
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="sm:max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>Schedule Meeting for: {call.title}</DialogTitle>
                     <DialogDescription>Select applicants and set the details for the evaluation meeting.</DialogDescription>
@@ -192,7 +209,30 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
                                 </FormItem> 
                             )} />
                              <FormField name="time" control={scheduleForm.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                             <FormField name="venue" control={scheduleForm.control} render={({ field }) => ( <FormItem><FormLabel>Venue</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                             
+                             <FormField name="mode" control={scheduleForm.control} render={({ field }) => (
+                                <FormItem className="space-y-3">
+                                    <FormLabel>Meeting Mode</FormLabel>
+                                    <FormControl>
+                                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4">
+                                            <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Offline" /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem>
+                                            <FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Online" /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem>
+                                        </RadioGroup>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            
+                             <FormField name="venue" control={scheduleForm.control} render={({ field }) => ( 
+                                <FormItem>
+                                    <FormLabel>{meetingMode === 'Online' ? 'Meeting Link' : 'Venue'}</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} placeholder={meetingMode === 'Online' ? 'https://meet.google.com/...' : 'Enter physical venue'}/>
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem> 
+                             )} />
+
                              <FormField name="pptDeadline" control={scheduleForm.control} render={({ field }) => ( 
                                 <FormItem className="flex flex-col">
                                     <FormLabel>Presentation Upload Deadline</FormLabel>
@@ -248,4 +288,3 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, isOpen, onOpe
         </Dialog>
     );
 }
-

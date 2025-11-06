@@ -44,8 +44,16 @@ const scheduleSchema = z.object({
   evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
   mode: z.enum(['Offline', 'Online'], { required_error: 'Please select a meeting mode.' }),
   venue: z.string().optional(),
-}).refine(data => data.mode === 'Online' || (data.venue && data.venue.length > 0), {
-    message: 'Venue is required for offline meetings.',
+}).refine(data => {
+    if (data.mode === 'Offline') {
+        return data.venue && data.venue.length > 0;
+    }
+    if (data.mode === 'Online') {
+        return data.venue && data.venue.startsWith('https://');
+    }
+    return true;
+}, {
+    message: 'A valid venue or meeting link is required for the selected mode.',
     path: ['venue'],
 });
 
@@ -277,7 +285,7 @@ export default function ScheduleMeetingPage() {
     const meetingDetails = {
       date: format(data.date, 'yyyy-MM-dd'),
       time: data.time,
-      venue: data.mode === 'Online' ? 'Google Meet' : data.venue || '',
+      venue: data.venue || '',
       mode: data.mode,
       evaluatorUids: data.evaluatorUids,
     };
@@ -396,15 +404,22 @@ export default function ScheduleMeetingPage() {
                         </FormItem>
                     )} />
                     
-                    {meetingMode === 'Offline' && (
-                        <FormField name="venue" control={form.control} render={({ field }) => (
+                    <FormField
+                        name="venue"
+                        control={form.control}
+                        render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Venue</FormLabel>
-                                <FormControl><Input {...field} /></FormControl>
+                                <FormLabel>{meetingMode === 'Online' ? 'Meeting Link' : 'Venue'}</FormLabel>
+                                <FormControl>
+                                    <Input 
+                                        {...field} 
+                                        placeholder={meetingMode === 'Online' ? 'https://meet.google.com/...' : 'Enter physical venue'}
+                                    />
+                                </FormControl>
                                 <FormMessage />
                             </FormItem>
-                        )} />
-                    )}
+                        )}
+                    />
                     
                     <FormField
                         control={form.control}
