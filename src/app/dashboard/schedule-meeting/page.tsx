@@ -10,6 +10,7 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { format, startOfToday, subMonths, parseISO, isAfter } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 import { PageHeader } from '@/components/page-header';
 import { db } from '@/lib/config';
@@ -163,6 +164,8 @@ export default function ScheduleMeetingPage() {
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('new-submissions');
+  const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof scheduleSchema>>({
     resolver: zodResolver(scheduleSchema),
@@ -173,6 +176,21 @@ export default function ScheduleMeetingPage() {
       venue: 'RDC Committee Room, PIMSR',
     },
   });
+  
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        if (!parsedUser.allowedModules?.includes('schedule-meeting')) {
+            toast({ variant: 'destructive', title: 'Access Denied', description: "You don't have permission to view this page." });
+            router.replace('/dashboard');
+        }
+    } else {
+        router.replace('/login');
+    }
+  }, [router, toast]);
+
 
   const fetchRequiredData = useCallback(async () => {
     setLoading(true);
@@ -207,8 +225,10 @@ export default function ScheduleMeetingPage() {
   }, [toast]);
 
   useEffect(() => {
-    fetchRequiredData();
-  }, [fetchRequiredData]);
+    if (user && user.allowedModules?.includes('schedule-meeting')) {
+        fetchRequiredData();
+    }
+  }, [user, fetchRequiredData]);
   
   const evaluators = allUsers.filter(u => ['CRO', 'admin', 'Super-admin'].includes(u.role));
   
@@ -288,7 +308,7 @@ export default function ScheduleMeetingPage() {
   const usersMap = new Map(allUsers.map(u => [u.uid, u]));
   const meetingMode = form.watch('mode');
 
-  if (loading) {
+  if (loading || !user) {
     return (
       <div className="container mx-auto py-10">
         <PageHeader title="Schedule IMR Meeting" description="Loading projects..." />

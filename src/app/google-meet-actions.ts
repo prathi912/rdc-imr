@@ -4,6 +4,8 @@
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 
+// The arguments from the previous Calendar API implementation are no longer needed,
+// but we keep the function signature for compatibility with where it's called.
 interface GenerateMeetLinkArgs {
   summary: string;
   description: string;
@@ -11,8 +13,10 @@ interface GenerateMeetLinkArgs {
   endDateTime: string;
 }
 
-const SCOPES = ['https://www.googleapis.com/auth/calendar'];
+// The correct scope for creating a meeting space with the Meet API.
+const SCOPES = ['https://www.googleapis.com/auth/meetings.space.created'];
 const GOOGLE_CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL;
+// The private key must be formatted correctly to handle newline characters from environment variables.
 const GOOGLE_PRIVATE_KEY = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
 export async function generateGoogleMeetLink({
@@ -21,9 +25,8 @@ export async function generateGoogleMeetLink({
   startDateTime,
   endDateTime,
 }: GenerateMeetLinkArgs): Promise<{ link: string | null; error?: string }> {
-
   if (!GOOGLE_CLIENT_EMAIL || !GOOGLE_PRIVATE_KEY) {
-    const errorMsg = "Google Calendar API credentials are not set in environment variables.";
+    const errorMsg = "Google Meet API credentials are not set in environment variables.";
     console.error(errorMsg);
     return { link: null, error: errorMsg };
   }
@@ -35,46 +38,21 @@ export async function generateGoogleMeetLink({
       scopes: SCOPES,
     });
 
-    const calendar = google.calendar({ version: 'v3', auth });
+    const meet = google.meet({ version: 'v2', auth });
 
-    const event = {
-      summary: summary,
-      description: description,
-      start: {
-        dateTime: startDateTime,
-        timeZone: 'Asia/Kolkata',
-      },
-      end: {
-        dateTime: endDateTime,
-        timeZone: 'Asia/Kolkata',
-      },
-      conferenceData: {
-        createRequest: {
-          requestId: `rdc-${Date.now()}`,
-          conferenceSolutionKey: {
-            type: 'hangoutsMeet',
-          },
-        },
-      },
-    };
-
-    const createdEvent = await calendar.events.insert({
-      calendarId: 'primary',
-      // @ts-ignore
-      resource: event,
-      conferenceDataVersion: 1,
-    });
+    const response = await meet.spaces.create({});
     
-    const hangoutLink = createdEvent.data.hangoutLink;
-    if (hangoutLink) {
-        return { link: hangoutLink };
+    const meetingUri = response.data.meetingUri;
+    
+    if (meetingUri) {
+      return { link: meetingUri };
     }
     
-    return { link: null, error: 'Hangout link was not created by the API.' };
+    return { link: null, error: 'Meeting URI was not returned by the Google Meet API.' };
     
   } catch (error: any) {
     console.error('Error creating Google Meet link:', error);
-    // Return the specific error message from the API
+    // Return the specific error message from the API for better debugging
     return { link: null, error: error.message || 'An unknown error occurred during Google Meet link generation.' };
   }
 }
