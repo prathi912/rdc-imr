@@ -217,11 +217,12 @@ export default function ScheduleMeetingPage() {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
         const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
         if (!parsedUser.allowedModules?.includes('schedule-meeting')) {
             toast({ variant: 'destructive', title: 'Access Denied', description: "You don't have permission to view this page." });
             router.replace('/dashboard');
+            return;
         }
+        setUser(parsedUser);
     } else {
         router.replace('/login');
     }
@@ -260,7 +261,7 @@ export default function ScheduleMeetingPage() {
   }, [toast]);
 
   useEffect(() => {
-    if (user && user.allowedModules?.includes('schedule-meeting')) {
+    if (user) {
         fetchRequiredData();
     }
   }, [user, fetchRequiredData]);
