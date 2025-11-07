@@ -133,12 +133,12 @@ function ResearchPaperClaimDetails({
                 <div className="col-span-3 flex justify-end gap-1">
                     {stageIndex > 0 && (
                         <div className="w-7 h-7 flex items-center justify-center">
-                            <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
+                            <Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip>
                         </div>
                     )}
-                     {stageIndex > 1 && (
+                      {stageIndex > 1 && (
                         <div className="w-7 h-7 flex items-center justify-center">
-                             <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval2, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 2 Verification</p></TooltipContent></Tooltip></TooltipProvider>
+                              <Tooltip><TooltipTrigger>{getVerificationMark(approval2, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 2 Verification</p></TooltipContent></Tooltip>
                         </div>
                     )}
                     {isChecklistEnabled && (
@@ -353,7 +353,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                         )}.
                     </DialogDescription>
                 </DialogHeader>
-                
+
                 <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-4">
                     {isViewerAdminOrApprover && previousApprovals.length > 0 && (
                         <div className="space-y-4">
@@ -383,7 +383,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                             <Separator />
                         </div>
                     )}
-                    
+
                      {stageIndex === 0 && claim.calculatedIncentive !== undefined && claim.calculatedIncentive !== null && (
                         <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-md text-center">
                             <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Tentatively Eligible Incentive Amount:</p>
@@ -429,8 +429,9 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                             <FormMessage />
                                         </FormItem>
                                     )}
+                                />
                             )}
-                             {action !== 'verify' && (
+                            {action !== 'verify' && (
                                 <FormField
                                     name="comments"
                                     control={form.control}
