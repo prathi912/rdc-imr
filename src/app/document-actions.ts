@@ -473,9 +473,24 @@ export async function generateInstallmentOfficeNoting(
     };
 
     const phases = project.grant?.phases || [];
-    const previousPhase = phases[phases.length - 1];
-    const previousPhaseNumber = phases.length;
+    // Find the index of the phase that is currently pending disbursement
+    const nextPhaseIndex = phases.findIndex(p => p.amount === phaseData.amount && (p.status === 'Pending Disbursement' || !p.status));
+    
+    let previousPhase;
+    let previousPhaseNumber = 0;
+    if (nextPhaseIndex > 0) {
+      previousPhase = phases[nextPhaseIndex - 1];
+      previousPhaseNumber = nextPhaseIndex;
+    } else {
+      // This is the first *real* installment after the initial one.
+      previousPhase = phases[0];
+      previousPhaseNumber = 1;
+    }
 
+    if (!previousPhase) {
+        throw new Error('Could not determine the previous grant phase to generate the noting.');
+    }
+    
     const data = {
       Instalment_Reference: phaseData.installmentRefNumber || 'N/A',
       date: format(new Date(), 'dd/MM/yyyy'),
