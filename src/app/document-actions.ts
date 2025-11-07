@@ -13,12 +13,13 @@ import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
 import JSZip from 'jszip';
-import { getTemplateContent } from '@/lib/template-manager';
+import { getTemplateContentFromUrl } from '@/lib/template-manager';
 import { getSystemSettings } from './actions';
 import { generateBookIncentiveForm } from './incentive-actions';
 import { generateMembershipIncentiveForm } from './membership-actions';
 import { generatePatentIncentiveForm } from './patent-actions';
 import { generateConferenceIncentiveForm } from './conference-actions';
+import { generateResearchPaperIncentiveForm } from './research-paper-actions';
 
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -100,7 +101,7 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
       return { success: false, error: 'IMR Recommendation template URL is not configured in system settings.' };
     }
 
-    const content = await getTemplateContent(templateUrl);
+    const content = await getTemplateContentFromUrl(templateUrl);
     if (!content) {
       return { success: false, error: 'Recommendation form template not found on the server.' };
     }
@@ -454,7 +455,7 @@ export async function generateInstallmentOfficeNoting(
       return { success: false, error: 'IMR Installment Noting template URL is not configured in system settings.' };
     }
 
-    const content = await getTemplateContent(templateUrl);
+    const content = await getTemplateContentFromUrl(templateUrl);
     if (!content) {
         throw new Error('Template not found.');
     }
@@ -538,7 +539,7 @@ export async function generateOfficeNotingForm(
       return { success: false, error: 'IMR Office Noting template URL is not configured.' };
     }
 
-    const content = await getTemplateContent(templateUrl);
+    const content = await getTemplateContentFromUrl(templateUrl);
     if (!content) {
         return { success: false, error: "Office Notings form template not found on the server." };
     }
@@ -596,7 +597,7 @@ export async function generateOfficeNotingForm(
     }
 
     const buf = doc.getZip().generate({ type: 'nodebuffer' })
-    const base64 = buf.toString("base64")
+    const base64 = buf.toString('base64')
 
     if (project.status === "Recommended") {
       await projectRef.update({
