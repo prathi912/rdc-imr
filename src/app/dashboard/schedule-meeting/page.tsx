@@ -236,7 +236,7 @@ export default function ScheduleMeetingPage() {
 
       const projectsQuery = query(
         collection(db, 'projects'),
-        where('status', 'in', ['Submitted', 'In Progress', 'Sanctioned']), // Include 'Sanctioned' for historic bulk uploads
+        where('status', 'in', ['Submitted', 'In Progress', 'Sanctioned', 'SANCTIONED']),
         orderBy('submissionDate', 'desc')
       );
       
@@ -271,8 +271,7 @@ export default function ScheduleMeetingPage() {
   const newSubmissions = allProjects.filter(p => p.status === 'Submitted');
   
   const midTermReviewProjects = allProjects.filter(p => {
-    // Project must be "In Progress" OR a "Sanctioned" bulk-uploaded project.
-    const isEligibleStatus = p.status === 'In Progress' || (p.isBulkUploaded && p.status === 'Sanctioned');
+    const isEligibleStatus = p.status === 'In Progress' || (p.isBulkUploaded && (p.status === 'Sanctioned' || p.status === 'SANCTIONED'));
     if (!isEligibleStatus) return false;
 
     if (p.hasHadMidTermReview) {
@@ -281,7 +280,6 @@ export default function ScheduleMeetingPage() {
     
     const reviewMonths = systemSettings?.imrMidTermReviewMonths ?? 6;
     const thresholdDate = subMonths(new Date(), reviewMonths);
-    // Use submissionDate for bulk-uploaded projects, otherwise use grant start date
     const grantStartDate = p.isBulkUploaded ? p.submissionDate : (p.grant?.phases?.[0]?.disbursementDate || p.projectStartDate);
 
     if (!grantStartDate) return false;
