@@ -52,10 +52,10 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
 }, {
     message: 'An action must be selected.',
     path: ['action'],
-}).refine(data => {
-    // Amount is ALWAYS required when approving, at ANY stage.
-    if (data.action === 'approve') {
-        return data.amount !== undefined && data.amount >= 0;
+})
+.refine(data => {
+    if (stageIndex >= 1 && data.action === 'approve') {
+        return data.amount !== undefined && data.amount > 0;
     }
     return true;
 }, {
@@ -416,7 +416,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {action === 'approve' && (
+                            {action === 'approve' && stageIndex >= 1 && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
