@@ -52,8 +52,7 @@ const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) =
 }, {
     message: 'An action must be selected.',
     path: ['action'],
-})
-.refine(data => {
+}).refine(data => {
     if (stageIndex >= 1 && data.action === 'approve') {
         return data.amount !== undefined && data.amount > 0;
     }
