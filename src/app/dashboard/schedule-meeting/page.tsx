@@ -272,15 +272,20 @@ export default function ScheduleMeetingPage() {
   
   const midTermReviewProjects = allProjects.filter(p => {
     if (p.status !== 'In Progress') return false;
+    
+    // Check if a mid-term review has already been scheduled for this project
+    if (p.hasHadMidTermReview) {
+      return false;
+    }
+    
     const reviewMonths = systemSettings?.imrMidTermReviewMonths ?? 6;
     const thresholdDate = subMonths(new Date(), reviewMonths);
     const grantStartDate = p.isBulkUploaded ? p.submissionDate : (p.grant?.phases?.[0]?.disbursementDate || p.projectStartDate);
     if (!grantStartDate) return false;
-    
-    const hasHadMidTermReview = p.meetingDetails?.date && isAfter(parseISO(p.meetingDetails.date), parseISO(grantStartDate));
 
-    return isAfter(thresholdDate, parseISO(grantStartDate)) && !hasHadMidTermReview;
+    return isAfter(thresholdDate, parseISO(grantStartDate));
   });
+
 
   const projectsForCurrentTab = activeTab === 'new-submissions' ? newSubmissions : midTermReviewProjects;
 

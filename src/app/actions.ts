@@ -622,7 +622,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     }
 
     emailHtml += `
-      <p style="color:#e0e0e0;">
+      <p style="color:#e0e0e_0;">
         You can view your project details on the 
         <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}" style="color:#64b5f6; text-decoration:underline;">
           PU Research Projects Portal
@@ -760,7 +760,9 @@ export async function scheduleMeeting(
         },
       };
 
-      if (!isMidTermReview) {
+      if (isMidTermReview) {
+        updateData.hasHadMidTermReview = true;
+      } else {
         updateData.status = "Under Review";
       }
 
@@ -1931,5 +1933,6 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
 
 
     
+
 
 

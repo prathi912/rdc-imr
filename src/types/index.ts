@@ -163,6 +163,7 @@ export type Project = {
   utilizationCertificateUrl?: string
   completionSubmissionDate?: string // ISO String
   evaluatedBy?: string[]
+  hasHadMidTermReview?: boolean; // New flag for mid-term review tracking
   meetingDetails?: {
     date: string
     time: string
