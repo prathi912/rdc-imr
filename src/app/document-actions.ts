@@ -432,6 +432,7 @@ const angularParser = (tag: string) => {
             get: (scope: any) => scope[innerTag]
         };
     }
+    
     // This is the default parser for tags like `{name}`
     return {
         get: (scope: any) => scope[tag]
@@ -439,88 +440,88 @@ const angularParser = (tag: string) => {
 };
 
 
-export async function generateInstallmentOfficeNoting(
-  projectId: string,
-  phaseData: { installmentRefNumber: string; amount: number; }
-) {
-  try {
-    const projectSnap = await adminDb.collection('projects').doc(projectId).get();
-    if (!projectSnap.exists) return { success: false, error: "Project not found." };
-    const project = projectSnap.data() as Project;
+  export async function generateInstallmentOfficeNoting(
+    projectId: string,
+    phaseData: { installmentRefNumber: string; amount: number; }
+  ) {
+    try {
+      const projectSnap = await adminDb.collection('projects').doc(projectId).get();
+      if (!projectSnap.exists) return { success: false, error: "Project not found." };
+      const project = projectSnap.data() as Project;
 
-    const settings = await getSystemSettings();
-    const templateUrl = settings.templateUrls?.IMR_INSTALLMENT_NOTING;
+      const settings = await getSystemSettings();
+      const templateUrl = settings.templateUrls?.IMR_INSTALLMENT_NOTING;
 
-    if (!templateUrl) {
-      return { success: false, error: 'IMR Installment Noting template URL is not configured in system settings.' };
-    }
-
-    const content = await getTemplateContentFromUrl(templateUrl);
-    if (!content) {
-        throw new Error('Template not found.');
-    }
-
-    const zip = new PizZip(content);
-    const doc = new Docxtemplater(zip, {
-        paragraphLoop: true,
-        linebreaks: true,
-        parser: angularParser,
-        nullGetter: () => "N/A", // Return "N/A" for any undefined/null placeholders
-    });
-
-    const safeDate = (val?: string) => {
-      try { return val ? format(parseISO(val), 'dd/MM/yyyy') : 'N/A'; }
-      catch { return 'N/A'; }
-    };
-
-    const phases = project.grant?.phases || [];
-    // Find the index of the phase that is currently pending disbursement
-    const nextPhaseIndex = phases.findIndex(p => p.amount === phaseData.amount && (p.status === 'Pending Disbursement' || !p.status));
-    
-    let previousPhase;
-    let previousPhaseNumber = 0;
-    if (nextPhaseIndex > 0) {
-      previousPhase = phases[nextPhaseIndex - 1];
-      previousPhaseNumber = nextPhaseIndex;
-    } else {
-      // This is the first *real* installment after the initial one.
-      previousPhase = phases.find(p => p.status === 'Utilization Submitted' || p.status === 'Completed');
-      if (previousPhase) {
-        previousPhaseNumber = phases.indexOf(previousPhase) + 1;
-      } else {
-        // Fallback to the first phase if no utilization is submitted yet
-        previousPhase = phases[0];
-        previousPhaseNumber = 1;
+      if (!templateUrl) {
+        return { success: false, error: 'IMR Installment Noting template URL is not configured in system settings.' };
       }
+
+      const content = await getTemplateContentFromUrl(templateUrl);
+      if (!content) {
+          throw new Error('Template not found.');
+      }
+
+      const zip = new PizZip(content);
+      const doc = new Docxtemplater(zip, {
+          paragraphLoop: true,
+          linebreaks: true,
+          parser: angularParser,
+          nullGetter: () => "N/A", // Return "N/A" for any undefined/null placeholders
+      });
+
+      const safeDate = (val?: string) => {
+        try { return val ? format(parseISO(val), 'dd/MM/yyyy') : 'N/A'; }
+        catch { return 'N/A'; }
+      };
+
+      const phases = project.grant?.phases || [];
+      // Find the index of the phase that is currently pending disbursement
+      const nextPhaseIndex = phases.findIndex(p => p.amount === phaseData.amount && (p.status === 'Pending Disbursement' || !p.status));
+      
+      let previousPhase;
+      let previousPhaseNumber = 0;
+      if (nextPhaseIndex > 0) {
+        previousPhase = phases[nextPhaseIndex - 1];
+        previousPhaseNumber = nextPhaseIndex;
+      } else {
+        // This is the first *real* installment after the initial one.
+        previousPhase = phases.find(p => p.status === 'Utilization Submitted' || p.status === 'Completed');
+        if (previousPhase) {
+          previousPhaseNumber = phases.indexOf(previousPhase) + 1;
+        } else {
+          // Fallback to the first phase if no utilization is submitted yet
+          previousPhase = phases[0];
+          previousPhaseNumber = 1;
+        }
+      }
+
+      const data = {
+        Instalment_Reference: phaseData.installmentRefNumber || 'N/A',
+        date: format(new Date(), 'dd/MM/yyyy'),
+        PI_name: project.pi || 'N/A',
+        sanction_reference: project.grant?.sanctionNumber || 'N/A',
+        date_sanction: safeDate(project.grant?.phases?.[0]?.disbursementDate || project.submissionDate),
+        total_sanction: project.grant?.totalAmount?.toLocaleString('en-IN') || 'N/A',
+        phase_number: toWords(previousPhaseNumber),
+        previous_phase_amount: previousPhase?.amount?.toLocaleString('en-IN') || 'N/A',
+        previous_phase_award_date: safeDate(previousPhase?.disbursementDate),
+        midterm_review_date: safeDate(project.meetingDetails?.date),
+        next_phase_number: toWords(previousPhaseNumber + 1),
+        next_phase_amount: phaseData.amount?.toLocaleString('en-IN') || 'N/A',
+      };
+
+      doc.render(data);
+      const buf = doc.getZip().generate({ type: 'nodebuffer' });
+      return { success: true, fileData: buf.toString('base64') };
+
+    } catch (error: any) {
+      console.error("Error generating installment office noting:", error);
+      if (error.properties?.errors) {
+        console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
+      }
+      return { success: false, error: error.message };
     }
-
-    const data = {
-      Instalment_Reference: phaseData.installmentRefNumber || 'N/A',
-      date: format(new Date(), 'dd/MM/yyyy'),
-      PI_name: project.pi || 'N/A',
-      sanction_reference: project.grant?.sanctionNumber || 'N/A',
-      date_sanction: safeDate(project.grant?.phases?.[0]?.disbursementDate || project.submissionDate),
-      total_sanction: project.grant?.totalAmount?.toLocaleString('en-IN') || 'N/A',
-      phase_number: toWords(previousPhaseNumber),
-      previous_phase_amount: previousPhase?.amount?.toLocaleString('en-IN') || 'N/A',
-      previous_phase_award_date: safeDate(previousPhase?.disbursementDate),
-      midterm_review_date: safeDate(project.meetingDetails?.date),
-      next_phase_number: toWords(previousPhaseNumber + 1),
-      next_phase_amount: phaseData.amount?.toLocaleString('en-IN') || 'N/A',
-    };
-
-    doc.render(data);
-    const buf = doc.getZip().generate({ type: 'nodebuffer' });
-    return { success: true, fileData: buf.toString('base64') };
-
-  } catch (error: any) {
-    console.error("Error generating installment office noting:", error);
-    if (error.properties?.errors) {
-      console.error("Template errors:", JSON.stringify(error.properties.errors, null, 2));
-    }
-    return { success: false, error: error.message };
   }
-}
 
 export async function generateOfficeNotingForm(
   projectId: string,
