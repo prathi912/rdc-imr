@@ -465,6 +465,7 @@ export async function generateInstallmentOfficeNoting(
         paragraphLoop: true,
         linebreaks: true,
         parser: angularParser,
+        nullGetter: () => "N/A", // Return "N/A" for any undefined/null placeholders
     });
 
     const safeDate = (val?: string) => {
@@ -483,14 +484,16 @@ export async function generateInstallmentOfficeNoting(
       previousPhaseNumber = nextPhaseIndex;
     } else {
       // This is the first *real* installment after the initial one.
-      previousPhase = phases[0];
-      previousPhaseNumber = 1;
+      previousPhase = phases.find(p => p.status === 'Utilization Submitted' || p.status === 'Completed');
+      if (previousPhase) {
+        previousPhaseNumber = phases.indexOf(previousPhase) + 1;
+      } else {
+        // Fallback to the first phase if no utilization is submitted yet
+        previousPhase = phases[0];
+        previousPhaseNumber = 1;
+      }
     }
 
-    if (!previousPhase) {
-        throw new Error('Could not determine the previous grant phase to generate the noting.');
-    }
-    
     const data = {
       Instalment_Reference: phaseData.installmentRefNumber || 'N/A',
       date: format(new Date(), 'dd/MM/yyyy'),
