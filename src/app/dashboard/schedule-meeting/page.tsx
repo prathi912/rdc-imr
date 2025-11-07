@@ -274,7 +274,7 @@ export default function ScheduleMeetingPage() {
     if (p.status !== 'In Progress') return false;
     const reviewMonths = systemSettings?.imrMidTermReviewMonths ?? 6;
     const thresholdDate = subMonths(new Date(), reviewMonths);
-    const grantStartDate = p.grant?.phases?.[0]?.disbursementDate || p.projectStartDate;
+    const grantStartDate = p.isBulkUploaded ? p.submissionDate : (p.grant?.phases?.[0]?.disbursementDate || p.projectStartDate);
     if (!grantStartDate) return false;
     
     const hasHadMidTermReview = p.meetingDetails?.date && isAfter(parseISO(p.meetingDetails.date), parseISO(grantStartDate));
