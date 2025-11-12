@@ -163,44 +163,77 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         resolver: zodResolver(coAuthorApplySchema),
     });
     
-    const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
-        if (!currentUser) return;
-        setClaimToApply(claim);
-        setIsCalculating(true);
-        setCalculatedAmount(null);
-        
-        try {
-            let result;
-            const myAuthorDetails = claim.authors?.find(a => a.email.toLowerCase() === currentUser.email.toLowerCase());
+  // Replace the handleOpenDialog function in your CoAuthorClaimsList component
+// Starting around line 95 in your file
 
-            if (claim.claimType === 'Research Papers') {
-                // To calculate, we need to pass the claim data as if the current user is the claimant
-                const claimDataForCalc = { 
-                    ...claim, 
-                    userEmail: currentUser.email,
-                    authorType: myAuthorDetails?.role, // Pass the co-author's specific role
-                };
-                result = await calculateResearchPaperIncentive(claimDataForCalc, currentUser.faculty || '', currentUser.designation);
-            } else if (claim.claimType === 'Books') {
-                 // For books, the calculation depends on the co-author's role and other factors
-                result = await calculateBookIncentive(claim);
-            } else {
-                result = { success: true, amount: 0 }; // Default for other types for now
-            }
-            
-            if (result.success) {
-                setCalculatedAmount(result.amount ?? 0);
-            } else {
-                toast({ variant: 'destructive', title: 'Calculation Error', description: result.error });
-            }
-        } catch (e: any) {
-             toast({ variant: 'destructive', title: 'Error', description: e.message || 'Could not calculate incentive amount.' });
-        } finally {
+const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
+    if (!currentUser) return;
+    setClaimToApply(claim);
+    setIsCalculating(true);
+    setCalculatedAmount(null);
+    
+    try {
+        let result;
+        const myAuthorDetails = claim.authors?.find(
+            a => a.email.toLowerCase() === currentUser.email.toLowerCase()
+        );
+
+        if (!myAuthorDetails) {
+            toast({ 
+                variant: 'destructive', 
+                title: 'Error', 
+                description: 'Your details not found in the author list.' 
+            });
             setIsCalculating(false);
+            return;
         }
 
-    }, [currentUser, toast]);
-
+        if (claim.claimType === 'Research Papers') {
+            // Create a modified claim data where the co-author is treated as the claimant
+            // The key is to keep the authors array intact but change userEmail
+            const claimDataForCalc = { 
+                ...claim, 
+                userEmail: currentUser.email, // This will be used to find the claimant in authors array
+                // Don't modify the authors array - keep it as is
+            };
+            
+            result = await calculateResearchPaperIncentive(
+                claimDataForCalc, 
+                currentUser.faculty || '', 
+                currentUser.designation
+            );
+        } else if (claim.claimType === 'Books'|| "Seed Money for APC" ) {
+            // For books, we need to calculate based on the number of PU authors
+            // The calculation already divides by internal author count
+            const claimDataForCalc = {
+                ...claim,
+                userEmail: currentUser.email,
+            };
+            result = await calculateBookIncentive(claimDataForCalc);
+        } else {
+            result = { success: true, amount: 0 };
+        }
+        
+        if (result.success) {
+            setCalculatedAmount(result.amount ?? 0);
+        } else {
+            toast({ 
+                variant: 'destructive', 
+                title: 'Calculation Error', 
+                description: result.error 
+            });
+        }
+    } catch (e: any) {
+        console.error('Calculation error:', e);
+        toast({ 
+            variant: 'destructive', 
+            title: 'Error', 
+            description: e.message || 'Could not calculate incentive amount.' 
+        });
+    } finally {
+        setIsCalculating(false);
+    }
+}, [currentUser, toast]);
 
     const handleApply = async (values: CoAuthorApplyValues) => {
         if (!claimToApply || !currentUser) {

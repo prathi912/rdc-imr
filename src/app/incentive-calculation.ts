@@ -297,19 +297,12 @@ export async function calculateApcIncentive(
                 case 'Q3': maxReimbursementLimit = 20000; break;
                 case 'Q4': maxReimbursementLimit = 15000; break;
             }
-        }
-        
-        if (!isSpecialFaculty && apcIndexingStatus) {
+        } else if (!isSpecialFaculty && apcIndexingStatus) {
             if (apcIndexingStatus.some(status => status.includes('Web of Science indexed journals (ESCI)'))) {
-                maxReimbursementLimit = Math.max(maxReimbursementLimit, 8000);
+                maxReimbursementLimit = 8000;
+            } else if (apcIndexingStatus.some(status => status.includes('UGC-CARE Group-I'))) {
+                maxReimbursementLimit = 5000;
             }
-            if (apcIndexingStatus.some(status => status.includes('UGC-CARE Group-I'))) {
-                maxReimbursementLimit = Math.max(maxReimbursementLimit, 5000);
-            }
-        }
-        
-        if (maxReimbursementLimit === 0 && !hasScopusOrWoS) {
-             return { success: true, amount: 0, error: "No applicable policy limit found for the selected indexing status and Q rating." };
         }
         
         const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
