@@ -160,8 +160,7 @@ a.href = url;
       );
     }
 
-    const isViewerAdminOrApprover = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin' || currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
-    const canViewBankDetails = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
+    const isFullAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
     const isPendingForBank = ['Accepted', 'Submitted to Accounts'].includes(claim.status);
 
@@ -210,6 +209,7 @@ a.href = url;
                             {renderDetail("Publication Year", claim.publicationYear, "publicationYear")}
                             {renderDetail("Author Position", claim.authorPosition)}
                             {renderDetail("PU Name in Publication", claim.isPuNameInPublication, "isPuNameInPublication")}
+                            {renderDetail("APC Paid by University", claim.wasApcPaidByUniversity)}
                             {renderDetail("Authors", claim.authors)}
                             {renderDetail("Total PU Student Authors", claim.totalPuStudentAuthors)}
                             {renderDetail("PU Student Names", claim.puStudentNames)}
@@ -368,7 +368,7 @@ a.href = url;
                         </>
                     )}
 
-                    {isViewerAdminOrApprover && (
+                    {isFullAdmin && (
                         <>
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>
@@ -389,7 +389,7 @@ a.href = url;
                                 </div>
                             )}
                             
-                            {canViewBankDetails && claim.bankDetails && (
+                            {claim.bankDetails && (
                                 <>
                                     <hr className="my-2" />
                                     <h4 className="font-semibold text-base mt-2">Bank Account Details (Visible to Admins only)</h4>
@@ -405,7 +405,7 @@ a.href = url;
                     )}
                 </div>
                 <DialogFooter className="gap-2">
-                    {isPendingForBank && isViewerAdminOrApprover && (
+                    {isPendingForBank && isFullAdmin && (
                          <Button onClick={handleDownloadNoting} disabled={isPrinting}>
                             {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
                             Download Notings
