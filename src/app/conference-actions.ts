@@ -75,6 +75,8 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
 
     const approval1 = claim.approvals?.find(a => a?.stage === 1);
     const approval2 = claim.approvals?.find(a => a?.stage === 2);
+    const approval3 = claim.approvals?.find(a => a?.stage === 3);
+    const approval4 = claim.approvals?.find(a => a?.stage === 4);
     
     const checklistFields = [
         'name', 'designation', 'eventType', 'conferencePaperTitle', 'authorType', 'totalAuthors',
@@ -105,7 +107,13 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
         other_expense: '0', 
         total_amount: claim.totalAmountClaimed?.toLocaleString('en-IN') || 'N/A',
         presentation_date: claim.presentationDate ? new Date(claim.presentationDate).toLocaleDateString('en-GB') : 'N/A',
-        ...approvalData
+        ...approvalData,
+        approver2_comments: approval2?.comments || '',
+        approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
+        approver3_comments: approval3?.comments || '',
+        approver3_amount: approval3?.approvedAmount?.toLocaleString('en-IN') || '',
+        approver4_comments: approval4?.comments || '',
+        approver4_amount: approval4?.approvedAmount?.toLocaleString('en-IN') || '',
     };
     
     doc.setData(data);
