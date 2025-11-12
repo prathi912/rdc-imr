@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -90,12 +91,108 @@ const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'des
     { id: 'publicationMonth', label: 'Published Month & Year' }, // Simplified for display
 ];
 
+const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
+    { id: 'name', label: 'Name of the Applicant' },
+    { id: 'designation', label: 'Designation & Department' },
+    { id: 'eventType', label: 'Type of Event' },
+    { id: 'conferencePaperTitle', label: 'Title of Paper' },
+    { id: 'authorType', label: 'First/Corresponding/Co-Author' },
+    { id: 'totalAuthors', label: 'Total No. of Authors' },
+    { id: 'conferenceName', label: 'Name of Conference' },
+    { id: 'organizerName', label: 'Name of Organizer' },
+    { id: 'conferenceType', label: 'National/International' },
+    { id: 'presentationType', label: 'Oral/Poster' },
+    { id: 'conferenceDate', label: 'Date of Conference' },
+    { id: 'travelPlaceVisited', label: 'Place Visited' },
+];
+
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
     if (!approval) return null;
     const verifiedStatus = approval.verifiedFields?.[fieldId];
     if (verifiedStatus === true) return <Check className="h-4 w-4 text-green-600" />;
     if (verifiedStatus === false) return <X className="h-4 w-4 text-red-600" />;
     return null;
+}
+
+
+function ConferenceClaimDetails({ 
+    claim, 
+    claimant, 
+    form, 
+    isChecklistEnabled, 
+    stageIndex, 
+    previousApprovals 
+}: { 
+    claim: IncentiveClaim, 
+    claimant: User | null, 
+    form: any, 
+    isChecklistEnabled: boolean,
+    stageIndex: number,
+    previousApprovals: (ApprovalStage | null)[]
+}) {
+    const approval1 = previousApprovals[0];
+
+    const renderDetail = (fieldId: string, label: string, value?: string | number | null | boolean | string[]) => {
+        if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
+        let displayValue = String(value);
+        if (typeof value === 'boolean') {
+            displayValue = value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            displayValue = value.join(', ');
+        }
+        return (
+            <div className="grid grid-cols-12 gap-2 text-sm items-center py-1">
+                <span className="text-muted-foreground col-span-5">{label}</span>
+                <span className="col-span-4">{displayValue}</span>
+                <div className="col-span-3 flex justify-end gap-1">
+                    {stageIndex > 0 && (
+                        <div className="w-7 h-7 flex items-center justify-center">
+                            <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
+                        </div>
+                    )}
+                    {isChecklistEnabled && (
+                        <FormField
+                            control={form.control}
+                            name={`verifiedFields.${fieldId}`}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormControl>
+                                        <div className="flex items-center gap-1">
+                                            <Button type="button" size="icon" variant={field.value === true ? 'secondary' : 'ghost'} className="h-7 w-7" onClick={() => field.onChange(field.value === true ? undefined : true)}><Check className="h-4 w-4" /></Button>
+                                            <Button type="button" size="icon" variant={field.value === false ? 'destructive' : 'ghost'} className="h-7 w-7" onClick={() => field.onChange(field.value === false ? undefined : false)}><X className="h-4 w-4" /></Button>
+                                        </div>
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    const claimWithUserData = {
+        ...claim,
+        name: claimant?.name,
+        designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`,
+    };
+
+    return (
+        <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
+            <div className="flex items-center justify-between">
+                <h4 className="font-semibold">Conference Details to Verify</h4>
+                 <div className="grid grid-cols-2 gap-1 text-xs font-semibold text-center">
+                    {stageIndex > 0 && <span>Appr. 1</span>}
+                    {isChecklistEnabled && <span>Your Verify</span>}
+                </div>
+            </div>
+            <div className="space-y-1">
+                {conferenceChecklistFields.map(field => renderDetail(field.id, field.label, (claimWithUserData as any)[field.id]))}
+            </div>
+            {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
+        </div>
+    );
 }
 
 
@@ -133,12 +230,12 @@ function ResearchPaperClaimDetails({
                 <div className="col-span-3 flex justify-end gap-1">
                     {stageIndex > 0 && (
                         <div className="w-7 h-7 flex items-center justify-center">
-                            <Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip>
+                            <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
                         </div>
                     )}
-                      {stageIndex > 1 && (
+                     {stageIndex > 1 && (
                         <div className="w-7 h-7 flex items-center justify-center">
-                              <Tooltip><TooltipTrigger>{getVerificationMark(approval2, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 2 Verification</p></TooltipContent></Tooltip>
+                             <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval2, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 2 Verification</p></TooltipContent></Tooltip></TooltipProvider>
                         </div>
                     )}
                     {isChecklistEnabled && (
@@ -231,30 +328,25 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
-    const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1));
+    const isConferenceClaim = claim.claimType === 'Conference Presentations';
+    const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && (stageIndex === 0 || stageIndex === 1));
     
     const getFieldsToVerify = () => {
-        if (!isResearchPaperClaim) return [];
-
-        const claimWithUserData = {
-            ...claim,
-            name: claimant?.name,
-            designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`,
-            authorRoleAndPosition: `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`
-        };
-
-        return allPossibleResearchPaperFields
-            .filter(field => {
-                const value = (claimWithUserData as any)[field.id];
-                return value !== undefined && value !== null && value !== '' && (!Array.isArray(value) || value.length > 0);
-            })
-            .map(field => field.id);
+        if (isResearchPaperClaim) return allPossibleResearchPaperFields.map(f => f.id);
+        if (isConferenceClaim) return conferenceChecklistFields.map(f => f.id);
+        return [];
     };
     const fieldsToVerify = getFieldsToVerify();
     
     const approvalSchema = createApprovalSchema(stageIndex, isChecklistEnabled);
     const formSchemaWithVerification = approvalSchema.refine(data => {
         if (!isChecklistEnabled) return true;
+        // For conference claims, we only need to verify the fields that are actually displayed.
+        const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
+        const displayedFields = conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id]).map(f => f.id);
+        if (isConferenceClaim) {
+            return displayedFields.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
+        }
         return fieldsToVerify.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
     }, {
         message: 'You must verify all visible fields (mark as correct or incorrect).',
@@ -394,6 +486,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                     <Form {...form}>
                         {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
                         {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
+                        {isConferenceClaim && <ConferenceClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
 
 
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
