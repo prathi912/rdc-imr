@@ -542,96 +542,209 @@ export default function ManageUsersPage() {
 
       <div className="mt-4">
         <Card>
-          <CardContent className="pt-6 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                   <TableHead className="w-[50px]">
-                    <Checkbox
-                      checked={isAllSelected}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedUsers(sortedAndFilteredUsers.map(u => u.uid));
-                        } else {
-                          setSelectedUsers([]);
-                        }
-                      }}
-                      // @ts-ignore
-                      indeterminate={isSomeSelected || undefined}
-                    />
-                  </TableHead>
-                  <TableHead>
-                     <Button variant="ghost" onClick={() => requestSort('name')}>
-                        Name <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                     <Button variant="ghost" onClick={() => requestSort('email')}>
-                        Email <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                  <TableHead>
-                     <Button variant="ghost" onClick={() => requestSort('role')}>
-                        Role <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                   <TableHead className="hidden lg:table-cell">
-                     <Button variant="ghost" onClick={() => requestSort('faculty')}>
-                        Faculty <ArrowUpDown className="ml-2 h-4 w-4" />
-                    </Button>
-                  </TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedAndFilteredUsers.map((user) => {
-                   const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
-                   const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
-                   const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
-                   const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
+          <CardContent className="pt-6">
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedUsers(sortedAndFilteredUsers.map(u => u.uid));
+                          } else {
+                            setSelectedUsers([]);
+                          }
+                        }}
+                        // @ts-ignore
+                        indeterminate={isSomeSelected || undefined}
+                      />
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" onClick={() => requestSort('name')}>
+                          Name <ArrowUpDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" onClick={() => requestSort('email')}>
+                          Email <ArrowUpDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" onClick={() => requestSort('role')}>
+                          Role <ArrowUpDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" onClick={() => requestSort('faculty')}>
+                          Faculty <ArrowUpDown className="ml-2 h-4 w-4" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedAndFilteredUsers.map((user) => {
+                    const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
+                    const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
+                    const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
+                    const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
 
-                   return (
-                    <TableRow key={user.uid} data-state={selectedUsers.includes(user.uid) && "selected"}>
-                       <TableCell>
-                        <Checkbox
-                          checked={selectedUsers.includes(user.uid)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedUsers([...selectedUsers, user.uid]);
-                            } else {
-                              setSelectedUsers(selectedUsers.filter(id => id !== user.uid));
-                            }
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        <div>
+                    return (
+                      <TableRow key={user.uid} data-state={selectedUsers.includes(user.uid) && "selected"}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedUsers.includes(user.uid)}
+                            onCheckedChange={(checked) => {
+                              setSelectedUsers(
+                                checked
+                                ? [...selectedUsers, user.uid]
+                                : selectedUsers.filter(id => id !== user.uid)
+                              );
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <div>
+                              {user.misId ? (
+                                  <Link href={profileLink} className="hover:underline" target="_blank" rel="noopener noreferrer">
+                                      {user.name}
+                                  </Link>
+                              ) : (
+                                  user.name
+                              )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                              {user.designation}, {user.institute}
+                          </div>
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge variant={user.role === 'admin' || user.role === 'Super-admin' || user.role === 'IQAC' ? 'default' : 'secondary'}>{user.role}</Badge>
+                        </TableCell>
+                        <TableCell>{user.faculty || 'N/A'}</TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button aria-haspopup="true" size="icon" variant="ghost" disabled={isActionsDisabled}>
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem onSelect={() => setUserToView(user)}>View Details</DropdownMenuItem>
+                              {isCurrentUserSuperAdmin && (
+                                <>
+                                  <DropdownMenuItem onSelect={() => setUserToManageModules(user)}>
+                                      <ShieldCheck className="mr-2 h-4 w-4" /> Manage Modules
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => setUserToManageNotifications(user)}>
+                                      <Bell className="mr-2 h-4 w-4" /> Notification Settings
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger>Change Role</DropdownMenuSubTrigger>
+                                      <DropdownMenuPortal>
+                                          <DropdownMenuSubContent>
+                                              {availableRoles.map(role => (
+                                                  <DropdownMenuItem 
+                                                      key={role} 
+                                                      onClick={() => handleRoleChange(user.uid, role)}
+                                                      disabled={user.role === role}
+                                                  >
+                                                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                                                  </DropdownMenuItem>
+                                              ))}
+                                          </DropdownMenuSubContent>
+                                      </DropdownMenuPortal>
+                                  </DropdownMenuSub>
+                                  {user.designation === 'Head of Goa Campus' ? (
+                                      <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty', { designation: 'faculty', campus: 'Goa' })}>
+                                          Dismiss as Head of Goa Campus
+                                      </DropdownMenuItem>
+                                  ) : (
+                                      <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin', { designation: 'Head of Goa Campus', campus: 'Goa'})}>
+                                          Assign as Head of Goa Campus
+                                      </DropdownMenuItem>
+                                  )}
+                                </>
+                              )}
+                              {isCurrentUserSuperAdmin && user.role === 'CRO' && (
+                                  <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger>Assign Faculties</DropdownMenuSubTrigger>
+                                      <DropdownMenuPortal>
+                                          <DropdownMenuSubContent className="max-h-80 overflow-y-auto">
+                                              <DropdownMenuLabel>Faculties</DropdownMenuLabel>
+                                              <DropdownMenuSeparator />
+                                              {faculties.map(faculty => (
+                                                  <DropdownMenuCheckboxItem
+                                                      key={faculty}
+                                                      checked={user.faculties?.includes(faculty)}
+                                                      onCheckedChange={(checked) => {
+                                                          const currentFaculties = user.faculties || [];
+                                                          const newFaculties = checked
+                                                              ? [...currentFaculties, faculty]
+                                                              : currentFaculties.filter(f => f !== faculty);
+                                                          handleRoleChange(user.uid, user.role, { faculties: newFaculties });
+                                                      }}
+                                                  >
+                                                      {faculty}
+                                                  </DropdownMenuCheckboxItem>
+                                              ))}
+                                          </DropdownMenuSubContent>
+                                      </DropdownMenuPortal>
+                                  </DropdownMenuSub>
+                              )}
+                              <DropdownMenuItem className="text-destructive" onSelect={() => setUserToDelete(user)}>
+                                Delete User
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            
+            <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
+              {sortedAndFilteredUsers.map(user => {
+                const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
+                const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
+                const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
+                const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
+                return (
+                  <Card key={user.uid} className="flex flex-col">
+                    <CardHeader className="flex-row items-start justify-between gap-4 pb-2">
+                        <div className="flex items-center gap-2">
+                           <Checkbox
+                            checked={selectedUsers.includes(user.uid)}
+                            onCheckedChange={(checked) => {
+                              setSelectedUsers(
+                                checked
+                                ? [...selectedUsers, user.uid]
+                                : selectedUsers.filter(id => id !== user.uid)
+                              );
+                            }}
+                          />
+                          <div className="flex flex-col">
                             {user.misId ? (
-                                <Link href={profileLink} className="hover:underline" target="_blank" rel="noopener noreferrer">
-                                    {user.name}
-                                </Link>
+                              <Link href={profileLink} className="font-semibold hover:underline" target="_blank" rel="noopener noreferrer">{user.name}</Link>
                             ) : (
-                                user.name
+                              <span className="font-semibold">{user.name}</span>
                             )}
+                            <span className="text-xs text-muted-foreground">{user.email}</span>
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                            {user.designation}, {user.institute}
-                        </div>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">{user.email}</TableCell>
-                      <TableCell>
-                        <Badge variant={user.role === 'admin' || user.role === 'Super-admin' || user.role === 'IQAC' ? 'default' : 'secondary'}>{user.role}</Badge>
-                      </TableCell>
-                       <TableCell className="hidden lg:table-cell">{user.faculty || 'N/A'}</TableCell>
-                      <TableCell className="text-right">
-                         <DropdownMenu>
+                        <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button aria-haspopup="true" size="icon" variant="ghost" disabled={isActionsDisabled}>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" disabled={isActionsDisabled}>
                               <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuItem onSelect={() => setUserToView(user)}>View Details</DropdownMenuItem>
                             {isCurrentUserSuperAdmin && (
@@ -647,26 +760,12 @@ export default function ManageUsersPage() {
                                     <DropdownMenuPortal>
                                         <DropdownMenuSubContent>
                                             {availableRoles.map(role => (
-                                                <DropdownMenuItem 
-                                                    key={role} 
-                                                    onClick={() => handleRoleChange(user.uid, role)}
-                                                    disabled={user.role === role}
-                                                >
-                                                   {role.charAt(0).toUpperCase() + role.slice(1)}
-                                                </DropdownMenuItem>
+                                                <DropdownMenuItem key={role} onClick={() => handleRoleChange(user.uid, role)} disabled={user.role === role}>{role.charAt(0).toUpperCase() + role.slice(1)}</DropdownMenuItem>
                                             ))}
                                         </DropdownMenuSubContent>
                                     </DropdownMenuPortal>
                                 </DropdownMenuSub>
-                                {user.designation === 'Head of Goa Campus' ? (
-                                    <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty', { designation: 'faculty', campus: 'Goa' })}>
-                                        Dismiss as Head of Goa Campus
-                                    </DropdownMenuItem>
-                                ) : (
-                                    <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin', { designation: 'Head of Goa Campus', campus: 'Goa'})}>
-                                        Assign as Head of Goa Campus
-                                    </DropdownMenuItem>
-                                )}
+                                {user.designation === 'Head of Goa Campus' ? ( <DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'faculty', { designation: 'faculty', campus: 'Goa' })}>Dismiss as Head of Goa Campus</DropdownMenuItem>) : (<DropdownMenuItem onClick={() => handleRoleChange(user.uid, 'admin', { designation: 'Head of Goa Campus', campus: 'Goa'})}>Assign as Head of Goa Campus</DropdownMenuItem>)}
                               </>
                             )}
                             {isCurrentUserSuperAdmin && user.role === 'CRO' && (
@@ -682,30 +781,27 @@ export default function ManageUsersPage() {
                                                     checked={user.faculties?.includes(faculty)}
                                                     onCheckedChange={(checked) => {
                                                         const currentFaculties = user.faculties || [];
-                                                        const newFaculties = checked
-                                                            ? [...currentFaculties, faculty]
-                                                            : currentFaculties.filter(f => f !== faculty);
+                                                        const newFaculties = checked ? [...currentFaculties, faculty] : currentFaculties.filter(f => f !== faculty);
                                                         handleRoleChange(user.uid, user.role, { faculties: newFaculties });
                                                     }}
-                                                >
-                                                    {faculty}
-                                                </DropdownMenuCheckboxItem>
+                                                >{faculty}</DropdownMenuCheckboxItem>
                                             ))}
                                         </DropdownMenuSubContent>
                                     </DropdownMenuPortal>
                                 </DropdownMenuSub>
                             )}
-                            <DropdownMenuItem className="text-destructive" onSelect={() => setUserToDelete(user)}>
-                              Delete User
-                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onSelect={() => setUserToDelete(user)}>Delete User</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                    </CardHeader>
+                    <CardContent className="flex-grow space-y-2 text-sm">
+                        <p><Badge variant={user.role === 'admin' || user.role === 'Super-admin' || user.role === 'IQAC' ? 'default' : 'secondary'}>{user.role}</Badge></p>
+                        <p className="text-muted-foreground">{user.faculty || 'No faculty set'}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           </CardContent>
            {selectedUsers.length > 0 && isCurrentUserSuperAdmin && (
               <CardFooter className="p-4 border-t sticky bottom-0 bg-background/95">
