@@ -23,7 +23,7 @@ import type { User, IncentiveClaim, PatentInventor } from '@/types';
 import { uploadFileToServer, checkPatentUniqueness } from '@/app/actions';
 import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
-import { findUserByMisId } from '@/app/userfinding';
+import { findUser } from '@/app/userfinding';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
@@ -157,7 +157,6 @@ export function PatentForm() {
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
       
-      // Automatically add the current user as the first inventor if not already present
       const inventors = form.getValues('patentInventors');
       if (inventors.length === 0 && parsedUser.misId) {
         appendInventor({ name: parsedUser.name, misId: parsedUser.misId, uid: parsedUser.uid });
@@ -206,15 +205,15 @@ export function PatentForm() {
     setIsSearching(true);
     setFoundUser(null);
     try {
-        const result = await findUserByMisId(searchTerm);
+        const result = await findUser(searchTerm);
         if (result.success && result.users && result.users.length > 0) {
             const user = result.users[0];
             setFoundUser({ ...user });
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
         }
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Search Failed', description: error.message || 'An error occurred while searching.' });
     } finally {
         setIsSearching(false);
     }
@@ -263,7 +262,6 @@ export function PatentForm() {
     try {
         const data = form.getValues();
         
-        // Uniqueness check
         const uniquenessCheck = await checkPatentUniqueness(data.patentTitle, data.patentApplicationNumber, searchParams.get('claimId') || undefined);
         if (!uniquenessCheck.isUnique) {
             toast({ variant: 'destructive', title: 'Duplicate Entry', description: uniquenessCheck.message, duration: 8000 });
@@ -390,12 +388,12 @@ export function PatentForm() {
                         <div className="flex items-center space-x-2"><RadioGroupItem value="applicant" id="r2" /><label htmlFor="r2">Co-Applicant</label></div>
                     </RadioGroup>
                     <div className="flex items-center gap-2">
-                        <Input placeholder={`Search by ${searchType}'s MIS ID`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        <Button type="button" onClick={handleSearchUser} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                        <Input placeholder={`Search by ${searchType}'s Name or MIS ID`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        <Button type="button" onClick={handleSearchUser} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
                     </div>
                     {foundUser && (
                         <div className="flex items-center justify-between p-2 border rounded-md mt-2">
-                            <div><p className="text-sm">{foundUser.name}</p></div>
+                            <div><p className="text-sm">{foundUser.name} ({foundUser.misId})</p></div>
                             <Button type="button" size="sm" onClick={handleAddUser}>Add</Button>
                         </div>
                     )}
@@ -509,5 +507,3 @@ export function PatentForm() {
     </Card>
   );
 }
-
-    
