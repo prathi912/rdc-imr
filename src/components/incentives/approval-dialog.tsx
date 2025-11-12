@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -135,7 +136,7 @@ function ConferenceClaimDetails({
 }) {
     const approval1 = previousApprovals[0];
 
-    const renderDetail = (fieldId: string, label: string, value?: string | number | null | boolean | string[]) => {
+    const renderDetail = (field: { id: string; label: string; }, value?: string | number | null | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         
         let displayValue: React.ReactNode = String(value);
@@ -149,25 +150,25 @@ function ConferenceClaimDetails({
         }
         
         return (
-            <div className="grid grid-cols-12 gap-2 text-sm items-center py-1">
-                <span className="text-muted-foreground col-span-5">{label}</span>
+            <div key={field.id} className="grid grid-cols-12 gap-2 text-sm items-center py-1">
+                <span className="text-muted-foreground col-span-5">{field.label}</span>
                 <span className="col-span-4">{displayValue}</span>
                 <div className="col-span-3 flex justify-end gap-1">
                     {stageIndex > 0 && (
                         <div className="w-7 h-7 flex items-center justify-center">
-                            <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
+                            <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, field.id)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
                         </div>
                     )}
                     {isChecklistEnabled && (
                         <FormField
                             control={form.control}
-                            name={`verifiedFields.${fieldId}`}
-                            render={({ field }) => (
+                            name={`verifiedFields.${field.id}`}
+                            render={({ field: formField }) => (
                                 <FormItem>
                                     <FormControl>
                                         <div className="flex items-center gap-1">
-                                            <Button type="button" size="icon" variant={field.value === true ? 'secondary' : 'ghost'} className="h-7 w-7" onClick={() => field.onChange(field.value === true ? undefined : true)}><Check className="h-4 w-4" /></Button>
-                                            <Button type="button" size="icon" variant={field.value === false ? 'destructive' : 'ghost'} className="h-7 w-7" onClick={() => field.onChange(field.value === false ? undefined : false)}><X className="h-4 w-4" /></Button>
+                                            <Button type="button" size="icon" variant={formField.value === true ? 'secondary' : 'ghost'} className="h-7 w-7" onClick={() => formField.onChange(formField.value === true ? undefined : true)}><Check className="h-4 w-4" /></Button>
+                                            <Button type="button" size="icon" variant={formField.value === false ? 'destructive' : 'ghost'} className="h-7 w-7" onClick={() => formField.onChange(formField.value === false ? undefined : false)}><X className="h-4 w-4" /></Button>
                                         </div>
                                     </FormControl>
                                 </FormItem>
@@ -195,7 +196,7 @@ function ConferenceClaimDetails({
                 </div>
             </div>
             <div className="space-y-1">
-                {conferenceChecklistFields.map(field => renderDetail(field.id, field.label, (claimWithUserData as any)[field.id]))}
+                {conferenceChecklistFields.map(field => renderDetail(field, (claimWithUserData as any)[field.id]))}
             </div>
             {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
         </div>
@@ -221,7 +222,7 @@ function ResearchPaperClaimDetails({
     const approval1 = previousApprovals[0];
     const approval2 = previousApprovals[1];
 
-    const renderDetail = (fieldId: string, label: string, value?: string | number | null | boolean | string[]) => {
+    const renderDetail = (field: {id: string, label: string}, value?: string | number | null | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
         let displayValue = String(value);
         if (typeof value === 'boolean') {
@@ -231,32 +232,32 @@ function ResearchPaperClaimDetails({
             displayValue = value.join(', ');
         }
         return (
-            <div className="grid grid-cols-12 gap-2 text-sm items-center py-1">
-                <span className="text-muted-foreground col-span-5">{label}</span>
+            <div key={field.id} className="grid grid-cols-12 gap-2 text-sm items-center py-1">
+                <span className="text-muted-foreground col-span-5">{field.label}</span>
                 <span className="col-span-4">{displayValue}</span>
                 <div className="col-span-3 flex justify-end gap-1">
                     {stageIndex > 0 && (
                         <div className="w-7 h-7 flex items-center justify-center">
-                            <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
+                            <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval1, field.id)}</TooltipTrigger><TooltipContent><p>Approver 1 Verification</p></TooltipContent></Tooltip></TooltipProvider>
                         </div>
                     )}
                      {stageIndex > 1 && (
                         <div className="w-7 h-7 flex items-center justify-center">
-                             <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval2, fieldId)}</TooltipTrigger><TooltipContent><p>Approver 2 Verification</p></TooltipContent></Tooltip></TooltipProvider>
+                             <TooltipProvider><Tooltip><TooltipTrigger>{getVerificationMark(approval2, field.id)}</TooltipTrigger><TooltipContent><p>Approver 2 Verification</p></TooltipContent></Tooltip></TooltipProvider>
                         </div>
                     )}
                     {isChecklistEnabled && (
                         <FormField
                             control={form.control}
-                            name={`verifiedFields.${fieldId}`}
-                            render={({ field }) => (
+                            name={`verifiedFields.${field.id}`}
+                            render={({ field: formField }) => (
                                 <FormItem>
                                     <FormControl>
                                         <div className="flex items-center gap-1">
-                                            <Button type="button" size="icon" variant={field.value === true ? 'secondary' : 'ghost'} className="h-7 w-7" onClick={() => field.onChange(field.value === true ? undefined : true)}>
+                                            <Button type="button" size="icon" variant={formField.value === true ? 'secondary' : 'ghost'} className="h-7 w-7" onClick={() => formField.onChange(formField.value === true ? undefined : true)}>
                                                 <Check className="h-4 w-4" />
                                             </Button>
-                                            <Button type="button" size="icon" variant={field.value === false ? 'destructive' : 'ghost'} className="h-7 w-7" onClick={() => field.onChange(field.value === false ? undefined : false)}>
+                                            <Button type="button" size="icon" variant={formField.value === false ? 'destructive' : 'ghost'} className="h-7 w-7" onClick={() => formField.onChange(formField.value === false ? undefined : false)}>
                                                 <X className="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -269,6 +270,14 @@ function ResearchPaperClaimDetails({
             </div>
         );
     };
+    
+    const claimWithUserData = {
+        ...claim,
+        name: claimant?.name,
+        designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`,
+        authorRoleAndPosition: `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`
+    };
+
 
     return (
         <div className="space-y-4 rounded-lg border bg-muted/50 p-4">
@@ -281,20 +290,7 @@ function ResearchPaperClaimDetails({
                 </div>
             </div>
             <div className="space-y-1">
-                {renderDetail('name', 'Name of the Applicant', claimant?.name)}
-                {renderDetail('designation', 'Designation and Dept.', `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`)}
-                {renderDetail('publicationType', 'Type of publication', claim.publicationType)}
-                {renderDetail('journalName', 'Name of Journal', claim.journalName)}
-                {renderDetail('locale', 'Whether National/International', claim.locale)}
-                {renderDetail('indexType', 'Indexed In', claim.indexType?.toUpperCase())}
-                {renderDetail('wosType', 'WoS Type', claim.wosType)}
-                {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
-                {renderDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
-                {renderDetail('totalInternalAuthors', 'No. of Authors from PU', claim.totalInternalAuthors)}
-                {renderDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
-                {renderDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
-                {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
-                {renderDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
+                 {allPossibleResearchPaperFields.map(field => renderDetail(field, (claimWithUserData as any)[field.id]))}
             </div>
             {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
         </div>
