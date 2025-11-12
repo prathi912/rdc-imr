@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import fs from 'fs';
@@ -13,7 +14,7 @@ import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
 import JSZip from 'jszip';
 import { getTemplateContentFromUrl } from '@/lib/template-manager';
-import { getSystemSettings } from './actions';
+import { getSystemSettings } from '@/app/actions';
 import { generateBookIncentiveForm } from '@/app/incentive-actions';
 import { generateMembershipIncentiveForm } from '@/app/membership-actions';
 import { generatePatentIncentiveForm } from '@/app/patent-actions';
