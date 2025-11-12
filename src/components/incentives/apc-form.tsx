@@ -1,6 +1,6 @@
 
 'use client';
-
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -14,7 +14,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
-import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
@@ -165,35 +164,65 @@ export function ApcForm() {
   }, [isSpecialFaculty]);
 
   const formValues = form.watch();
+
+// Inside your component, replace the calculate callback and useEffect:
+
+const calculate = useCallback(async () => {
+  // Get fresh values directly from the form
+  const currentValues = form.getValues();
   
-  const calculate = useCallback(async () => {
-    if (user && user.faculty) {
-      const dataForCalc = {
-        ...formValues,
-        userEmail: user.email,
-      };
-      const result = await calculateApcIncentive(dataForCalc, isSpecialFaculty);
-      if (result.success) {
-        setCalculatedIncentive(result.amount ?? null);
-      } else {
-        console.error("Incentive calculation failed:", result.error);
-        setCalculatedIncentive(null);
-      }
-    }
-  }, [formValues, user, isSpecialFaculty]);
-
-  useEffect(() => {
-    const subscription = form.watch((value, { name, type }) => {
-        const fieldsForRecalculation = [
-            'apcTotalAmount', 'apcIndexingStatus', 'apcQRating', 'authors'
-        ];
-        if (type === 'change' && fieldsForRecalculation.includes(name as string)) {
-            calculate();
-        }
+  if (user && user.faculty) {
+    const dataForCalc = {
+      ...currentValues,
+      userEmail: user.email,
+    };
+    
+    console.log('Calculating with:', {
+      apcTotalAmount: dataForCalc.apcTotalAmount,
+      authors: dataForCalc.authors?.length,
+      qRating: dataForCalc.apcQRating,
     });
-    return () => subscription.unsubscribe();
-  }, [form, calculate]);
+    
+    const result = await calculateApcIncentive(dataForCalc, isSpecialFaculty);
+    if (result.success) {
+      console.log('Calculated incentive:', result.amount);
+      setCalculatedIncentive(result.amount ?? null);
+    } else {
+      console.error("Incentive calculation failed:", result.error);
+      setCalculatedIncentive(null);
+    }
+  }
+}, [user, isSpecialFaculty, form]);
 
+// Add debouncing to prevent rapid recalculations
+const timeoutRef = useRef<NodeJS.Timeout>();
+
+useEffect(() => {
+  const subscription = form.watch((value, { name, type }) => {
+    const fieldsForRecalculation = [
+      'apcTotalAmount', 'apcIndexingStatus', 'apcQRating', 'authors'
+    ];
+    
+    if (type === 'change' && fieldsForRecalculation.some(field => name?.includes(field))) {
+      // Clear previous timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      // Debounce calculation by 300ms
+      timeoutRef.current = setTimeout(() => {
+        calculate();
+      }, 300);
+    }
+  });
+  
+  return () => {
+    subscription.unsubscribe();
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+  };
+}, [form, calculate]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -622,9 +651,54 @@ export function ApcForm() {
                 <FormField name="apcApcWaiverRequested" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Whether APC waiver was requested</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
                 {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>If yes, give proof</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField name="apcTotalAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total amount of APC (INR)</FormLabel><FormControl><Input type="number" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
-                  <FormField name="apcAmountClaimed" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount claimed (INR)</FormLabel><FormControl><Input type="number" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
-                </div>
+  <FormField 
+    name="apcTotalAmount" 
+    control={form.control} 
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Total amount of APC (INR)</FormLabel>
+        <FormControl>
+          <Input 
+            type="text"
+            inputMode="numeric"
+            {...field}
+            value={field.value ?? ''}
+            onChange={(e) => {
+              const value = e.target.value.replace(/[^0-9]/g, '');
+              field.onChange(value === '' ? undefined : Number(value));
+            }}
+            placeholder="0"
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )} 
+  />
+  
+  <FormField 
+    name="apcAmountClaimed" 
+    control={form.control} 
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>Amount claimed (INR)</FormLabel>
+        <FormControl>
+          <Input 
+            type="text"
+            inputMode="numeric"
+            {...field}
+            value={field.value ?? ''}
+            onChange={(e) => {
+              const value = e.target.value.replace(/[^0-9]/g, '');
+              field.onChange(value === '' ? undefined : Number(value));
+            }}
+            placeholder="0"
+          />
+        </FormControl>
+        <FormMessage />
+      </FormItem>
+    )} 
+  />
+</div>
                  {calculatedIncentive !== null && (
                     <div className="p-4 bg-secondary rounded-md">
                         <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
