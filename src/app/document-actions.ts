@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import fs from 'fs';
@@ -8,19 +7,18 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { Project, User, Evaluation, IncentiveClaim, SystemSettings, ApprovalStage } from '@/types';
-import admin from 'firebase-admin';
+import { FieldValue } from 'firebase-admin/firestore';
 import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
 import JSZip from 'jszip';
 import { getTemplateContentFromUrl } from '@/lib/template-manager';
-import { getSystemSettings } from '@/app/actions';
+import { getSystemSettings } from './actions';
 import { generateBookIncentiveForm } from '@/app/incentive-actions';
 import { generateMembershipIncentiveForm } from '@/app/membership-actions';
 import { generatePatentIncentiveForm } from '@/app/patent-actions';
 import { generateConferenceIncentiveForm } from '@/app/conference-actions';
 import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
-import { FieldValue } from 'firebase-admin/firestore';
 
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -236,8 +234,8 @@ export async function generateIncentivePaymentSheet(
 
     flatData.date = format(new Date(), 'dd/MM/yyyy');
     flatData.reference_number = referenceNumber;
-    flatData.total_amount = totalAmount;
-    flatData.amount_in_word = toWords(totalAmount).replace(/\b\w/g, (l: string) => l.toUpperCase()) + ' Only';
+    flatData.total_amount = totalAmount.toLocaleString('en-IN');
+    flatData.amount_in_words = toWords(totalAmount).replace(/\b\w/g, (l: string) => l.toUpperCase()) + ' Only';
     
     worksheet.eachRow((row) => {
         row.eachCell((cell) => {
@@ -298,8 +296,8 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
         }
 
         if (result.success && result.fileData) {
-            const safeUserName = claim.userName.replace(/[\\/:"*?<>|]/g, '_');
-            const safeClaimId = (claim.claimId || claim.id.substring(0,5)).replace(/[\\/:"*?<>|]/g, '-');
+            const safeUserName = (claim.userName || 'user').replace(/[\\/:"*?<>|]/g, '_');
+            const safeClaimId = (claim.claimId || claim.id.substring(0, 5)).replace(/[\\/:"*?<>|]/g, '-');
             const fileName = `Office_Noting_${safeUserName}_${safeClaimId}.docx`;
             return { fileName, content: Buffer.from(result.fileData, 'base64') };
         } else {
