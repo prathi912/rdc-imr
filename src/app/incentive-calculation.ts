@@ -270,7 +270,11 @@ export async function calculateApcIncentive(
         if (!authors || authors.length === 0) {
             return { success: false, error: "Author list is empty." };
         }
-        const claimant = authors?.find(a => a.email.toLowerCase() === userEmail?.toLowerCase());
+        if (!userEmail) {
+            return { success: false, error: "Claimant email is not available." };
+        }
+        
+        const claimant = authors.find(a => a.email.toLowerCase() === userEmail.toLowerCase());
         if (!claimant) {
             return { success: false, error: "Claimant not found in the author list." };
         }
@@ -285,7 +289,7 @@ export async function calculateApcIncentive(
                 case 'Q2': maxReimbursementLimit = 30000; break;
                 case 'Q3': maxReimbursementLimit = 20000; break;
                 case 'Q4': maxReimbursementLimit = 15000; break;
-                default: maxReimbursementLimit = 0; // Default if no Q rating
+                default: maxReimbursementLimit = 0; 
             }
         } 
         
