@@ -325,6 +325,8 @@ export type IncentiveClaim = {
   organizerName?: string
   eventWebsite?: string
   conferenceDate?: string // ISO String
+  conferenceEndDate?: string;
+  conferenceDuration?: string;
   presentationDate?: string // ISO String
   registrationFeeProofUrl?: string
   participationCertificateUrl?: string

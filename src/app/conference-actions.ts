@@ -35,21 +35,6 @@ function getInstituteAcronym(name?: string): string {
         .toUpperCase();
 }
 
-const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
-    { id: 'name', label: 'Name of the Applicant' },
-    { id: 'designation', label: 'Designation & Department' },
-    { id: 'eventType', label: 'Type of Event' },
-    { id: 'conferencePaperTitle', label: 'Title of Paper' },
-    { id: 'authorType', label: 'First/Corresponding/Co-Author' },
-    { id: 'totalAuthors', label: 'Total No. of Authors' },
-    { id: 'conferenceName', label: 'Name of Conference' },
-    { id: 'organizerName', label: 'Name of Organizer' },
-    { id: 'conferenceType', label: 'National/International' },
-    { id: 'presentationType', label: 'Oral/Poster' },
-    { id: 'conferenceDate', label: 'Date of Conference' },
-    { id: 'travelPlaceVisited', label: 'Place Visited' },
-];
-
 
 export async function generateConferenceIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
@@ -91,7 +76,7 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
     const approval2 = claim.approvals?.find(a => a?.stage === 2);
     const approval3 = claim.approvals?.find(a => a?.stage === 3);
 
-    const data: { [key: string]: any } = {
+    const data = {
         applicant_name: user.name || 'N/A',
         designation: user.designation || 'N/A',
         institute: getInstituteAcronym(user.institute),
@@ -103,24 +88,12 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
         presentation_date: claim.presentationDate ? new Date(claim.presentationDate).toLocaleDateString('en-GB') : 'N/A',
         event_name: claim.conferenceName || 'N/A',
         organiser_name: claim.organizerName || 'N/A',
-        duration_event: claim.conferenceDate ? new Date(claim.conferenceDate).toLocaleDateString('en-GB') : 'N/A',
+        duration_event: claim.conferenceDuration || 'N/A',
         registration_fee: claim.registrationFee?.toLocaleString('en-IN') || '0',
         travel_expense: claim.travelFare?.toLocaleString('en-IN') || '0',
         other_expense: '0', // This field is not in the form, so defaulting to 0
         total_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
     };
-
-    // Populate checklist fields for approver 1
-    conferenceChecklistFields.forEach((field, index) => {
-        const key = `a1_c${index + 1}`;
-        data[key] = approval1?.verifiedFields?.[field.id] ? '✓' : '';
-    });
-
-    // Populate checklist fields for approver 2
-    conferenceChecklistFields.forEach((field, index) => {
-        const key = `a2_c${index + 1}`;
-        data[key] = approval2?.verifiedFields?.[field.id] ? '✓' : '';
-    });
     
     doc.setData(data);
 

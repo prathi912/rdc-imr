@@ -103,6 +103,7 @@ const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designat
     { id: 'conferenceType', label: 'National/International' },
     { id: 'presentationType', label: 'Oral/Poster' },
     { id: 'conferenceDate', label: 'Date of Conference' },
+    { id: 'conferenceDuration', label: 'Duration of Event'},
     { id: 'travelPlaceVisited', label: 'Place Visited' },
 ];
 
@@ -341,13 +342,17 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const approvalSchema = createApprovalSchema(stageIndex, isChecklistEnabled);
     const formSchemaWithVerification = approvalSchema.refine(data => {
         if (!isChecklistEnabled) return true;
-        // For conference claims, we only need to verify the fields that are actually displayed.
+        
+        let displayedFields: string[] = [];
         const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
-        const displayedFields = conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id]).map(f => f.id);
+        
         if (isConferenceClaim) {
-            return displayedFields.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
+            displayedFields = conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id]).map(f => f.id);
+        } else if (isResearchPaperClaim) {
+            displayedFields = allPossibleResearchPaperFields.filter(f => (claimWithUserData as any)[f.id]).map(f => f.id);
         }
-        return fieldsToVerify.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
+        
+        return displayedFields.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
     }, {
         message: 'You must verify all visible fields (mark as correct or incorrect).',
         path: ['verifiedFields'],
