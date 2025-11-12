@@ -72,7 +72,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { subMonths } from 'date-fns'
+import { subMonths, differenceInDays } from 'date-fns'
 
 
 interface NavItem {
@@ -382,6 +382,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (user) {
+      // Auto-logout logic
+      const lastActivity = localStorage.getItem('lastActivity');
+      if (lastActivity) {
+        const lastActivityDate = new Date(parseInt(lastActivity, 10));
+        const daysSinceLastActivity = differenceInDays(new Date(), lastActivityDate);
+        if (daysSinceLastActivity > 10) {
+          toast({
+            title: 'Session Expired',
+            description: 'You have been logged out due to inactivity.',
+            variant: 'destructive',
+          });
+          handleLogout();
+          return;
+        }
+      }
+      // Update activity timestamp on every dashboard load
+      localStorage.setItem('lastActivity', Date.now().toString());
+
       const filtered = allNavItems.filter((item) => {
         if (item.condition) return true
         if (item.id === "incentive-approvals") {
@@ -395,7 +413,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       setMenuItems(sorted)
     }
-  }, [user, allNavItems])
+  }, [user, allNavItems]);
 
   useEffect(() => {
     if (!user) return
