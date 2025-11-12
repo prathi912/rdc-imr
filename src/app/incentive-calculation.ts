@@ -264,46 +264,37 @@ export async function calculateApcIncentive(
     isSpecialFaculty: boolean
 ): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
-        const { apcIndexingStatus, apcQRating, authors, apcTotalAmount, userEmail } = claimData;
+        const { apcIndexingStatus, apcQRating, authors, apcTotalAmount } = claimData;
         
         if (!authors || authors.length === 0) {
             return { success: false, error: "Author list is empty." };
         }
-        if (!userEmail) {
-            return { success: false, error: "Claimant email is not available." };
-        }
-
+        
         const totalAuthorCount = authors.length;
         
-        // CRITICAL FIX: Ensure apcTotalAmount is properly parsed as a number
-        // Handle cases where it might be a string or have currency formatting
         let actualAmountPaid = 0;
         if (apcTotalAmount !== undefined && apcTotalAmount !== null) {
-            // Convert to string first, remove any commas or currency symbols, then parse
             const cleanAmount = String(apcTotalAmount).replace(/[^0-9.]/g, '');
             actualAmountPaid = parseFloat(cleanAmount) || 0;
         }
-        
+
         let maxReimbursementLimit = 0;
         
-        // Check for Scopus/Web of Science/SCI with Q rating
         const hasScopusOrWoS = apcIndexingStatus?.some(status => 
-            status.includes('Scopus') || 
-            status.includes('Web of science') || 
-            status.includes('SCI')
+            status.toLowerCase().includes('scopus') || 
+            status.toLowerCase().includes('web of science') || 
+            status.toLowerCase().includes('sci')
         );
-        
+
         if (hasScopusOrWoS && apcQRating) {
             switch (apcQRating) {
                 case 'Q1': maxReimbursementLimit = 40000; break;
                 case 'Q2': maxReimbursementLimit = 30000; break;
                 case 'Q3': maxReimbursementLimit = 20000; break;
                 case 'Q4': maxReimbursementLimit = 15000; break;
-                default: maxReimbursementLimit = 0; 
             }
         }
         
-        // Additional indexing benefits (only for non-special faculty)
         if (!isSpecialFaculty && apcIndexingStatus) {
             if (apcIndexingStatus.some(status => status.includes('Web of Science indexed journals (ESCI)'))) {
                 maxReimbursementLimit = Math.max(maxReimbursementLimit, 8000);
@@ -313,18 +304,15 @@ export async function calculateApcIncentive(
             }
         }
         
-        // If no policy limit applies, no incentive
-        if (maxReimbursementLimit === 0) {
-            return { success: false, error: "No applicable policy limit found for the selected indexing status and Q rating." };
+        if (maxReimbursementLimit === 0 && !hasScopusOrWoS) {
+             return { success: false, error: "No applicable policy limit found for the selected indexing status and Q rating." };
         }
         
         // Admissible amount is the LESSER of actual amount paid and policy limit
-        const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
+        const admissibleAmount = maxReimbursementLimit > 0 ? Math.min(actualAmountPaid, maxReimbursementLimit) : actualAmountPaid;
         
-        // Final incentive is admissible amount divided by number of authors
         const finalIncentive = totalAuthorCount > 0 ? admissibleAmount / totalAuthorCount : 0;
         
-        // Round to nearest integer (or use Math.floor if you want to round down)
         return { success: true, amount: Math.round(finalIncentive) };
         
     } catch (error: any) {
