@@ -55,8 +55,12 @@ const apcSchema = z.object({
   apcTotalStudentAuthors: z.coerce.number().nonnegative("Number of students cannot be negative.").optional(),
   apcStudentNames: z.string().optional(),
   apcJournalDetails: z.string().min(5, 'Journal details are required.'),
-  apcApcWaiverRequested: z.boolean().optional(),
-  apcApcWaiverProof: z.any().optional(),
+  apcApcWaiverRequested: z.boolean().refine(val => val === true, {
+    message: 'You must request an APC waiver and provide proof to be eligible.',
+  }),
+  apcApcWaiverProof: z.any().refine(files => files?.length > 0, {
+    message: 'Proof of waiver request is required.',
+  }),
   apcJournalWebsite: z.string().url('Please enter a valid URL.'),
   apcIssnNo: z.string().min(5, 'ISSN is required.'),
   apcSciImpactFactor: z.coerce.number().optional(),
@@ -69,9 +73,6 @@ const apcSchema = z.object({
 }).refine(data => data.apcTypeOfArticle !== 'Other' || (!!data.apcOtherArticleType && data.apcOtherArticleType.length > 0), {
   message: 'Please specify the article type.',
   path: ['apcOtherArticleType'],
-}).refine(data => !data.apcApcWaiverRequested || (!!data.apcApcWaiverProof && data.apcApcWaiverProof.length > 0), {
-  message: 'Proof of waiver request is required.',
-  path: ['apcApcWaiverProof'],
 });
 
 type ApcFormValues = z.infer<typeof apcSchema>;
@@ -165,37 +166,26 @@ export function ApcForm() {
 
   const formValues = form.watch();
 
-// Inside your component, replace the calculate callback and useEffect:
-
-const calculate = useCallback(async () => {
-  // Get fresh values directly from the form
-  const currentValues = form.getValues();
-  
-  if (user && user.faculty) {
-    const dataForCalc = {
-      ...currentValues,
-      userEmail: user.email,
-    };
+  const calculate = useCallback(async () => {
+    const currentValues = form.getValues();
     
-    console.log('Calculating with:', {
-      apcTotalAmount: dataForCalc.apcTotalAmount,
-      authors: dataForCalc.authors?.length,
-      qRating: dataForCalc.apcQRating,
-    });
-    
-    const result = await calculateApcIncentive(dataForCalc, isSpecialFaculty);
-    if (result.success) {
-      console.log('Calculated incentive:', result.amount);
-      setCalculatedIncentive(result.amount ?? null);
-    } else {
-      console.error("Incentive calculation failed:", result.error);
-      setCalculatedIncentive(null);
+    if (user && user.faculty) {
+      const dataForCalc = {
+        ...currentValues,
+        userEmail: user.email,
+      };
+      
+      const result = await calculateApcIncentive(dataForCalc, isSpecialFaculty);
+      if (result.success) {
+        setCalculatedIncentive(result.amount ?? null);
+      } else {
+        console.error("Incentive calculation failed:", result.error);
+        setCalculatedIncentive(null);
+      }
     }
-  }
-}, [user, isSpecialFaculty, form]);
+  }, [user, isSpecialFaculty, form]);
 
-// Add debouncing to prevent rapid recalculations
-const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
 useEffect(() => {
   const subscription = form.watch((value, { name, type }) => {
@@ -204,12 +194,9 @@ useEffect(() => {
     ];
     
     if (type === 'change' && fieldsForRecalculation.some(field => name?.includes(field))) {
-      // Clear previous timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
-      // Debounce calculation by 300ms
       timeoutRef.current = setTimeout(() => {
         calculate();
       }, 300);
@@ -539,7 +526,7 @@ useEffect(() => {
                 <Info className="h-4 w-4" />
                 <AlertTitle>APC Reimbursement Policy</AlertTitle>
                 <AlertDescription>
-                    Admissible APC = (Maximum APC as per policy ÷ total number of PU authors).
+                    Admissible APC = (Lesser of (Actual APC Paid, Max Policy Limit)) ÷ Total Number of PU Authors.
                     The author must request the Editor for an APC waiver and submit the proof along with this application.
                 </AlertDescription>
             </Alert>
@@ -648,57 +635,56 @@ useEffect(() => {
             <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">FINANCIAL & DECLARATION DETAILS</h3>
                 <Separator />
-                <FormField name="apcApcWaiverRequested" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Whether APC waiver was requested</FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
-                {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>If yes, give proof</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
+                <FormField name="apcApcWaiverRequested" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Whether APC waiver was requested <span className="text-destructive">*</span></FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
+                {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>If yes, give proof (PDF)<span className="text-destructive">*</span></FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <FormField 
-    name="apcTotalAmount" 
-    control={form.control} 
-    render={({ field }) => (
-      <FormItem>
-        <FormLabel>Total amount of APC (INR)</FormLabel>
-        <FormControl>
-          <Input 
-            type="text"
-            inputMode="numeric"
-            {...field}
-            value={field.value ?? ''}
-            onChange={(e) => {
-              const value = e.target.value.replace(/[^0-9]/g, '');
-              field.onChange(value === '' ? undefined : Number(value));
-            }}
-            placeholder="0"
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )} 
-  />
-  
-  <FormField 
-    name="apcAmountClaimed" 
-    control={form.control} 
-    render={({ field }) => (
-      <FormItem>
-        <FormLabel>Amount claimed (INR)</FormLabel>
-        <FormControl>
-          <Input 
-            type="text"
-            inputMode="numeric"
-            {...field}
-            value={field.value ?? ''}
-            onChange={(e) => {
-              const value = e.target.value.replace(/[^0-9]/g, '');
-              field.onChange(value === '' ? undefined : Number(value));
-            }}
-            placeholder="0"
-          />
-        </FormControl>
-        <FormMessage />
-      </FormItem>
-    )} 
-  />
-</div>
+                  <FormField
+                    name="apcTotalAmount"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Total amount of APC (INR)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            {...field}
+                            value={field.value ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              field.onChange(value === '' ? undefined : Number(value));
+                            }}
+                            placeholder="0"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    name="apcAmountClaimed"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount claimed (INR)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="text"
+                            inputMode="numeric"
+                            {...field}
+                            value={field.value ?? ''}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '');
+                              field.onChange(value === '' ? undefined : Number(value));
+                            }}
+                            placeholder="0"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                  {calculatedIncentive !== null && (
                     <div className="p-4 bg-secondary rounded-md">
                         <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
@@ -752,5 +738,3 @@ useEffect(() => {
     </>
   );
 }
-
-    
