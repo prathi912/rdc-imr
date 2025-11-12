@@ -317,6 +317,7 @@ export type IncentiveClaim = {
   govtFundingRequestProofUrl?: string
   registrationFee?: number
   travelFare?: number
+  totalAmountClaimed?: number;
   conferenceMode?: "Online" | "Offline"
   onlinePresentationOrder?: "First" | "Second" | "Third" | "Additional"
   wasPresentingAuthor?: boolean

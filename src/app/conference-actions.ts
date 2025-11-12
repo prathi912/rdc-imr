@@ -7,7 +7,7 @@ import type { IncentiveClaim, User } from '@/types';
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getTemplateContentFromUrl } from '@/lib/template-manager';
-import { format } from 'date-fns';
+import { format, differenceInDays, parseISO } from 'date-fns';
 import { getSystemSettings } from './actions';
 
 function getInstituteAcronym(name?: string): string {
@@ -75,24 +75,37 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
     const approval1 = claim.approvals?.find(a => a?.stage === 1);
     const approval2 = claim.approvals?.find(a => a?.stage === 2);
     const approval3 = claim.approvals?.find(a => a?.stage === 3);
+    
+    const checklistFields = [
+        'name', 'designation', 'eventType', 'conferencePaperTitle', 'authorType', 'totalAuthors',
+        'conferenceName', 'organizerName', 'conferenceType', 'presentationType', 'conferenceDate', 
+        'conferenceDuration', 'travelPlaceVisited', 'registrationFee', 'travelFare', 'totalAmountClaimed'
+    ];
+    
+    const approvalData: { [key: string]: string } = {};
+    checklistFields.forEach((field, index) => {
+        const c_num = index + 1;
+        approvalData[`a1_c${c_num}`] = approval1?.verifiedFields?.[field] ? '✓' : '';
+        approvalData[`a2_c${c_num}`] = approval2?.verifiedFields?.[field] ? '✓' : '';
+    });
 
     const data = {
         applicant_name: user.name || 'N/A',
         designation: user.designation || 'N/A',
         institute: getInstituteAcronym(user.institute),
-        conference_type: claim.presentationType || 'N/A',
-        mode_conference: claim.eventType || 'N/A',
+        conference_type: claim.eventType || 'N/A',
+        mode_presentation: claim.presentationType || 'N/A',
         locale: claim.conferenceType || 'N/A',
         title_paper: claim.conferencePaperTitle || 'N/A',
-        mode_presentation: claim.conferenceMode || 'N/A',
-        presentation_date: claim.presentationDate ? new Date(claim.presentationDate).toLocaleDateString('en-GB') : 'N/A',
         event_name: claim.conferenceName || 'N/A',
         organiser_name: claim.organizerName || 'N/A',
         duration_event: claim.conferenceDuration || 'N/A',
         registration_fee: claim.registrationFee?.toLocaleString('en-IN') || '0',
         travel_expense: claim.travelFare?.toLocaleString('en-IN') || '0',
-        other_expense: '0', // This field is not in the form, so defaulting to 0
-        total_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
+        other_expense: '0', 
+        total_amount: claim.totalAmountClaimed?.toLocaleString('en-IN') || 'N/A',
+        mode_conference: claim.conferenceMode || 'N/A',
+        ...approvalData
     };
     
     doc.setData(data);

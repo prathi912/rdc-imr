@@ -105,6 +105,9 @@ const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designat
     { id: 'conferenceDate', label: 'Date of Conference' },
     { id: 'conferenceDuration', label: 'Duration of Event'},
     { id: 'travelPlaceVisited', label: 'Place Visited' },
+    { id: 'registrationFee', label: 'Registration Fee' },
+    { id: 'travelFare', label: 'Travelling Expenses' },
+    { id: 'totalAmountClaimed', label: 'Total Amount Claimed' },
 ];
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
@@ -135,13 +138,17 @@ function ConferenceClaimDetails({
 
     const renderDetail = (fieldId: string, label: string, value?: string | number | null | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
-        let displayValue = String(value);
+        
+        let displayValue: React.ReactNode = String(value);
+        
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
-        }
-        if (Array.isArray(value)) {
+        } else if (typeof value === 'number') {
+            displayValue = `₹${value.toLocaleString('en-IN')}`;
+        } else if (Array.isArray(value)) {
             displayValue = value.join(', ');
         }
+        
         return (
             <div className="grid grid-cols-12 gap-2 text-sm items-center py-1">
                 <span className="text-muted-foreground col-span-5">{label}</span>
@@ -284,7 +291,7 @@ function ResearchPaperClaimDetails({
                 {renderDetail('wosType', 'WoS Type', claim.wosType)}
                 {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
                 {renderDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
-                {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
+                {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalInternalAuthors)}
                 {renderDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
                 {renderDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
                 {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
