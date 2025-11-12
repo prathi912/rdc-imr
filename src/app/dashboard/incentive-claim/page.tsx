@@ -171,9 +171,15 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         
         try {
             let result;
+            const myAuthorDetails = claim.authors?.find(a => a.email.toLowerCase() === currentUser.email.toLowerCase());
+
             if (claim.claimType === 'Research Papers') {
                 // To calculate, we need to pass the claim data as if the current user is the claimant
-                const claimDataForCalc = { ...claim, userEmail: currentUser.email };
+                const claimDataForCalc = { 
+                    ...claim, 
+                    userEmail: currentUser.email,
+                    authorType: myAuthorDetails?.role, // Pass the co-author's specific role
+                };
                 result = await calculateResearchPaperIncentive(claimDataForCalc, currentUser.faculty || '', currentUser.designation);
             } else if (claim.claimType === 'Books') {
                  // For books, the calculation depends on the co-author's role and other factors
