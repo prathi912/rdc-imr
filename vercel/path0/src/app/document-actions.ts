@@ -457,6 +457,8 @@ const angularParser = (tag: string) => {
           previousPhase = lastSubmittedOrCompletedPhase;
           previousPhaseNumber = phases.indexOf(lastSubmittedOrCompletedPhase) + 1;
         } else {
+          // Fallback to the first phase if nothing else is found.
+          // This might not be perfect, but it prevents a crash.
           previousPhase = phases[0];
           previousPhaseNumber = 1;
         }
