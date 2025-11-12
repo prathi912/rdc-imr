@@ -7,6 +7,7 @@ import { sendEmail as sendEmailUtility } from "@/lib/email";
 import ExcelJS from 'exceljs';
 import { getSystemSettings } from './actions';
 import { format } from 'date-fns';
+import { FieldPath } from 'firebase-admin/firestore';
 
 // --- Centralized Logging Service ---
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -47,7 +48,7 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
     const claimsRef = adminDb.collection('incentiveClaims');
     const batch = adminDb.batch();
     
-    const claimsQuery = await claimsRef.where(adminDb.firestore.FieldPath.documentId(), 'in', claimIds).get();
+    const claimsQuery = await claimsRef.where(FieldPath.documentId(), 'in', claimIds).get();
     
     for (const doc of claimsQuery.docs) {
       const claim = { id: doc.id, ...doc.data() } as IncentiveClaim;
@@ -117,7 +118,7 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
     const claimsRef = adminDb.collection('incentiveClaims');
     const batch = adminDb.batch();
     
-    const claimsQuery = await claimsRef.where(adminDb.firestore.FieldPath.documentId(), 'in', claimIds).get();
+    const claimsQuery = await claimsRef.where(FieldPath.documentId(), 'in', claimIds).get();
     
     for (const doc of claimsQuery.docs) {
         const claim = doc.data() as IncentiveClaim;
@@ -139,6 +140,33 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
   }
 }
 
+
+function getInstituteAcronym(name?: string): string {
+    if (!name) return '';
+
+    const acronymMap: { [key: string]: string } = {
+        'Parul Institute of Ayurved and Research': 'PIAR (Ayu.)',
+        'Parul Institute of Architecture & Research': 'PIAR (Arc.)',
+        'Parul Institute of Ayurved': 'PIA (Ayu.)',
+        'Parul Institute of Arts': 'PIA (Art.)',
+        'Parul Institute of Pharmacy': 'PIP (Pharma)',
+        'Parul Institute of Physiotherapy': 'PIP (Physio)',
+    };
+
+    if (acronymMap[name]) {
+        return acronymMap[name];
+    }
+
+    const ignoreWords = ['of', 'and', '&', 'the', 'in'];
+    return name
+        .split(' ')
+        .filter(word => !ignoreWords.includes(word.toLowerCase()))
+        .map(word => word.charAt(0))
+        .join('')
+        .toUpperCase();
+}
+
+
 export async function generateIncentivePaymentSheet(
   claimIds: string[],
   remarks: Record<string, string>,
@@ -147,13 +175,17 @@ export async function generateIncentivePaymentSheet(
   try {
     const toWords = (await import('number-to-words')).toWords;
     const claimsRef = adminDb.collection('incentiveClaims');
-    const q = claimsRef.where(adminDb.firestore.FieldPath.documentId(), 'in', claimIds);
+    const q = claimsRef.where(FieldPath.documentId(), 'in', claimIds);
     const claimsSnapshot = await q.get();
     const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
 
+    if (claims.length === 0) {
+        return { success: false, error: "No valid claims found for the provided IDs." };
+    }
+
     const userIds = [...new Set(claims.map(c => c.uid))];
     const usersRef = adminDb.collection('users');
-    const usersQuery = usersRef.where(adminDb.firestore.FieldPath.documentId(), 'in', userIds);
+    const usersQuery = usersRef.where(FieldPath.documentId(), 'in', userIds);
     const usersSnapshot = await usersQuery.get();
     const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data()]));
 
@@ -195,13 +227,13 @@ export async function generateIncentivePaymentSheet(
         [`ifsc_${index + 1}`]: user?.bankDetails?.ifscCode || '',
         [`branch_${index + 1}`]: user?.bankDetails?.branchName || '',
         [`amount_${index + 1}`]: amount,
-        [`college_${index + 1}`]: user?.institute || 'N/A',
+        [`college_${index + 1}`]: getInstituteAcronym(user?.institute),
         [`mis_${index + 1}`]: user?.misId || '',
         [`remarks_${index + 1}`]: remarks[claim.id] || '',
       };
     });
 
-    const flatData = paymentData.reduce((acc, item) => ({ ...acc, ...item }), {});
+    const flatData: { [key: string]: any } = paymentData.reduce((acc, item) => ({ ...acc, ...item }), {});
     
     flatData.date = format(new Date(), 'dd/MM/yyyy');
     flatData.reference_number = referenceNumber;
