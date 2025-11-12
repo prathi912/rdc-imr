@@ -19,10 +19,11 @@ import {
   signInWithPopup,
   signOut,
   type User as FirebaseUser,
+  onAuthStateChanged,
 } from "firebase/auth"
 import { doc, getDoc, setDoc, collection, addDoc } from "firebase/firestore"
 import type { User } from "@/types"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { getDefaultModulesForRole } from "@/lib/modules"
 import {
   linkHistoricalData,
@@ -32,8 +33,9 @@ import {
   linkEmrInterestsToNewUser,
   linkEmrCoPiInterestsToNewUser,
 } from "@/app/actions"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { OtpDialog } from "@/components/otp-dialog"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address."),
@@ -62,6 +64,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isOtpOpen, setIsOtpOpen] = useState(false)
   const [otpUser, setOtpUser] = useState<{ email: string; firebaseUser: FirebaseUser } | null>(null)
+  const [loading, setLoading] = useState(true);
   
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -70,6 +73,18 @@ export default function LoginPage() {
       password: "",
     },
   });
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.replace('/dashboard');
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
 
   const processSignIn = async (firebaseUser: FirebaseUser) => {
@@ -283,6 +298,14 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return (
+        <div className="flex flex-col min-h-screen items-center justify-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    )
   }
 
   return (

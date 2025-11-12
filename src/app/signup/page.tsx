@@ -19,10 +19,11 @@ import {
   signInWithPopup,
   signOut,
   type User as FirebaseUser,
+  onAuthStateChanged,
 } from "firebase/auth"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import type { User } from "@/types"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { getDefaultModulesForRole } from "@/lib/modules"
 import {
   linkHistoricalData,
@@ -32,7 +33,7 @@ import {
   isEmailDomainAllowed,
   linkEmrCoPiInterestsToNewUser,
 } from "@/app/actions"
-import { Eye, EyeOff } from "lucide-react"
+import { Eye, EyeOff, Loader2 } from "lucide-react"
 
 const signupSchema = z
   .object({
@@ -53,6 +54,7 @@ export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [loading, setLoading] = useState(true);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -61,7 +63,19 @@ export default function SignupPage() {
       password: "",
       confirmPassword: "",
     },
-  })
+  });
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.replace('/dashboard');
+      } else {
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   const validateEmailDomain = async (email: string): Promise<boolean> => {
     if (email === "rathipranav07@gmail.com" || email === "vicepresident_86@paruluniversity.ac.in") {
@@ -273,6 +287,14 @@ export default function SignupPage() {
       })
       setIsSubmitting(false)
     }
+  }
+  
+  if (loading) {
+    return (
+        <div className="flex flex-col min-h-screen items-center justify-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        </div>
+    )
   }
 
   return (
