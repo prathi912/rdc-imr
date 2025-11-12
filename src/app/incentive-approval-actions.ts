@@ -109,7 +109,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
                 await adminDb.collection('notifications').add(notification);
 
                 if (coAuthor.email) {
-                    const claimTitle = finalClaimData.paperTitle || finalClaimData.publicationTitle || 'N/A';
+                    const claimTitle = finalClaimData.paperTitle || finalClaimData.publicationTitle || finalClaimData.conferencePaperTitle || finalClaimData.professionalBodyName || finalClaimData.patentTitle || finalClaimData.apcPaperTitle || 'N/A';
                      const emailHtml = `
                         <div ${EMAIL_STYLES.background}>
                             ${EMAIL_STYLES.logo}
@@ -310,7 +310,7 @@ export async function processIncentiveClaimAction(
 
     await claimRef.update(updateData);
     
-    const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || 'your recent incentive claim';
+    const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || 'your recent incentive claim';
 
     if (action === 'reject' && claim.userEmail) {
         await sendEmail({
@@ -370,3 +370,5 @@ export async function processIncentiveClaimAction(
     return { success: false, error: error.message || 'An unexpected error occurred.' };
   }
 }
+
+    
