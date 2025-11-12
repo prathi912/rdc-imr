@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, Author } from '@/types';
-import { uploadFileToServer } from '@/app/actions';
+import { uploadFileToServer, checkPatentUniqueness } from '@/app/actions';
 import { findUserByMisId } from '@/app/userfinding';
 import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Bot } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
@@ -65,7 +65,7 @@ const apcSchema = z.object({
   apcInvoiceProof: z.any().refine((files) => files?.length > 0, 'Proof of payment/invoice is required.'),
   apcPuNameInPublication: z.boolean().optional(),
   apcAmountClaimed: z.coerce.number().positive('Claimed amount must be positive.'),
-  apcTotalAmount: z.coerce.number().positive('Total amount must be positive.'),
+  apcTotalAmount: z.coerce.number().positive('Total amount must be a positive number greater than 0.'),
   apcSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
 }).refine(data => data.apcTypeOfArticle !== 'Other' || (!!data.apcOtherArticleType && data.apcOtherArticleType.length > 0), {
   message: 'Please specify the article type.',
@@ -389,12 +389,16 @@ export function ApcForm() {
   };
 
   const updateAuthorRole = (index: number, role: Author['role']) => {
-    const author = fields[index];
-    // Check for conflict before updating
-    if ((role === 'First Author' || role === 'First & Corresponding Author') && firstAuthorExists && author.role !== 'First Author' && author.role !== 'First & Corresponding Author') {
+    const currentAuthors = form.getValues('authors');
+    const author = currentAuthors[index];
+    const isTryingToBeFirst = role === 'First Author' || role === 'First & Corresponding Author';
+    const isAnotherFirst = currentAuthors.some((a, i) => i !== index && (a.role === 'First Author' || a.role === 'First & Corresponding Author'));
+    
+    if (isTryingToBeFirst && isAnotherFirst) {
         toast({ title: 'Conflict', description: 'Another author is already the First Author.', variant: 'destructive'});
         return;
     }
+    
     update(index, { ...author, role });
   };
 
@@ -479,6 +483,8 @@ export function ApcForm() {
     }
   }
 
+  const onFinalSubmit = () => handleSave('Pending');
+
   if (isLoadingDraft) {
     return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
   }
@@ -487,7 +493,7 @@ export function ApcForm() {
     <>
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
+        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
           <CardContent className="space-y-6 pt-6">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
@@ -672,3 +678,5 @@ export function ApcForm() {
     </>
   );
 }
+
+    
