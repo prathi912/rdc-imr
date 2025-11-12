@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -9,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -165,7 +164,11 @@ export function ApcForm() {
   
   const calculate = useCallback(async () => {
     if (user && user.faculty) {
-      const result = await calculateApcIncentive(formValues, isSpecialFaculty);
+      const dataForCalc = {
+        ...formValues,
+        userEmail: user.email,
+      };
+      const result = await calculateApcIncentive(dataForCalc, isSpecialFaculty);
       if (result.success) {
         setCalculatedIncentive(result.amount ?? null);
       } else {
@@ -546,14 +549,17 @@ export function ApcForm() {
                         </div>
                     ))}
                      <div className="space-y-2 p-3 border rounded-md">
-                        <FormLabel className="text-sm">Add PU Co-Author</FormLabel>
+                        <FormLabel className="text-sm">Add Internal Co-Author</FormLabel>
                         <div className="flex items-center gap-2">
                             <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
                             <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
                         </div>
                         {foundCoPi && (
-                            <div className="flex items-center justify-between p-2 border rounded-md mt-2">
-                                <div><p className="text-sm">{foundCoPi.name}</p></div>
+                            <div className="flex items-center justify-between p-2 border rounded-md mt-2 bg-muted/50">
+                                <div>
+                                    <p className="text-sm">{foundCoPi.name}</p>
+                                    {!foundCoPi.uid && <p className="text-xs text-muted-foreground">Not registered, but found in staff data.</p>}
+                                </div>
                                 <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
                             </div>
                         )}
