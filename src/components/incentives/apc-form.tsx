@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -28,6 +29,8 @@ import { calculateApcIncentive } from '@/app/incentive-calculation';
 import { fetchAdvancedScopusData } from '@/app/scopus-actions';
 import { fetchScienceDirectData } from '@/app/sciencedirect-actions';
 import { fetchWosDataByUrl } from '@/app/wos-actions';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 const authorSchema = z.object({
     name: z.string().min(2, 'Author name is required.'),
