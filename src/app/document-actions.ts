@@ -168,15 +168,20 @@ export async function generateIncentivePaymentSheet(
     const usersSnapshot = await usersQuery.get();
     const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
 
-    const TEMPLATE_URL = "https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/INCENTIVE_PAYMENT_SHEET.xlsx";
-    const response = await fetch(TEMPLATE_URL);
-    if (!response.ok) {
-        return { success: false, error: 'Payment sheet template not found.' };
+    const settings = await getSystemSettings();
+    const templateUrl = settings.templateUrls?.INCENTIVE_PAYMENT_SHEET;
+
+    if (!templateUrl) {
+      return { success: false, error: 'Incentive Payment Sheet template URL is not configured.' };
     }
-    const templateBuffer = await response.arrayBuffer();
+    
+    const templateContent = await getTemplateContentFromUrl(templateUrl);
+    if (!templateContent) {
+      return { success: false, error: 'Payment sheet template not found or could not be loaded.' };
+    }
     
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(templateBuffer);
+    await workbook.xlsx.load(templateContent);
     const worksheet = workbook.getWorksheet("Sheet1");
 
     if (!worksheet) {

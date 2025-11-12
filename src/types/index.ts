@@ -514,6 +514,7 @@ export type TemplateUrls = {
   IMR_RECOMMENDATION?: string;
   IMR_INSTALLMENT_NOTING?: string;
   IMR_OFFICE_NOTING?: string;
+  INCENTIVE_PAYMENT_SHEET?: string;
 };
 
 export type SystemSettings = {

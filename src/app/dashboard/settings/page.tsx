@@ -36,7 +36,7 @@ import {
   updatePassword,
 } from "firebase/auth"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock, Mail, BellOff, FileText } from "lucide-react"
+import { Banknote, Bot, Loader2, ShieldCheck, Plus, X, Award, Upload, Image as ImageIcon, Calendar as CalendarIcon, Clock, Mail, BellOff, FileText, FileSpreadsheet } from "lucide-react"
 import { Combobox } from "@/components/ui/combobox"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -680,6 +680,8 @@ export default function SettingsPage() {
     { key: 'INCENTIVE_MEMBERSHIP', label: 'Incentive - Membership' },
     { key: 'IMR_RECOMMENDATION', label: 'IMR Recommendation Form' },
     { key: 'IMR_INSTALLMENT_NOTING', label: 'IMR Installment Office Noting' },
+    { key: 'IMR_OFFICE_NOTING', label: 'IMR Initial Office Noting' },
+    { key: 'INCENTIVE_PAYMENT_SHEET', label: 'Incentive Payment Sheet' },
   ];
 
 
@@ -883,7 +885,7 @@ export default function SettingsPage() {
               
               <div className="space-y-4 rounded-lg border p-4">
                   <div className="flex items-center gap-2">
-                      <BellOff className="h-5 w-5" />
+                      <Mail className="h-5 w-5" />
                       <Label className="text-base">Do Not Disturb (DND) Email</Label>
                   </div>
                   <p className="text-sm text-muted-foreground">
