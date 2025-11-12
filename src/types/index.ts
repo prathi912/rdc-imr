@@ -302,6 +302,7 @@ export type IncentiveClaim = {
 
 
   // Conference Fields
+  eventType?: string;
   conferenceName?: string
   conferencePaperTitle?: string
   conferenceType?: "International" | "National" | "Regional/State"
@@ -417,7 +418,7 @@ export type FundingCall = {
     date: string // yyyy-MM-dd
     time?: string // HH:mm
     venue: string
-    pptDeadline?: string // ISO String for PPT deadline
+    pptDeadline?: string // ISO String
     assignedEvaluators?: string[],
     absentEvaluators?: string[],
   }
@@ -509,6 +510,7 @@ export type TemplateUrls = {
   INCENTIVE_MEMBERSHIP?: string;
   IMR_RECOMMENDATION?: string;
   IMR_INSTALLMENT_NOTING?: string;
+  IMR_OFFICE_NOTING?: string;
 };
 
 export type SystemSettings = {
