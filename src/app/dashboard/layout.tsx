@@ -460,7 +460,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const approverModule = user.allowedModules?.find((m) => m.startsWith("incentive-approver-"))
     if (approverModule) {
       const stage = Number.parseInt(approverModule.split("-")[2], 10)
-      const statusToFetch = stage === 1 ? "Pending" : `Pending Stage ${stage} Approval`
+      const statusToFetch = `Pending Stage ${stage} Approval`
       const incentiveQuery = query(collection(db, "incentiveClaims"), where("status", "==", statusToFetch))
       unsubscribes.push(
         onSnapshot(incentiveQuery, (snapshot) => {
