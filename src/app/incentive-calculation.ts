@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -284,7 +285,7 @@ export async function calculateApcIncentive(
                 case 'Q2': maxReimbursementLimit = 30000; break;
                 case 'Q3': maxReimbursementLimit = 20000; break;
                 case 'Q4': maxReimbursementLimit = 15000; break;
-                default: maxReimbursementLimit = 0;
+                default: maxReimbursementLimit = 0; // Default if no Q rating
             }
         } 
         
