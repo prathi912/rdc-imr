@@ -112,11 +112,12 @@ export function ApcForm() {
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   
   const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
+  const [foundCoPis, setFoundCoPis] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [externalAuthorName, setExternalAuthorName] = useState('');
   const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
   const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
+  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 
   const form = useForm<ApcFormValues>({
     resolver: zodResolver(apcSchema),
@@ -318,12 +319,15 @@ export function ApcForm() {
   const handleSearchCoPi = async () => {
     if (!coPiSearchTerm) return;
     setIsSearching(true);
-    setFoundCoPi(null);
     try {
         const result = await findUserByMisId(coPiSearchTerm);
         if (result.success && result.users && result.users.length > 0) {
-            const user = result.users[0];
-            setFoundCoPi({ ...user, uid: user.uid || undefined });
+            if (result.users.length === 1) {
+                handleAddCoPi(result.users[0]);
+            } else {
+                setFoundCoPis(result.users);
+                setIsSelectionOpen(true);
+            }
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
         }
@@ -333,24 +337,25 @@ export function ApcForm() {
         setIsSearching(false);
     }
   };
-
-  const handleAddCoPi = () => {
-    if (foundCoPi && !fields.some(field => field.email.toLowerCase() === foundCoPi.email.toLowerCase())) {
-        if (user && foundCoPi.email.toLowerCase() === user.email.toLowerCase()) {
+  
+  const handleAddCoPi = (selectedUser: any) => {
+    if (selectedUser && !fields.some(field => field.email.toLowerCase() === selectedUser.email.toLowerCase())) {
+        if (user && selectedUser.email.toLowerCase() === user.email.toLowerCase()) {
             toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You are already listed as an author.' });
             return;
         }
         append({ 
-            name: foundCoPi.name, 
-            email: foundCoPi.email,
-            uid: foundCoPi.uid,
+            name: selectedUser.name, 
+            email: selectedUser.email,
+            uid: selectedUser.uid,
             role: 'Co-Author',
-            isExternal: !foundCoPi.uid,
+            isExternal: !selectedUser.uid,
             status: 'pending',
         });
     }
-    setFoundCoPi(null);
     setCoPiSearchTerm('');
+    setFoundCoPis([]);
+    setIsSelectionOpen(false);
   };
   
    const addExternalAuthor = () => {
@@ -369,6 +374,7 @@ export function ApcForm() {
         setExternalAuthorEmail('');
         setExternalAuthorRole('Co-Author'); // Reset role selector
     };
+
 
   const removeAuthor = (index: number) => {
     const authorToRemove = fields[index];
@@ -475,6 +481,7 @@ export function ApcForm() {
   }
 
   return (
+    <>
     <Card>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
@@ -533,38 +540,46 @@ export function ApcForm() {
                 
                 <div className="space-y-4">
                     <FormLabel>Author(s) & Roles</FormLabel>
-                     {fields.map((field, index) => (
-                        <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-3 rounded-md items-center">
-                            <div className="md:col-span-2">
-                                <p className="font-medium text-sm">{field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}</p>
-                                <p className="text-xs text-muted-foreground">{field.email}</p>
+                    <div className="space-y-4">
+                        {fields.map((field, index) => (
+                            <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-4 rounded-md items-end">
+                                <FormItem className="md:col-span-2">
+                                    <FormLabel>Name</FormLabel>
+                                    <FormControl><Input value={field.name} readOnly /></FormControl>
+                                </FormItem>
+                                <FormField
+                                    control={form.control}
+                                    name={`authors.${index}.role`}
+                                    render={({ field: roleField }) => (
+                                        <FormItem>
+                                            <FormLabel>Role</FormLabel>
+                                            <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={roleField.value}>
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl>
+                                                <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                                {index > 0 && (
+                                    <Button type="button" variant="destructive" className="md:col-start-4" onClick={() => remove(index)}>
+                                        <Trash2 className="h-4 w-4 mr-2" /> Remove
+                                    </Button>
+                                )}
                             </div>
-                            <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
-                                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-                                <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
-                            </Select>
-                            {field.email.toLowerCase() !== user?.email.toLowerCase() && (
-                              <Button type="button" variant="destructive" size="sm" className="md:col-start-4 justify-self-end mt-2" onClick={() => remove(index)}><Trash2 className="h-4 w-4 mr-2" /> Remove</Button> 
-                            )}
-                        </div>
-                    ))}
-                     <div className="space-y-2 p-3 border rounded-md">
-                        <FormLabel className="text-sm">Add Internal Co-Author</FormLabel>
+                        ))}
+                    </div>
+                    
+                    <Separator className="my-4" />
+                    
+                    <div className="space-y-2 p-3 border rounded-md">
+                        <FormLabel>Add Internal Co-Author</FormLabel>
                         <div className="flex items-center gap-2">
-                            <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
+                            <Input placeholder="Search by Co-Author's Name or MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
                             <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
                         </div>
-                        {foundCoPi && (
-                            <div className="flex items-center justify-between p-2 border rounded-md mt-2 bg-muted/50">
-                                <div>
-                                    <p className="text-sm">{foundCoPi.name}</p>
-                                    {!foundCoPi.uid && <p className="text-xs text-muted-foreground">Not registered, but found in staff data.</p>}
-                                </div>
-                                <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
-                            </div>
-                        )}
                     </div>
-                     <div className="space-y-2 p-3 border rounded-md">
+                    <div className="space-y-2 p-3 border rounded-md">
                         <FormLabel className="text-sm">Add External Co-Author</FormLabel>
                         <div className="flex flex-col md:flex-row gap-2 mt-1">
                             <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
@@ -629,5 +644,28 @@ export function ApcForm() {
         </form>
       </Form>
     </Card>
+    <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Multiple Users Found</DialogTitle>
+                <DialogDescription>Please select the correct user to add.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))}>
+                    {foundCoPis.map((u, i) => (
+                        <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
+                            <RadioGroupItem value={JSON.stringify(u)} id={`user-${i}`} />
+                            <Label htmlFor={`user-${i}`} className="flex flex-col">
+                                <span className="font-semibold">{u.name}</span>
+                                <span className="text-muted-foreground text-xs">{u.email}</span>
+                                <span className="text-muted-foreground text-xs">{u.campus}</span>
+                            </Label>
+                        </div>
+                    ))}
+                </RadioGroup>
+            </div>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }

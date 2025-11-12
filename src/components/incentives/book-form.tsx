@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -38,7 +36,7 @@ const bookSchema = z
         name: z.string().min(2, 'Author name is required.'),
         email: z.string().email('Invalid email format.'),
         uid: z.string().optional().nullable(),
-        role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', 'Presenting Author', 'First & Presenting Author']),
+        role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', "Presenting Author", "First & Presenting Author"]),
         isExternal: z.boolean(),
         status: z.enum(['approved', 'pending', 'Applied']),
     })).min(1, 'At least one author is required.')
@@ -193,7 +191,7 @@ export function BookForm() {
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   
   const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-  const [foundCoPi, setFoundCoPi] = useState<{ uid?: string; name: string; email: string; } | null>(null);
+  const [foundCoPis, setFoundCoPis] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [externalAuthorName, setExternalAuthorName] = useState('');
@@ -201,6 +199,7 @@ export function BookForm() {
   const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
@@ -421,17 +420,20 @@ export function BookForm() {
   const handleSearchCoPi = async () => {
     if (!coPiSearchTerm) return;
     setIsSearching(true);
-    setFoundCoPi(null);
     try {
         const result = await findUserByMisId(coPiSearchTerm);
         if (result.success && result.users && result.users.length > 0) {
-            const user = result.users[0];
-            setFoundCoPi({ ...user, uid: user.uid || undefined });
+            if (result.users.length === 1) {
+                handleAddCoPi(result.users[0]);
+            } else {
+                setFoundCoPis(result.users);
+                setIsSelectionOpen(true);
+            }
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
         }
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Search Failed', description: error.message || 'An error occurred while searching.' });
     } finally {
         setIsSearching(false);
     }
@@ -448,23 +450,24 @@ export function BookForm() {
     return coAuthorRoles;
   };
 
-  const handleAddCoPi = () => {
-    if (foundCoPi && !fields.some(field => field.email.toLowerCase() === foundCoPi.email.toLowerCase())) {
-        if (user && foundCoPi.email.toLowerCase() === user.email.toLowerCase()) {
-            toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You cannot add yourself as a Co-PI.' });
+  const handleAddCoPi = (selectedUser: any) => {
+    if (selectedUser && !fields.some(field => field.email.toLowerCase() === selectedUser.email.toLowerCase())) {
+        if (user && selectedUser.email.toLowerCase() === user.email.toLowerCase()) {
+            toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You are already listed as an author.' });
             return;
         }
         append({ 
-            name: foundCoPi.name, 
-            email: foundCoPi.email,
-            uid: foundCoPi.uid,
+            name: selectedUser.name, 
+            email: selectedUser.email,
+            uid: selectedUser.uid,
             role: 'Co-Author',
-            isExternal: !foundCoPi.uid,
+            isExternal: !selectedUser.uid,
             status: 'pending',
         });
     }
-    setFoundCoPi(null);
     setCoPiSearchTerm('');
+    setFoundCoPis([]);
+    setIsSelectionOpen(false);
   };
   
    const addExternalAuthor = () => {
@@ -484,6 +487,29 @@ export function BookForm() {
         setExternalAuthorRole('Co-Author'); // Reset role selector
     };
 
+
+  const removeAuthor = (index: number) => {
+    const authorToRemove = fields[index];
+    if (authorToRemove.email === user?.email) {
+      toast({ variant: 'destructive', title: 'Action not allowed', description: 'You cannot remove yourself as the primary author.' });
+      return;
+    }
+    remove(index);
+  };
+  
+  const updateAuthorRole = (index: number, role: Author['role']) => {
+    const currentAuthors = form.getValues('authors');
+    const author = currentAuthors[index];
+    const isTryingToBeFirst = role === 'First Author' || role === 'First & Corresponding Author';
+    const isAnotherFirst = currentAuthors.some((a, i) => i !== index && (a.role === 'First Author' || a.role === 'First & Corresponding Author'));
+    
+    if (isTryingToBeFirst && isAnotherFirst) {
+        toast({ title: 'Conflict', description: 'Another author is already the First Author.', variant: 'destructive'});
+        return;
+    }
+    
+    update(index, { ...author, role });
+  };
 
   if (isLoadingDraft) {
     return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
@@ -508,19 +534,20 @@ export function BookForm() {
   }
 
   return (
+    <>
     <Card>
       <Form {...form}>
         <form>
           <CardContent className="space-y-6 pt-6">
             {bankDetailsMissing && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Bank Details Required</AlertTitle>
-                <AlertDescription>
-                  Please add your salary bank account details in your profile before you can submit an incentive claim.
-                  <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
-                </AlertDescription>
-              </Alert>
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Bank Details Required</AlertTitle>
+                    <AlertDescription>
+                        Please add your salary bank account details in your profile before you can submit an incentive claim.
+                        <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
+                    </AlertDescription>
+                </Alert>
             )}
 
             <div className="rounded-lg border p-4 space-y-6 animate-in fade-in-0">
@@ -530,7 +557,6 @@ export function BookForm() {
                 <FormField name="publicationTitle" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the {bookApplicationType || 'Publication'}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookTitleForChapter" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Title of the Book (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />)}
                  
-                 {/* Author Management Section */}
                 <div className="space-y-4">
                     <FormLabel>Author(s) & Roles</FormLabel>
                     <div className="space-y-4">
@@ -546,7 +572,7 @@ export function BookForm() {
                                     render={({ field: roleField }) => (
                                         <FormItem>
                                             <FormLabel>Role</FormLabel>
-                                            <Select onValueChange={roleField.onChange} value={roleField.value}>
+                                            <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={roleField.value}>
                                                 <FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl>
                                                 <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                                             </Select>
@@ -565,26 +591,15 @@ export function BookForm() {
                     
                     <Separator className="my-4" />
 
-                    <div className="space-y-2 p-4 border rounded-md">
+                    <div className="space-y-2 p-3 border rounded-md">
                         <FormLabel>Add Internal Co-Author</FormLabel>
                         <div className="flex items-center gap-2">
-                            <Input placeholder="Search by Co-PI's MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
-                            <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>
-                                {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}
-                            </Button>
+                            <Input placeholder="Search by Co-Author's Name or MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
+                            <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
                         </div>
-                        {foundCoPi && (
-                            <div className="flex items-center justify-between p-2 border rounded-md mt-2 bg-muted/50">
-                                <div>
-                                    <p className="text-sm">{foundCoPi.name}</p>
-                                    {!foundCoPi.uid && <p className="text-xs text-muted-foreground">Not registered, but found in staff data.</p>}
-                                </div>
-                                <Button type="button" size="sm" onClick={handleAddCoPi}>Add</Button>
-                            </div>
-                        )}
                     </div>
-                    <div className="space-y-2 p-4 border rounded-md">
-                        <FormLabel>Add External Co-Author</FormLabel>
+                    <div className="space-y-2 p-3 border rounded-md">
+                        <FormLabel className="text-sm">Add External Co-Author</FormLabel>
                         <div className="flex flex-col md:flex-row gap-2 mt-1">
                             <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
                             <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
@@ -645,7 +660,7 @@ export function BookForm() {
               type="button"
               variant="outline"
               onClick={() => handleSave('Draft')}
-              disabled={isSubmitting || bankDetailsMissing}
+              disabled={isSubmitting}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
@@ -657,5 +672,28 @@ export function BookForm() {
         </form>
       </Form>
     </Card>
+    <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Multiple Users Found</DialogTitle>
+                <DialogDescription>Please select the correct user to add.</DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))}>
+                    {foundCoPis.map((u, i) => (
+                        <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
+                            <RadioGroupItem value={JSON.stringify(u)} id={`user-${i}`} />
+                            <Label htmlFor={`user-${i}`} className="flex flex-col">
+                                <span className="font-semibold">{u.name}</span>
+                                <span className="text-muted-foreground text-xs">{u.email}</span>
+                                <span className="text-muted-foreground text-xs">{u.campus}</span>
+                            </Label>
+                        </div>
+                    ))}
+                </RadioGroup>
+            </div>
+        </DialogContent>
+    </Dialog>
+    </>
   );
 }
