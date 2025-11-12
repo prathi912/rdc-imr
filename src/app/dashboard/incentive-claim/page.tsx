@@ -35,7 +35,7 @@ import { getSystemSettings } from '@/app/actions';
 import { submitIncentiveClaim, deleteIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { calculateBookIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
+import { calculateBookIncentive,calculateApcIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
 import { Separator } from '@/components/ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -188,13 +188,24 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
             return;
         }
 
+        // Determine which faculty-specific rules apply
+        const SPECIAL_POLICY_FACULTIES = [
+            "Faculty of Applied Sciences",
+            "Faculty of Medicine",
+            "Faculty of Homoeopathy",
+            "Faculty of Ayurved",
+            "Faculty of Nursing",
+            "Faculty of Pharmacy",
+            "Faculty of Physiotherapy",
+            "Faculty of Public Health",
+            "Faculty of Engineering & Technology"
+        ];
+        const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(currentUser.faculty || '');
+
         if (claim.claimType === 'Research Papers') {
-            // Create a modified claim data where the co-author is treated as the claimant
-            // The key is to keep the authors array intact but change userEmail
             const claimDataForCalc = { 
                 ...claim, 
-                userEmail: currentUser.email, // This will be used to find the claimant in authors array
-                // Don't modify the authors array - keep it as is
+                userEmail: currentUser.email,
             };
             
             result = await calculateResearchPaperIncentive(
@@ -202,14 +213,21 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                 currentUser.faculty || '', 
                 currentUser.designation
             );
-        } else if (claim.claimType === 'Books'|| "Seed Money for APC" ) {
-            // For books, we need to calculate based on the number of PU authors
-            // The calculation already divides by internal author count
+        } else if (claim.claimType === 'Books') {
             const claimDataForCalc = {
                 ...claim,
                 userEmail: currentUser.email,
             };
             result = await calculateBookIncentive(claimDataForCalc);
+        } else if (claim.claimType === 'Seed Money for APC') {
+            // Import the calculateApcIncentive function at the top of your file
+            // import { calculateApcIncentive } from '@/app/incentive-calculation';
+            
+            const claimDataForCalc = {
+                ...claim,
+                userEmail: currentUser.email,
+            };
+            result = await calculateApcIncentive(claimDataForCalc, isSpecialFaculty);
         } else {
             result = { success: true, amount: 0 };
         }
