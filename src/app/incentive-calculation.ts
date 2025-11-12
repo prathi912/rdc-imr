@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -261,7 +260,7 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
 // --- APC Calculation ---
 
 export async function calculateApcIncentive(
-    claimData: Partial<IncentiveClaim>, 
+    claimData: Partial<IncentiveClaim>,
     isSpecialFaculty: boolean
 ): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
@@ -272,11 +271,6 @@ export async function calculateApcIncentive(
         }
         if (!userEmail) {
             return { success: false, error: "Claimant email is not available." };
-        }
-        
-        const claimant = authors.find(a => a.email.toLowerCase() === userEmail.toLowerCase());
-        if (!claimant) {
-            return { success: false, error: "Claimant not found in the author list." };
         }
 
         const totalAuthorCount = authors.length;
@@ -483,3 +477,5 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
+
+    
