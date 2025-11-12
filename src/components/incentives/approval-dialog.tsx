@@ -25,7 +25,7 @@ import { Loader2, Check, X } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 
 interface ApprovalDialogProps {
   claim: IncentiveClaim;
@@ -102,11 +102,11 @@ const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designat
     { id: 'conferenceType', label: 'National/International' },
     { id: 'presentationType', label: 'Oral/Poster' },
     { id: 'conferenceDate', label: 'Date of Conference' },
-    { id: 'conferenceDuration', label: 'Duration of Event'},
+    { id: 'conferenceDuration', label: 'Duration of Event' },
     { id: 'travelPlaceVisited', label: 'Place Visited' },
     { id: 'registrationFee', label: 'Registration Fee' },
     { id: 'travelFare', label: 'Travelling Expenses' },
-    { id: 'totalAmountClaimed', label: 'Amount Claimed (Rs.)' },
+    { id: 'calculatedIncentive', label: 'Amount Claimed (Rs.)' },
 ];
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
