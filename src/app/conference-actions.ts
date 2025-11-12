@@ -8,7 +8,8 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { getTemplateContentFromUrl } from '@/lib/template-manager';
 import { format, differenceInDays, parseISO } from 'date-fns';
-import { getSystemSettings } from './actions';
+import { getSystemSettings } from '@/app/actions';
+
 
 function getInstituteAcronym(name?: string): string {
     if (!name) return '';
@@ -78,7 +79,7 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
     const checklistFields = [
         'name', 'designation', 'eventType', 'conferencePaperTitle', 'authorType', 'totalAuthors',
         'conferenceName', 'organizerName', 'conferenceType', 'presentationType', 'conferenceDate', 
-        'conferenceDuration', 'travelPlaceVisited', 'registrationFee', 'travelFare', 'totalAmountClaimed'
+        'conferenceDuration', 'travelPlaceVisited', 'registrationFee', 'travelFare', 'calculatedIncentive'
     ];
     
     const approvalData: { [key: string]: string } = {};
@@ -92,18 +93,18 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
         applicant_name: user.name || 'N/A',
         designation: user.designation || 'N/A',
         institute: getInstituteAcronym(user.institute),
-        conference_type: claim.eventType || 'N/A',
-        mode_presentation: claim.presentationType || 'N/A',
+        conference_type: claim.presentationType || 'N/A',
+        mode_conference: claim.conferenceMode || 'N/A',
         locale: claim.conferenceType || 'N/A',
         title_paper: claim.conferencePaperTitle || 'N/A',
         event_name: claim.conferenceName || 'N/A',
         organiser_name: claim.organizerName || 'N/A',
-        duration_event: claim.conferenceDuration ? `${claim.conferenceDuration} Days` : 'N/A',
+        duration_event: claim.conferenceDuration || 'N/A',
         registration_fee: claim.registrationFee?.toLocaleString('en-IN') || '0',
         travel_expense: claim.travelFare?.toLocaleString('en-IN') || '0',
         other_expense: '0', 
         total_amount: claim.totalAmountClaimed?.toLocaleString('en-IN') || 'N/A',
-        mode_conference: claim.conferenceMode || 'N/A',
+        presentation_date: claim.presentationDate ? new Date(claim.presentationDate).toLocaleDateString('en-GB') : 'N/A',
         ...approvalData
     };
     

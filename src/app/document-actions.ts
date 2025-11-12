@@ -14,12 +14,12 @@ import ExcelJS from 'exceljs';
 import { toWords } from 'number-to-words';
 import JSZip from 'jszip';
 import { getTemplateContentFromUrl } from '@/lib/template-manager';
-import { getSystemSettings } from './actions';
-import { generateBookIncentiveForm } from './incentive-actions';
-import { generateMembershipIncentiveForm } from './membership-actions';
-import { generatePatentIncentiveForm } from './patent-actions';
-import { generateConferenceIncentiveForm } from './conference-actions';
-import { generateResearchPaperIncentiveForm } from './research-paper-actions';
+import { getSystemSettings } from '@/app/actions';
+import { generateBookIncentiveForm } from '@/app/incentive-actions';
+import { generateMembershipIncentiveForm } from '@/app/membership-actions';
+import { generatePatentIncentiveForm } from '@/app/patent-actions';
+import { generateConferenceIncentiveForm } from '@/app/conference-actions';
+import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
 
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -457,6 +457,8 @@ const angularParser = (tag: string) => {
           previousPhase = lastSubmittedOrCompletedPhase;
           previousPhaseNumber = phases.indexOf(lastSubmittedOrCompletedPhase) + 1;
         } else {
+          // Fallback to the first phase if nothing else is found.
+          // This might not be perfect, but it prevents a crash.
           previousPhase = phases[0];
           previousPhaseNumber = 1;
         }
