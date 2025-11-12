@@ -109,12 +109,13 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
                 await adminDb.collection('notifications').add(notification);
 
                 if (coAuthor.email) {
+                    const claimTitle = finalClaimData.paperTitle || finalClaimData.publicationTitle || 'N/A';
                      const emailHtml = `
                         <div ${EMAIL_STYLES.background}>
                             ${EMAIL_STYLES.logo}
                             <p style="color:#ffffff;">Dear ${coAuthor.name},</p>
                             <p style="color:#e0e0e0;">
-                                This is to inform you that ${claimData.userName} has submitted an incentive claim for the publication/work titled "<strong style="color:#ffffff;">${claimData.paperTitle || claimData.publicationTitle || 'N/A'}</strong>" and has listed you as a co-author.
+                                This is to inform you that ${claimData.userName} has submitted an incentive claim for the publication/work titled "<strong style="color:#ffffff;">${claimTitle}</strong>" and has listed you as a co-author.
                             </p>
                             ${canApply
                                 ? `<p style="color:#e0e0e0;">
