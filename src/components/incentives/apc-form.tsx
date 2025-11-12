@@ -59,7 +59,7 @@ const apcSchema = z.object({
     message: 'You must request an APC waiver and provide proof to be eligible.',
   }),
   apcApcWaiverProof: z.any().refine(files => files?.length > 0, {
-    message: 'Proof of waiver request is required.',
+    message: 'Proof of APC waiver request is required.',
   }),
   apcJournalWebsite: z.string().url('Please enter a valid URL.'),
   apcIssnNo: z.string().min(5, 'ISSN is required.'),
@@ -636,7 +636,7 @@ useEffect(() => {
                 <h3 className="font-semibold text-sm -mb-2">FINANCIAL & DECLARATION DETAILS</h3>
                 <Separator />
                 <FormField name="apcApcWaiverRequested" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Whether APC waiver was requested <span className="text-destructive">*</span></FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
-                {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>If yes, give proof (PDF)<span className="text-destructive">*</span></FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
+                {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of APC waiver request</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     name="apcTotalAmount"
