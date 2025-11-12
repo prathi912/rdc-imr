@@ -275,9 +275,25 @@ export async function calculateApcIncentive(
 
         const totalAuthorCount = authors.length;
         
+        // CRITICAL FIX: Ensure apcTotalAmount is properly parsed as a number
+        // Handle cases where it might be a string or have currency formatting
+        let actualAmountPaid = 0;
+        if (apcTotalAmount !== undefined && apcTotalAmount !== null) {
+            // Convert to string first, remove any commas or currency symbols, then parse
+            const cleanAmount = String(apcTotalAmount).replace(/[^0-9.]/g, '');
+            actualAmountPaid = parseFloat(cleanAmount) || 0;
+        }
+        
         let maxReimbursementLimit = 0;
-    
-        if (apcIndexingStatus?.includes('Scopus') || apcIndexingStatus?.includes('Web of science') || apcIndexingStatus?.includes('SCI')) {
+        
+        // Check for Scopus/Web of Science/SCI with Q rating
+        const hasScopusOrWoS = apcIndexingStatus?.some(status => 
+            status.includes('Scopus') || 
+            status.includes('Web of science') || 
+            status.includes('SCI')
+        );
+        
+        if (hasScopusOrWoS && apcQRating) {
             switch (apcQRating) {
                 case 'Q1': maxReimbursementLimit = 40000; break;
                 case 'Q2': maxReimbursementLimit = 30000; break;
@@ -285,30 +301,34 @@ export async function calculateApcIncentive(
                 case 'Q4': maxReimbursementLimit = 15000; break;
                 default: maxReimbursementLimit = 0; 
             }
-        } 
+        }
         
-        if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
-            if (!isSpecialFaculty) {
+        // Additional indexing benefits (only for non-special faculty)
+        if (!isSpecialFaculty && apcIndexingStatus) {
+            if (apcIndexingStatus.some(status => status.includes('Web of Science indexed journals (ESCI)'))) {
                 maxReimbursementLimit = Math.max(maxReimbursementLimit, 8000);
             }
-        }
-         if (apcIndexingStatus?.includes('UGC-CARE Group-I')) {
-            if (!isSpecialFaculty) {
+            if (apcIndexingStatus.some(status => status.includes('UGC-CARE Group-I'))) {
                 maxReimbursementLimit = Math.max(maxReimbursementLimit, 5000);
             }
         }
         
-        const actualAmountPaid = apcTotalAmount || 0;
+        // If no policy limit applies, no incentive
+        if (maxReimbursementLimit === 0) {
+            return { success: false, error: "No applicable policy limit found for the selected indexing status and Q rating." };
+        }
         
-        // Admissible amount is the LESSER of the actual amount paid and the policy limit.
+        // Admissible amount is the LESSER of actual amount paid and policy limit
         const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
         
-        // The final incentive is the admissible amount divided by the number of authors.
+        // Final incentive is admissible amount divided by number of authors
         const finalIncentive = totalAuthorCount > 0 ? admissibleAmount / totalAuthorCount : 0;
         
+        // Round to nearest integer (or use Math.floor if you want to round down)
         return { success: true, amount: Math.round(finalIncentive) };
+        
     } catch (error: any) {
-         console.error("Error calculating APC incentive:", error);
+        console.error("Error calculating APC incentive:", error);
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
