@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -177,8 +176,16 @@ export function ApcForm() {
   }, [formValues, user, isSpecialFaculty]);
 
   useEffect(() => {
-    calculate();
-  }, [calculate]);
+    const subscription = form.watch((value, { name, type }) => {
+        const fieldsForRecalculation = [
+            'apcTotalAmount', 'apcIndexingStatus', 'apcQRating', 'authors'
+        ];
+        if (type === 'change' && fieldsForRecalculation.includes(name as string)) {
+            calculate();
+        }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, calculate]);
 
 
   useEffect(() => {
@@ -313,7 +320,7 @@ export function ApcForm() {
         const result = await findUserByMisId(coPiSearchTerm);
         if (result.success && result.users && result.users.length > 0) {
             const user = result.users[0];
-            setFoundCoPi({ ...user });
+            setFoundCoPi({ ...user, uid: user.uid || undefined });
         } else {
             toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
         }
