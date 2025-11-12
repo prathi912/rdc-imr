@@ -2,7 +2,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import type { IncentiveClaim } from '@/types';
+import type { IncentiveClaim, User } from '@/types';
 import { sendEmail as sendEmailUtility } from "@/lib/email";
 import ExcelJS from 'exceljs';
 import { getSystemSettings } from './actions';
@@ -173,7 +173,9 @@ export async function generateIncentivePaymentSheet(
   referenceNumber: string
 ): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
-    const toWords = (await import('number-to-words')).toWords;
+    const numberToWords = await import('number-to-words');
+    const toWords = numberToWords.toWords;
+
     const claimsRef = adminDb.collection('incentiveClaims');
     const q = claimsRef.where(FieldPath.documentId(), 'in', claimIds);
     const claimsSnapshot = await q.get();
@@ -204,10 +206,10 @@ export async function generateIncentivePaymentSheet(
     
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(templateContent);
-    const worksheet = workbook.getWorksheet("Sheet1");
+    const worksheet = workbook.getWorksheet("NEFT");
 
     if (!worksheet) {
-      return { success: false, error: 'Could not find a worksheet named "Sheet1" in the template file.' };
+      return { success: false, error: 'Could not find a worksheet named "NEFT" in the template file.' };
     }
     
     const batch = adminDb.batch();
