@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -173,9 +174,8 @@ export async function generateIncentivePaymentSheet(
   referenceNumber: string
 ): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
-    const numberToWords = await import('number-to-words');
-    const toWords = numberToWords.toWords;
-
+    const { toWords } = await import('number-to-words');
+    
     const claimsRef = adminDb.collection('incentiveClaims');
     const q = claimsRef.where(FieldPath.documentId(), 'in', claimIds);
     const claimsSnapshot = await q.get();
@@ -206,10 +206,10 @@ export async function generateIncentivePaymentSheet(
     
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(templateContent);
-    const worksheet = workbook.getWorksheet("NEFT");
+    const worksheet = workbook.worksheets[0]; // Get the first worksheet by index
 
     if (!worksheet) {
-      return { success: false, error: 'Could not find a worksheet named "NEFT" in the template file.' };
+      return { success: false, error: 'Could not find a worksheet in the template file.' };
     }
     
     const batch = adminDb.batch();
