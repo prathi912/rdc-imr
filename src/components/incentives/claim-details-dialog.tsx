@@ -375,6 +375,8 @@ a.href = url;
                             {renderDetail("Benefit Mode", claim.benefitMode)}
                             {renderDetail("Calculated Incentive", claim.calculatedIncentive?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
                             {renderDetail("Final Approved Amount", claim.finalApprovedAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' }))}
+                            {renderDetail("Payment Sheet Ref No.", claim.paymentSheetRef)}
+                            {renderDetail("Payment Remarks", claim.paymentSheetRemarks)}
                             
                             {claim.approvals && claim.approvals.length > 0 && (
                                 <div className="space-y-2 pt-2">

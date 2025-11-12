@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import fs from 'fs';
@@ -11,7 +10,6 @@ import type { Project, User, Evaluation, IncentiveClaim, SystemSettings, Approva
 import { FieldValue } from 'firebase-admin/firestore';
 import { format, parseISO } from 'date-fns';
 import ExcelJS from 'exceljs';
-import { toWords } from 'number-to-words';
 import JSZip from 'jszip';
 import { getTemplateContentFromUrl } from '@/lib/template-manager';
 import { getSystemSettings } from '@/app/actions';
@@ -177,94 +175,6 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
   }
 }
 
-export async function generateIncentivePaymentSheet(
-  claimIds: string[],
-  remarks: Record<string, string>,
-  referenceNumber: string
-): Promise<{ success: boolean; fileData?: string; error?: string }> {
-  try {
-    const claimsRef = adminDb.collection('incentiveClaims');
-    const q = claimsRef.where(FieldValue.documentId(), 'in', claimIds);
-    const claimsSnapshot = await q.get();
-    const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
-
-    const userIds = [...new Set(claims.map(c => c.uid))];
-    const usersRef = adminDb.collection('users');
-    const usersQuery = usersRef.where(FieldValue.documentId(), 'in', userIds);
-    const usersSnapshot = await usersQuery.get();
-    const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
-
-    const settings = await getSystemSettings();
-    const templateUrl = settings.templateUrls?.INCENTIVE_PAYMENT_SHEET;
-
-    if (!templateUrl) {
-      return { success: false, error: 'Incentive Payment Sheet template URL is not configured.' };
-    }
-    
-    const templateContent = await getTemplateContentFromUrl(templateUrl);
-    if (!templateContent) {
-      return { success: false, error: 'Payment sheet template not found or could not be loaded.' };
-    }
-    
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(templateContent);
-    const worksheet = workbook.getWorksheet("Sheet1");
-
-    if (!worksheet) {
-      return { success: false, error: 'Could not find a worksheet named "Sheet1" in the template file.' };
-    }
-
-    let totalAmount = 0;
-    const paymentData = claims.map((claim, index) => {
-      const user = usersMap.get(claim.uid);
-      const amount = claim.finalApprovedAmount || 0;
-      totalAmount += amount;
-      return {
-        [`beneficiary_${index + 1}`]: user?.bankDetails?.beneficiaryName || user?.name || '',
-        [`account_${index + 1}`]: user?.bankDetails?.accountNumber || '',
-        [`ifsc_${index + 1}`]: user?.bankDetails?.ifscCode || '',
-        [`branch_${index + 1}`]: user?.bankDetails?.branchName || '',
-        [`amount_${index + 1}`]: amount,
-        [`college_${index + 1}`]: getInstituteAcronym(user?.institute),
-        [`mis_${index + 1}`]: user?.misId || '',
-        [`remarks_${index + 1}`]: remarks[claim.id] || '',
-      };
-    });
-
-    const flatData = paymentData.reduce((acc, item) => ({ ...acc, ...item }), {});
-
-    flatData.date = format(new Date(), 'dd/MM/yyyy');
-    flatData.reference_number = referenceNumber;
-    flatData.total_amount = totalAmount.toLocaleString('en-IN');
-    flatData.amount_in_words = toWords(totalAmount).replace(/\b\w/g, (l: string) => l.toUpperCase()) + ' Only';
-    
-    worksheet.eachRow((row) => {
-        row.eachCell((cell) => {
-            if (cell.value && typeof cell.value === 'string') {
-                const templateVarMatch = cell.value.match(/\{(.*?)\}/);
-                if (templateVarMatch && templateVarMatch[1]) {
-                    const key = templateVarMatch[1];
-                    const newValue = flatData[key] !== undefined ? flatData[key] : '';
-                    
-                    cell.value = newValue;
-                    cell.font = { ...cell.font, size: 26 };
-                    cell.alignment = { ...cell.alignment, horizontal: 'center', vertical: 'middle' };
-                }
-            }
-        });
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
-
-    return { success: true, fileData: base64 };
-  } catch (error: any) {
-    console.error('Error generating payment sheet:', error);
-    await logActivity('ERROR', 'Failed to generate payment sheet', { error: error.message });
-    return { success: false, error: error.message || 'Failed to generate the sheet.' };
-  }
-}
-
 async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: string, content: Buffer } | null> {
     try {
         const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
@@ -297,8 +207,8 @@ async function generateSingleOfficeNoting(claimId: string): Promise<{ fileName: 
         }
 
         if (result.success && result.fileData) {
-            const safeUserName = (claim.userName || 'user').replace(/[\\/:"*?<>|]/g, '_');
-            const safeClaimId = (claim.claimId || claim.id.substring(0, 5)).replace(/[\\/:"*?<>|]/g, '-');
+            const safeUserName = (claim.userName || 'user').replace(/[\/\?<>\\:\*\|":]/g, '_');
+            const safeClaimId = (claim.claimId || claim.id.substring(0, 5)).replace(/[\/\?<>\\:\*\|":]/g, '-');
             const fileName = `Office_Noting_${safeUserName}_${safeClaimId}.docx`;
             return { fileName, content: Buffer.from(result.fileData, 'base64') };
         } else {
@@ -354,80 +264,6 @@ export async function generateOfficeNotingForClaim(claimId: string): Promise<{ s
         await logActivity('ERROR', 'Failed to generate single office noting', { claimId, error: error.message });
         return { success: false, error: error.message || 'Failed to generate the form.' };
     }
-}
-
-export async function exportClaimToExcel(
-  claimId: string,
-): Promise<{ success: boolean; fileData?: string; error?: string }> {
-  try {
-    const claimRef = adminDb.collection("incentiveClaims").doc(claimId)
-    const claimSnap = await claimRef.get()
-    if (!claimSnap.exists) {
-      return { success: false, error: "Claim not found." }
-    }
-    const claim = claimSnap.data() as IncentiveClaim
-
-    // Fetch user data for designation and department
-    let user: User | null = null
-    if (claim.uid) {
-      const userRef = adminDb.collection("users").doc(claim.uid)
-      const userSnap = await userRef.get()
-      if (userSnap.exists) {
-        user = userSnap.data() as User
-      }
-    }
-
-    const templatePath = path.join(process.cwd(), 'src', 'templates', 'format.xlsx');
-    if (!fs.existsSync(templatePath)) {
-        return { success: false, error: 'Template file "format.xlsx" not found or could not be read.' };
-    }
-    
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(templatePath);
-    const worksheet = workbook.getWorksheet(1); // Get the first worksheet
-    
-    if (!worksheet) {
-        return { success: false, error: 'Could not find a worksheet in the template file.' };
-    }
-
-    const getClaimTitle = (claim: IncentiveClaim): string => {
-      return (
-        claim.paperTitle ||
-        claim.patentTitle ||
-        claim.conferencePaperTitle ||
-        claim.publicationTitle ||
-        claim.professionalBodyName ||
-        claim.apcPaperTitle ||
-        "N/A"
-      )
-    }
-
-    const claimTitle = getClaimTitle(claim)
-    const submissionDate = claim.submissionDate ? new Date(claim.submissionDate).toLocaleDateString() : "N/A"
-
-    const dataMap: { [key: string]: any } = {
-      B2: claim.userName,
-      B3: user?.designation || "N/A",
-      B4: user?.department || "N/A",
-      B5: claimTitle,
-      D11: submissionDate,
-    }
-    
-    for (const cellAddress in dataMap) {
-        if (Object.prototype.hasOwnProperty.call(dataMap, cellAddress)) {
-            worksheet.getCell(cellAddress).value = dataMap[cellAddress];
-        }
-    }
-
-    const outputBuffer = await workbook.xlsx.writeBuffer();
-    const base64 = Buffer.from(outputBuffer).toString('base64');
-
-    return { success: true, fileData: base64 }
-  } catch (error: any) {
-    console.error("Error exporting claim to Excel:", error)
-    await logActivity('ERROR', 'Failed to export claim to Excel', { claimId, error: error.message, stack: error.stack });
-    return { success: false, error: error.message || "Failed to export data." }
-  }
 }
 
 // This parser is needed to handle both single `{}` and double `{{}}` braces in the same template.
@@ -504,11 +340,11 @@ const angularParser = (tag: string) => {
         sanction_reference: project.grant?.sanctionNumber || 'N/A',
         date_sanction: project.grant?.phases?.[0]?.disbursementDate ? format(parseISO(project.grant.phases[0].disbursementDate), 'dd/MM/yyyy') : 'N/A',
         total_sanction: project.grant?.totalAmount?.toLocaleString('en-IN') || 'N/A',
-        phase_number: toWords(previousPhaseNumber),
+        phase_number: (await import('number-to-words')).toWords(previousPhaseNumber),
         previous_phase_amount: previousPhase?.amount?.toLocaleString('en-IN') || 'N/A',
         previous_phase_award_date: previousPhase?.disbursementDate ? format(parseISO(previousPhase.disbursementDate), 'dd/MM/yyyy') : 'N/A',
         midterm_review_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
-        next_phase_number: toWords(previousPhaseNumber + 1),
+        next_phase_number: (await import('number-to-words')).toWords(previousPhaseNumber + 1),
         next_phase_amount: phaseData.amount?.toLocaleString('en-IN') || 'N/A',
       };
 
