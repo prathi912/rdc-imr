@@ -20,6 +20,7 @@ import { generateMembershipIncentiveForm } from '@/app/membership-actions';
 import { generatePatentIncentiveForm } from '@/app/patent-actions';
 import { generateConferenceIncentiveForm } from '@/app/conference-actions';
 import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
+import { FieldPath } from 'firebase-admin/firestore';
 
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -158,13 +159,13 @@ export async function generateIncentivePaymentSheet(
 ): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
     const claimsRef = adminDb.collection('incentiveClaims');
-    const q = claimsRef.where(adminDb.firestore.FieldPath.documentId(), 'in', claimIds);
+    const q = claimsRef.where(FieldPath.documentId(), 'in', claimIds);
     const claimsSnapshot = await q.get();
     const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
 
     const userIds = [...new Set(claims.map(c => c.uid))];
     const usersRef = adminDb.collection('users');
-    const usersQuery = usersRef.where(adminDb.firestore.FieldPath.documentId(), 'in', userIds);
+    const usersQuery = usersRef.where(FieldPath.documentId(), 'in', userIds);
     const usersSnapshot = await usersQuery.get();
     const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
 
