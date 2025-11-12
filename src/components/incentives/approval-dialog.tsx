@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -84,7 +83,7 @@ const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'des
     { id: 'wosType', label: 'WoS Type' },
     { id: 'journalClassification', label: 'Q Rating of the Journal' },
     { id: 'authorRoleAndPosition', label: 'Author Role / Position' },
-    { id: 'totalPuAuthors', label: 'No. of Authors from PU' },
+    { id: 'totalInternalAuthors', label: 'No. of Authors from PU' },
     { id: 'printIssn', label: 'ISSN' }, // Simplified for display
     { id: 'publicationProofUrls', label: 'PROOF OF PUBLICATION ATTACHED' },
     { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
@@ -107,7 +106,7 @@ const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designat
     { id: 'travelPlaceVisited', label: 'Place Visited' },
     { id: 'registrationFee', label: 'Registration Fee' },
     { id: 'travelFare', label: 'Travelling Expenses' },
-    { id: 'totalAmountClaimed', label: 'Total Amount Claimed' },
+    { id: 'totalAmountClaimed', label: 'Amount Claimed (Rs.)' },
 ];
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
@@ -291,7 +290,7 @@ function ResearchPaperClaimDetails({
                 {renderDetail('wosType', 'WoS Type', claim.wosType)}
                 {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
                 {renderDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
-                {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalInternalAuthors)}
+                {renderDetail('totalInternalAuthors', 'No. of Authors from PU', claim.totalInternalAuthors)}
                 {renderDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
                 {renderDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
                 {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
