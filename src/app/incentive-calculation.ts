@@ -265,12 +265,16 @@ export async function calculateApcIncentive(
 ): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
         const { apcIndexingStatus, apcQRating, authors, apcTotalAmount } = claimData;
-        
+
         if (!authors || authors.length === 0) {
             return { success: false, error: "Author list is empty." };
         }
         
-        const totalAuthorCount = authors.length;
+        const internalAuthors = authors.filter(a => !a.isExternal);
+        const internalAuthorCount = internalAuthors.length;
+        if (internalAuthorCount === 0) {
+            return { success: true, amount: 0 };
+        }
         
         let actualAmountPaid = 0;
         if (apcTotalAmount !== undefined && apcTotalAmount !== null) {
@@ -282,7 +286,7 @@ export async function calculateApcIncentive(
         
         const hasScopusOrWoS = apcIndexingStatus?.some(status => 
             status.toLowerCase().includes('scopus') || 
-            status.toLowerCase().includes('web of science') || 
+            status.toLowerCase().includes('web of science') ||
             status.toLowerCase().includes('sci')
         );
 
@@ -305,13 +309,12 @@ export async function calculateApcIncentive(
         }
         
         if (maxReimbursementLimit === 0 && !hasScopusOrWoS) {
-             return { success: false, error: "No applicable policy limit found for the selected indexing status and Q rating." };
+             return { success: true, amount: 0, error: "No applicable policy limit found for the selected indexing status and Q rating." };
         }
         
-        // Admissible amount is the LESSER of actual amount paid and policy limit
-        const admissibleAmount = maxReimbursementLimit > 0 ? Math.min(actualAmountPaid, maxReimbursementLimit) : actualAmountPaid;
+        const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
         
-        const finalIncentive = totalAuthorCount > 0 ? admissibleAmount / totalAuthorCount : 0;
+        const finalIncentive = admissibleAmount / internalAuthorCount;
         
         return { success: true, amount: Math.round(finalIncentive) };
         
@@ -485,5 +488,3 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
-
-    
