@@ -93,7 +93,7 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
         applicant_name: user.name || 'N/A',
         designation: user.designation || 'N/A',
         institute: getInstituteAcronym(user.institute),
-        conference_type: claim.presentationType || 'N/A',
+        mode_presentation: claim.presentationType || 'N/A',
         mode_conference: claim.conferenceMode || 'N/A',
         locale: claim.conferenceType || 'N/A',
         title_paper: claim.conferencePaperTitle || 'N/A',
