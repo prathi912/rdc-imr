@@ -256,6 +256,7 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
     }
 }
 
+
 // --- APC Calculation ---
 
 export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, isSpecialFaculty: boolean): Promise<{ success: boolean; amount?: number; error?: string }> {
@@ -325,8 +326,8 @@ export async function calculateConferenceIncentive(
       let maxReimbursement = 0;
   
       const isPuConference =
-        (organizerName || "").toString().toLowerCase().includes("parul university") ||
-        (conferenceName || "").toString().toLowerCase().includes("picet");
+        (organizerName || "").toLowerCase().includes("parul university") ||
+        (conferenceName || "").toLowerCase().includes("parul");
   
       if (isPuConference) {
         // PU conferences: 75% of registration fee (cap = 75% of reg fee)
