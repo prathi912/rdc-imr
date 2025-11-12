@@ -184,6 +184,7 @@ function ConferenceClaimDetails({
         ...claim,
         name: claimant?.name,
         designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`,
+        conferenceDuration: claim.conferenceDuration ? `${claim.conferenceDuration} Days` : 'N/A',
     };
 
     return (
