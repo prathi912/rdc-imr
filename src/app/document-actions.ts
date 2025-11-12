@@ -42,7 +42,7 @@ async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string,
   }
 }
 
-function getInstituteAcronym(name?: string): string {
+export function getInstituteAcronym(name?: string): string {
     if (!name) return '';
 
     const acronymMap: { [key: string]: string } = {
@@ -466,16 +466,10 @@ const angularParser = (tag: string) => {
           paragraphLoop: true,
           linebreaks: true,
           parser: angularParser,
-          nullGetter: () => "N/A", // Return "N/A" for any undefined/null placeholders
+          nullGetter: () => "N/A",
       });
 
-      const safeDate = (val?: string) => {
-        try { return val ? format(parseISO(val), 'dd/MM/yyyy') : 'N/A'; }
-        catch { return 'N/A'; }
-      };
-
       const phases = project.grant?.phases || [];
-      // Find the index of the phase that is currently pending disbursement
       const nextPhaseIndex = phases.findIndex(p => p.amount === phaseData.amount && (p.status === 'Pending Disbursement' || !p.status));
       
       let previousPhase;
@@ -484,12 +478,11 @@ const angularParser = (tag: string) => {
         previousPhase = phases[nextPhaseIndex - 1];
         previousPhaseNumber = nextPhaseIndex;
       } else {
-        // This is the first *real* installment after the initial one.
-        previousPhase = phases.find(p => p.status === 'Utilization Submitted' || p.status === 'Completed');
-        if (previousPhase) {
-          previousPhaseNumber = phases.indexOf(previousPhase) + 1;
+        const lastSubmittedOrCompletedPhase = [...phases].reverse().find(p => p.status === 'Utilization Submitted' || p.status === 'Completed');
+        if (lastSubmittedOrCompletedPhase) {
+          previousPhase = lastSubmittedOrCompletedPhase;
+          previousPhaseNumber = phases.indexOf(lastSubmittedOrCompletedPhase) + 1;
         } else {
-          // Fallback to the first phase if no utilization is submitted yet
           previousPhase = phases[0];
           previousPhaseNumber = 1;
         }
@@ -500,12 +493,12 @@ const angularParser = (tag: string) => {
         date: format(new Date(), 'dd/MM/yyyy'),
         PI_name: project.pi || 'N/A',
         sanction_reference: project.grant?.sanctionNumber || 'N/A',
-        date_sanction: safeDate(project.grant?.phases?.[0]?.disbursementDate || project.submissionDate),
+        date_sanction: project.grant?.phases?.[0]?.disbursementDate ? format(parseISO(project.grant.phases[0].disbursementDate), 'dd/MM/yyyy') : 'N/A',
         total_sanction: project.grant?.totalAmount?.toLocaleString('en-IN') || 'N/A',
         phase_number: toWords(previousPhaseNumber),
         previous_phase_amount: previousPhase?.amount?.toLocaleString('en-IN') || 'N/A',
-        previous_phase_award_date: safeDate(previousPhase?.disbursementDate),
-        midterm_review_date: safeDate(project.meetingDetails?.date),
+        previous_phase_award_date: previousPhase?.disbursementDate ? format(parseISO(previousPhase.disbursementDate), 'dd/MM/yyyy') : 'N/A',
+        midterm_review_date: project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'dd/MM/yyyy') : 'N/A',
         next_phase_number: toWords(previousPhaseNumber + 1),
         next_phase_amount: phaseData.amount?.toLocaleString('en-IN') || 'N/A',
       };

@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -8,6 +9,7 @@ import Docxtemplater from 'docxtemplater';
 import { getTemplateContentFromUrl } from '@/lib/template-manager';
 import { format } from 'date-fns';
 import { getSystemSettings } from './actions';
+import { getInstituteAcronym } from './document-actions';
 
 export async function generateConferenceIncentiveForm(claimId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
@@ -50,27 +52,26 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
     const approval3 = claim.approvals?.find(a => a?.stage === 3);
 
     const data = {
-        name: user.name || 'N/A',
+        applicant_name: user.name || 'N/A',
         designation: user.designation || 'N/A',
-        department: user.department || 'N/A',
-        conference_name: claim.conferenceName || 'N/A',
-        paper_title: claim.conferencePaperTitle || 'N/A',
-        conference_date: claim.conferenceDate ? new Date(claim.conferenceDate).toLocaleDateString('en-GB') : 'N/A',
+        institute: getInstituteAcronym(user.institute),
+        conference_type: claim.presentationType || 'N/A',
+        mode_conference: claim.eventType || 'N/A',
+        locale: claim.conferenceType || 'N/A',
+        title_paper: claim.conferencePaperTitle || 'N/A',
+        mode_presentation: claim.conferenceMode || 'N/A',
         presentation_date: claim.presentationDate ? new Date(claim.presentationDate).toLocaleDateString('en-GB') : 'N/A',
-        conference_type: claim.conferenceType || 'N/A',
-        organizer: claim.organizerName || 'N/A',
-        presenting_author: claim.wasPresentingAuthor ? 'Yes' : 'No',
-        pu_name_present: claim.isPuNamePresent ? 'Yes' : 'No',
-        total_authors: claim.totalAuthors || 'N/A',
-        author_type: claim.authorType || 'N/A',
-        date: format(new Date(), 'dd/MM/yyyy'),
+        event_name: claim.conferenceName || 'N/A',
+        organiser_name: claim.organizerName || 'N/A',
+        duration_event: claim.conferenceDate ? new Date(claim.conferenceDate).toLocaleDateString('en-GB') : 'N/A',
+        registration_fee: claim.registrationFee?.toLocaleString('en-IN') || '0',
+        travel_expense: claim.travelFare?.toLocaleString('en-IN') || '0',
+        other_expense: '0', // This field is not in the form, so defaulting to 0
+        total_amount: claim.finalApprovedAmount?.toLocaleString('en-IN') || 'N/A',
         
-        approver1_comments: approval1?.comments || '',
-        approver1_amount: approval1?.approvedAmount?.toLocaleString('en-IN') || '',
-        approver2_comments: approval2?.comments || '',
-        approver2_amount: approval2?.approvedAmount?.toLocaleString('en-IN') || '',
-        approver3_comments: approval3?.comments || '',
-        approver3_amount: approval3?.approvedAmount?.toLocaleString('en-IN') || '',
+        a1_c1: approval1?.verifiedFields?.['name'] ? '✓' : '',
+        a2_c1: approval2?.verifiedFields?.['name'] ? '✓' : '',
+        // Add other a1/a2 fields if they are implemented
     };
     
     doc.setData(data);
