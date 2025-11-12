@@ -23,7 +23,7 @@ import type { User, IncentiveClaim, PatentInventor } from '@/types';
 import { uploadFileToServer, checkPatentUniqueness } from '@/app/actions';
 import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
-import { findUser } from '@/app/userfinding';
+import { findUserByMisId } from '@/app/userfinding';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
@@ -205,7 +205,7 @@ export function PatentForm() {
     setIsSearching(true);
     setFoundUser(null);
     try {
-        const result = await findUser(searchTerm);
+        const result = await findUserByMisId(searchTerm);
         if (result.success && result.users && result.users.length > 0) {
             const user = result.users[0];
             setFoundUser({ ...user });
@@ -507,3 +507,5 @@ export function PatentForm() {
     </Card>
   );
 }
+
+    
