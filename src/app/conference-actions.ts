@@ -74,7 +74,6 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
 
     const approval1 = claim.approvals?.find(a => a?.stage === 1);
     const approval2 = claim.approvals?.find(a => a?.stage === 2);
-    const approval3 = claim.approvals?.find(a => a?.stage === 3);
     
     const checklistFields = [
         'name', 'designation', 'eventType', 'conferencePaperTitle', 'authorType', 'totalAuthors',
@@ -85,8 +84,8 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
     const approvalData: { [key: string]: string } = {};
     checklistFields.forEach((field, index) => {
         const c_num = index + 1;
-        approvalData[`a1_c${c_num}`] = approval1?.verifiedFields?.[field] ? '✓' : '';
-        approvalData[`a2_c${c_num}`] = approval2?.verifiedFields?.[field] ? '✓' : '';
+        approvalData[`a1_c${c_num}`] = approval1?.verifiedFields?.[field as keyof IncentiveClaim] ? '✓' : '';
+        approvalData[`a2_c${c_num}`] = approval2?.verifiedFields?.[field as keyof IncentiveClaim] ? '✓' : '';
     });
 
     const data = {
@@ -99,7 +98,7 @@ export async function generateConferenceIncentiveForm(claimId: string): Promise<
         title_paper: claim.conferencePaperTitle || 'N/A',
         event_name: claim.conferenceName || 'N/A',
         organiser_name: claim.organizerName || 'N/A',
-        duration_event: claim.conferenceDuration || 'N/A',
+        duration_event: claim.conferenceDuration ? `${claim.conferenceDuration} Days` : 'N/A',
         registration_fee: claim.registrationFee?.toLocaleString('en-IN') || '0',
         travel_expense: claim.travelFare?.toLocaleString('en-IN') || '0',
         other_expense: '0', 
