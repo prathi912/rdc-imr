@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -90,7 +91,6 @@ export async function calculateResearchPaperIncentive(
 ): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
         const { authors = [], userEmail, publicationType, journalClassification, wasApcPaidByUniversity } = claimData;
-        const totalAuthors = authors.length || 1;
         
         // Find the claimant in the author list
         const claimant = authors.find(a => a.email.toLowerCase() === userEmail?.toLowerCase());
@@ -100,6 +100,7 @@ export async function calculateResearchPaperIncentive(
         
         const baseIncentive = getBaseIncentiveForPaper(claimData, faculty, designation);
         const totalSpecifiedIncentive = adjustForPublicationType(baseIncentive, publicationType, journalClassification);
+        const totalAuthors = authors.length || 1;
 
         // Special case for Letter to Editor/Editorial
         if (publicationType === 'Letter to the Editor/Editorial') {
@@ -259,7 +260,10 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
 
 // --- APC Calculation ---
 
-export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, isSpecialFaculty: boolean): Promise<{ success: boolean; amount?: number; error?: string }> {
+export async function calculateApcIncentive(
+    claimData: Partial<IncentiveClaim>, 
+    isSpecialFaculty: boolean
+): Promise<{ success: boolean; amount?: number; error?: string }> {
     try {
         const { apcIndexingStatus, apcQRating, authors, apcTotalAmount, userEmail } = claimData;
         
@@ -287,6 +291,11 @@ export async function calculateApcIncentive(claimData: Partial<IncentiveClaim>, 
         if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
             if (!isSpecialFaculty) {
                 maxReimbursementLimit = Math.max(maxReimbursementLimit, 8000);
+            }
+        }
+         if (apcIndexingStatus?.includes('UGC-CARE Group-I')) {
+            if (!isSpecialFaculty) {
+                maxReimbursementLimit = Math.max(maxReimbursementLimit, 5000);
             }
         }
         
