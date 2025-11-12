@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
@@ -267,27 +266,28 @@ export async function calculateApcIncentive(
     try {
         const { apcIndexingStatus, apcQRating, authors, apcTotalAmount, userEmail } = claimData;
         
-        // Find the claimant in the author list
+        if (!authors || authors.length === 0) {
+            return { success: false, error: "Author list is empty." };
+        }
         const claimant = authors?.find(a => a.email.toLowerCase() === userEmail?.toLowerCase());
         if (!claimant) {
             return { success: false, error: "Claimant not found in the author list." };
         }
 
-        const totalAuthorCount = authors?.length || 1;
-        if (totalAuthorCount === 0) {
-            return { success: true, amount: 0 };
-        }
+        const totalAuthorCount = authors.length;
         
         let maxReimbursementLimit = 0;
     
-        if (apcIndexingStatus?.includes('Scopus') || apcIndexingStatus?.includes('Web of science')) {
+        if (apcIndexingStatus?.includes('Scopus') || apcIndexingStatus?.includes('Web of science') || apcIndexingStatus?.includes('SCI')) {
             switch (apcQRating) {
                 case 'Q1': maxReimbursementLimit = 40000; break;
                 case 'Q2': maxReimbursementLimit = 30000; break;
                 case 'Q3': maxReimbursementLimit = 20000; break;
                 case 'Q4': maxReimbursementLimit = 15000; break;
+                default: maxReimbursementLimit = 0;
             }
         } 
+        
         if (apcIndexingStatus?.includes('Web of Science indexed journals (ESCI)')) {
             if (!isSpecialFaculty) {
                 maxReimbursementLimit = Math.max(maxReimbursementLimit, 8000);
@@ -300,9 +300,12 @@ export async function calculateApcIncentive(
         }
         
         const actualAmountPaid = apcTotalAmount || 0;
+        
+        // Admissible amount is the LESSER of the actual amount paid and the policy limit.
         const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
         
-        const finalIncentive = admissibleAmount / totalAuthorCount;
+        // The final incentive is the admissible amount divided by the number of authors.
+        const finalIncentive = totalAuthorCount > 0 ? admissibleAmount / totalAuthorCount : 0;
         
         return { success: true, amount: Math.round(finalIncentive) };
     } catch (error: any) {
@@ -336,7 +339,7 @@ export async function calculateConferenceIncentive(
   
       const isPuConference =
         (organizerName || "").toLowerCase().includes("parul university") ||
-        (conferenceName || "").toLowerCase().includes("parul");
+        (conferenceName || "").toLowerCase().includes("picet");
   
       if (isPuConference) {
         // PU conferences: 75% of registration fee (cap = 75% of reg fee)
