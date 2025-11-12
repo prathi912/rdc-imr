@@ -40,36 +40,48 @@ interface ApprovalDialogProps {
 
 const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 
-const createApprovalSchema = (stageIndex: number, isChecklistEnabled: boolean) => z.object({
-  action: z.enum(['approve', 'reject', 'verify']),
-  amount: z.coerce.number().nonnegative("Amount cannot be negative.").optional(),
-  comments: z.string().optional(),
-  verifiedFields: verifiedFieldsSchema,
-}).refine(data => {
-    if (isChecklistEnabled) {
-        return data.action === 'verify';
-    }
-    return data.action === 'approve' || data.action === 'reject';
-}, {
-    message: 'An action must be selected.',
-    path: ['action'],
-}).refine(data => {
-    if (stageIndex >= 1 && data.action === 'approve') {
-        return data.amount !== undefined && data.amount > 0;
-    }
-    return true;
-}, {
-  message: 'Approved amount is required for this stage.',
-  path: ['amount'],
-}).refine(data => {
-    if (data.action === 'reject') {
-        return !!data.comments && data.comments.trim() !== '';
-    }
-    return true;
-}, {
-  message: 'Comments are required when rejecting a claim.',
-  path: ['comments'],
-});
+const createApprovalSchema = (stageIndex: number, claimType?: string) => {
+    const isConferenceStage2 = claimType === 'Conference Presentations' && stageIndex === 1;
+
+    return z.object({
+        action: z.enum(['approve', 'reject', 'verify']),
+        amount: z.coerce.number().nonnegative("Amount cannot be negative.").optional(),
+        comments: z.string().optional(),
+        verifiedFields: verifiedFieldsSchema,
+    }).refine(data => {
+        // For conference stage 2, it's a verification action but requires an amount.
+        if (isConferenceStage2) {
+            return data.action === 'verify' && data.amount !== undefined && data.amount > 0;
+        }
+        // For other checklist stages, it's just verification.
+        const isChecklistEnabled = (claimType === 'Research Papers' && (stageIndex === 0 || stageIndex === 1)) || (claimType === 'Conference Presentations' && stageIndex === 0);
+        if (isChecklistEnabled) {
+            return data.action === 'verify';
+        }
+        // For non-checklist stages, it's approve or reject.
+        return data.action === 'approve' || data.action === 'reject';
+    }, {
+        message: 'An action must be selected, and amount is required for approval.',
+        path: ['action'],
+    }).refine(data => {
+        // Amount is required for approval stages that aren't the initial checklist verification
+        if (data.action === 'approve' && !isConferenceStage2) {
+            return data.amount !== undefined && data.amount >= 0;
+        }
+        return true;
+    }, {
+      message: 'Approved amount is required for this stage.',
+      path: ['amount'],
+    }).refine(data => {
+        if (data.action === 'reject') {
+            return !!data.comments && data.comments.trim() !== '';
+        }
+        return true;
+    }, {
+      message: 'Comments are required when rejecting a claim.',
+      path: ['comments'],
+    });
+}
 
 
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
@@ -333,16 +345,12 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
+    
     const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && (stageIndex === 0 || stageIndex === 1));
-    
-    const getFieldsToVerify = () => {
-        if (isResearchPaperClaim) return allPossibleResearchPaperFields.map(f => f.id);
-        if (isConferenceClaim) return conferenceChecklistFields.map(f => f.id);
-        return [];
-    };
-    const fieldsToVerify = getFieldsToVerify();
-    
-    const approvalSchema = createApprovalSchema(stageIndex, isChecklistEnabled);
+    const showAmountForVerification = isConferenceClaim && stageIndex === 1;
+
+    const approvalSchema = createApprovalSchema(stageIndex, claim.claimType);
+
     const formSchemaWithVerification = approvalSchema.refine(data => {
         if (!isChecklistEnabled) return true;
         
@@ -350,9 +358,9 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
         
         if (isConferenceClaim) {
-            displayedFields = conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id]).map(f => f.id);
+            displayedFields = conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
         } else if (isResearchPaperClaim) {
-            displayedFields = allPossibleResearchPaperFields.filter(f => (claimWithUserData as any)[f.id]).map(f => f.id);
+            displayedFields = allPossibleResearchPaperFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
         }
         
         return displayedFields.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
@@ -498,7 +506,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
 
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                             {!isChecklistEnabled && (
+                             {(!isChecklistEnabled || showAmountForVerification) && (
                                 <FormField
                                     name="action"
                                     control={form.control}
@@ -516,7 +524,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {action === 'approve' && stageIndex >= 1 && (
+                            {(action === 'approve' || showAmountForVerification) && stageIndex >= 1 && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
@@ -532,7 +540,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {action !== 'verify' && (
+                             {action !== 'verify' || showAmountForVerification ? (
                                 <FormField
                                     name="comments"
                                     control={form.control}
@@ -544,7 +552,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         </FormItem>
                                     )}
                                 />
-                             )}
+                             ) : null}
                         </form>
                     </Form>
                 </div>
