@@ -1,8 +1,8 @@
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
 import type { User, FoundUser } from '@/types';
-import { or, where, query, collection, getDocs, limit } from "firebase/firestore";
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
     try {
@@ -41,14 +41,17 @@ export async function findUserByMisId(
   
       // 1. Search existing users in Firestore by MIS ID and Name
       const usersRef = adminDb.collection("users");
-      const userQuery = query(usersRef, 
-        or(
-            where("misId", "==", searchTerm),
-            where("name", "==", searchTerm)
-        ),
-        limit(10)
-      );
-      const querySnapshot = await getDocs(userQuery);
+      const userQuery = usersRef
+        .where("misId", "==", searchTerm)
+        .limit(10);
+      const nameQuery = usersRef
+        .where("name", "==", searchTerm)
+        .limit(10);
+
+      const [querySnapshot, nameSnapshot] = await Promise.all([
+          userQuery.get(),
+          nameQuery.get()
+      ]);
   
       querySnapshot.forEach(doc => {
         const userData = doc.data() as User;
@@ -60,6 +63,20 @@ export async function findUserByMisId(
             campus: userData.campus || 'Vadodara',
         };
         if(userResult.email) {
+            allFound.set(userResult.email.toLowerCase(), userResult);
+        }
+      });
+      
+      nameSnapshot.forEach(doc => {
+        const userData = doc.data() as User;
+        const userResult: FoundUser = {
+            uid: doc.id,
+            name: userData.name,
+            email: userData.email,
+            misId: userData.misId!,
+            campus: userData.campus || 'Vadodara',
+        };
+        if(userResult.email && !allFound.has(userResult.email.toLowerCase())) {
             allFound.set(userResult.email.toLowerCase(), userResult);
         }
       });
