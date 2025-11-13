@@ -42,6 +42,10 @@ export async function fetchScienceDirectData(
     });
 
     if (!response.ok) {
+        // Return a more user-friendly message for authorization issues
+        if (response.status === 401 || response.status === 403) {
+            return { success: false, error: "ScienceDirect fetching is not available right now." };
+        }
         const errorData = await response.json();
         const errorMessage = errorData?.['service-error']?.status?.statusText || "The resource specified cannot be found.";
         throw new Error(`ScienceDirect API Error: ${errorMessage}`);
@@ -92,6 +96,6 @@ export async function fetchScienceDirectData(
 
   } catch (error: any) {
     console.error('Error fetching from ScienceDirect API:', error);
-    return { success: false, error: error.message || "An unexpected error occurred." };
+    return { success: false, error: "ScienceDirect fetching is not available right now." };
   }
 }
