@@ -421,8 +421,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const isConferenceStage2 = isConferenceClaim && stageIndex === 1;
     const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0) || (isConferenceClaim && stageIndex === 0);
-    const showActionButtons = !isChecklistEnabled;
-    const showAmountForVerification = isConferenceStage2;
+    const showActionButtons = !isChecklistEnabled && !isConferenceStage2;
+    const showAmountField = (isConferenceStage2) || (showActionButtons && form.watch('action') === 'approve');
     
     const getFieldsToVerify = () => {
         if (isConferenceClaim) {
@@ -623,7 +623,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {(action === 'approve' || showAmountForVerification) && (
+                            {showAmountField && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
@@ -639,7 +639,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                             {showActionButtons ? (
+                             {action !== 'verify' && (
                                 <FormField
                                     name="comments"
                                     control={form.control}
@@ -651,7 +651,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                         </FormItem>
                                     )}
                                 />
-                             ) : null}
+                             )}
                         </form>
                     </Form>
                 </div>
