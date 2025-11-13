@@ -93,10 +93,10 @@ const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'des
     { id: 'journalClassification', label: 'Q Rating of the Journal' },
     { id: 'authorRoleAndPosition', label: 'Author Role / Position' },
     { id: 'totalInternalAuthors', label: 'No. of Authors from PU' },
-    { id: 'printIssn', label: 'ISSN' }, // Simplified for display
+    { id: 'printIssn', label: 'ISSN' },
     { id: 'publicationProofUrls', label: 'PROOF OF PUBLICATION ATTACHED' },
     { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
-    { id: 'publicationMonth', label: 'Published Month & Year' }, // Simplified for display
+    { id: 'publicationMonth', label: 'Published Month & Year' },
 ];
 
 const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
@@ -415,89 +415,84 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
     
-    const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
-    const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
-
     const isConferenceStage2 = isConferenceClaim && stageIndex === 1;
+    const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0) || (isConferenceClaim && stageIndex === 0);
     const showActionButtons = !isChecklistEnabled && !isConferenceStage2;
-    const showAmountField = (isConferenceStage2) || (showActionButtons && form.watch('action') === 'approve');
     
-    const getFieldsToVerify = () => {
+    const approvalSchema = createApprovalSchema(stageIndex, claim.claimType);
+    
+    const fieldsToVerify = useMemo(() => {
         if (isConferenceClaim) {
-             const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
-             return conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
+            const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
+            return conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
         }
         if (isResearchPaperClaim) {
-            const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}`, authorRoleAndPosition: `${claim.authorType} / ${claim.authorPosition}`, totalInternalAuthors: (claim.authors || []).filter(a => !a.isExternal).length, };
+            const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}`, authorRoleAndPosition: `${claim.authorType} / ${claim.authorPosition}`, totalInternalAuthors: (claim.authors || []).filter(a => !a.isExternal).length };
             return allPossibleResearchPaperFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
         }
         return [];
-    };
-    const fieldsToVerify = getFieldsToVerify();
-    
-    const approvalSchema = createApprovalSchema(stageIndex, claim.claimType);
-    const formSchemaWithVerification = approvalSchema.refine(data => {
+    }, [isConferenceClaim, isResearchPaperClaim, claim, claimant]);
+
+    const formSchemaWithVerification = useMemo(() => approvalSchema.refine(data => {
         if (!isChecklistEnabled) return true;
         return fieldsToVerify.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
     }, {
         message: 'You must verify all visible fields (mark as correct or incorrect).',
         path: ['verifiedFields'],
-    });
+    }), [approvalSchema, isChecklistEnabled, fieldsToVerify]);
 
-    const { defaultAmount, isAutoCalculated } = (() => {
+    const { defaultAmount, isAutoCalculated } = useMemo(() => {
         if (stageIndex > 0 && claim.approvals) {
             const previousApprovals = claim.approvals
-                .filter(a => a && a.stage < stageIndex + 1 && a.status === 'Approved')
-                .sort((a, b) => b!.stage - a!.stage);
+                .filter((a): a is ApprovalStage => a !== null && a.stage < stageIndex + 1 && a.status === 'Approved')
+                .sort((a, b) => b.stage - a.stage);
 
-            if (previousApprovals.length > 0 && previousApprovals[0]!.approvedAmount >= 0) {
-                return { defaultAmount: previousApprovals[0]!.approvedAmount, isAutoCalculated: false };
+            if (previousApprovals.length > 0 && previousApprovals[0].approvedAmount >= 0) {
+                return { defaultAmount: previousApprovals[0].approvedAmount, isAutoCalculated: false };
             }
         }
         return { defaultAmount: claim.calculatedIncentive, isAutoCalculated: true };
-    })();
+    }, [stageIndex, claim]);
     
-    const getDefaultAction = () => {
+    const getDefaultAction = useCallback(() => {
         if (isChecklistEnabled || isConferenceStage2) return 'verify';
         return 'approve';
-    };
-
-    const initialSuggestions = fieldsToVerify.reduce((acc, fieldId) => {
-        acc[fieldId] = '';
-        return acc;
-    }, {} as Record<string, string>);
+    }, [isChecklistEnabled, isConferenceStage2]);
 
     const form = useForm<ApprovalFormData>({
         resolver: zodResolver(formSchemaWithVerification),
         defaultValues: {
             amount: defaultAmount || 0,
             verifiedFields: {},
-            suggestions: initialSuggestions,
+            suggestions: {},
             action: getDefaultAction(),
         }
     });
+    
+    const { reset } = form;
 
     useEffect(() => {
         if (isOpen) {
+             const approval1 = claim.approvals?.find(a => a?.stage === 1);
              const suggestions = fieldsToVerify.reduce((acc, fieldId) => {
-                acc[fieldId] = '';
+                acc[fieldId] = approval1?.suggestions?.[fieldId] || '';
                 return acc;
             }, {} as Record<string, string>);
-
-            form.reset({
+            reset({
                 amount: defaultAmount || 0,
-                verifiedFields: {},
+                verifiedFields: approval1?.verifiedFields || {},
                 suggestions,
                 action: getDefaultAction(),
                 comments: '',
             });
         }
-    }, [isOpen, claim, stageIndex, defaultAmount, form, fieldsToVerify, getDefaultAction]);
+    }, [isOpen, claim, defaultAmount, reset, getDefaultAction, fieldsToVerify]);
 
 
     const action = form.watch('action');
+    const showAmountField = (isConferenceStage2) || (showActionButtons && action === 'approve');
 
     const handleSubmit = async (values: ApprovalFormData) => {
         setIsSubmitting(true);
@@ -514,7 +509,6 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                 toast({ title: 'Success', description: successMessage });
                 onActionComplete();
                 onOpenChange(false);
-                form.reset();
             } else {
                 throw new Error(result.error);
             }
@@ -599,10 +593,9 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                     )}
 
                     <Form {...form}>
-                        {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
+                        {claim.claimType === 'Membership of Professional Bodies' && <MembershipClaimDetails claim={claim} claimant={claimant} />}
                         {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
                         {isConferenceClaim && <ConferenceClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
-
 
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                              {showActionButtons && (
@@ -667,5 +660,3 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         </Dialog>
     );
 }
-
-    
