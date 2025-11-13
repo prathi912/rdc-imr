@@ -455,8 +455,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     return !isBefore(today, meetingDate) && !isAfter(today, deadline);
   }, [project.meetingDetails?.date, systemSettings]);
   
-  const isMeetingScheduled = !!project.meetingDetails?.date;
-  const showEvaluationForm = user && isMeetingScheduled && isAssignedEvaluator && isEvaluationPeriodActive;
+  const showEvaluationForm = user && isAssignedEvaluator && isEvaluationPeriodActive;
 
 
   const assignedEvaluatorsCount = project.meetingDetails?.assignedEvaluators?.length ?? 0;
@@ -604,6 +603,34 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         setIsAwarding(false);
     }
   };
+
+  const handleDirectDownload = async () => {
+    setIsAwarding(true); // Re-use the same loading state
+    try {
+        const printResult = await generateRecommendationForm(project.id);
+        if (printResult.success && printResult.fileData) {
+            const byteCharacters = atob(printResult.fileData);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `IMR_Recommendation_${project.pi.replace(/\s/g, '_')}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } else {
+            throw new Error(printResult.error || "Failed to generate recommendation form.");
+        }
+    } catch (error: any) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+    } finally {
+        setIsAwarding(false);
+    }
+};
 
   const handleCompletionFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -851,32 +878,42 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const canViewEvaluations = (isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive)) && !isHeadOfGoaCampus;
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
 
+  const isGrantAwarded = !!project.grant;
+  const showDownloadButton = isAdmin && project.status === 'Recommended';
+
   return (
     <>
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
         <div className="flex items-center gap-2">
-            {isAdmin && project.status === "Recommended" && (
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button>
-                            <Download className="mr-2 h-4 w-4" /> Download Recommendation Form
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Award Grant & Download</DialogTitle>
-                            <DialogDescription>
-                                To download the recommendation form, first confirm the grant details. This will update the project status and save the grant information.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <AwardGrantForm
-                            form={awardGrantForm}
-                            onSubmit={handleAwardGrantAndDownload}
-                            isAwarding={isAwarding}
-                        />
-                    </DialogContent>
-                </Dialog>
+            {showDownloadButton && (
+                isGrantAwarded ? (
+                    <Button onClick={handleDirectDownload} disabled={isAwarding}>
+                        {isAwarding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Download Recommendation Form
+                    </Button>
+                ) : (
+                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button>
+                                <Download className="mr-2 h-4 w-4" /> Award Grant & Download
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Award Grant & Download</DialogTitle>
+                                <DialogDescription>
+                                    To download the recommendation form, first confirm the grant details. This will update the project status and save the grant information.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <AwardGrantForm
+                                form={awardGrantForm}
+                                onSubmit={handleAwardGrantAndDownload}
+                                isAwarding={isAwarding}
+                            />
+                        </DialogContent>
+                    </Dialog>
+                )
             )}
              {showAdminActions && (
                 <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
@@ -1615,4 +1652,3 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
-
