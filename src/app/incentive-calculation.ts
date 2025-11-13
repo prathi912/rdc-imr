@@ -98,15 +98,21 @@ export async function calculateResearchPaperIncentive(
         }
         
         const baseIncentive = getBaseIncentiveForPaper(claimData, faculty, designation);
-        const totalSpecifiedIncentive = adjustForPublicationType(baseIncentive, publicationType, journalClassification);
+        let totalSpecifiedIncentive = adjustForPublicationType(baseIncentive, publicationType, journalClassification);
+        
+        // Apply university-level deductions before author distribution
+        if (wasApcPaidByUniversity) {
+            totalSpecifiedIncentive /= 2;
+        }
+        if (claimData.isPuNameInPublication === false) {
+            totalSpecifiedIncentive /= 2;
+        }
+        
         const totalAuthors = authors.length || 1;
 
         // Special case for Letter to Editor/Editorial
         if (publicationType === 'Letter to the Editor/Editorial') {
-            let amountPerAuthor = totalSpecifiedIncentive / totalAuthors;
-            if (wasApcPaidByUniversity) {
-                amountPerAuthor /= 2;
-            }
+            const amountPerAuthor = totalSpecifiedIncentive / totalAuthors;
             return { success: true, amount: Math.round(amountPerAuthor) };
         }
 
@@ -124,10 +130,7 @@ export async function calculateResearchPaperIncentive(
                 return { success: true, amount: 0, error: 'Only Presenting Authors can claim for this publication type.' };
             }
             
-            let amountPerPresentingAuthor = totalSpecifiedIncentive / (presentingAuthors.length || 1);
-            if (wasApcPaidByUniversity) {
-                amountPerPresentingAuthor /= 2;
-            }
+            const amountPerPresentingAuthor = totalSpecifiedIncentive / (presentingAuthors.length || 1);
             return { success: true, amount: Math.round(amountPerPresentingAuthor) };
         }
         
@@ -136,43 +139,31 @@ export async function calculateResearchPaperIncentive(
 
         let finalAmount = 0;
 
-        // Rule 1: First or Corresponding author from PU is the sole internal author
-        if (mainAuthors.length === 1 && coAuthors.length === 0 && internalAuthors.length === 1) {
-            finalAmount = totalSpecifiedIncentive;
-        }
-        // Rule 4: First/Corresponding author from PU and one or more Co-authors also from PU
-        else if (mainAuthors.length > 0 && coAuthors.length > 0) {
-            const mainAuthorSharePool = totalSpecifiedIncentive * 0.7;
-            const coAuthorSharePool = totalSpecifiedIncentive * 0.3;
-            
-            if (claimant.role === 'Co-Author') {
-                finalAmount = coAuthorSharePool / (coAuthors.length || 1);
-            } else { // Is a main author
-                finalAmount = mainAuthorSharePool / (mainAuthors.length || 1);
+        if (internalAuthors.length === 1) {
+            // Rule 1: Sole author (as First or Corresponding)
+            if (mainAuthors.length === 1) {
+                finalAmount = totalSpecifiedIncentive;
+            }
+            // Rule 2: Sole author (as Co-Author)
+            else if (coAuthors.length === 1) {
+                finalAmount = totalSpecifiedIncentive * 0.8;
             }
         }
-        // Rule 2: Single Co-author from PU with other Co-authors from other institutions
-        else if (coAuthors.length === 1 && mainAuthors.length === 0 && internalAuthors.length === 1) {
-             finalAmount = totalSpecifiedIncentive * 0.8;
+        // Rule 4: Mixed roles (First/Corresponding AND Co-Authors)
+        else if (mainAuthors.length > 0 && coAuthors.length > 0) {
+            if (claimant.role === 'Co-Author') {
+                finalAmount = (totalSpecifiedIncentive * 0.3) / (coAuthors.length || 1);
+            } else { // Claimant is a main author
+                finalAmount = (totalSpecifiedIncentive * 0.7) / (mainAuthors.length || 1);
+            }
         }
-        // Rule 3: Multiple Co-authors from PU (and no main authors from PU)
-        else if (coAuthors.length > 1 && mainAuthors.length === 0) {
-            const sharePerCoAuthor = (totalSpecifiedIncentive * 0.8) / (coAuthors.length || 1);
-            finalAmount = sharePerCoAuthor;
+        // Rule 3: Multiple Co-Authors only (no internal Main Authors)
+        else if (mainAuthors.length === 0 && coAuthors.length > 1) {
+            finalAmount = (totalSpecifiedIncentive * 0.8) / (coAuthors.length || 1);
         }
         // Fallback for cases like multiple main authors from PU but no co-authors
         else if (mainAuthors.length > 0 && coAuthors.length === 0) {
             finalAmount = totalSpecifiedIncentive / mainAuthors.length;
-        }
-
-        // New rule: If APC was paid by university, halve the incentive.
-        if (wasApcPaidByUniversity) {
-            finalAmount /= 2;
-        }
-
-        // New rule: If PU affiliation is not present, halve the incentive.
-        if (claimData.isPuNameInPublication === false) {
-            finalAmount /= 2;
         }
 
         return { success: true, amount: Math.round(finalAmount) };
