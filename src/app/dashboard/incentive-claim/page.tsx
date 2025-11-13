@@ -38,7 +38,7 @@ import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateBookIncentive,calculateApcIncentive, calculateResearchPaperIncentive, calculateConferenceIncentive } from '@/app/incentive-calculation';
 import { Separator } from '@/components/ui/separator';
-import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 function UserClaimsList({ 
@@ -104,15 +104,8 @@ function UserClaimsList({
                          <div className="flex-1 space-y-1">
                             <Badge variant="outline">{claim.claimType}</Badge>
                             <p className="font-semibold">
-                              {claim.claimType === 'Research Papers' && claim.relevantLink ? (
-                                <a href={claim.relevantLink} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                  {getClaimTitle(claim)}
-                                </a>
-                              ) : (
-                                getClaimTitle(claim)
-                              )}
+                              {getClaimTitle(claim)}
                             </p>
-                            <p className="text-xs text-muted-foreground">{claim.claimId || 'N/A'}</p>
                             {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
                             {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
                             <p className="text-sm text-muted-foreground pt-1">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
@@ -186,10 +179,28 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
             return;
         }
 
+        const SPECIAL_POLICY_FACULTIES = [
+            "Faculty of Applied Sciences",
+            "Faculty of Medicine",
+            "Faculty of Homoeopathy",
+            "Faculty of Ayurved",
+            "Faculty of Nursing",
+            "Faculty of Pharmacy",
+            "Faculty of Physiotherapy",
+            "Faculty of Public Health",
+            "Faculty of Engineering & Technology"
+        ];
         const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(currentUser.faculty || '');
 
-        const claimDataForCalc = { 
+        const claimDataForCalc: Partial<IncentiveClaim> = { 
             ...claim, 
+            authors: claim.authors?.map(author => {
+                // For calculation, treat the current applicant as the primary one for role-based logic
+                if (author.email.toLowerCase() === currentUser.email.toLowerCase()) {
+                    return { ...author, role: myAuthorDetails.role }; 
+                }
+                return author;
+            }),
             userEmail: currentUser.email,
         };
 
@@ -308,13 +319,7 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                     <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                          <div className="flex-1 space-y-2">
                             <p className="font-semibold">
-                              {claim.claimType === 'Research Papers' && claim.relevantLink ? (
-                                <a href={claim.relevantLink} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                  {getClaimTitle(claim)}
-                                </a>
-                              ) : (
-                                getClaimTitle(claim)
-                              )}
+                                {getClaimTitle(claim)}
                             </p>
                             <p className="text-sm text-muted-foreground">Primary Author: <span className="font-medium text-foreground">{claim.userName}</span></p>
                              <div className="flex items-center gap-2">
