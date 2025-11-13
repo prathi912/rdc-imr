@@ -42,6 +42,7 @@ const suggestionsSchema = z.record(z.string(), z.string()).optional();
 
 const createApprovalSchema = (stageIndex: number, claimType?: string) => {
     const isConferenceStage2 = claimType === 'Conference Presentations' && stageIndex === 1;
+    const isChecklistEnabled = (claimType === 'Research Papers' && (stageIndex === 0 || stageIndex === 1)) || (claimType === 'Conference Presentations' && stageIndex === 0);
 
     return z.object({
         action: z.enum(['approve', 'reject', 'verify']),
@@ -50,22 +51,17 @@ const createApprovalSchema = (stageIndex: number, claimType?: string) => {
         verifiedFields: verifiedFieldsSchema,
         suggestions: suggestionsSchema,
     }).refine(data => {
-        // For conference stage 2, it's a verification action but requires an amount.
         if (isConferenceStage2) {
-            return data.action === 'verify' && data.amount !== undefined && data.amount > 0;
+            return data.action === 'verify' && data.amount !== undefined && data.amount >= 0;
         }
-        // For other checklist stages, it's just verification.
-        const isChecklistEnabled = (claimType === 'Research Papers' && (stageIndex === 0 || stageIndex === 1)) || (claimType === 'Conference Presentations' && stageIndex === 0);
         if (isChecklistEnabled) {
             return data.action === 'verify';
         }
-        // For non-checklist stages, it's approve or reject.
         return data.action === 'approve' || data.action === 'reject';
     }, {
         message: 'An action must be selected, and amount is required for approval.',
         path: ['action'],
     }).refine(data => {
-        // Amount is required for approval stages that aren't the initial checklist verification
         if (data.action === 'approve' && !isConferenceStage2) {
             return data.amount !== undefined && data.amount >= 0;
         }
@@ -87,7 +83,7 @@ const createApprovalSchema = (stageIndex: number, claimType?: string) => {
 
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
 
-const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'designation' | 'authorRoleAndPosition', label: string }[] = [
+const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'designation' | 'authorRoleAndPosition' | 'totalInternalAuthors', label: string }[] = [
     { id: 'designation', label: 'Designation and Dept.' },
     { id: 'publicationType', label: 'Type of publication' },
     { id: 'journalName', label: 'Name of Journal' },
@@ -160,10 +156,21 @@ function ConferenceClaimDetails({
             displayValue = value.join(', ');
         }
         
+        const suggestion = approval1?.suggestions?.[field.id];
+
         return (
             <div key={field.id} className="grid grid-cols-12 gap-2 text-sm items-center py-1">
                 <span className="text-muted-foreground col-span-5">{field.label}</span>
-                <span className="col-span-4">{displayValue}</span>
+                <div className="col-span-4 flex flex-col">
+                  {suggestion ? (
+                    <>
+                      <span className="line-through text-muted-foreground">{displayValue}</span>
+                      <span className="text-primary font-medium">{suggestion}</span>
+                    </>
+                  ) : (
+                    <span>{displayValue}</span>
+                  )}
+                </div>
                 <div className="col-span-3 flex justify-end gap-1">
                     {stageIndex > 0 && (
                         <div className="w-7 h-7 flex items-center justify-center">
@@ -187,6 +194,25 @@ function ConferenceClaimDetails({
                         />
                     )}
                 </div>
+                 {isChecklistEnabled && form.watch(`verifiedFields.${field.id}`) === false && (
+                    <div className="col-start-6 col-span-7">
+                        <FormField
+                            control={form.control}
+                            name={`suggestions.${field.id}`}
+                            render={({ field: suggestionField }) => (
+                                <FormItem>
+                                    <FormControl>
+                                        <Input
+                                            {...suggestionField}
+                                            placeholder="Suggest a correction..."
+                                            className="h-8 text-xs"
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                )}
             </div>
         );
     };
@@ -222,17 +248,17 @@ function ResearchPaperClaimDetails({
     form, 
     isChecklistEnabled, 
     stageIndex, 
-    previousApprovals 
+    previousApprovals_ 
 }: { 
     claim: IncentiveClaim, 
     claimant: User | null, 
     form: any, 
     isChecklistEnabled: boolean,
     stageIndex: number,
-    previousApprovals: (ApprovalStage | null)[]
+    previousApprovals_: (ApprovalStage | null)[]
 }) {
-    const approval1 = previousApprovals[0];
-    const approval2 = previousApprovals[1];
+    const approval1 = previousApprovals_[0];
+    const approval2 = previousApprovals_[1];
 
     const renderDetail = (field: {id: string, label: string}, value?: string | number | null | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
@@ -257,10 +283,23 @@ function ResearchPaperClaimDetails({
             }
         }
         
+        const suggestion1 = approval1?.suggestions?.[field.id];
+        const suggestion2 = approval2?.suggestions?.[field.id];
+        const finalSuggestion = stageIndex === 1 ? suggestion1 : suggestion2 || suggestion1;
+
         return (
             <div key={field.id} className="grid grid-cols-12 gap-2 text-sm items-center py-1">
                 <span className="text-muted-foreground col-span-5">{field.label}</span>
-                <span className="col-span-4 break-words">{displayValue}</span>
+                <div className="col-span-4 flex flex-col break-words">
+                  {finalSuggestion ? (
+                    <>
+                      <span className="line-through text-muted-foreground">{displayValue}</span>
+                      <span className="text-primary font-medium">{finalSuggestion}</span>
+                    </>
+                  ) : (
+                    <span>{displayValue}</span>
+                  )}
+                </div>
                 <div className="col-span-3 flex justify-end gap-1">
                     {stageIndex > 0 && (
                         <div className="w-7 h-7 flex items-center justify-center">
@@ -293,7 +332,7 @@ function ResearchPaperClaimDetails({
                         />
                     )}
                 </div>
-                 {form.watch(`verifiedFields.${field.id}`) === false && (
+                 {isChecklistEnabled && form.watch(`verifiedFields.${field.id}`) === false && (
                     <div className="col-start-6 col-span-7">
                         <FormField
                             control={form.control}
@@ -418,8 +457,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     })();
     
     const getDefaultAction = () => {
-        if (isChecklistEnabled) return 'verify';
-        if (isConferenceClaim && stageIndex === 1) return 'verify';
+        if (isChecklistEnabled || showAmountForVerification) return 'verify';
         return 'approve';
     };
 
@@ -544,7 +582,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
                     <Form {...form}>
                         {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
-                        {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
+                        {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals_={claim.approvals || []} />}
                         {isConferenceClaim && <ConferenceClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
 
 
