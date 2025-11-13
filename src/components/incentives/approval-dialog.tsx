@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -38,7 +38,7 @@ interface ApprovalDialogProps {
 }
 
 const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
-const suggestionsSchema = z.record(z.string(), z.string()).optional();
+const suggestionsSchema = z.record(z.string(), z.string().optional()).optional();
 
 const createApprovalSchema = (stageIndex: number, claimType?: string) => {
     const isConferenceStage2 = claimType === 'Conference Presentations' && stageIndex === 1;
@@ -418,22 +418,28 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
     const isConferenceStage2 = isConferenceClaim && stageIndex === 1;
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
-    const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0) || (isConferenceClaim && stageIndex === 0);
+    const isChecklistEnabled = (isResearchPaperClaim && stageIndex <= 1) || (isConferenceClaim && stageIndex === 0);
     const showActionButtons = !isChecklistEnabled && !isConferenceStage2;
-    const showAmountForVerification = isConferenceStage2;
     
     const approvalSchema = createApprovalSchema(stageIndex, claim.claimType);
     
     const fieldsToVerify = useMemo(() => {
+        let fieldList;
+        let claimData: Record<string, any>;
+
         if (isConferenceClaim) {
-            const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
-            return conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
+            fieldList = conferenceChecklistFields;
+            claimData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
+        } else if (isResearchPaperClaim) {
+            fieldList = allPossibleResearchPaperFields;
+            claimData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}`, authorRoleAndPosition: `${claim.authorType} / ${claim.authorPosition}`, totalInternalAuthors: (claim.authors || []).filter(a => !a.isExternal).length };
+        } else {
+            return [];
         }
-        if (isResearchPaperClaim) {
-            const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}`, authorRoleAndPosition: `${claim.authorType} / ${claim.authorPosition}`, totalInternalAuthors: (claim.authors || []).filter(a => !a.isExternal).length };
-            return allPossibleResearchPaperFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
-        }
-        return [];
+        
+        return fieldList
+            .filter(f => (claimData as any)[f.id] !== undefined && (claimData as any)[f.id] !== null && (claimData as any)[f.id] !== '')
+            .map(f => f.id);
     }, [isConferenceClaim, isResearchPaperClaim, claim, claimant]);
 
     const formSchemaWithVerification = useMemo(() => approvalSchema.refine(data => {
@@ -475,14 +481,15 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     useEffect(() => {
         if (isOpen) {
              const approval1 = claim.approvals?.find(a => a?.stage === 1);
-             const suggestions = fieldsToVerify.reduce((acc, fieldId) => {
-                acc[fieldId] = approval1?.suggestions?.[fieldId] || '';
-                return acc;
-            }, {} as Record<string, string>);
+             const suggestions: Record<string, string> = {};
+             fieldsToVerify.forEach(fieldId => {
+                suggestions[fieldId] = approval1?.suggestions?.[fieldId] || '';
+             });
+             
             form.reset({
                 amount: defaultAmount || 0,
                 verifiedFields: approval1?.verifiedFields || {},
-                suggestions,
+                suggestions: suggestions,
                 action: getDefaultAction(),
                 comments: '',
             });
@@ -598,7 +605,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
 
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                             {showActionButtons && (
+                            {showActionButtons && (
                                 <FormField
                                     name="action"
                                     control={form.control}
@@ -660,4 +667,3 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         </Dialog>
     );
 }
-
