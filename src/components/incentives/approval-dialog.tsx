@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -298,7 +299,8 @@ function ResearchPaperClaimDetails({
         ...claim,
         name: claimant?.name,
         designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`,
-        authorRoleAndPosition: `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`
+        authorRoleAndPosition: `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`,
+        totalInternalAuthors: (claim.authors || []).filter(a => !a.isExternal).length,
     };
 
 
@@ -357,7 +359,6 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
 
     const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && stageIndex === 0);
-    const showAmountForVerification = isConferenceClaim && stageIndex === 1;
     
     const getFieldsToVerify = () => {
         if (isConferenceClaim) {
@@ -365,7 +366,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
              return conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
         }
         if (isResearchPaperClaim) {
-            const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}`, authorRoleAndPosition: `${claim.authorType} / ${claim.authorPosition}` };
+            const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}`, authorRoleAndPosition: `${claim.authorType} / ${claim.authorPosition}`, totalInternalAuthors: (claim.authors || []).filter(a => !a.isExternal).length, };
             return allPossibleResearchPaperFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
         }
         return [];
@@ -395,7 +396,9 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     })();
     
     const getDefaultAction = () => {
-        return isChecklistEnabled ? 'verify' : 'approve';
+        if (isChecklistEnabled) return 'verify';
+        if (isConferenceClaim && stageIndex === 1) return 'verify';
+        return 'approve';
     };
 
 
@@ -473,7 +476,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                         )}.
                     </DialogDescription>
                 </DialogHeader>
-
+                
                 <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-4">
                     {isViewerAdminOrApprover && previousApprovals.length > 0 && (
                         <div className="space-y-4">
@@ -503,7 +506,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                             <Separator />
                         </div>
                     )}
-
+                    
                      {stageIndex === 0 && claim.calculatedIncentive !== undefined && claim.calculatedIncentive !== null && (
                         <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-md text-center">
                             <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Tentatively Eligible Incentive Amount:</p>

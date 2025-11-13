@@ -196,8 +196,8 @@ a.href = url;
                             <h4 className="font-semibold text-base mt-2">Research Paper Details</h4>
                             {renderDetail("Paper Title", claim.paperTitle, "paperTitle")}
                             {renderDetail("DOI", claim.doi, "doi")}
-                            {renderDetail("Scopus Link", claim.scopusLink)}
-                            {renderDetail("WoS Link", claim.wosLink)}
+                            {renderLinkDetail("Scopus Link", claim.scopusLink)}
+                            {renderLinkDetail("WoS Link", claim.wosLink)}
                             {renderDetail("Publication Type", claim.publicationType, "publicationType")}
                             {renderDetail("Index Type", claim.indexType?.toUpperCase(), "indexType")}
                             {renderDetail("WoS Type", claim.wosType, "wosType")}
@@ -210,6 +210,7 @@ a.href = url;
                             {renderDetail("Publication Month", claim.publicationMonth, "publicationMonth")}
                             {renderDetail("Publication Year", claim.publicationYear, "publicationYear")}
                             {renderDetail("Author Position", claim.authorPosition)}
+                            {renderDetail("Total Authors from PU", (claim.authors || []).filter(a => !a.isExternal).length)}
                             {renderDetail("PU Name in Publication", claim.isPuNameInPublication, "isPuNameInPublication")}
                             {renderDetail("APC Paid by University", claim.wasApcPaidByUniversity)}
                             {renderDetail("Authors", claim.authors)}
@@ -313,7 +314,7 @@ a.href = url;
                                 {renderDetail("ISBN (Electronic)", claim.isbnElectronic)}
                                 </>
                             )}
-                            {renderDetail("Publication Year Order", claim.publicationOrderInYear)}
+                            {renderDetail("Publication Order in Year", claim.publicationOrderInYear)}
                             {renderDetail("Total PU Authors", claim.authors?.filter(a => !a.isExternal).length)}
                             {renderDetail("Total PU Students", claim.totalPuStudents)}
                             {renderDetail("Student Names", claim.puStudentNames)}
