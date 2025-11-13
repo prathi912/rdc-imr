@@ -562,7 +562,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     try {
         const result = await awardInitialGrant(
             project.id,
-            values, // Pass the entire phases array
+            values,
             { uid: project.pi_uid, name: project.pi, email: project.pi_email },
             project.title
         );
@@ -879,6 +879,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const isGrantAwarded = !!project.grant;
   const isUserAdmin = user && ["Super-admin", "admin"].includes(user.role);
   const showDownloadButton = isUserAdmin && (project.status === 'Recommended' || project.status === 'In Progress');
+  const isDurationSet = !!project.projectStartDate && !!project.projectEndDate;
 
   const isMeetingScheduled = !!project.meetingDetails?.date;
 
@@ -895,11 +896,24 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     </Button>
                 ) : (
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Download className="mr-2 h-4 w-4" /> Award Grant & Download
-                            </Button>
-                        </DialogTrigger>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <div tabIndex={isDurationSet ? undefined : -1}>
+                                        <DialogTrigger asChild>
+                                            <Button disabled={!isDurationSet}>
+                                                <Download className="mr-2 h-4 w-4" /> Award Grant & Download
+                                            </Button>
+                                        </DialogTrigger>
+                                    </div>
+                                </TooltipTrigger>
+                                {!isDurationSet && (
+                                    <TooltipContent>
+                                        <p>Please set project duration before awarding a grant.</p>
+                                    </TooltipContent>
+                                )}
+                            </Tooltip>
+                        </TooltipProvider>
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Award Grant & Download</DialogTitle>
@@ -1653,4 +1667,3 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
-
