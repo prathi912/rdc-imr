@@ -517,6 +517,7 @@ export type TemplateUrls = {
   IMR_INSTALLMENT_NOTING?: string;
   IMR_OFFICE_NOTING?: string;
   INCENTIVE_PAYMENT_SHEET?: string;
+  IMR_SANCTION_ORDER?: string;
 };
 
 export type ApiIntegrations = {

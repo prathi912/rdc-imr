@@ -489,3 +489,91 @@ export async function generateOfficeNotingForm(
     return { success: false, error: error.message || "Failed to generate the form." }
   }
 }
+
+export async function generateSanctionOrder(projectId: string): Promise<{ success: boolean; fileData?: string; error?: string }> {
+  try {
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    const projectSnap = await projectRef.get();
+    if (!projectSnap.exists) {
+      return { success: false, error: "Project not found." };
+    }
+    const project = { id: projectSnap.id, ...projectSnap.data() } as Project;
+
+    const piUserRef = adminDb.collection("users").doc(project.pi_uid);
+    const piUserSnap = await piUserRef.get();
+    const piUser = piUserSnap.exists ? (piUserSnap.data() as User) : null;
+    
+    const coPiUsers = new Map<string, User>();
+    if (project.coPiUids && project.coPiUids.length > 0) {
+        const coPiSnapshot = await adminDb.collection('users').where('__name__', 'in', project.coPiUids).get();
+        coPiSnapshot.forEach(doc => coPiUsers.set(doc.id, doc.data() as User));
+    }
+
+    const settings = await getSystemSettings();
+    const templateUrl = settings.templateUrls?.IMR_SANCTION_ORDER;
+    if (!templateUrl) {
+      return { success: false, error: "IMR Sanction Order template URL is not configured." };
+    }
+
+    const content = await getTemplateContentFromUrl(templateUrl);
+    if (!content) {
+      return { success: false, error: "Sanction order template could not be loaded." };
+    }
+
+    const zip = new PizZip(content);
+    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true });
+    
+    let duration = project.projectDuration || 'N/A';
+    if (project.projectStartDate && project.projectEndDate) {
+        try {
+            const start = parseISO(project.projectStartDate);
+            const end = parseISO(project.projectEndDate);
+            const days = differenceInDays(end, start);
+            const years = Math.round(days / 365.25);
+            duration = `${years} Year${years !== 1 ? 's' : ''}`;
+        } catch (e) {
+            console.error("Error calculating duration for sanction order:", e);
+        }
+    }
+
+    const templateData: { [key: string]: any } = {
+        Overall_Sanction: project.grant?.sanctionNumber || 'N/A',
+        Date: format(new Date(), 'dd.MM.yyyy'),
+        total_amount: project.grant?.totalAmount?.toLocaleString('en-IN') || 'N/A',
+        Project_title: project.title,
+        pi_name: project.pi,
+        pi_institute: piUser?.institute || 'N/A',
+        pi_designation: piUser?.designation || 'N/A',
+        project_duration: duration,
+        phase1_amount: project.grant?.phases?.[0]?.amount.toLocaleString('en-IN') || 'N/A',
+    };
+
+    for(let i=0; i<3; i++) {
+        const coPiDetails = project.coPiDetails?.[i];
+        const coPiUser = coPiDetails?.uid ? coPiUsers.get(coPiDetails.uid) : null;
+        templateData[`copi${i+1}_name`] = coPiDetails?.name || '';
+        templateData[`copi${i+1}_institute`] = coPiUser?.institute || '';
+    }
+
+    doc.setData(templateData);
+
+    try {
+      doc.render();
+    } catch (error: any) {
+      console.error('Docxtemplater render error:', error);
+      if (error.properties?.errors) {
+        console.error("Template errors:", JSON.stringify(error.properties.errors));
+      }
+      return { success: false, error: 'Failed to render the sanction order template.' };
+    }
+
+    const buf = doc.getZip().generate({ type: 'nodebuffer' });
+    const base64 = buf.toString('base64');
+
+    return { success: true, fileData: base64 };
+  } catch (error: any) {
+    console.error('Error generating sanction order:', error);
+    await logActivity('ERROR', 'Failed to generate sanction order', { projectId, error: error.message });
+    return { success: false, error: error.message || 'Failed to generate the sanction order.' };
+  }
+}

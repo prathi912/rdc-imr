@@ -35,6 +35,7 @@ import type * as z from "zod"
 import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
+import { generateSanctionOrder } from "./document-actions"
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -59,7 +60,7 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
   }
 }
 
-export { awardInitialGrant, addGrantPhase, updatePhaseStatus };
+export { awardInitialGrant, addGrantPhase, updatePhaseStatus, generateSanctionOrder };
 
 export async function deleteImrProject(
   projectId: string,
@@ -1924,15 +1925,3 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
     });
   }
 }
-
-
-
-
-
-
-
-
-    
-
-
-

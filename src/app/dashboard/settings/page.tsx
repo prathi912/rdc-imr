@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import type React from "react"
@@ -111,7 +112,7 @@ const faculties = [
   "Faculty of Nursing",
   "Faculty of Pharmacy",
   "Faculty of Physiotherapy",
-  "Faculty of Public Health",
+  "Faculty of Public Health", 
   "Parul Sevashram Hospital",
   "RDC",
   "University Office",
@@ -689,6 +690,7 @@ export default function SettingsPage() {
     { key: 'IMR_INSTALLMENT_NOTING', label: 'IMR Installment Office Noting' },
     { key: 'IMR_OFFICE_NOTING', label: 'IMR Initial Office Noting' },
     { key: 'INCENTIVE_PAYMENT_SHEET', label: 'Incentive Payment Sheet' },
+    { key: 'IMR_SANCTION_ORDER', label: 'IMR Sanction Order' },
   ];
 
 
@@ -1226,5 +1228,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
-    
