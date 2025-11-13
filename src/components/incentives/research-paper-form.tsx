@@ -216,6 +216,18 @@ const fileToDataUrl = (file: File): Promise<string> => {
   })
 }
 
+const SPECIAL_POLICY_FACULTIES = [
+    "Faculty of Applied Sciences",
+    "Faculty of Medicine",
+    "Faculty of Homoeopathy",
+    "Faculty of Ayurved",
+    "Faculty of Nursing",
+    "Faculty of Pharmacy",
+    "Faculty of Physiotherapy",
+    "Faculty of Public Health",
+    "Faculty of Engineering & Technology"
+];
+
 function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit: () => void }) {
     const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[]) => {
         if (!value && value !== 0 && value !== false) return null;
