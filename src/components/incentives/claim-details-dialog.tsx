@@ -150,9 +150,11 @@ a.href = url;
           <dd className="col-span-2">
             <div className="flex flex-col gap-1">
                 {urls.map((url, index) => (
-                    <a key={index} href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                  <Button key={index} variant="link" asChild className="p-0 h-auto justify-start">
+                    <a href={url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
                         View Document {urls.length > 1 ? index + 1 : ''}
                     </a>
+                  </Button>
                 ))}
             </div>
           </dd>
