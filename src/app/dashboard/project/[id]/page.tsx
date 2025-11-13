@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import { doc, getDoc, onSnapshot, collection, query, where } from "firebase/firestore"
 import { db } from "@/lib/config"
 import type { Project, User, Evaluation } from "@/types"
@@ -14,6 +14,7 @@ import { getDocs } from "firebase/firestore"
 
 export default function ProjectDetailsPage() {
   const params = useParams()
+  const router = useRouter()
   const projectId = params.id as string
   const [project, setProject] = useState<Project | null>(null)
   const [allUsers, setAllUsers] = useState<User[]>([])
@@ -64,7 +65,6 @@ export default function ProjectDetailsPage() {
   
   const handleProjectUpdate = (updatedProject: Project) => {
     setProject(updatedProject);
-    // Optionally, you might want to re-fetch related data here if the update could affect it
   };
 
 
@@ -102,7 +102,12 @@ export default function ProjectDetailsPage() {
 
   return (
     <div className="container mx-auto py-10">
-      <PageHeader title={project.title} description={project.type} backButtonHref="/dashboard/my-projects" />
+      <PageHeader 
+        title={project.title} 
+        description={project.type} 
+        onBackClick={() => router.back()} 
+        backButtonText="Back"
+      />
       <div className="mt-8">
         <ProjectDetailsClient 
           project={project}

@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -8,6 +9,7 @@ interface PageHeaderProps {
   showBackButton?: boolean;
   backButtonHref?: string;
   backButtonText?: string;
+  onBackClick?: () => void;
   children?: React.ReactNode;
 }
 
@@ -17,17 +19,27 @@ export function PageHeader({
   showBackButton = true, 
   backButtonHref = '/dashboard',
   backButtonText = 'Back to Dashboard',
+  onBackClick,
   children 
 }: PageHeaderProps) {
+  const BackButton = () => (
+    <Button variant="ghost" onClick={onBackClick}>
+      <ArrowLeft className="mr-2 h-4 w-4" />
+      {backButtonText}
+    </Button>
+  );
+
   return (
     <div className="space-y-4">
       {showBackButton && (
-        <Link href={backButtonHref}>
-          <Button variant="ghost">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {backButtonText}
-          </Button>
-        </Link>
+        onBackClick ? <BackButton /> : (
+          <Link href={backButtonHref}>
+            <Button variant="ghost">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              {backButtonText}
+            </Button>
+          </Link>
+        )
       )}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1">
