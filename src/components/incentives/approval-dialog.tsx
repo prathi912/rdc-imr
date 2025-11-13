@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import type { User, IncentiveClaim, ApprovalStage } from '@/types';
+import type { User, IncentiveClaim, ApprovalStage, Author } from '@/types';
 import { processIncentiveClaimAction } from '@/app/incentive-approval-actions';
 import {
   Dialog,
@@ -38,6 +38,7 @@ interface ApprovalDialogProps {
 }
 
 const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
+const suggestionsSchema = z.record(z.string(), z.string()).optional();
 
 const createApprovalSchema = (stageIndex: number, claimType?: string) => {
     const isConferenceStage2 = claimType === 'Conference Presentations' && stageIndex === 1;
@@ -47,6 +48,7 @@ const createApprovalSchema = (stageIndex: number, claimType?: string) => {
         amount: z.coerce.number().nonnegative("Amount cannot be negative.").optional(),
         comments: z.string().optional(),
         verifiedFields: verifiedFieldsSchema,
+        suggestions: suggestionsSchema,
     }).refine(data => {
         // For conference stage 2, it's a verification action but requires an amount.
         if (isConferenceStage2) {
@@ -291,6 +293,25 @@ function ResearchPaperClaimDetails({
                         />
                     )}
                 </div>
+                 {form.watch(`verifiedFields.${field.id}`) === false && (
+                    <div className="col-start-6 col-span-7">
+                        <FormField
+                            control={form.control}
+                            name={`suggestions.${field.id}`}
+                            render={({ field: suggestionField }) => (
+                                <FormItem>
+                                    <FormControl>
+                                        <Input
+                                            {...suggestionField}
+                                            placeholder="Suggest a correction..."
+                                            className="h-8 text-xs"
+                                        />
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                )}
             </div>
         );
     };
@@ -359,6 +380,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
 
     const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && stageIndex === 0);
+    const showAmountForVerification = isConferenceClaim && stageIndex === 1;
     
     const getFieldsToVerify = () => {
         if (isConferenceClaim) {
@@ -407,6 +429,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         defaultValues: {
             amount: defaultAmount || 0,
             verifiedFields: {},
+            suggestions: {},
             action: getDefaultAction(),
         }
     });
@@ -416,6 +439,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
             form.reset({
                 amount: defaultAmount || 0,
                 verifiedFields: {},
+                suggestions: {},
                 action: getDefaultAction(),
                 comments: '',
             });
