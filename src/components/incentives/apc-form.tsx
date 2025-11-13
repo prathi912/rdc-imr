@@ -624,7 +624,7 @@ useEffect(() => {
     <Card>
       <Form {...form}>
         <form>
-          <CardContent className="space-y-6 pt-6">
+          <CardContent className="space-y-8 pt-6">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
                     <AlertCircle className="h-4 w-4" />
@@ -645,17 +645,13 @@ useEffect(() => {
                 </AlertDescription>
             </Alert>
 
-
-            <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
-                <h3 className="font-semibold text-sm -mb-2">ARTICLE & JOURNAL DETAILS</h3>
-                <Separator />
+            <div className="space-y-6">
+                <h3 className="font-semibold text-sm">ARTICLE & JOURNAL DETAILS</h3>
                 <FormField control={form.control} name="apcTypeOfArticle" render={({ field }) => ( <FormItem><FormLabel>Type of Article</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-6">{articleTypes.map(type => (<FormItem key={type} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={type} /></FormControl><FormLabel className="font-normal">{type}</FormLabel></FormItem>))}</RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 {watchArticleType === 'Other' && <FormField name="apcOtherArticleType" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Please specify other article type</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
                 <FormField name="apcIndexingStatus" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Indexing/Listing status of the Journal</FormLabel>{availableIndexingStatuses.map(item => (<FormField key={item} control={form.control} name="apcIndexingStatus" render={({ field }) => ( <FormItem key={item} className="flex flex-row items-start space-x-3 space-y-0"><FormControl><Checkbox checked={field.value?.includes(item)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), item]) : field.onChange(field.value?.filter(value => value !== item)); }} /></FormControl><FormLabel className="font-normal">{item}</FormLabel></FormItem> )} />))}<FormMessage /></FormItem> )} />
                 <FormField name="apcQRating" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Q Rating of the Journal</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Q Rating" /></SelectTrigger></FormControl><SelectContent><SelectItem value="Q1">Q1</SelectItem><SelectItem value="Q2">Q2</SelectItem><SelectItem value="Q3">Q3</SelectItem><SelectItem value="Q4">Q4</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
-
-                <Separator />
-
+                
                 <FormField
                   control={form.control}
                   name="doi"
@@ -709,8 +705,6 @@ useEffect(() => {
                         ))}
                     </div>
                     
-                    <Separator className="my-4" />
-                    
                     <div className="space-y-2 p-3 border rounded-md">
                         <FormLabel>Add Internal Co-Author</FormLabel>
                         <div className="flex items-center gap-2">
@@ -746,9 +740,8 @@ useEffect(() => {
                 <FormField name="apcPublicationProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attachment Proof of publication (PDF)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
             </div>
 
-            <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
-                <h3 className="font-semibold text-sm -mb-2">FINANCIAL & DECLARATION DETAILS</h3>
-                <Separator />
+            <div className="space-y-6">
+                <h3 className="font-semibold text-sm">FINANCIAL & DECLARATION DETAILS</h3>
                 <FormField name="apcApcWaiverRequested" control={form.control} render={({ field }) => ( <FormItem><div className="flex items-center justify-between"><FormLabel>Whether APC waiver was requested <span className="text-destructive">*</span></FormLabel><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl></div><FormMessage /></FormItem> )} />
                 {watchWaiverRequested && <FormField name="apcApcWaiverProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Proof of APC waiver request</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -826,28 +819,6 @@ useEffect(() => {
         </form>
       </Form>
     </Card>
-    <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Multiple Users Found</DialogTitle>
-                <DialogDescription>Please select the correct user to add.</DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-                <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))}>
-                    {foundCoPis.map((u, i) => (
-                        <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
-                            <RadioGroupItem value={JSON.stringify(u)} id={`user-${i}`} />
-                            <Label htmlFor={`user-${i}`} className="flex flex-col">
-                                <span className="font-semibold">{u.name}</span>
-                                <span className="text-muted-foreground text-xs">{u.email}</span>
-                                <span className="text-muted-foreground text-xs">{u.campus}</span>
-                            </Label>
-                        </div>
-                    ))}
-                </RadioGroup>
-            </div>
-        </DialogContent>
-    </Dialog>
     </>
   );
 }
