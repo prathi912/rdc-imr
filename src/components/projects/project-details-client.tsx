@@ -880,6 +880,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const isGrantAwarded = !!project.grant;
   const showDownloadButton = isAdmin && project.status === 'Recommended';
+  const isMeetingScheduled = !!project.meetingDetails?.date;
 
   return (
     <>
