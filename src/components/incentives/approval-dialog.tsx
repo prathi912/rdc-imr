@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, Check, X } from 'lucide-react';
+import { Loader2, Check, X, ExternalLink } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
@@ -42,7 +42,7 @@ const suggestionsSchema = z.record(z.string(), z.string()).optional();
 
 const createApprovalSchema = (stageIndex: number, claimType?: string) => {
     const isConferenceStage2 = claimType === 'Conference Presentations' && stageIndex === 1;
-    const isChecklistEnabled = (claimType === 'Research Papers' && (stageIndex === 0 || stageIndex === 1)) || (claimType === 'Conference Presentations' && stageIndex === 0);
+    const isChecklistEnabled = (claimType === 'Research Papers' && stageIndex === 0) || (claimType === 'Conference Presentations' && stageIndex === 0);
 
     return z.object({
         action: z.enum(['approve', 'reject', 'verify']),
@@ -419,8 +419,8 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
 
-    const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && stageIndex === 0);
-    const showAmountForVerification = isConferenceClaim && stageIndex === 1;
+    const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0) || (isConferenceClaim && stageIndex === 0);
+    const showActionButtons = !isChecklistEnabled || (isResearchPaperClaim && stageIndex === 1);
     
     const getFieldsToVerify = () => {
         if (isConferenceClaim) {
@@ -458,7 +458,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     })();
     
     const getDefaultAction = () => {
-        if (isChecklistEnabled || showAmountForVerification) return 'verify';
+        if (isChecklistEnabled) return 'verify';
         return 'approve';
     };
 
@@ -479,16 +479,20 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     useEffect(() => {
         if (isOpen) {
+            const suggestions = fieldsToVerify.reduce((acc, fieldId) => {
+                acc[fieldId] = '';
+                return acc;
+            }, {} as Record<string, string>);
+
             form.reset({
                 amount: defaultAmount || 0,
                 verifiedFields: {},
-                suggestions: initialSuggestions,
+                suggestions: suggestions,
                 action: getDefaultAction(),
                 comments: '',
             });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, claim, stageIndex]);
+    }, [isOpen, claim, stageIndex, defaultAmount, form, fieldsToVerify, getDefaultAction]);
 
 
     const action = form.watch('action');
@@ -533,15 +537,26 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>Stage {stageIndex + 1} Approval</DialogTitle>
-                    <DialogDescription>
-                        Review and take action on the claim for {' '}
-                        {hasProfileLink ? (
-                            <Link href={profileLink} target="_blank" className="text-primary hover:underline">{claim.userName}</Link>
-                        ) : (
-                            claim.userName
-                        )}.
-                    </DialogDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <DialogTitle>Stage {stageIndex + 1} Approval</DialogTitle>
+                        <DialogDescription>
+                            Review and take action on the claim for {' '}
+                            {hasProfileLink ? (
+                                <Link href={profileLink} target="_blank" className="text-primary hover:underline">{claim.userName}</Link>
+                            ) : (
+                                claim.userName
+                            )}.
+                        </DialogDescription>
+                      </div>
+                      {claim.doi && (
+                        <Button asChild variant="outline">
+                            <a href={`https://doi.org/${claim.doi}`} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="mr-2 h-4 w-4"/> View Paper
+                            </a>
+                        </Button>
+                      )}
+                    </div>
                 </DialogHeader>
                 
                 <div className="max-h-[60vh] overflow-y-auto pr-4 space-y-4">
@@ -588,7 +603,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
 
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                             {action !== 'verify' && (
+                             {showActionButtons && (
                                 <FormField
                                     name="action"
                                     control={form.control}
@@ -606,7 +621,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {(action === 'approve' || showAmountForVerification) && stageIndex >= 0 && (
+                            {(action === 'approve' || (isConferenceClaim && stageIndex === 1)) && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
@@ -622,7 +637,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                             {action !== 'verify' || showAmountForVerification ? (
+                             {showActionButtons ? (
                                 <FormField
                                     name="comments"
                                     control={form.control}
@@ -642,7 +657,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button type="submit" form="approval-form" disabled={isSubmitting}>
                         {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : (
-                            isChecklistEnabled || showAmountForVerification ? 'Submit & Forward' : 'Submit Action'
+                            showActionButtons ? 'Submit Action' : 'Submit & Forward'
                         )}
                     </Button>
                 </DialogFooter>
