@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -87,7 +85,6 @@ const createApprovalSchema = (stageIndex: number, claimType?: string) => {
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
 
 const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'designation' | 'authorRoleAndPosition', label: string }[] = [
-    { id: 'name', label: 'Name of the Applicant' },
     { id: 'designation', label: 'Designation and Dept.' },
     { id: 'publicationType', label: 'Type of publication' },
     { id: 'journalName', label: 'Name of Journal' },
@@ -104,7 +101,6 @@ const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'des
 ];
 
 const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
-    { id: 'name', label: 'Name of the Applicant' },
     { id: 'designation', label: 'Designation & Department' },
     { id: 'eventType', label: 'Type of Event' },
     { id: 'conferencePaperTitle', label: 'Title of Paper' },
@@ -359,25 +355,27 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isMembershipClaim = claim.claimType === 'Membership of Professional Bodies';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
-    
-    const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && (stageIndex === 0 || stageIndex === 1));
+
+    const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && stageIndex === 0);
     const showAmountForVerification = isConferenceClaim && stageIndex === 1;
-
+    
+    const getFieldsToVerify = () => {
+        if (isConferenceClaim) {
+             const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
+             return conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
+        }
+        if (isResearchPaperClaim) {
+            const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}`, authorRoleAndPosition: `${claim.authorType} / ${claim.authorPosition}` };
+            return allPossibleResearchPaperFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
+        }
+        return [];
+    };
+    const fieldsToVerify = getFieldsToVerify();
+    
     const approvalSchema = createApprovalSchema(stageIndex, claim.claimType);
-
     const formSchemaWithVerification = approvalSchema.refine(data => {
         if (!isChecklistEnabled) return true;
-        
-        let displayedFields: string[] = [];
-        const claimWithUserData = { ...claim, name: claimant?.name, designation: `${claimant?.designation}, ${claimant?.department}` };
-        
-        if (isConferenceClaim) {
-            displayedFields = conferenceChecklistFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
-        } else if (isResearchPaperClaim) {
-            displayedFields = allPossibleResearchPaperFields.filter(f => (claimWithUserData as any)[f.id] !== undefined && (claimWithUserData as any)[f.id] !== null && (claimWithUserData as any)[f.id] !== '').map(f => f.id);
-        }
-        
-        return displayedFields.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
+        return fieldsToVerify.every(fieldId => typeof data.verifiedFields?.[fieldId] === 'boolean');
     }, {
         message: 'You must verify all visible fields (mark as correct or incorrect).',
         path: ['verifiedFields'],
@@ -538,7 +536,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {(action === 'approve' || showAmountForVerification) && stageIndex >= 1 && (
+                            {(action === 'approve' || showAmountForVerification) && stageIndex >= 0 && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
