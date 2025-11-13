@@ -136,10 +136,8 @@ const awardGrantSchema = z.object({
 }, {
     message: "The sum of phase amounts must equal the total sanctioned amount.",
     path: ["totalAmount"],
-}).refine(data => data.phases.length > 0 && !!data.phases[0].installmentRefNumber, {
-    message: "Installment Reference No. is required for Phase 1.",
-    path: ["phases.0.installmentRefNumber"],
 });
+
 
 const notingFormSchema = z.object({
     projectDuration: z.string().min(3, 'Project duration is required.'),
@@ -324,7 +322,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
      defaultValues: {
       sanctionNumber: "",
       totalAmount: 0,
-      phases: [{ name: "Phase 1", amount: 0, installmentRefNumber: '' }],
+      phases: [{ name: "Phase 1", amount: 0 }],
     },
   });
 
@@ -1583,7 +1581,7 @@ function AwardGrantForm({ form, onSubmit, isAwarding }: { form: any, onSubmit: (
                 {fields.map((field, index) => (
                     <div key={field.id} className="p-3 border rounded-md space-y-3">
                          <h4 className="font-semibold text-sm">{`Phase ${index + 1}`}</h4>
-                         {index === 0 && (
+                         {index > 0 && (
                             <FormField control={form.control} name={`phases.${index}.installmentRefNumber`} render={({ field }) => ( <FormItem><FormLabel>Installment Ref. No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                          )}
                          <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
