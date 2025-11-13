@@ -206,6 +206,7 @@ export type ApprovalStage = {
   approvedAmount: number;
   stage: number; // 1, 2, 3 or 4
   verifiedFields?: { [key: string]: boolean };
+  suggestions?: { [key: string]: string };
 };
 
 export type PatentInventor = {
@@ -232,6 +233,8 @@ export type IncentiveClaim = {
   approvals?: ApprovalStage[];
   autoFetchedFields?: (keyof IncentiveClaim)[];
   paperId?: string; // Link to the entry in the 'papers' collection
+  paymentSheetRef?: string;
+  paymentSheetRemarks?: string;
 
   // Main selector
   claimType: string

@@ -47,6 +47,16 @@ const getClaimTypeAcronym = (claimType: string): string => {
     }
 };
 
+const getClaimTitle = (claimData: Partial<IncentiveClaim>): string => {
+    return claimData.paperTitle 
+        || claimData.publicationTitle 
+        || claimData.patentTitle 
+        || claimData.conferencePaperTitle 
+        || claimData.professionalBodyName 
+        || claimData.apcPaperTitle 
+        || 'your recent incentive claim';
+};
+
 export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' | 'claimId'>): Promise<{ success: boolean; error?: string, claimId?: string }> {
     try {
         const newClaimRef = adminDb.collection('incentiveClaims').doc();
@@ -109,7 +119,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
                 await adminDb.collection('notifications').add(notification);
 
                 if (coAuthor.email) {
-                    const claimTitle = finalClaimData.paperTitle || finalClaimData.publicationTitle || finalClaimData.conferencePaperTitle || finalClaimData.professionalBodyName || finalClaimData.patentTitle || finalClaimData.apcPaperTitle || 'N/A';
+                    const claimTitle = getClaimTitle(finalClaimData);
                      const emailHtml = `
                         <div ${EMAIL_STYLES.background}>
                             ${EMAIL_STYLES.logo}
@@ -246,7 +256,7 @@ export async function processIncentiveClaimAction(
   action: 'approve' | 'reject' | 'verify',
   approver: User,
   stageIndex: number, // 0, 1, 2, or 3
-  data: { amount?: number; comments?: string, verifiedFields?: { [key: string]: boolean } }
+  data: { amount?: number; comments?: string, verifiedFields?: { [key: string]: boolean }, suggestions?: { [key: string]: string } }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const claimRef = adminDb.collection('incentiveClaims').doc(claimId);
@@ -276,6 +286,7 @@ export async function processIncentiveClaimAction(
       timestamp: new Date().toISOString(),
       stage: stageIndex + 1,
       verifiedFields: data.verifiedFields || {},
+      suggestions: data.suggestions || {},
     };
     
     const approvals = claim.approvals || [];
@@ -306,7 +317,7 @@ export async function processIncentiveClaimAction(
         status: newStatus,
     };
     
-    if (action === 'approve') {
+    if (action === 'approve' || action === 'verify') {
         // For stages 2, 3, 4 (stageIndex 1, 2, 3), the approver finalizes the amount
         if (stageIndex >= 1) {
             updateData.finalApprovedAmount = data.amount;
@@ -315,7 +326,7 @@ export async function processIncentiveClaimAction(
 
     await claimRef.update(updateData);
     
-    const claimTitle = claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || 'your recent incentive claim';
+    const claimTitle = getClaimTitle(claim);
 
     if (action === 'reject' && claim.userEmail) {
         await sendEmail({
@@ -375,5 +386,3 @@ export async function processIncentiveClaimAction(
     return { success: false, error: error.message || 'An unexpected error occurred.' };
   }
 }
-
-    
