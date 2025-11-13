@@ -36,9 +36,9 @@ import { getSystemSettings } from '@/app/actions';
 import { submitIncentiveClaim, deleteIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { calculateBookIncentive,calculateApcIncentive, calculateResearchPaperIncentive } from '@/app/incentive-calculation';
+import { calculateBookIncentive,calculateApcIncentive, calculateResearchPaperIncentive, calculateConferenceIncentive } from '@/app/incentive-calculation';
 import { Separator } from '@/components/ui/separator';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 
 
 function UserClaimsList({ 
@@ -63,7 +63,7 @@ function UserClaimsList({
     }
     
     const getClaimTitle = (claim: IncentiveClaim): string => {
-        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
+        return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
     };
 
     const getClaimEditHref = (claim: IncentiveClaim): string => {
@@ -199,7 +199,10 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
             result = await calculateBookIncentive(claimDataForCalc);
         } else if (claim.claimType === 'Seed Money for APC') {
             result = await calculateApcIncentive(claimDataForCalc, isSpecialFaculty);
-        } else {
+        } else if (claim.claimType === 'Conference Presentations') {
+             result = await calculateConferenceIncentive(claimDataForCalc);
+        }
+        else {
             result = { success: true, amount: 0 };
         }
         
@@ -282,7 +285,7 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
     }
     
     const getClaimTitle = (claim: IncentiveClaim): string => {
-        return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
+        return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
     };
 
     const myDetailsInDialog = claimToApply ? getMyCoAuthorDetails(claimToApply) : null;
