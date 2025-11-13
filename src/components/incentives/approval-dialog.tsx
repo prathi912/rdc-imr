@@ -248,17 +248,17 @@ function ResearchPaperClaimDetails({
     form, 
     isChecklistEnabled, 
     stageIndex, 
-    previousApprovals_ 
+    previousApprovals 
 }: { 
     claim: IncentiveClaim, 
     claimant: User | null, 
     form: any, 
     isChecklistEnabled: boolean,
     stageIndex: number,
-    previousApprovals_: (ApprovalStage | null)[]
+    previousApprovals: (ApprovalStage | null)[]
 }) {
-    const approval1 = previousApprovals_[0];
-    const approval2 = previousApprovals_[1];
+    const approval1 = previousApprovals[0];
+    const approval2 = previousApprovals[1];
 
     const renderDetail = (field: {id: string, label: string}, value?: string | number | null | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
@@ -285,7 +285,8 @@ function ResearchPaperClaimDetails({
         
         const suggestion1 = approval1?.suggestions?.[field.id];
         const suggestion2 = approval2?.suggestions?.[field.id];
-        const finalSuggestion = stageIndex === 1 ? suggestion1 : suggestion2 || suggestion1;
+        
+        const finalSuggestion = stageIndex === 0 ? undefined : stageIndex === 1 ? suggestion1 : suggestion2 || suggestion1;
 
         return (
             <div key={field.id} className="grid grid-cols-12 gap-2 text-sm items-center py-1">
@@ -582,12 +583,12 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
                     <Form {...form}>
                         {isMembershipClaim && <MembershipClaimDetails claim={claim} claimant={claimant} />}
-                        {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals_={claim.approvals || []} />}
+                        {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
                         {isConferenceClaim && <ConferenceClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
 
 
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                             {(!isChecklistEnabled || showAmountForVerification) && (
+                             {action !== 'verify' && (
                                 <FormField
                                     name="action"
                                     control={form.control}
@@ -641,7 +642,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                     <Button type="submit" form="approval-form" disabled={isSubmitting}>
                         {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Submitting...</> : (
-                            isChecklistEnabled ? 'Submit & Forward' : 'Submit Action'
+                            isChecklistEnabled || showAmountForVerification ? 'Submit & Forward' : 'Submit Action'
                         )}
                     </Button>
                 </DialogFooter>
