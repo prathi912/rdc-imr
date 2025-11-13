@@ -27,6 +27,7 @@ import {
   deleteImrProject,
   markImrAttendance,
   getSystemSettings,
+  generateSanctionOrder,
 } from "@/app/actions"
 import { generateRecommendationForm } from "@/app/document-actions"
 import { findUserByMisId } from '@/app/userfinding';
@@ -306,6 +307,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [isAwarding, setIsAwarding] = useState(false);
+  const [isDownloadingSanctionOrder, setIsDownloadingSanctionOrder] = useState(false);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const isMobile = useIsMobile();
 
@@ -425,6 +427,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const isCoPi = user && project.coPiUids?.includes(user.uid)
   const isAdmin = user && ["Super-admin", "admin", "CRO"].includes(user.role)
   const isSuperAdmin = user?.role === "Super-admin"
+  const isUserAdmin = user && ["Super-admin", "admin"].includes(user.role);
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid)
   const isHeadOfGoaCampus = user?.designation === 'Head of Goa Campus';
   const canViewDocuments = (isPI || isCoPi || isAdmin || isAssignedEvaluator) && !isHeadOfGoaCampus;
@@ -453,7 +456,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }, [project.meetingDetails?.date, systemSettings]);
   
   const showEvaluationForm = user && isAssignedEvaluator && isEvaluationPeriodActive;
-
 
   const assignedEvaluatorsCount = project.meetingDetails?.assignedEvaluators?.length ?? 0;
   const absentEvaluatorsCount = project.meetingDetails?.absentEvaluators?.length ?? 0;
@@ -851,6 +853,30 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
     setIsPrinting(false);
   };
+  
+  const handleDownloadSanctionOrder = async () => {
+    setIsDownloadingSanctionOrder(true);
+    const result = await generateSanctionOrder(project.id);
+    if (result.success && result.fileData) {
+        const byteCharacters = atob(result.fileData);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Sanction_Order_${project.pi.replace(/\s/g, '_')}.docx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } else {
+        toast({ variant: 'destructive', title: 'Download Failed', description: result.error });
+    }
+    setIsDownloadingSanctionOrder(false);
+  };
 
   const handleOpenNotingDialog = () => {
     notingForm.reset({
@@ -876,10 +902,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
 
   const isGrantAwarded = !!project.grant;
-  const isUserAdmin = user && ["Super-admin", "admin"].includes(user.role);
   const showDownloadButton = isUserAdmin && (project.status === 'Recommended' || project.status === 'In Progress');
+  const showSanctionOrderButton = isUserAdmin && project.status === 'In Progress';
   const isDurationSet = !!project.projectStartDate && !!project.projectEndDate;
-
   const isMeetingScheduled = !!project.meetingDetails?.date;
 
   return (
@@ -928,6 +953,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         )}
                     </Tooltip>
                 </TooltipProvider>
+            )}
+            {showSanctionOrderButton && (
+                 <Button onClick={handleDownloadSanctionOrder} disabled={isDownloadingSanctionOrder}>
+                    {isDownloadingSanctionOrder ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    Download Sanction Order
+                </Button>
             )}
              {showAdminActions && (
                 <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
