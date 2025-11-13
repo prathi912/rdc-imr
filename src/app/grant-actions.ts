@@ -43,7 +43,7 @@ export async function awardInitialGrant(
       totalAmount: number; 
       phases: { name: string; amount: number; installmentRefNumber?: string }[];
     },
-    pi: { uid: string; name: string; email?: string },
+    pi: { uid: string; name: string; email?: string; campus?: string },
     projectTitle: string
 ): Promise<{ success: boolean; error?: string, updatedProject?: Project }> {
     try {
@@ -58,7 +58,7 @@ export async function awardInitialGrant(
             name: phase.name,
             amount: phase.amount,
             installmentRefNumber: phase.installmentRefNumber || null,
-            status: index === 0 ? "Pending Disbursement" : "Pending", // Only first phase is active
+            status: index === 0 ? "Pending Disbursement" : "Pending",
             transactions: [],
         }));
 
@@ -98,9 +98,15 @@ export async function awardInitialGrant(
                     ${EMAIL_STYLES.footer}
                 </div>
             `;
+
+            let ccEmails = 'rdc@paruluniversity.ac.in';
+            if (pi.campus === 'Goa') {
+                ccEmails += ', rdc@goa.paruluniversity.ac.in';
+            }
+
             await sendEmailUtility({
                 to: pi.email,
-                cc: 'rdc@paruluniversity.ac.in',
+                cc: ccEmails,
                 subject: `Grant Awarded for Your IMR Project: ${projectTitle}`,
                 html: emailHtml,
                 from: 'default'
