@@ -1,10 +1,9 @@
 
-
 "use client"
 
 import type React from "react"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -169,6 +168,8 @@ const institutes = [
   "Parul Institute of Physiotherapy",
   "Parul Institute of Physiotherapy and Research",
   "Parul Institute of Social Work",
+  "Parul Institute of Technology",
+  "Parul Institute of Technology-Diploma studies",
   "Parul Institute of Vocational Education",
   "Parul Medical Institute & Hospital",
   "Parul Polytechnic Institute",
@@ -746,304 +747,59 @@ export default function SettingsPage() {
               <CardDescription>Global settings for the application. Changes affect all users.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-               <div className="space-y-4 rounded-lg border p-4">
-                 <div className="flex items-center gap-2">
-                    <Bot className="h-5 w-5" />
-                    <Label className="text-base">API Integrations</Label>
-                 </div>
-                 <p className="text-sm text-muted-foreground">
-                    Enable or disable external data fetching services.
-                 </p>
-                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="flex items-center justify-between rounded-lg border p-3">
-                        <Label htmlFor="scopus-toggle">Scopus</Label>
-                        <Switch id="scopus-toggle" checked={systemSettings.apiIntegrations?.scopus !== false} onCheckedChange={(c) => handleApiIntegrationToggle('scopus', c)} disabled={isSavingSettings} />
-                    </div>
-                     <div className="flex items-center justify-between rounded-lg border p-3">
-                        <Label htmlFor="wos-toggle">Web of Science</Label>
-                        <Switch id="wos-toggle" checked={systemSettings.apiIntegrations?.wos !== false} onCheckedChange={(c) => handleApiIntegrationToggle('wos', c)} disabled={isSavingSettings} />
-                    </div>
-                     <div className="flex items-center justify-between rounded-lg border p-3">
-                        <Label htmlFor="sci-toggle">ScienceDirect</Label>
-                        <Switch id="sci-toggle" checked={systemSettings.apiIntegrations?.sci !== false} onCheckedChange={(c) => handleApiIntegrationToggle('sci', c)} disabled={isSavingSettings} />
-                    </div>
-                 </div>
-               </div>
-               <div className="space-y-4 rounded-lg border p-4">
-                 <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    <Label className="text-base">Template Management</Label>
-                </div>
-                 <p className="text-sm text-muted-foreground">
-                    Provide the direct download URLs for the DOCX templates used to generate office notings and other documents.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                    {templateFields.map(({ key, label }) => (
-                         <div key={key} className="space-y-1">
-                            <Label htmlFor={`template-${key}`} className="text-sm">{label}</Label>
-                            <Input
-                                id={`template-${key}`}
-                                placeholder="https://..."
-                                defaultValue={systemSettings.templateUrls?.[key] || ''}
-                                onBlur={(e) => handleTemplateUrlChange(key, e.target.value)}
-                                disabled={isSavingSettings}
-                            />
-                        </div>
-                    ))}
-                </div>
-               </div>
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Two-Factor Authentication (2FA)</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require users to verify their identity with
-                    an email OTP upon login.
-                  </p>
-                </div>
-                <Switch
-                  checked={systemSettings.is2faEnabled}
-                  onCheckedChange={handle2faToggle}
-                  disabled={isSavingSettings}
-                />
-              </div>
-
-              <div className="space-y-4 rounded-lg border p-4">
-                  <div className="flex items-center gap-2">
-                      <Clock className="h-5 w-5" />
-                      <Label className="text-base">IMR Mid-term Review Window</Label>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Set the number of months after a grant is awarded that a project becomes eligible for a mid-term review.
-                  </p>
-                  <div className="flex items-center gap-2">
-                      <Input 
-                          type="number"
-                          className="w-24"
-                          defaultValue={systemSettings.imrMidTermReviewMonths || 6}
-                          onBlur={(e) => handleImrMidTermReviewChange(parseInt(e.target.value, 10) || 6)}
-                          disabled={isSavingSettings}
-                          min="1"
-                      />
-                      <span className="text-sm text-muted-foreground">months</span>
-                  </div>
-              </div>
-              
-              <div className="space-y-4 rounded-lg border p-4">
-                  <div className="flex items-center gap-2">
-                      <CalendarIcon className="h-5 w-5" />
-                      <Label className="text-base">IMR Evaluation Window</Label>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Set the number of days evaluators have to submit their feedback after the scheduled meeting date. Set to 0 to only allow same-day evaluations.
-                  </p>
-                  <div className="flex items-center gap-2">
-                      <Input 
-                          type="number"
-                          className="w-24"
-                          defaultValue={systemSettings.imrEvaluationDays || 0}
-                          onBlur={(e) => handleImrEvaluationDaysChange(parseInt(e.target.value, 10) || 0)}
-                          disabled={isSavingSettings}
-                          min="0"
-                      />
-                      <span className="text-sm text-muted-foreground">days</span>
-                  </div>
-              </div>
-
-               <div className="space-y-4 rounded-lg border p-4">
-                    <div className="flex items-center gap-2">
-                        <Award className="h-5 w-5" />
-                        <Label className="text-base">Incentive Claim Management</Label>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                       Enable or disable specific types of incentive claims for all users.
-                    </p>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {incentiveClaimTypes.map(type => (
-                            <div key={type} className="flex items-center space-x-2">
-                                <Switch
-                                    id={`incentive-${type.replace(/\s+/g, '-')}`}
-                                    checked={systemSettings.enabledIncentiveTypes?.[type] !== false} // Default to true if not set
-                                    onCheckedChange={(checked) => handleIncentiveTypeToggle(type, checked)}
-                                    disabled={isSavingSettings}
-                                />
-                                <Label htmlFor={`incentive-${type.replace(/\s+/g, '-')}`}>{type}</Label>
-                            </div>
-                        ))}
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2"><Bot className="h-5 w-5" /><Label className="text-base">API Integrations</Label></div>
+                    <p className="text-sm text-muted-foreground">Enable or disable external data fetching services.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="scopus-toggle">Scopus</Label><Switch id="scopus-toggle" checked={systemSettings.apiIntegrations?.scopus !== false} onCheckedChange={(c) => handleApiIntegrationToggle('scopus', c)} disabled={isSavingSettings} /></div>
+                        <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="wos-toggle">Web of Science</Label><Switch id="wos-toggle" checked={systemSettings.apiIntegrations?.wos !== false} onCheckedChange={(c) => handleApiIntegrationToggle('wos', c)} disabled={isSavingSettings} /></div>
+                        <div className="flex items-center justify-between rounded-lg border p-3"><Label htmlFor="sci-toggle">ScienceDirect</Label><Switch id="sci-toggle" checked={systemSettings.apiIntegrations?.sci !== false} onCheckedChange={(c) => handleApiIntegrationToggle('sci', c)} disabled={isSavingSettings} /></div>
                     </div>
                 </div>
-
-                <div className="space-y-4 rounded-lg border p-4">
-                    <div className="flex items-center gap-2">
-                        <Award className="h-5 w-5" />
-                        <Label className="text-base">Incentive Approval Workflow</Label>
+                <Separator />
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2"><FileText className="h-5 w-5" /><Label className="text-base">Template Management</Label></div>
+                    <p className="text-sm text-muted-foreground">Provide the direct download URLs for the DOCX templates used to generate office notings and other documents.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                        {templateFields.map(({ key, label }) => (<div key={key} className="space-y-1"><Label htmlFor={`template-${key}`} className="text-sm">{label}</Label><Input id={`template-${key}`} placeholder="https://..." defaultValue={systemSettings.templateUrls?.[key] || ''} onBlur={(e) => handleTemplateUrlChange(key, e.target.value)} disabled={isSavingSettings} /></div>))}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                       Select which approval stages are required for each claim type. The first selected stage will be the starting point.
-                    </p>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Claim Type</TableHead>
-                                <TableHead className="text-center">Stage 1</TableHead>
-                                <TableHead className="text-center">Stage 2</TableHead>
-                                <TableHead className="text-center">Stage 3</TableHead>
-                                <TableHead className="text-center">Stage 4</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {incentiveClaimTypes.map(type => {
-                                const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4];
-                                return (
-                                    <TableRow key={type}>
-                                        <TableCell className="font-medium">{type}</TableCell>
-                                        {[1, 2, 3, 4].map(stage => (
-                                            <TableCell key={stage} className="text-center">
-                                                <Checkbox
-                                                    checked={workflow.includes(stage)}
-                                                    onCheckedChange={(checked) => handleWorkflowChange(type, stage, !!checked)}
-                                                    disabled={isSavingSettings}
-                                                />
-                                            </TableCell>
-                                        ))}
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
                 </div>
-              
-              <div className="space-y-4 rounded-lg border p-4">
-                  <div className="flex items-center gap-2">
-                      <Mail className="h-5 w-5" />
-                      <Label className="text-base">Do Not Disturb (DND) Email</Label>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    The email address entered here will be excluded from all automated system email notifications.
-                  </p>
-                  <Input 
-                      placeholder="dnd.user@paruluniversity.ac.in"
-                      defaultValue={systemSettings.dndEmail || ''}
-                      onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })}
-                      disabled={isSavingSettings}
-                  />
-              </div>
-
-              <div className="space-y-4">
-                <Label className="text-base">Allowed Email Domains</Label>
-                <p className="text-sm text-muted-foreground">
-                  Users with these email domains can register and access the portal.
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="@newcampus.paruluniversity.ac.in"
-                    value={newAllowedDomain}
-                    onChange={(e) => setNewAllowedDomain(e.target.value)}
-                  />
-                  <Button onClick={addAllowedDomain} disabled={isSavingSettings || !newAllowedDomain.trim()}>
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                <Separator />
+                <div className="flex items-center justify-between">
+                    <div className="space-y-0.5"><Label className="text-base">Two-Factor Authentication (2FA)</Label><p className="text-sm text-muted-foreground">{systemSettings.is2faEnabled ? "Enabled" : "Disabled"} - Require users to verify their identity with an email OTP upon login.</p></div>
+                    <Switch checked={systemSettings.is2faEnabled} onCheckedChange={handle2faToggle} disabled={isSavingSettings}/>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {(systemSettings.allowedDomains || []).map((domain) => (
-                    <Badge key={domain} variant="secondary" className="flex items-center gap-1">
-                      {domain}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
-                        onClick={() => removeAllowedDomain(domain)}
-                        disabled={isSavingSettings}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </Badge>
-                  ))}
+                <Separator />
+                <div className="space-y-4"><div className="flex items-center gap-2"><Clock className="h-5 w-5" /><Label className="text-base">IMR Mid-term Review Window</Label></div><p className="text-sm text-muted-foreground">Set the number of months after a grant is awarded that a project becomes eligible for a mid-term review.</p><div className="flex items-center gap-2"><Input type="number" className="w-24" defaultValue={systemSettings.imrMidTermReviewMonths || 6} onBlur={(e) => handleImrMidTermReviewChange(parseInt(e.target.value, 10) || 6)} disabled={isSavingSettings} min="1" /><span className="text-sm text-muted-foreground">months</span></div></div>
+                <Separator />
+                <div className="space-y-4"><div className="flex items-center gap-2"><CalendarIcon className="h-5 w-5" /><Label className="text-base">IMR Evaluation Window</Label></div><p className="text-sm text-muted-foreground">Set the number of days evaluators have to submit their feedback after the scheduled meeting date. Set to 0 to only allow same-day evaluations.</p><div className="flex items-center gap-2"><Input type="number" className="w-24" defaultValue={systemSettings.imrEvaluationDays || 0} onBlur={(e) => handleImrEvaluationDaysChange(parseInt(e.target.value, 10) || 0)} disabled={isSavingSettings} min="0" /><span className="text-sm text-muted-foreground">days</span></div></div>
+                <Separator />
+                <div className="space-y-4"><div className="flex items-center gap-2"><Award className="h-5 w-5" /><Label className="text-base">Incentive Claim Management</Label></div><p className="text-sm text-muted-foreground">Enable or disable specific types of incentive claims for all users.</p><div className="grid grid-cols-2 md:grid-cols-3 gap-4">{incentiveClaimTypes.map(type => (<div key={type} className="flex items-center space-x-2"><Switch id={`incentive-${type.replace(/\s+/g, '-')}`} checked={systemSettings.enabledIncentiveTypes?.[type] !== false} onCheckedChange={(checked) => handleIncentiveTypeToggle(type, checked)} disabled={isSavingSettings} /><Label htmlFor={`incentive-${type.replace(/\s+/g, '-')}`}>{type}</Label></div>))}</div></div>
+                <Separator />
+                <div className="space-y-4"><div className="flex items-center gap-2"><Award className="h-5 w-5" /><Label className="text-base">Incentive Approval Workflow</Label></div><p className="text-sm text-muted-foreground">Select which approval stages are required for each claim type. The first selected stage will be the starting point.</p><Table><TableHeader><TableRow><TableHead>Claim Type</TableHead><TableHead className="text-center">Stage 1</TableHead><TableHead className="text-center">Stage 2</TableHead><TableHead className="text-center">Stage 3</TableHead><TableHead className="text-center">Stage 4</TableHead></TableRow></TableHeader><TableBody>{incentiveClaimTypes.map(type => { const workflow = systemSettings.incentiveApprovalWorkflows?.[type] || [1, 2, 3, 4]; return (<TableRow key={type}><TableCell className="font-medium">{type}</TableCell>{[1, 2, 3, 4].map(stage => (<TableCell key={stage} className="text-center"><Checkbox checked={workflow.includes(stage)} onCheckedChange={(checked) => handleWorkflowChange(type, stage, !!checked)} disabled={isSavingSettings} /></TableCell>))}</TableRow>);})}</TableBody></Table></div>
+                <Separator />
+                <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Do Not Disturb (DND) Email</Label></div><p className="text-sm text-muted-foreground">The email address entered here will be excluded from all automated system email notifications.</p><Input placeholder="dnd.user@paruluniversity.ac.in" defaultValue={systemSettings.dndEmail || ''} onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, dndEmail: e.target.value })} disabled={isSavingSettings} /></div>
+                <Separator />
+                <div className="space-y-4"><Label className="text-base">Allowed Email Domains</Label><p className="text-sm text-muted-foreground">Users with these email domains can register and access the portal.</p><div className="flex gap-2"><Input placeholder="@newcampus.paruluniversity.ac.in" value={newAllowedDomain} onChange={(e) => setNewAllowedDomain(e.target.value)} /><Button onClick={addAllowedDomain} disabled={isSavingSettings || !newAllowedDomain.trim()}><Plus className="h-4 w-4" /></Button></div><div className="flex flex-wrap gap-2">{(systemSettings.allowedDomains || []).map((domain) => (<Badge key={domain} variant="secondary" className="flex items-center gap-1">{domain}<Button variant="ghost" size="icon" className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground" onClick={() => removeAllowedDomain(domain)} disabled={isSavingSettings}><X className="h-3 w-3" /></Button></Badge>))}</div></div>
+                <Separator />
+                <div className="space-y-4"><Label className="text-base">CRO Pre-assignment</Label><p className="text-sm text-muted-foreground">Pre-assign the CRO role and their primary faculty/campus to a specific email. This will be automatically applied upon sign-up.</p><Form {...croAssignmentForm}><form onSubmit={croAssignmentForm.handleSubmit(addCroAssignment)} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end p-4 border rounded-lg"><FormField control={croAssignmentForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>CRO Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} /><FormField control={croAssignmentForm.control} name="campus" render={({ field }) => ( <FormItem><FormLabel>Campus</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select campus" /></SelectTrigger></FormControl><SelectContent>{campuses.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} /><FormField control={croAssignmentForm.control} name="faculty" render={({ field }) => ( <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl><SelectContent>{facultyOptionsForCro.map(f => (<SelectItem key={f} value={f}>{f}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} /><Button type="submit" disabled={isSavingSettings}><Plus className="h-4 w-4 mr-2" /> Add CRO</Button></form></Form>{(systemSettings.croAssignments || []).length > 0 && (<Table><TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Faculty</TableHead><TableHead>Campus</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{systemSettings.croAssignments?.map((assignment) => (<TableRow key={assignment.email}><TableCell>{assignment.email}</TableCell><TableCell>{assignment.faculty}</TableCell><TableCell>{assignment.campus}</TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => removeCroAssignment(assignment.email)} disabled={isSavingSettings}><X className="h-4 w-4" /></Button></TableCell></TableRow>))}</TableBody></Table>)}</div>
+                <Separator />
+                <div className="space-y-4"><div className="flex items-center gap-2"><Mail className="h-5 w-5" /><Label className="text-base">Utilization Report Email Recipient</Label></div><p className="text-sm text-muted-foreground">The email address that will receive a notification when a PI submits a utilization report and requests the next grant phase.</p><Input placeholder="finance.rdc@paruluniversity.ac.in" defaultValue={systemSettings.utilizationNotificationEmail || ''} onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, utilizationNotificationEmail: e.target.value })} disabled={isSavingSettings} /></div>
+                <Separator />
+                <div className="space-y-4"><Label className="text-base">IQAC Email Address</Label><p className="text-sm text-muted-foreground">The user who signs up with this email will be automatically assigned the IQAC role.</p><Input placeholder="iqac@paruluniversity.ac.in" defaultValue={systemSettings.iqacEmail || ''} onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, iqacEmail: e.target.value })} disabled={isSavingSettings} /></div>
+                <Separator />
+                <div className="space-y-4">
+                  <Form {...dummyForm}>
+                    <Label className="text-base">Incentive Approval Workflow</Label>
+                    <p className="text-sm text-muted-foreground">Define the email addresses for the four stages of incentive claim approval.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {[1, 2, 3, 4].map(stage => {
+                            const approver = systemSettings.incentiveApprovers?.find(a => a.stage === stage);
+                            return (<div key={stage} className="p-4 border rounded-lg space-y-3"><FormItem><FormLabel>Stage {stage} Approver Email</FormLabel><Input type="email" placeholder={`approver.stage${stage}@paruluniversity.ac.in`} defaultValue={approver?.email || ''} onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)} disabled={isSavingSettings} /></FormItem></div>);
+                        })}
+                    </div>
+                  </Form>
                 </div>
-              </div>
-               <div className="space-y-4">
-                <Label className="text-base">CRO Pre-assignment</Label>
-                <p className="text-sm text-muted-foreground">
-                  Pre-assign the CRO role and their primary faculty/campus to a specific email. This will be automatically applied upon sign-up.
-                </p>
-                <Form {...croAssignmentForm}>
-                    <form onSubmit={croAssignmentForm.handleSubmit(addCroAssignment)} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end p-4 border rounded-lg">
-                        <FormField control={croAssignmentForm.control} name="email" render={({ field }) => ( <FormItem><FormLabel>CRO Email</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                        <FormField control={croAssignmentForm.control} name="campus" render={({ field }) => ( <FormItem><FormLabel>Campus</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select campus" /></SelectTrigger></FormControl><SelectContent>{campuses.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                        <FormField control={croAssignmentForm.control} name="faculty" render={({ field }) => ( <FormItem><FormLabel>Faculty</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select faculty" /></SelectTrigger></FormControl><SelectContent>{facultyOptionsForCro.map(f => (<SelectItem key={f} value={f}>{f}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem> )} />
-                        <Button type="submit" disabled={isSavingSettings}><Plus className="h-4 w-4 mr-2" /> Add CRO</Button>
-                    </form>
-                </Form>
-                
-                {(systemSettings.croAssignments || []).length > 0 && (
-                    <Table>
-                        <TableHeader><TableRow><TableHead>Email</TableHead><TableHead>Faculty</TableHead><TableHead>Campus</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader>
-                        <TableBody>
-                            {systemSettings.croAssignments?.map((assignment) => (
-                                <TableRow key={assignment.email}>
-                                    <TableCell>{assignment.email}</TableCell>
-                                    <TableCell>{assignment.faculty}</TableCell>
-                                    <TableCell>{assignment.campus}</TableCell>
-                                    <TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => removeCroAssignment(assignment.email)} disabled={isSavingSettings}><X className="h-4 w-4" /></Button></TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                )}
-              </div>
-              <div className="space-y-4 rounded-lg border p-4">
-                  <div className="flex items-center gap-2">
-                      <Mail className="h-5 w-5" />
-                      <Label className="text-base">Utilization Report Email Recipient</Label>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    The email address that will receive a notification when a PI submits a utilization report and requests the next grant phase.
-                  </p>
-                  <Input 
-                      placeholder="finance.rdc@paruluniversity.ac.in"
-                      defaultValue={systemSettings.utilizationNotificationEmail || ''}
-                      onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, utilizationNotificationEmail: e.target.value })}
-                      disabled={isSavingSettings}
-                  />
-              </div>
-              <div className="space-y-4">
-                <Label className="text-base">IQAC Email Address</Label>
-                   <p className="text-sm text-muted-foreground">
-                    The user who signs up with this email will be automatically assigned the IQAC role.
-                  </p>
-                   <Input 
-                      placeholder="iqac@paruluniversity.ac.in"
-                      defaultValue={systemSettings.iqacEmail || ''}
-                      onBlur={(e) => handleSystemSettingsSave({ ...systemSettings, iqacEmail: e.target.value })}
-                      disabled={isSavingSettings}
-                  />
-              </div>
-              <div className="space-y-4">
-                <Form {...dummyForm}>
-                  <Label className="text-base">Incentive Approval Workflow</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Define the email addresses for the four stages of incentive claim approval.
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {[1, 2, 3, 4].map(stage => {
-                          const approver = systemSettings.incentiveApprovers?.find(a => a.stage === stage);
-                          return (
-                              <div key={stage} className="p-4 border rounded-lg space-y-3">
-                                  <FormItem>
-                                      <FormLabel>Stage {stage} Approver Email</FormLabel>
-                                      <Input 
-                                          type="email"
-                                          placeholder={`approver.stage${stage}@paruluniversity.ac.in`}
-                                          defaultValue={approver?.email || ''}
-                                          onBlur={(e) => handleApproverChange(stage as 1 | 2 | 3 | 4, e.target.value)}
-                                          disabled={isSavingSettings}
-                                      />
-                                  </FormItem>
-                              </div>
-                          );
-                      })}
-                  </div>
-                </Form>
-              </div>
             </CardContent>
           </Card>
         )}
@@ -1202,10 +958,21 @@ export default function SettingsPage() {
                     </FormItem>
                   )}
                 />
-
+                <FormField
+                  control={profileForm.control}
+                  name="phoneNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input type="tel" placeholder="e.g. 9876543210" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Separator />
                 <h3 className="text-md font-semibold pt-2">Academic & Researcher IDs</h3>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={profileForm.control}
@@ -1268,21 +1035,6 @@ export default function SettingsPage() {
                       <FormLabel>Google Scholar ID (Optional)</FormLabel>
                       <FormControl>
                         <Input placeholder="Your Google Scholar Profile ID" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <Separator />
-                <FormField
-                  control={profileForm.control}
-                  name="phoneNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
-                      <FormControl>
-                        <Input type="tel" placeholder="e.g. 9876543210" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1474,3 +1226,5 @@ export default function SettingsPage() {
     </div>
   )
 }
+
+    
