@@ -724,7 +724,7 @@ useEffect(() => {
                             <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><Plus className="h-4 w-4"/></Button>
                         </div>
                         <FormDescription className="!mt-2 text-destructive text-xs">
-                           Important: If an external co-author is found at the approval stage that was not declared here, the claim will be rejected.
+                           Important: If an internal/external co-author is found at the approval stage that was not declared here, the claim will be rejected.
                         </FormDescription>
                     </div>
                      <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
