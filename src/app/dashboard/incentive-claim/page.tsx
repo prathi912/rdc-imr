@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -163,9 +164,6 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
         resolver: zodResolver(coAuthorApplySchema),
     });
     
-  // Replace the handleOpenDialog function in your CoAuthorClaimsList component
-// Starting around line 95 in your file
-
 const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
     if (!currentUser) return;
     setClaimToApply(claim);
@@ -188,45 +186,18 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
             return;
         }
 
-        // Determine which faculty-specific rules apply
-        const SPECIAL_POLICY_FACULTIES = [
-            "Faculty of Applied Sciences",
-            "Faculty of Medicine",
-            "Faculty of Homoeopathy",
-            "Faculty of Ayurved",
-            "Faculty of Nursing",
-            "Faculty of Pharmacy",
-            "Faculty of Physiotherapy",
-            "Faculty of Public Health",
-            "Faculty of Engineering & Technology"
-        ];
         const isSpecialFaculty = SPECIAL_POLICY_FACULTIES.includes(currentUser.faculty || '');
 
+        const claimDataForCalc = { 
+            ...claim, 
+            userEmail: currentUser.email,
+        };
+
         if (claim.claimType === 'Research Papers') {
-            const claimDataForCalc = { 
-                ...claim, 
-                userEmail: currentUser.email,
-            };
-            
-            result = await calculateResearchPaperIncentive(
-                claimDataForCalc, 
-                currentUser.faculty || '', 
-                currentUser.designation
-            );
+            result = await calculateResearchPaperIncentive(claimDataForCalc, currentUser.faculty || '', currentUser.designation);
         } else if (claim.claimType === 'Books') {
-            const claimDataForCalc = {
-                ...claim,
-                userEmail: currentUser.email,
-            };
             result = await calculateBookIncentive(claimDataForCalc);
         } else if (claim.claimType === 'Seed Money for APC') {
-            // Import the calculateApcIncentive function at the top of your file
-            // import { calculateApcIncentive } from '@/app/incentive-calculation';
-            
-            const claimDataForCalc = {
-                ...claim,
-                userEmail: currentUser.email,
-            };
             result = await calculateApcIncentive(claimDataForCalc, isSpecialFaculty);
         } else {
             result = { success: true, amount: 0 };
@@ -453,6 +424,10 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
 
 
 export default function IncentiveClaimPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [userClaims, setUserClaims] = useState<IncentiveClaim[]>([]);
@@ -464,8 +439,28 @@ export default function IncentiveClaimPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [membershipClaimInfo, setMembershipClaimInfo] = useState<{ canClaim: boolean; nextAvailableDate?: string }>({ canClaim: true });
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
-  const [activeTab, setActiveTab] = useState('apply');
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'apply');
   const isMobile = useIsMobile();
+
+  const updateUrl = useCallback((tab: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [searchParams, pathname, router]);
+
+  useEffect(() => {
+    const currentTab = searchParams.get('tab');
+    if (currentTab) {
+      setActiveTab(currentTab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab) {
+      updateUrl(activeTab);
+    }
+  }, [activeTab, updateUrl]);
+
 
   const fetchAllData = useCallback(async (uid: string) => {
       setLoading(true);
