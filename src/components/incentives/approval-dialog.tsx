@@ -423,13 +423,17 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         return 'approve';
     };
 
+    const initialSuggestions = fieldsToVerify.reduce((acc, fieldId) => {
+        acc[fieldId] = '';
+        return acc;
+    }, {} as Record<string, string>);
 
     const form = useForm<ApprovalFormData>({
         resolver: zodResolver(formSchemaWithVerification),
         defaultValues: {
             amount: defaultAmount || 0,
             verifiedFields: {},
-            suggestions: {},
+            suggestions: initialSuggestions,
             action: getDefaultAction(),
         }
     });
@@ -439,7 +443,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
             form.reset({
                 amount: defaultAmount || 0,
                 verifiedFields: {},
-                suggestions: {},
+                suggestions: initialSuggestions,
                 action: getDefaultAction(),
                 comments: '',
             });
