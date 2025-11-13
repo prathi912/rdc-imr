@@ -237,17 +237,31 @@ function ResearchPaperClaimDetails({
 
     const renderDetail = (field: {id: string, label: string}, value?: string | number | null | boolean | string[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
-        let displayValue = String(value);
+        
+        let displayValue: React.ReactNode = String(value);
+
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
+        } else if (Array.isArray(value)) {
+             if (value.every(item => typeof item === 'string' && item.startsWith('https://'))) {
+                displayValue = (
+                    <div className="flex flex-col gap-1">
+                        {value.map((url, i) => (
+                             <Button key={i} asChild variant="link" size="sm" className="p-0 h-auto justify-start">
+                                <a href={url} target="_blank" rel="noopener noreferrer">View Document {value.length > 1 ? i + 1 : ''}</a>
+                            </Button>
+                        ))}
+                    </div>
+                );
+            } else {
+                displayValue = value.join(', ');
+            }
         }
-        if (Array.isArray(value)) {
-            displayValue = value.join(', ');
-        }
+        
         return (
             <div key={field.id} className="grid grid-cols-12 gap-2 text-sm items-center py-1">
                 <span className="text-muted-foreground col-span-5">{field.label}</span>
-                <span className="col-span-4">{displayValue}</span>
+                <span className="col-span-4 break-words">{displayValue}</span>
                 <div className="col-span-3 flex justify-end gap-1">
                     {stageIndex > 0 && (
                         <div className="w-7 h-7 flex items-center justify-center">
