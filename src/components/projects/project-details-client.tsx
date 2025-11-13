@@ -128,7 +128,6 @@ const awardGrantSchema = z.object({
     phases: z.array(z.object({
         name: z.string(),
         amount: z.coerce.number().positive('Phase amount must be positive.'),
-        installmentRefNumber: z.string().optional(),
     })).min(1, 'At least one phase is required.'),
 }).refine(data => {
     const totalPhaseAmount = data.phases.reduce((sum, phase) => sum + phase.amount, 0);
@@ -563,7 +562,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         const result = await awardInitialGrant(
             project.id,
             values,
-            { uid: project.pi_uid, name: project.pi, email: project.pi_email },
+            { uid: project.pi_uid, name: project.pi, email: project.pi_email, campus: piUser?.campus },
             project.title
         );
 
@@ -889,46 +888,46 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         <div>{/* Spacer */}</div>
         <div className="flex items-center gap-2">
             {showDownloadButton && (
-                isGrantAwarded ? (
-                    <Button onClick={handleDirectDownload} disabled={isAwarding}>
-                        {isAwarding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                        Download Recommendation Form
-                    </Button>
-                ) : (
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div tabIndex={isDurationSet ? undefined : -1}>
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div tabIndex={isDurationSet ? undefined : -1}>
+                                {isGrantAwarded ? (
+                                    <Button onClick={handleDirectDownload} disabled={isAwarding}>
+                                        {isAwarding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                                        Download Recommendation Form
+                                    </Button>
+                                ) : (
+                                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                                         <DialogTrigger asChild>
                                             <Button disabled={!isDurationSet}>
                                                 <Download className="mr-2 h-4 w-4" /> Award Grant & Download
                                             </Button>
                                         </DialogTrigger>
-                                    </div>
-                                </TooltipTrigger>
-                                {!isDurationSet && (
-                                    <TooltipContent>
-                                        <p>Please set project duration before awarding a grant.</p>
-                                    </TooltipContent>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Award Grant & Download</DialogTitle>
+                                                <DialogDescription>
+                                                    To download the recommendation form, first confirm the grant details. This will update the project status and save the grant information.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <AwardGrantForm
+                                                form={awardGrantForm}
+                                                onSubmit={handleAwardGrantAndDownload}
+                                                isAwarding={isAwarding}
+                                            />
+                                        </DialogContent>
+                                    </Dialog>
                                 )}
-                            </Tooltip>
-                        </TooltipProvider>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle>Award Grant & Download</DialogTitle>
-                                <DialogDescription>
-                                    To download the recommendation form, first confirm the grant details. This will update the project status and save the grant information.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <AwardGrantForm
-                                form={awardGrantForm}
-                                onSubmit={handleAwardGrantAndDownload}
-                                isAwarding={isAwarding}
-                            />
-                        </DialogContent>
-                    </Dialog>
-                )
+                            </div>
+                        </TooltipTrigger>
+                        {!isDurationSet && (
+                            <TooltipContent>
+                                <p>Set project duration before awarding a grant.</p>
+                            </TooltipContent>
+                        )}
+                    </Tooltip>
+                </TooltipProvider>
             )}
              {showAdminActions && (
                 <Dialog open={isDurationDialogOpen} onOpenChange={setIsDurationDialogOpen}>
@@ -1595,9 +1594,6 @@ function AwardGrantForm({ form, onSubmit, isAwarding }: { form: any, onSubmit: (
                 {fields.map((field, index) => (
                     <div key={field.id} className="p-3 border rounded-md space-y-3">
                          <h4 className="font-semibold text-sm">{`Phase ${index + 1}`}</h4>
-                         {index > 0 && (
-                            <FormField control={form.control} name={`phases.${index}.installmentRefNumber`} render={({ field }) => ( <FormItem><FormLabel>Installment Ref. No.</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                         )}
                          <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                          {fields.length > 1 && (<Button type="button" variant="destructive" size="sm" onClick={() => remove(index)}>Remove Phase</Button>)}
                     </div>

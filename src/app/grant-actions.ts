@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { adminDb } from "@/lib/admin";
@@ -41,7 +40,7 @@ export async function awardInitialGrant(
     grantData: { 
       sanctionNumber: string; 
       totalAmount: number; 
-      phases: { name: string; amount: number; installmentRefNumber?: string }[];
+      phases: { name: string; amount: number;}[];
     },
     pi: { uid: string; name: string; email?: string; campus?: string },
     projectTitle: string
@@ -57,7 +56,6 @@ export async function awardInitialGrant(
             id: new Date().toISOString() + `-${index}`,
             name: phase.name,
             amount: phase.amount,
-            installmentRefNumber: phase.installmentRefNumber || null,
             status: index === 0 ? "Pending Disbursement" : "Pending",
             transactions: [],
         }));
@@ -91,7 +89,6 @@ export async function awardInitialGrant(
                     <ul style="color:#e0e0e0; list-style-type: none; padding-left: 0;">
                         <li><strong>Project Sanction Number:</strong> ${newGrant.sanctionNumber}</li>
                         <li><strong>Total Sanctioned Amount:</strong> ₹${newGrant.totalAmount.toLocaleString('en-IN')}</li>
-                        ${firstPhase.installmentRefNumber ? `<li><strong>Phase 1 Installment Ref. No:</strong> ${firstPhase.installmentRefNumber}</li>` : ''}
                         <li><strong>Phase 1 Amount:</strong> ₹${firstPhase.amount.toLocaleString('en-IN')}</li>
                     </ul>
                     <p style="color:#e0e0e0;">The first phase amount will be disbursed to your registered bank account shortly. You can now log your project expenses through the grant management section on the portal.</p>
