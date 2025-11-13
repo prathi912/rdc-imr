@@ -26,7 +26,7 @@ import {
   updateSystemSettings,
   checkMisIdExists,
 } from "@/app/actions"
-import type { User, SystemSettings, CroAssignment, ApproverSetting } from "@/types"
+import type { User, SystemSettings, CroAssignment, ApproverSetting, ApiIntegrations } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   onAuthStateChanged,
@@ -530,6 +530,12 @@ export default function SettingsPage() {
     setIsSavingSettings(false);
   };
 
+  const handleApiIntegrationToggle = async (api: keyof ApiIntegrations, enabled: boolean) => {
+    if (!systemSettings) return;
+    const newApiSettings = { ...systemSettings.apiIntegrations, [api]: enabled };
+    await handleSystemSettingsSave({ ...systemSettings, apiIntegrations: newApiSettings });
+  };
+
   const handle2faToggle = async (enabled: boolean) => {
     if (!systemSettings) return;
     await handleSystemSettingsSave({ ...systemSettings, is2faEnabled: enabled });
@@ -740,6 +746,29 @@ export default function SettingsPage() {
               <CardDescription>Global settings for the application. Changes affect all users.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+               <div className="space-y-4 rounded-lg border p-4">
+                 <div className="flex items-center gap-2">
+                    <Bot className="h-5 w-5" />
+                    <Label className="text-base">API Integrations</Label>
+                 </div>
+                 <p className="text-sm text-muted-foreground">
+                    Enable or disable external data fetching services.
+                 </p>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center justify-between rounded-lg border p-3">
+                        <Label htmlFor="scopus-toggle">Scopus</Label>
+                        <Switch id="scopus-toggle" checked={systemSettings.apiIntegrations?.scopus !== false} onCheckedChange={(c) => handleApiIntegrationToggle('scopus', c)} disabled={isSavingSettings} />
+                    </div>
+                     <div className="flex items-center justify-between rounded-lg border p-3">
+                        <Label htmlFor="wos-toggle">Web of Science</Label>
+                        <Switch id="wos-toggle" checked={systemSettings.apiIntegrations?.wos !== false} onCheckedChange={(c) => handleApiIntegrationToggle('wos', c)} disabled={isSavingSettings} />
+                    </div>
+                     <div className="flex items-center justify-between rounded-lg border p-3">
+                        <Label htmlFor="sci-toggle">ScienceDirect</Label>
+                        <Switch id="sci-toggle" checked={systemSettings.apiIntegrations?.sci !== false} onCheckedChange={(c) => handleApiIntegrationToggle('sci', c)} disabled={isSavingSettings} />
+                    </div>
+                 </div>
+               </div>
                <div className="space-y-4 rounded-lg border p-4">
                  <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />

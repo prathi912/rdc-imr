@@ -1,5 +1,4 @@
 
-
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -520,6 +519,12 @@ export type TemplateUrls = {
   INCENTIVE_PAYMENT_SHEET?: string;
 };
 
+export type ApiIntegrations = {
+    scopus?: boolean;
+    wos?: boolean;
+    sci?: boolean;
+};
+
 export type SystemSettings = {
   is2faEnabled: boolean
   allowedDomains?: string[]
@@ -533,6 +538,7 @@ export type SystemSettings = {
   utilizationNotificationEmail?: string;
   dndEmail?: string;
   templateUrls?: TemplateUrls;
+  apiIntegrations?: ApiIntegrations;
 }
 
 export type LoginOtp = {
