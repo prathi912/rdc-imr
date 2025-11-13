@@ -353,6 +353,7 @@ export async function scheduleEmrMeeting(
         emailPromises.push(
           sendEmailUtility({
             to: interest.userEmail,
+            cc: 'rdc@paruluniversity.ac.in',
             subject: `Your EMR Presentation Slot for: ${call.title}${subjectOnlineIndicator}`,
             html: emailHtml,
             from: "default",
@@ -1305,7 +1306,7 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
             `;
             await sendEmailUtility({
                 to: interest.userEmail,
-                cc: interest.coPiEmails,
+                cc: interest.coPiEmails?.join(','),
                 subject: `Your EMR Endorsement Form is Ready`,
                 html: emailHtml,
                 from: 'default',
@@ -1425,5 +1426,6 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
 
 
     
+
 
 

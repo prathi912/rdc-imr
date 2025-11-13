@@ -42,13 +42,14 @@ const rdcTransporter = nodemailer.createTransport({
 
 interface EmailOptions {
   to: string;
+  cc?: string;
   subject: string;
   html: string;
   attachments?: { filename: string; path: string }[];
   from: 'default' | 'rdc';
 }
 
-export async function sendEmail({ to, subject, html, attachments, from = 'default' }: EmailOptions) {
+export async function sendEmail({ to, cc, subject, html, attachments, from = 'default' }: EmailOptions) {
   // DND Check
   try {
     const settings = await getSystemSettings();
@@ -85,6 +86,7 @@ export async function sendEmail({ to, subject, html, attachments, from = 'defaul
   const mailOptions = {
     from: fromAddress,
     to: to,
+    cc: cc,
     subject: subject,
     html: html,
     attachments: attachments,
