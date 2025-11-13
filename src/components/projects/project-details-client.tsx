@@ -879,7 +879,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
 
   const isGrantAwarded = !!project.grant;
-  const showDownloadButton = isAdmin && project.status === 'Recommended';
+  const isUserAdmin = user && ["Super-admin", "admin"].includes(user.role);
+  const showDownloadButton = isUserAdmin && (project.status === 'Recommended' || project.status === 'In Progress');
+
   const isMeetingScheduled = !!project.meetingDetails?.date;
 
   return (
@@ -1653,3 +1655,4 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
+
