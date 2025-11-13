@@ -419,8 +419,10 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
 
+    const isConferenceStage2 = isConferenceClaim && stageIndex === 1;
     const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0) || (isConferenceClaim && stageIndex === 0);
-    const showActionButtons = !isChecklistEnabled || (isResearchPaperClaim && stageIndex === 1);
+    const showActionButtons = !isChecklistEnabled;
+    const showAmountForVerification = isConferenceStage2;
     
     const getFieldsToVerify = () => {
         if (isConferenceClaim) {
@@ -458,7 +460,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     })();
     
     const getDefaultAction = () => {
-        if (isChecklistEnabled) return 'verify';
+        if (isChecklistEnabled || isConferenceStage2) return 'verify';
         return 'approve';
     };
 
@@ -479,7 +481,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     useEffect(() => {
         if (isOpen) {
-            const suggestions = fieldsToVerify.reduce((acc, fieldId) => {
+             const suggestions = fieldsToVerify.reduce((acc, fieldId) => {
                 acc[fieldId] = '';
                 return acc;
             }, {} as Record<string, string>);
@@ -487,7 +489,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
             form.reset({
                 amount: defaultAmount || 0,
                 verifiedFields: {},
-                suggestions: suggestions,
+                suggestions,
                 action: getDefaultAction(),
                 comments: '',
             });
@@ -621,7 +623,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                            {(action === 'approve' || (isConferenceClaim && stageIndex === 1)) && (
+                            {(action === 'approve' || showAmountForVerification) && (
                                 <FormField
                                     name="amount"
                                     control={form.control}
@@ -665,3 +667,5 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         </Dialog>
     );
 }
+
+    
