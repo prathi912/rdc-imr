@@ -8,7 +8,7 @@ import Docxtemplater from 'docxtemplater';
 import { adminDb } from '@/lib/admin';
 import type { Project, User, Evaluation, IncentiveClaim, SystemSettings, ApprovalStage } from '@/types';
 import { FieldValue } from 'firebase-admin/firestore';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import { getTemplateContentFromUrl } from '@/lib/template-manager';
@@ -130,11 +130,26 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
         phaseData[`phase${i + 1}_amount`] = "N/A";
       }
     }
+    
+    let duration = project.projectDuration || 'N/A';
+    if (project.projectStartDate && project.projectEndDate) {
+        try {
+            const start = parseISO(project.projectStartDate);
+            const end = parseISO(project.projectEndDate);
+            const days = differenceInDays(end, start);
+            const years = days / 365.25;
+            const roundedYears = Math.round(years);
+            duration = `${roundedYears} Year${roundedYears !== 1 ? 's' : ''}`;
+        } catch (e) {
+            console.error("Error calculating duration:", e);
+        }
+    }
+
 
     const data = {
         pi_name: project.pi || 'N/A',
         pi_designation: piUser?.designation || 'N/A',
-        pi_department: piUser?.department || project.departmentName || 'N/A',
+        pi_institute: piUser?.institute || project.institute || 'N/A',
         pi_phone: project.pi_phoneNumber || piUser?.phoneNumber || "N/A",
         pi_email: project.pi_email || "N/A",
         ...coPiData,
@@ -142,7 +157,7 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
         copi_department: coPi1User?.department || 'N/A',
         submission_date: project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : 'N/A',
         project_title: project.title || 'N/A',
-        project_duration: project.projectDuration || 'N/A',
+        project_duration: duration,
         faculty: piUser?.faculty || project.faculty || 'N/A',
         institute: piUser?.institute || project.institute || 'N/A',
         grant_amount: project.grant?.totalAmount.toLocaleString('en-IN') || 'N/A',
