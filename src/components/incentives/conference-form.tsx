@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -21,11 +22,12 @@ import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc, getDocs, query, where, orderBy, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle, Info, Calculator, Search } from 'lucide-react';
+import { Loader2, AlertCircle, Info, Calculator, Search, Edit } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { calculateConferenceIncentive } from '@/app/incentive-calculation';
 import { findUserByMisId } from '@/app/userfinding';
+import { CardHeader, CardTitle, CardDescription } from '../ui/card';
 
 const conferenceSchema = z
   .object({
@@ -104,6 +106,54 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
+function ReviewDetails({ data, onEdit }: { data: ConferenceFormValues; onEdit: () => void }) {
+    const renderDetail = (label: string, value?: string | number | boolean | React.ReactNode) => {
+        if (!value && value !== 0 && value !== false) return null;
+        return (
+            <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
+                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
+                <dd className="col-span-2">{String(value)}</dd>
+            </div>
+        );
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Review Your Application</CardTitle>
+                        <CardDescription>Please review the details below before final submission.</CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={onEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {renderDetail("Event Type", data.eventType)}
+                {renderDetail("Paper Title", data.conferencePaperTitle)}
+                {renderDetail("Conference Name", data.conferenceName)}
+                {renderDetail("Organizer", data.organizerName)}
+                {renderDetail("Event Website", data.eventWebsite)}
+                {renderDetail("Conference Date", data.conferenceDate)}
+                {renderDetail("Presentation Date", data.presentationDate)}
+                {renderDetail("Conference Type", data.conferenceType)}
+                {renderDetail("Presentation Type", data.presentationType)}
+                {renderDetail("Presentation Mode", data.conferenceMode)}
+                {renderDetail("Online Presentation Order", data.onlinePresentationOrder)}
+                {renderDetail("Registration Fee", `₹${data.registrationFee?.toLocaleString('en-IN')}`)}
+                {renderDetail("Venue/Location", data.conferenceVenue)}
+                {renderDetail("Place Visited", data.travelPlaceVisited)}
+                {renderDetail("Travel Mode", data.travelMode)}
+                {renderDetail("Travel Fare", `₹${data.travelFare?.toLocaleString('en-IN')}`)}
+                {renderDetail("Presenting Author?", data.wasPresentingAuthor ? 'Yes' : 'No')}
+                {renderDetail("PU Name in Paper?", data.isPuNamePresent ? 'Yes' : 'No')}
+                {renderDetail("Won a Prize?", data.wonPrize ? 'Yes' : 'No')}
+                {renderDetail("Prize Details", data.prizeDetails)}
+            </CardContent>
+        </Card>
+    );
+}
+
 export function ConferenceForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -114,6 +164,7 @@ export function ConferenceForm() {
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [eligibility, setEligibility] = useState<{ eligible: boolean; nextAvailableDate?: string }>({ eligible: true });
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+  const [currentStep, setCurrentStep] = useState(1);
   
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [calculationBreakdown, setCalculationBreakdown] = useState<{ eligibleExpenses?: number, maxReimbursement?: number } | null>(null);
@@ -266,6 +317,19 @@ export function ConferenceForm() {
         fetchDraft();
     }
   }, [searchParams, user, form, toast]);
+  
+  const handleProceedToReview = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+      setCurrentStep(2);
+    } else {
+        toast({
+            variant: 'destructive',
+            title: 'Validation Error',
+            description: 'Please correct the errors before proceeding.',
+        });
+    }
+  };
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -370,20 +434,39 @@ export function ConferenceForm() {
         setIsSubmitting(false);
     }
   }
+  
+  const onFinalSubmit = () => handleSave('Pending');
 
   const { conferenceMode, conferenceType, wonPrize, organizerName, conferenceName, travelMode, conferenceVenue } = form.watch();
   const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
   const isFormDisabled = (!eligibility.eligible && isPuConference) || isSubmitting;
 
-
   if (isLoadingDraft) {
     return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
+  }
+
+  if (currentStep === 2) {
+    return (
+      <Card>
+        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+          <CardContent className="pt-6">
+            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={isFormDisabled || bankDetailsMissing || orcidOrMisIdMissing}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    );
   }
 
   return (
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
+        <form>
           <CardContent className="space-y-6 pt-6">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
@@ -490,9 +573,8 @@ export function ConferenceForm() {
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isFormDisabled}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            <Button type="button" onClick={handleProceedToReview} disabled={isFormDisabled || bankDetailsMissing || orcidOrMisIdMissing}>
+                Proceed to Review
             </Button>
           </CardFooter>
         </form>

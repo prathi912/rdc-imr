@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -21,7 +21,7 @@ import { collection, addDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, Author } from '@/types';
 import { uploadFileToServer, checkPatentUniqueness } from '@/app/actions';
 import { findUserByMisId } from '@/app/userfinding';
-import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Bot } from 'lucide-react';
+import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Bot, Edit } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { calculateApcIncentive } from '@/app/incentive-calculation';
@@ -30,6 +30,8 @@ import { fetchScienceDirectData } from '@/app/sciencedirect-actions';
 import { fetchWosDataByUrl } from '@/app/wos-actions';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../ui/table';
+import { Badge } from '../ui/badge';
 
 const authorSchema = z.object({
     name: z.string().min(2, 'Author name is required.'),
@@ -101,6 +103,86 @@ const SPECIAL_POLICY_FACULTIES = [
     "Faculty of Engineering & Technology"
 ];
 
+function ReviewDetails({ data, onEdit }: { data: ApcFormValues; onEdit: () => void }) {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[]) => {
+        if (!value && value !== 0 && value !== false) return null;
+        
+        let displayValue: React.ReactNode = String(value);
+        if (typeof value === 'boolean') {
+            displayValue = value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
+                 displayValue = (
+                    <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Author Name</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Email</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {(value as Author[]).map((author, idx) => (
+                                    <TableRow key={idx}>
+                                        <TableCell>{author.name}</TableCell>
+                                        <TableCell><Badge variant="secondary">{author.role}</Badge></TableCell>
+                                        <TableCell>{author.email}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                );
+            } else {
+                displayValue = (value as string[]).join(', ');
+            }
+        }
+
+        return (
+            <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
+                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
+                <dd className="col-span-2">{displayValue}</dd>
+            </div>
+        );
+    };
+
+    const apcWaiverProofFile = data.apcApcWaiverProof?.[0] as File | undefined;
+    const apcPublicationProofFile = data.apcPublicationProof?.[0] as File | undefined;
+    const apcInvoiceProofFile = data.apcInvoiceProof?.[0] as File | undefined;
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Review Your Application</CardTitle>
+                        <CardDescription>Please review the details below before final submission.</CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={onEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {renderDetail("Article Type", data.apcTypeOfArticle === 'Other' ? data.apcOtherArticleType : data.apcTypeOfArticle)}
+                {renderDetail("Indexing Status", data.apcIndexingStatus)}
+                {renderDetail("Q Rating", data.apcQRating)}
+                {renderDetail("Paper Title", data.apcPaperTitle)}
+                {renderDetail("Authors", data.authors)}
+                {renderDetail("Journal Details", data.apcJournalDetails)}
+                {renderDetail("Journal Website", data.apcJournalWebsite)}
+                {renderDetail("ISSN", data.apcIssnNo)}
+                {renderDetail("SCI Impact Factor", data.apcSciImpactFactor)}
+                {renderDetail("PU Name in Publication", data.apcPuNameInPublication)}
+                {renderDetail("Total Amount of APC (INR)", `₹${data.apcTotalAmount.toLocaleString('en-IN')}`)}
+                {renderDetail("Amount Claimed (INR)", `₹${data.apcAmountClaimed.toLocaleString('en-IN')}`)}
+                {renderDetail("Proof of APC Waiver Request", apcWaiverProofFile?.name)}
+                {renderDetail("Proof of Publication", apcPublicationProofFile?.name)}
+                {renderDetail("Proof of Invoice/Payment", apcInvoiceProofFile?.name)}
+            </CardContent>
+        </Card>
+    );
+}
 
 export function ApcForm() {
   const { toast } = useToast();
@@ -113,6 +195,7 @@ export function ApcForm() {
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+  const [currentStep, setCurrentStep] = useState(1);
   
   const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
   const [foundCoPis, setFoundCoPis] = useState<any[]>([]);
@@ -283,6 +366,19 @@ useEffect(() => {
   const watchArticleType = form.watch('apcTypeOfArticle');
   const watchWaiverRequested = form.watch('apcApcWaiverRequested');
   const indexType = form.watch("apcIndexingStatus");
+
+  const handleProceedToReview = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+      setCurrentStep(2);
+    } else {
+        toast({
+            variant: 'destructive',
+            title: 'Validation Error',
+            description: 'Please correct the errors before proceeding.',
+        });
+    }
+  };
 
   const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
     const doi = form.getValues('doi');
@@ -504,12 +600,30 @@ useEffect(() => {
   if (isLoadingDraft) {
     return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
   }
+  
+  if (currentStep === 2) {
+    return (
+        <Card>
+            <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+                <CardContent className="pt-6">
+                    <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+                    </Button>
+                </CardFooter>
+            </form>
+        </Card>
+    );
+  }
 
   return (
     <>
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+        <form>
           <CardContent className="space-y-6 pt-6">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
@@ -705,9 +819,8 @@ useEffect(() => {
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+                Proceed to Review
             </Button>
           </CardFooter>
         </form>

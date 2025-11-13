@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
@@ -21,7 +21,7 @@ import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, PatentInventor } from '@/types';
 import { uploadFileToServer, checkPatentUniqueness } from '@/app/actions';
-import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown } from 'lucide-react';
+import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown, Edit } from 'lucide-react';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { findUserByMisId } from '@/app/userfinding';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { calculatePatentIncentive } from '@/app/incentive-calculation';
+import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '../ui/table';
 
 const sdgGoalsList = [
   "Goal 1: No Poverty", "Goal 2: Zero Hunger", "Goal 3: Good Health and Well-being", "Goal 4: Quality Education",
@@ -99,6 +100,85 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
+function ReviewDetails({ data, onEdit }: { data: PatentFormValues; onEdit: () => void }) {
+    const renderDetail = (label: string, value?: string | number | boolean | string[] | PatentInventor[]) => {
+        if (!value && value !== 0 && value !== false) return null;
+        
+        let displayValue: React.ReactNode = String(value);
+        if (typeof value === 'boolean') {
+            displayValue = value ? 'Yes' : 'No';
+        }
+        if (Array.isArray(value)) {
+            if (value.length > 0 && typeof value[0] === 'object' && value[0] !== null && 'name' in value[0]) {
+                displayValue = (
+                    <div className="border rounded-lg overflow-hidden">
+                        <Table><TableHeader><TableRow><TableHead>Name</TableHead><TableHead>MIS ID</TableHead></TableRow></TableHeader>
+                        <TableBody>
+                            {(value as PatentInventor[]).map((p, idx) => (
+                                <TableRow key={idx}><TableCell>{p.name}</TableCell><TableCell>{p.misId}</TableCell></TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </div>
+                );
+            } else {
+                displayValue = (value as string[]).join(', ');
+            }
+        }
+
+        return (
+            <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
+                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
+                <dd className="col-span-2">{displayValue}</dd>
+            </div>
+        );
+    };
+    
+    const form1File = data.patentForm1?.[0] as File | undefined;
+    const approvalProofFile = data.patentApprovalProof?.[0] as File | undefined;
+    const govtReceiptFile = data.patentGovtReceipt?.[0] as File | undefined;
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Review Your Application</CardTitle>
+                        <CardDescription>Please review the details below before final submission.</CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={onEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {renderDetail("Locale", data.patentLocale)}
+                {renderDetail("Country", data.patentCountry)}
+                {renderDetail("Patent Title", data.patentTitle)}
+                {renderDetail("Application Number", data.patentApplicationNumber)}
+                {renderDetail("Domain", data.patentDomain)}
+                {renderDetail("Inventors", data.patentInventors)}
+                {renderDetail("Co-Applicants", data.patentCoApplicants)}
+                {renderDetail("Collaboration", data.isCollaboration)}
+                {renderDetail("Collaboration Details", data.collaborationDetails)}
+                {renderDetail("Relates to SDGs", data.isIprSdg)}
+                {renderDetail("SDGs", data.sdgGoals)}
+                {renderDetail("Disciplinary Type", data.disciplinaryType)}
+                {renderDetail("Filing Date", data.filingDate ? format(data.filingDate, 'PPP') : 'N/A')}
+                {renderDetail("Publication Date", data.publicationDate ? format(data.publicationDate, 'PPP') : 'N/A')}
+                {renderDetail("Grant Date", data.grantDate ? format(data.grantDate, 'PPP') : 'N/A')}
+                {renderDetail("Current Status", data.currentStatus)}
+                {renderDetail("Specification Type", data.patentSpecificationType)}
+                {renderDetail("Filed in PU Name", data.patentFiledInPuName)}
+                {renderDetail("PU is Sole Applicant", data.isPuSoleApplicant)}
+                {renderDetail("Filed from IPR Cell", data.patentFiledFromIprCell)}
+                {renderDetail("Permission Taken", data.patentPermissionTaken)}
+                {renderDetail("Form 1 Proof", form1File?.name)}
+                {renderDetail("Approval Proof", approvalProofFile?.name)}
+                {renderDetail("Govt. Receipt", govtReceiptFile?.name)}
+            </CardContent>
+        </Card>
+    );
+}
+
 export function PatentForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -113,6 +193,7 @@ export function PatentForm() {
   const [foundUser, setFoundUser] = useState<PatentInventor | null>(null);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+  const [currentStep, setCurrentStep] = useState(1);
   
   const form = useForm<PatentFormValues>({
     resolver: zodResolver(patentSchema),
@@ -243,6 +324,18 @@ export function PatentForm() {
   const patentFiledFromIprCell = form.watch('patentFiledFromIprCell');
   const patentFiledInPuName = form.watch('patentFiledInPuName');
   
+  const handleProceedToReview = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+      setCurrentStep(2);
+    } else {
+        toast({
+            variant: 'destructive',
+            title: 'Validation Error',
+            description: 'Please correct the errors before proceeding.',
+        });
+    }
+  };
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -334,15 +427,35 @@ export function PatentForm() {
         setIsSubmitting(false);
     }
   }
+  
+  const onFinalSubmit = () => handleSave('Pending');
 
   if (isLoadingDraft) {
     return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
+  }
+  
+  if (currentStep === 2) {
+    return (
+      <Card>
+        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+          <CardContent className="pt-6">
+            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    );
   }
 
   return (
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
+        <form>
           <CardContent className="space-y-6 pt-6">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
@@ -497,9 +610,8 @@ export function PatentForm() {
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+             <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+                Proceed to Review
             </Button>
           </CardFooter>
         </form>
@@ -507,5 +619,3 @@ export function PatentForm() {
     </Card>
   );
 }
-
-    

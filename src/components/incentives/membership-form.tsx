@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -7,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,7 +19,7 @@ import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToServer } from '@/app/actions';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Edit } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 
@@ -46,6 +45,43 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
+function ReviewDetails({ data, onEdit }: { data: MembershipFormValues; onEdit: () => void }) {
+    const renderDetail = (label: string, value?: string | number | boolean) => {
+        if (!value && value !== 0 && value !== false) return null;
+        return (
+            <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
+                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
+                <dd className="col-span-2">{String(value)}</dd>
+            </div>
+        );
+    };
+
+    const proofFile = data.membershipProof?.[0] as File | undefined;
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle>Review Your Application</CardTitle>
+                        <CardDescription>Please review the details below before final submission.</CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={onEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {renderDetail("Professional Body Name", data.professionalBodyName)}
+                {renderDetail("Membership Type", data.membershipType)}
+                {renderDetail("Locale", data.membershipLocale)}
+                {renderDetail("Membership Number", data.membershipNumber)}
+                {renderDetail("Amount Paid (INR)", `₹${data.membershipAmountPaid.toLocaleString('en-IN')}`)}
+                {renderDetail("Payment Date", data.membershipPaymentDate)}
+                {renderDetail("Proof Document", proofFile?.name)}
+            </CardContent>
+        </Card>
+    );
+}
+
 export function MembershipForm() {
   const { toast } = useToast();
   const router = useRouter();
@@ -56,6 +92,7 @@ export function MembershipForm() {
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+  const [currentStep, setCurrentStep] = useState(1);
   
   const form = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipSchema),
@@ -123,6 +160,18 @@ export function MembershipForm() {
     }
   }, [searchParams, user, form, toast]);
 
+  const handleProceedToReview = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+      setCurrentStep(2);
+    } else {
+        toast({
+            variant: 'destructive',
+            title: 'Validation Error',
+            description: 'Please correct the errors before proceeding.',
+        });
+    }
+  };
 
   async function handleSave(status: 'Draft' | 'Pending') {
     if (!user || !user.faculty) {
@@ -201,15 +250,35 @@ export function MembershipForm() {
         setIsSubmitting(false);
     }
   }
+  
+  const onFinalSubmit = () => handleSave('Pending');
 
   if (isLoadingDraft) {
     return <Card className="p-8 flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></Card>;
   }
 
+  if (currentStep === 2) {
+    return (
+        <Card>
+            <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+                <CardContent className="pt-6">
+                    <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+                </CardContent>
+                <CardFooter>
+                    <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+                    </Button>
+                </CardFooter>
+            </form>
+        </Card>
+    );
+  }
+
   return (
     <Card>
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(() => handleSave('Pending'))}>
+        <form>
           <CardContent className="space-y-6 pt-6">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
                 <Alert variant="destructive">
@@ -252,9 +321,8 @@ export function MembershipForm() {
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Save as Draft
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
+                Proceed to Review
             </Button>
           </CardFooter>
         </form>
