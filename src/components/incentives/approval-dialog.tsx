@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -420,6 +420,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0) || (isConferenceClaim && stageIndex === 0);
     const showActionButtons = !isChecklistEnabled && !isConferenceStage2;
+    const showAmountForVerification = isConferenceStage2;
     
     const approvalSchema = createApprovalSchema(stageIndex, claim.claimType);
     
@@ -470,8 +471,6 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
             action: getDefaultAction(),
         }
     });
-    
-    const { reset } = form;
 
     useEffect(() => {
         if (isOpen) {
@@ -480,7 +479,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                 acc[fieldId] = approval1?.suggestions?.[fieldId] || '';
                 return acc;
             }, {} as Record<string, string>);
-            reset({
+            form.reset({
                 amount: defaultAmount || 0,
                 verifiedFields: approval1?.verifiedFields || {},
                 suggestions,
@@ -488,7 +487,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                 comments: '',
             });
         }
-    }, [isOpen, claim, defaultAmount, reset, getDefaultAction, fieldsToVerify]);
+    }, [isOpen, claim, defaultAmount, form.reset, getDefaultAction, fieldsToVerify]);
 
 
     const action = form.watch('action');
@@ -597,6 +596,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                         {isResearchPaperClaim && <ResearchPaperClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
                         {isConferenceClaim && <ConferenceClaimDetails claim={claim} claimant={claimant} form={form} isChecklistEnabled={isChecklistEnabled} stageIndex={stageIndex} previousApprovals={claim.approvals || []} />}
 
+
                         <form id="approval-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                              {showActionButtons && (
                                 <FormField
@@ -660,3 +660,4 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         </Dialog>
     );
 }
+
