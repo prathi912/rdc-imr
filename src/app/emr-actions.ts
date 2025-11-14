@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
@@ -814,6 +813,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
 
     await sendEmailUtility({
       to: allStaffEmails,
+      bcc: 'registrar@goa.paruluniversity.ac.in, provost@goa.paruluniversity.ac.in',
       subject: `New Funding Call: ${call.title}`,
       from: "rdc",
       attachments: emailAttachments,
@@ -1426,6 +1426,7 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
 
 
     
+
 
 
 
