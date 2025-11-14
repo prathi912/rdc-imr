@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import fs from 'fs';
@@ -137,9 +138,8 @@ export async function generateRecommendationForm(projectId: string): Promise<{ s
             const start = parseISO(project.projectStartDate);
             const end = parseISO(project.projectEndDate);
             const days = differenceInDays(end, start);
-            const years = days / 365.25;
-            const roundedYears = Math.round(years);
-            duration = `${roundedYears} Year${roundedYears !== 1 ? 's' : ''}`;
+            const years = Math.round(days / 365.25);
+            duration = `${years} Year${years !== 1 ? 's' : ''}`;
         } catch (e) {
             console.error("Error calculating duration:", e);
         }
@@ -577,3 +577,4 @@ export async function generateSanctionOrder(projectId: string): Promise<{ succes
     return { success: false, error: error.message || 'Failed to generate the sanction order.' };
   }
 }
+
