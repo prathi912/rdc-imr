@@ -752,7 +752,6 @@ export async function createFundingCall(
 export async function announceEmrCall(callId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const vadodaraEmail = process.env.ALL_STAFF_EMAIL_VADODARA;
-    const goaEmail = process.env.ALL_STAFF_EMAIL_GOA;
 
     if (!vadodaraEmail || !goaEmail) {
       return {
@@ -761,7 +760,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
       }
     }
     
-    const allStaffEmails = [vadodaraEmail, goaEmail].join(',');
+    const allStaffEmails = [vadodaraEmail];
 
     const callRef = adminDb.collection("fundingCalls").doc(callId)
     const callSnap = await callRef.get()
@@ -813,9 +812,8 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
 
     await sendEmailUtility({
       to: allStaffEmails,
-      bcc: 'registrar@goa.paruluniversity.ac.in, provost@goa.paruluniversity.ac.in',
       subject: `New Funding Call: ${call.title}`,
-      from: "rdc",
+      from: "Research & Development Cell",
       attachments: emailAttachments,
       html: emailHtml,
     })
