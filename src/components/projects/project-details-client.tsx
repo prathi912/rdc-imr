@@ -906,6 +906,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const showSanctionOrderButton = isUserAdmin && project.status === 'In Progress';
   const isDurationSet = !!project.projectStartDate && !!project.projectEndDate;
   const isMeetingScheduled = !!project.meetingDetails?.date;
+  const showBankDetails = isAdmin && ['Recommended', 'In Progress', 'Completed', 'Sanctioned', 'Pending Completion Approval'].includes(project.status);
 
   return (
     <>
@@ -948,7 +949,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                         </TooltipTrigger>
                         {!isDurationSet && (
                             <TooltipContent>
-                                <p>Set project duration before awarding a grant.</p>
+                                <p>Set project duration first.</p>
                             </TooltipContent>
                         )}
                     </Tooltip>
@@ -1311,6 +1312,21 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               </dl>
             </div>
           </div>
+          {showBankDetails && piUser?.bankDetails && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg flex items-center gap-2"><Banknote className="h-5 w-5" />Bank Details</h3>
+                  <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                    <div className="grid grid-cols-2"><dt className="font-medium text-muted-foreground">Beneficiary Name</dt><dd>{piUser.bankDetails.beneficiaryName}</dd></div>
+                    <div className="grid grid-cols-2"><dt className="font-medium text-muted-foreground">Account Number</dt><dd>{piUser.bankDetails.accountNumber}</dd></div>
+                    <div className="grid grid-cols-2"><dt className="font-medium text-muted-foreground">Bank Name</dt><dd>{piUser.bankDetails.bankName}</dd></div>
+                    <div className="grid grid-cols-2"><dt className="font-medium text-muted-foreground">IFSC Code</dt><dd>{piUser.bankDetails.ifscCode}</dd></div>
+                    <div className="grid grid-cols-2"><dt className="font-medium text-muted-foreground">Branch</dt><dd>{piUser.bankDetails.branchName}</dd></div>
+                  </dl>
+                </div>
+              </>
+          )}
           <Separator />
           {(project.teamInfo || (project.coPiDetails && project.coPiDetails.length > 0) || isPI) && (
             <>
@@ -1624,7 +1640,7 @@ function AwardGrantForm({ form, onSubmit, isAwarding }: { form: any, onSubmit: (
 
                 {fields.map((field, index) => (
                     <div key={field.id} className="p-3 border rounded-md space-y-3">
-                         <h4 className="font-semibold text-sm">{`Phase ${index + 1}`}</h4>
+                         <h4 className="font-semibold text-sm">{form.getValues(`phases.${index}.name`)}</h4>
                          <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
                          {fields.length > 1 && (<Button type="button" variant="destructive" size="sm" onClick={() => remove(index)}>Remove Phase</Button>)}
                     </div>
