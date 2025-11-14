@@ -753,7 +753,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
   try {
     const vadodaraEmail = process.env.ALL_STAFF_EMAIL_VADODARA;
 
-    if (!vadodaraEmail || !goaEmail) {
+    if (!vadodaraEmail) {
       return {
         success: false,
         error: "One or more staff email addresses are not configured on the server. Please add them to the .env file.",
