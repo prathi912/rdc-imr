@@ -159,11 +159,11 @@ export default function SignupPage() {
       role,
       designation,
       campus,
-      faculty: userDataFromExcel.faculty || domainCheck.croFaculty || null,
-      institute: userDataFromExcel.institute || null,
-      department: userDataFromExcel.department || null,
-      phoneNumber: userDataFromExcel.phoneNumber || null,
-      misId: userDataFromExcel.misId || null,
+      faculty: userDataFromExcel.faculty || domainCheck.croFaculty || '',
+      institute: userDataFromExcel.institute || '',
+      department: userDataFromExcel.department || '',
+      phoneNumber: userDataFromExcel.phoneNumber || '',
+      misId: userDataFromExcel.misId || '',
       profileComplete,
       allowedModules: getDefaultModulesForRole(role, designation),
       hasCompletedTutorial: false,
@@ -173,7 +173,7 @@ export default function SignupPage() {
       user.photoURL = firebaseUser.photoURL
     }
 
-    await setDoc(userDocRef, user)
+    await setDoc(userDocRef, user, { merge: true })
 
     if (notifyRole) {
       await notifySuperAdminsOnNewUser(user.name, notifyRole)
