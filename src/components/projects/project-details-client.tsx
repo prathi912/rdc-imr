@@ -1527,8 +1527,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>OK</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
+          </AlertDialogContent>
       </AlertDialog>
 
       <Dialog open={isRevisionCommentDialogOpen} onOpenChange={setIsRevisionCommentDialogOpen}>
@@ -1635,7 +1634,7 @@ function AwardGrantForm({ form, onSubmit, isAwarding }: { form: any, onSubmit: (
         <Form {...form}>
             <form id="award-grant-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
                 <FormField name="sanctionNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Project Sanction Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="totalAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Sanctioned Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                <FormField name="totalAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Total Sanctioned Amount (₹)</FormLabel><FormControl><Input type="number" {...field} min="0" onWheel={(e) => (e.target as HTMLElement).blur()} /></FormControl><FormMessage /></FormItem> )} />
                 
                 <Separator />
                 <Label>Phase-wise Grant Amounts</Label>
@@ -1643,7 +1642,7 @@ function AwardGrantForm({ form, onSubmit, isAwarding }: { form: any, onSubmit: (
                 {fields.map((field, index) => (
                     <div key={field.id} className="p-3 border rounded-md space-y-3">
                          <h4 className="font-semibold text-sm">{form.getValues(`phases.${index}.name`)}</h4>
-                         <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                         <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" {...field} min="0" onWheel={(e) => (e.target as HTMLElement).blur()} /></FormControl><FormMessage /></FormItem> )} />
                          {fields.length > 1 && (<Button type="button" variant="destructive" size="sm" onClick={() => remove(index)}>Remove Phase</Button>)}
                     </div>
                 ))}
@@ -1712,3 +1711,5 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
+
+    
