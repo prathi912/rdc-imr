@@ -425,7 +425,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const isPI = user?.uid === project.pi_uid || user?.email === project.pi_email
   const isCoPi = user && project.coPiUids?.includes(user.uid)
-  const isAdmin = user && ["Super-admin", "admin", "CRO"].includes(user.role)
+  const isAdmin = user && ["Super-admin", "admin"].includes(user.role)
   const isSuperAdmin = user?.role === "Super-admin"
   const isUserAdmin = user && ["Super-admin", "admin"].includes(user.role);
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid)
@@ -900,6 +900,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   const canViewEvaluations = (isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive)) && !isHeadOfGoaCampus;
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
+  const canManageCoPi = (isPI || isAdmin) && project.status !== 'Not Recommended';
+
 
   const isGrantAwarded = !!project.grant;
   const showDownloadButton = isUserAdmin && (project.status === 'Recommended' || project.status === 'In Progress');
@@ -1328,14 +1330,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
               </>
           )}
           <Separator />
-          {(project.teamInfo || (project.coPiDetails && project.coPiDetails.length > 0) || isPI) && (
+          {(project.teamInfo || (project.coPiDetails && project.coPiDetails.length > 0) || canManageCoPi) && (
             <>
               <div className="space-y-4">
                   <h3 className="font-semibold text-lg flex items-center gap-2">
                       <Users className="h-5 w-5" />
                       Team Information
                   </h3>
-                  {isPI && project.status !== 'Not Recommended' && (
+                  {canManageCoPi && project.status !== 'Not Recommended' && (
                       <Card className="bg-muted/50">
                           <CardHeader>
                               <CardTitle className="text-base">Manage Co-Investigators</CardTitle>
