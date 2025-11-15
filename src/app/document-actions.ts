@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import fs from 'fs';
@@ -538,7 +537,7 @@ export async function generateSanctionOrder(projectId: string): Promise<{ succes
 
     const templateData: { [key: string]: any } = {
         Overall_Sanction: project.grant?.sanctionNumber || 'N/A',
-        Date: format(new Date(), 'dd.MM.yyyy'),
+        date: format(new Date(), 'dd.MM.yyyy'),
         total_amount: project.grant?.totalAmount?.toLocaleString('en-IN') || 'N/A',
         Project_title: project.title,
         pi_name: project.pi,
@@ -578,3 +577,6 @@ export async function generateSanctionOrder(projectId: string): Promise<{ succes
   }
 }
 
+
+
+    
