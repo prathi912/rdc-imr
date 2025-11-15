@@ -32,6 +32,7 @@ import {
   isEmailDomainAllowed,
   linkEmrInterestsToNewUser,
   linkEmrCoPiInterestsToNewUser,
+  verifyLoginOtp,
 } from "@/app/actions"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { OtpDialog } from "@/components/otp-dialog"
@@ -63,7 +64,7 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isOtpOpen, setIsOtpOpen] = useState(false)
-  const [otpUser, setOtpUser] = useState<{ email: string; firebaseUser: FirebaseUser } | null>(null)
+  const [pendingUser, setPendingUser] = useState<LoginFormValues | null>(null);
   const [loading, setLoading] = useState(true);
   
   const form = useForm<LoginFormValues>({
@@ -106,7 +107,6 @@ export default function LoginPage() {
       let designation: User["designation"] = "faculty"
       let profileComplete = false
 
-      // Check if this is a CRO domain
       const domainCheck = await isEmailDomainAllowed(firebaseUser.email!)
 
       if (staffResult.success) {
@@ -123,7 +123,6 @@ export default function LoginPage() {
           profileComplete = true
         }
       } else if (domainCheck.isCro) {
-        // Auto-assign CRO role for CRO domains
         role = "CRO"
         designation = "CRO"
         profileComplete = true
@@ -153,7 +152,6 @@ export default function LoginPage() {
       user.allowedModules = getDefaultModulesForRole(user.role, user.designation)
     }
     
-    // Check for special incentive approver role from system settings
     const systemSettings = await getSystemSettings();
     const approverSetting = systemSettings.incentiveApprovers?.find(a => a.email.toLowerCase() === user.email.toLowerCase());
     
@@ -175,7 +173,6 @@ export default function LoginPage() {
         console.log(`Successfully linked ${result.count} historical projects for user ${user.email}.`)
       }
 
-      // Link EMR interests
       const emrResult = await linkEmrInterestsToNewUser(user.uid, user.email)
       if (emrResult.success && emrResult.count > 0) {
         console.log(`Successfully linked ${emrResult.count} EMR interests for user ${user.email}.`)
@@ -183,7 +180,7 @@ export default function LoginPage() {
 
       const emrCoPiResult = await linkEmrCoPiInterestsToNewUser(user.uid, user.email)
       if (emrCoPiResult.success && emrCoPiResult.count > 0) {
-        console.log(`Successfully linked ${emrCoPiResult.count} EMR Co-PI interests for user ${user.email}.`)
+        console.log(`Successfully linked ${emrCoPiResult.count} EMR Co-PI interests for user ${user.email}.`);
       }
 
 
@@ -213,27 +210,45 @@ export default function LoginPage() {
     }
   }
 
-  const handleSuccessfulOtp = async () => {
-    if (!otpUser) return
-    setIsOtpOpen(false)
-    await processSignIn(otpUser.firebaseUser)
-  }
+  const handleSuccessfulOtp = async (otp: string) => {
+    if (!pendingUser) return;
+    setIsSubmitting(true);
+    try {
+        const otpResult = await verifyLoginOtp(pendingUser.email, otp);
+        if (!otpResult.success) {
+            throw new Error(otpResult.error || "Invalid OTP");
+        }
+        
+        // Now that OTP is verified, sign the user in
+        const userCredential = await signInWithEmailAndPassword(auth, pendingUser.email, pendingUser.password);
+        setIsOtpOpen(false);
+        await processSignIn(userCredential.user);
+    } catch (error: any) {
+        toast({
+            variant: "destructive",
+            title: "Verification Failed",
+            description: error.message || "An error occurred.",
+        });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
 
   const onEmailSubmit = async (data: LoginFormValues) => {
     setIsSubmitting(true)
     try {
       const settings = await getSystemSettings()
-      const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password)
-
+      
       if (settings.is2faEnabled && data.email !== "vicepresident_86@paruluniversity.ac.in") {
-        const otpResult = await sendLoginOtp(data.email)
+        setPendingUser(data);
+        const otpResult = await sendLoginOtp(data.email);
         if (otpResult.success) {
-          setOtpUser({ email: data.email, firebaseUser: userCredential.user })
-          setIsOtpOpen(true)
+          setIsOtpOpen(true);
         } else {
-          throw new Error(otpResult.error || "Failed to send OTP.")
+          throw new Error(otpResult.error || "Failed to send OTP.");
         }
       } else {
+        const userCredential = await signInWithEmailAndPassword(auth, data.email, data.password)
         await processSignIn(userCredential.user)
       }
     } catch (error: any) {
@@ -299,7 +314,7 @@ export default function LoginPage() {
       setIsSubmitting(false)
     }
   }
-
+  
   if (loading) {
     return (
         <div className="flex flex-col min-h-screen items-center justify-center">
@@ -429,12 +444,13 @@ export default function LoginPage() {
           </nav>
         </footer>
       </div>
-      {otpUser && (
+      {pendingUser && (
         <OtpDialog
           isOpen={isOtpOpen}
           onOpenChange={setIsOtpOpen}
-          email={otpUser.email}
+          email={pendingUser.email}
           onVerify={handleSuccessfulOtp}
+          isVerifying={isSubmitting}
         />
       )}
     </>

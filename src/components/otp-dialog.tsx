@@ -1,5 +1,5 @@
 
-'use client';
+"use client";
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -27,15 +27,14 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from '@/components/ui/input-otp';
-import { useToast } from '@/hooks/use-toast';
-import { verifyLoginOtp } from '@/app/actions';
 import { Loader2 } from 'lucide-react';
 
 interface OtpDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   email: string;
-  onVerify: () => void;
+  onVerify: (otp: string) => Promise<void>;
+  isVerifying: boolean;
 }
 
 const otpSchema = z.object({
@@ -44,9 +43,7 @@ const otpSchema = z.object({
   }),
 });
 
-export function OtpDialog({ isOpen, onOpenChange, email, onVerify }: OtpDialogProps) {
-  const { toast } = useToast();
-  const [isVerifying, setIsVerifying] = useState(false);
+export function OtpDialog({ isOpen, onOpenChange, email, onVerify, isVerifying }: OtpDialogProps) {
 
   const form = useForm<z.infer<typeof otpSchema>>({
     resolver: zodResolver(otpSchema),
@@ -56,31 +53,7 @@ export function OtpDialog({ isOpen, onOpenChange, email, onVerify }: OtpDialogPr
   });
 
   const onSubmit = async (data: z.infer<typeof otpSchema>) => {
-    setIsVerifying(true);
-    try {
-      const result = await verifyLoginOtp(email, data.otp);
-      if (result.success) {
-        toast({
-          title: 'Verification Successful',
-          description: 'You are now being logged in.',
-        });
-        onVerify();
-      } else {
-        toast({
-          variant: 'destructive',
-          title: 'Verification Failed',
-          description: result.error || 'Invalid or expired OTP.',
-        });
-      }
-    } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'An unexpected error occurred.',
-      });
-    } finally {
-      setIsVerifying(false);
-    }
+    await onVerify(data.otp);
   };
 
   return (
