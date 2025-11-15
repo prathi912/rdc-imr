@@ -41,7 +41,6 @@ const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
 const suggestionsSchema = z.record(z.string(), z.string().optional()).optional();
 
 const createApprovalSchema = (stageIndex: number, claimType?: string) => {
-    const isConferenceStage2 = claimType === 'Conference Presentations' && stageIndex === 1;
     const isChecklistEnabled = (claimType === 'Research Papers' && (stageIndex === 0 || stageIndex === 1)) || (claimType === 'Conference Presentations' && stageIndex === 0);
 
     return z.object({
@@ -51,24 +50,13 @@ const createApprovalSchema = (stageIndex: number, claimType?: string) => {
         verifiedFields: verifiedFieldsSchema,
         suggestions: suggestionsSchema,
     }).refine(data => {
-        if (isConferenceStage2) {
-            return data.action === 'verify' && data.amount !== undefined && data.amount >= 0;
-        }
-        if (isChecklistEnabled) {
-            return data.action === 'verify';
-        }
-        return data.action === 'approve' || data.action === 'reject';
-    }, {
-        message: 'An action must be selected, and amount is required for approval.',
-        path: ['action'],
-    }).refine(data => {
-        if (data.action === 'approve' && !isConferenceStage2) {
+        if (data.action !== 'reject') {
             return data.amount !== undefined && data.amount >= 0;
         }
         return true;
     }, {
-      message: 'Approved amount is required for this stage.',
-      path: ['amount'],
+        message: 'Approved amount is required for this action.',
+        path: ['amount'],
     }).refine(data => {
         if (data.action === 'reject') {
             return !!data.comments && data.comments.trim() !== '';
@@ -88,7 +76,6 @@ const createApprovalSchema = (stageIndex: number, claimType?: string) => {
         path: ['comments'],
     });
 }
-
 
 type ApprovalFormData = z.infer<ReturnType<typeof createApprovalSchema>>;
 
@@ -425,10 +412,9 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const [isSubmitting, setIsSubmitting] = useState(false);
     
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
-    const isConferenceStage2 = isConferenceClaim && stageIndex === 1;
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
     const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && stageIndex === 0);
-    const showActionButtons = !isChecklistEnabled && !isConferenceStage2;
+    const showActionButtons = !isChecklistEnabled;
     
     const approvalSchema = createApprovalSchema(stageIndex, claim.claimType);
     
@@ -473,9 +459,9 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     }, [stageIndex, claim]);
     
     const getDefaultAction = useCallback(() => {
-        if (isChecklistEnabled || isConferenceStage2) return 'verify';
+        if (isChecklistEnabled) return 'verify';
         return 'approve';
-    }, [isChecklistEnabled, isConferenceStage2]);
+    }, [isChecklistEnabled]);
 
     const form = useForm<ApprovalFormData>({
         resolver: zodResolver(formSchemaWithVerification),
@@ -507,7 +493,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
 
     const action = form.watch('action');
-    const showAmountField = (isConferenceStage2) || (showActionButtons && action === 'approve') || (isResearchPaperClaim && stageIndex === 1);
+    const showAmountField = action !== 'reject';
     const showCommentsField = (showActionButtons) || (stageIndex === 1 || stageIndex === 2);
 
 
@@ -678,3 +664,5 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         </Dialog>
     );
 }
+
+    
