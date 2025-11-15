@@ -467,8 +467,8 @@ export async function generateOfficeNotingForm(
       return { success: false, error: "Failed to render the document template." }
     }
 
-    const buf = doc.getZip().generate({ type: 'nodebuffer' })
-    const base64 = buf.toString('base64')
+    const buf = doc.getZip().generate({ type: "nodebuffer" })
+    const base64 = buf.toString("base64")
 
     if (project.status === "Recommended") {
       await projectRef.update({
@@ -536,7 +536,7 @@ export async function generateSanctionOrder(projectId: string): Promise<{ succes
     }
 
     const templateData: { [key: string]: any } = {
-        Overall_Sanction: project.grant?.sanctionNumber || 'N/A',
+        Overall_sanction: project.grant?.sanctionNumber || 'N/A',
         date: format(new Date(), 'dd.MM.yyyy'),
         total_amount: project.grant?.totalAmount?.toLocaleString('en-IN') || 'N/A',
         Project_title: project.title,
@@ -576,7 +576,3 @@ export async function generateSanctionOrder(projectId: string): Promise<{ succes
     return { success: false, error: error.message || 'Failed to generate the sanction order.' };
   }
 }
-
-
-
-    
