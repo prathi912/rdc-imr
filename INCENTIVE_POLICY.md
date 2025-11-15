@@ -105,11 +105,11 @@ The final reimbursement is the *lesser of* the total eligible expenses (Registra
   - Africa, South/North America, Other: Up to ₹75,000
 
 **Other Conferences (Online):**
-The final reimbursement is the *lesser of* 75% of the registration fee and the maximum limit based on presentation order.
-- **First Presentation of the year:** Up to ₹15,000
-- **Second Presentation:** Up to ₹10,000
-- **Third Presentation:** Up to ₹7,000
-- **Additional Presentations:** Up to ₹2,000
+The final reimbursement is the *lesser of* the calculated registration fee percentage and the maximum policy limit.
+- **First Presentation of the year:** 75% of registration fee, up to ₹15,000
+- **Second Presentation:** 60% of registration fee, up to ₹10,000
+- **Third Presentation:** 50% of registration fee, up to ₹7,000
+- **Additional Presentations:** 30% of registration fee, up to ₹2,000
 
 ---
 
