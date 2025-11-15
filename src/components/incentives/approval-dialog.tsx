@@ -44,7 +44,6 @@ const createApprovalSchema = (stageIndex: number, claimType?: string) => {
     const isConferenceStage2 = claimType === 'Conference Presentations' && stageIndex === 1;
     const isChecklistEnabled = (claimType === 'Research Papers' && (stageIndex === 0 || stageIndex === 1)) || (claimType === 'Conference Presentations' && stageIndex === 0);
 
-
     return z.object({
         action: z.enum(['approve', 'reject', 'verify']),
         amount: z.coerce.number().nonnegative("Amount cannot be negative.").optional(),
@@ -78,6 +77,15 @@ const createApprovalSchema = (stageIndex: number, claimType?: string) => {
     }, {
       message: 'Comments are required when rejecting a claim.',
       path: ['comments'],
+    }).refine(data => {
+        // Comments are mandatory for stages 2 and 3, unless rejecting (which has its own rule)
+        if ((stageIndex === 1 || stageIndex === 2) && data.action !== 'reject') {
+            return !!data.comments && data.comments.trim() !== '';
+        }
+        return true;
+    }, {
+        message: 'Comments are required for this approval stage.',
+        path: ['comments'],
     });
 }
 
@@ -500,6 +508,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const action = form.watch('action');
     const showAmountField = (isConferenceStage2) || (showActionButtons && action === 'approve') || (isResearchPaperClaim && stageIndex === 1);
+    const showCommentsField = (showActionButtons) || (stageIndex === 1 || stageIndex === 2);
 
 
     const handleSubmit = async (values: ApprovalFormData) => {
@@ -641,13 +650,13 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                             {(showActionButtons || (isResearchPaperClaim && stageIndex === 1)) && (
+                             {showCommentsField && (
                                 <FormField
                                     name="comments"
                                     control={form.control}
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Your Comments {action === 'reject' && '(Required)'}</FormLabel>
+                                            <FormLabel>Your Comments {action === 'reject' || stageIndex === 1 || stageIndex === 2 ? '(Required)' : ''}</FormLabel>
                                             <FormControl><Textarea {...field} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
