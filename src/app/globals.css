@@ -1,6 +1,6 @@
 @tailwind base;
-@tailwind components;
 @tailwind utilities;
+@tailwind components;
 
 @layer base {
   :root {
@@ -60,5 +60,15 @@
     background-image: radial-gradient(at 5% 95%, hsla(170, 70%, 40%, 0.2) 0px, transparent 50%),
       radial-gradient(at 95% 95%, hsla(260, 80%, 50%, 0.2) 0px, transparent 50%);
     background-attachment: fixed;
+  }
+  
+  /* Hide number input spinners */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
   }
 }

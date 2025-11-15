@@ -494,7 +494,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const action = form.watch('action');
     const showAmountField = action !== 'reject';
-    const showCommentsField = (showActionButtons) || (stageIndex === 1 || stageIndex === 2);
+    const showCommentsField = (showActionButtons && stageIndex < 2) || (stageIndex >= 1);
 
 
     const handleSubmit = async (values: ApprovalFormData) => {
@@ -630,7 +630,12 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                                 <FormLabel>Approved Amount (INR)</FormLabel>
                                                 {isAutoCalculated && stageIndex === 0 && <span className="text-xs text-muted-foreground">(Tentative)</span>}
                                             </div>
-                                            <FormControl><Input type="number" {...field} /></FormControl>
+                                            <FormControl><Input 
+                                                type="number" 
+                                                min="0"
+                                                onWheel={(e) => (e.target as HTMLElement).blur()}
+                                                {...field} 
+                                            /></FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )}
@@ -664,5 +669,3 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
         </Dialog>
     );
 }
-
-    
