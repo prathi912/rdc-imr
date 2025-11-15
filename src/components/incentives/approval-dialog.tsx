@@ -42,7 +42,8 @@ const suggestionsSchema = z.record(z.string(), z.string().optional()).optional()
 
 const createApprovalSchema = (stageIndex: number, claimType?: string) => {
     const isConferenceStage2 = claimType === 'Conference Presentations' && stageIndex === 1;
-    const isChecklistEnabled = (claimType === 'Research Papers' && stageIndex === 0) || (claimType === 'Conference Presentations' && stageIndex === 0);
+    const isChecklistEnabled = (claimType === 'Research Papers' && (stageIndex === 0 || stageIndex === 1)) || (claimType === 'Conference Presentations' && stageIndex === 0);
+
 
     return z.object({
         action: z.enum(['approve', 'reject', 'verify']),
@@ -418,7 +419,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
     const isConferenceStage2 = isConferenceClaim && stageIndex === 1;
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
-    const isChecklistEnabled = (isResearchPaperClaim && stageIndex === 0) || (isConferenceClaim && stageIndex === 0);
+    const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && stageIndex === 0);
     const showActionButtons = !isChecklistEnabled && !isConferenceStage2;
     
     const approvalSchema = createApprovalSchema(stageIndex, claim.claimType);
@@ -499,6 +500,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const action = form.watch('action');
     const showAmountField = (isConferenceStage2) || (showActionButtons && action === 'approve') || (isResearchPaperClaim && stageIndex === 1);
+
 
     const handleSubmit = async (values: ApprovalFormData) => {
         setIsSubmitting(true);
