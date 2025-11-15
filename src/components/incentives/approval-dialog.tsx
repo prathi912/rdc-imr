@@ -641,7 +641,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                     )}
                                 />
                             )}
-                             {action !== 'verify' && (
+                             {(showActionButtons || (isResearchPaperClaim && stageIndex === 1)) && (
                                 <FormField
                                     name="comments"
                                     control={form.control}
