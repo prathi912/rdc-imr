@@ -58,7 +58,7 @@ import { Button } from "@/components/ui/button"
 import { auth, db } from "@/lib/config"
 import { signOut, onAuthStateChanged, type User as FirebaseUser } from "firebase/auth"
 import { useToast } from "@/hooks/use-toast"
-import { collection, onSnapshot, query, where, doc } from "firebase/firestore"
+import { collection, onSnapshot, query, where, doc, getDoc } from "firebase/firestore"
 import { getDefaultModulesForRole } from "@/lib/modules"
 import { saveSidebarOrder, getSystemSettings } from "@/app/actions"
 import { TutorialDialog } from "@/components/tutorial-dialog"
@@ -298,74 +298,67 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | undefined
+    let retryTimeout: NodeJS.Timeout
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
-      if (unsubscribeProfile) {
-        unsubscribeProfile()
+    const fetchUserProfile = async (firebaseUser: FirebaseUser, attempt = 1) => {
+      const userDocRef = doc(db, "users", firebaseUser.uid)
+      const userDocSnap = await getDoc(userDocRef)
+
+      if (userDocSnap.exists()) {
+        const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User
+
+        if (!appUser.profileComplete) {
+          router.replace("/profile-setup")
+          return
+        }
+
+        if (!appUser.allowedModules || appUser.allowedModules.length === 0) {
+          appUser.allowedModules = getDefaultModulesForRole(appUser.role, appUser.designation)
+        }
+
+        const isPrincipal = appUser.designation === "Principal"
+        const isHod = appUser.designation === "HOD"
+
+        if (isPrincipal || isHod) {
+          if (!appUser.allowedModules.includes("all-projects")) {
+            appUser.allowedModules.push("all-projects")
+          }
+        }
+
+        const postSetupInfo = sessionStorage.getItem("postSetupInfo")
+        if (postSetupInfo) {
+          const { imr, emr } = JSON.parse(postSetupInfo)
+          if (imr > 0 || emr > 0) {
+            setLinkedProjectsCount({ imr, emr })
+            setIsPostSetupDialogOpen(true)
+          }
+          sessionStorage.removeItem("postSetupInfo")
+        }
+
+        setUser(appUser)
+        localStorage.setItem("user", JSON.stringify(appUser))
+        setLoading(false)
+      } else {
+        if (attempt < 5) {
+          // Retry after a short delay
+          retryTimeout = setTimeout(() => fetchUserProfile(firebaseUser, attempt + 1), 500 * attempt)
+        } else {
+          toast({ variant: "destructive", title: "Authentication Error", description: "User profile not found after multiple attempts." })
+          signOut(auth)
+          setLoading(false)
+        }
       }
+    }
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+      if (unsubscribeProfile) unsubscribeProfile()
+      clearTimeout(retryTimeout)
 
       if (firebaseUser) {
-        const userDocRef = doc(db, "users", firebaseUser.uid)
-
-        unsubscribeProfile = onSnapshot(
-          userDocRef,
-          (userDocSnap) => {
-            if (userDocSnap.exists()) {
-              const appUser = { uid: firebaseUser.uid, ...userDocSnap.data() } as User
-
-              // Critical check: Ensure profile is complete before allowing access to the dashboard.
-              if (!appUser.profileComplete) {
-                router.replace("/profile-setup")
-                return
-              }
-
-              if (!appUser.allowedModules || appUser.allowedModules.length === 0) {
-                appUser.allowedModules = getDefaultModulesForRole(appUser.role, appUser.designation)
-              }
-
-              const isPrincipal = appUser.designation === "Principal"
-              const isHod = appUser.designation === "HOD"
-
-              // Add special permission for Principals and HODs to see the 'All Projects' page
-              if (isPrincipal || isHod) {
-                if (!appUser.allowedModules.includes("all-projects")) {
-                  appUser.allowedModules.push("all-projects")
-                }
-              }
-
-              // Check for post-setup linking notification
-              const postSetupInfo = sessionStorage.getItem("postSetupInfo")
-              if (postSetupInfo) {
-                const { imr, emr } = JSON.parse(postSetupInfo)
-                if (imr > 0 || emr > 0) {
-                  setLinkedProjectsCount({ imr, emr })
-                  setIsPostSetupDialogOpen(true)
-                }
-                sessionStorage.removeItem("postSetupInfo")
-              }
-
-              setUser(appUser)
-              localStorage.setItem("user", JSON.stringify(appUser))
-            } else {
-              toast({ variant: "destructive", title: "Authentication Error", description: "User profile not found." })
-              signOut(auth)
-            }
-            setLoading(false)
-          },
-          (error) => {
-            console.error("Firestore user listener error:", error)
-            toast({
-              variant: "destructive",
-              title: "Network Error",
-              description: "Could not fetch real-time user data.",
-            })
-            signOut(auth)
-            setLoading(false)
-          },
-        )
+        fetchUserProfile(firebaseUser)
       } else {
         localStorage.removeItem("user")
-        sessionStorage.clear() // Clear session storage on logout
+        sessionStorage.clear()
         router.replace("/login")
         setUser(null)
         setLoading(false)
@@ -374,11 +367,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return () => {
       unsubscribeAuth()
-      if (unsubscribeProfile) {
-        unsubscribeProfile()
-      }
+      if (unsubscribeProfile) unsubscribeProfile()
+      clearTimeout(retryTimeout)
     }
   }, [router, toast])
+
 
   useEffect(() => {
     if (user) {
