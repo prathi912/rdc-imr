@@ -221,40 +221,40 @@ export async function addTransaction(
     invoiceFileName: string;
   }
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
+  console.log("SERVER ACTION: addTransaction called with projectId:", projectId);
+  if (!projectId) {
+    console.error("SERVER ACTION ERROR: projectId is missing.");
+    return { success: false, error: "Project ID is missing. Cannot add transaction." };
+  }
+  
   try {
-    console.log("Server action 'addTransaction' received data for project:", projectId, "and phase:", phaseId);
     const projectRef = adminDb.collection("projects").doc(projectId);
     const projectSnap = await projectRef.get();
 
     if (!projectSnap.exists) {
-      console.error("Project not found.");
+      console.error("Project not found in Firestore for ID:", projectId);
       return { success: false, error: "Project not found." };
     }
 
     const project = projectSnap.data() as Project;
     if (!project.grant) {
-      console.error("Project does not have grant details.");
       return { success: false, error: "Project does not have grant details." };
     }
 
     const phaseIndex = project.grant.phases.findIndex((p) => p.id === phaseId);
     if (phaseIndex === -1) {
-      console.error("Phase not found.");
       return { success: false, error: "Phase not found." };
     }
 
     let invoiceUrl: string | undefined;
     if (transactionData.invoiceDataUrl) {
-      console.log("Invoice data URL found, preparing to upload.");
       const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
       const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
 
       if (!result.success || !result.url) {
-        console.error("Invoice upload failed:", result.error);
-        return { success: false, error: result.error || "Invoice upload failed" };
+        throw new Error(result.error || "Invoice upload failed");
       }
       invoiceUrl = result.url;
-      console.log("Invoice uploaded successfully. URL:", invoiceUrl);
     }
 
     const newTransaction: Transaction = {
@@ -268,7 +268,6 @@ export async function addTransaction(
       description: transactionData.description || "",
       invoiceUrl: invoiceUrl,
     };
-    console.log("New transaction object created:", newTransaction);
 
     const updatedPhases = project.grant.phases.map((phase, index) => {
       if (index === phaseIndex) {
@@ -282,7 +281,6 @@ export async function addTransaction(
 
     const updatedGrant = { ...project.grant, phases: updatedPhases };
     await projectRef.update({ grant: updatedGrant });
-    console.log("Project document updated successfully in Firestore.");
     
     await logActivity("INFO", "Grant transaction added", { projectId, phaseId, amount: newTransaction.amount });
 

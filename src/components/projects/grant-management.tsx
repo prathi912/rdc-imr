@@ -10,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { addGrantPhase, addTransaction, updatePhaseStatus } from "@/app/grant-actions"
+import { addGrantPhase, addTransaction, updatePhaseStatus } from "@/app/actions"
 import { generateInstallmentOfficeNoting } from "@/app/document-actions"
 import React, { useState } from "react"
 import {
@@ -236,6 +236,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const handleAddTransaction = async (values: z.infer<typeof transactionSchema>) => {
     if (!grant || !currentPhaseId) return;
     setIsSubmitting(true);
+    console.log("CLIENT: handleAddTransaction called with projectId:", project.id, "and phaseId:", currentPhaseId);
     try {
         const invoiceFile = values.invoice?.[0];
         if (!invoiceFile) {
@@ -394,7 +395,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const showOfficeNoteButton = isAdmin && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
 
           return (
-            <Card key={phase.id} className="bg-muted/30">
+            <Card key={index} className="bg-muted/30">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                   <div>
@@ -746,5 +747,3 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     </React.Fragment>
   )
 }
-
-    

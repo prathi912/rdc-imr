@@ -1887,7 +1887,10 @@ export async function markImrAttendance(
   }
 }
 
-export async function addTransaction(...args: Parameters<typeof import('./grant-actions').addTransaction>) {
+// Re-export addTransaction so it's available to client components through the main actions file
+export async function addTransaction(
+    ...args: Parameters<typeof import('./grant-actions').addTransaction>
+) {
     const { addTransaction: originalAddTransaction } = await import('./grant-actions');
     return originalAddTransaction(...args);
 }
