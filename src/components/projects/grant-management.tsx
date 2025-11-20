@@ -393,8 +393,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const showOfficeNoteButton = isAdmin && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
 
           return (
-            <React.Fragment key={phase.id}>
-              <Card className="bg-muted/30">
+            <Card key={phase.id} className="bg-muted/30">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                   <div>
@@ -581,7 +580,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                 )}
               </CardContent>
             </Card>
-            </React.Fragment>
           )
         })}
 
