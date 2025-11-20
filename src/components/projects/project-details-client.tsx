@@ -1,8 +1,7 @@
 
 "use client"
 
-import type React from "react"
-
+import * as React from "react"
 import { useState, useEffect, useCallback, useMemo } from "react"
 import * as z from "zod"
 import { useForm, useFieldArray } from "react-hook-form"
@@ -1712,4 +1711,3 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
-
