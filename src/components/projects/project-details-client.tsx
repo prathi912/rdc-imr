@@ -794,14 +794,14 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A"
+    if (!dateString) return "N/A";
     try {
-      return format(parseISO(dateString), "PPP") // PPP is like "Jan 1, 2024"
+      return format(parseISO(dateString), "dd/MM/yyyy");
     } catch (e) {
-      console.error("Date formatting error:", e)
-      return "Invalid Date"
+      console.error("Date formatting error:", e);
+      return "Invalid Date";
     }
-  }
+  };
 
   const handleProjectUpdate = (updatedProject: Project) => {
     setProject(updatedProject)
@@ -911,7 +911,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const showBankDetails = isAdmin && ['Recommended', 'In Progress', 'Completed', 'Sanctioned', 'Pending Completion Approval'].includes(project.status);
 
   return (
-    <>
+    <React.Fragment>
       <div className="flex items-center justify-between mb-4">
         <div>{/* Spacer */}</div>
         <div className="flex items-center gap-2">
@@ -1252,8 +1252,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   <>
                     <dt className="font-medium text-muted-foreground">Project Duration</dt>
                     <dd>
-                      {format(new Date(project.projectStartDate), "PPP")} -{" "}
-                      {format(new Date(project.projectEndDate), "PPP")}
+                      {format(new Date(project.projectStartDate), "dd/MM/yyyy")} -{" "}
+                      {format(new Date(project.projectEndDate), "dd/MM/yyyy")}
                     </dd>
                   </>
                 )}
@@ -1621,7 +1621,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             onUpdate={refetchProject}
         />
       )}
-    </>
+    </React.Fragment>
   )
 }
 
@@ -1688,7 +1688,7 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
                                 {fields.map((field: any, index: number) => (
                                     <div key={field.id} className="flex items-center gap-2">
                                         <FormField control={form.control} name={`phases.${index}.name`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input {...field} placeholder={`Phase ${index + 1} Name`} /></FormControl><FormMessage /></FormItem> )} />
-                                        <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input type="number" {...field} placeholder="Amount" /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField control={form.control} name={`phases.${index}.amount`} render={({ field }) => ( <FormItem className="flex-1"><FormControl><Input type="number" {...field} min="0" onWheel={(e) => (e.target as HTMLElement).blur()} placeholder="Amount" /></FormControl><FormMessage /></FormItem> )} />
                                         {fields.length > 1 && (<Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}><X className="h-4 w-4" /></Button>)}
                                     </div>
                                 ))}
@@ -1713,4 +1713,3 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
     );
 }
 
-    

@@ -45,6 +45,7 @@ import Link from "next/link"
 import { Badge } from "../ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
 import { uploadFileToServer } from "@/app/actions"
+import { format, parseISO } from "date-fns"
 
 
 interface GrantManagementProps {
@@ -155,7 +156,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     }
 
     const dataToExport = phase.transactions.map((t: Transaction) => ({
-      "Transaction Date": new Date(t.dateOfTransaction).toLocaleDateString(),
+      "Transaction Date": new Date(t.dateOfTransaction).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
       "Vendor Name": t.vendorName,
       "Amount (₹)": t.amount,
       "GST Registered": t.isGstRegistered ? "Yes" : "No",
@@ -302,7 +303,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   };
 
   return (
-    <>
+    <React.Fragment>
     <Card className="mt-8">
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -353,7 +354,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         <FormItem>
                           <FormLabel>Amount (₹)</FormLabel>
                           <FormControl>
-                            <Input type="number" {...field} />
+                            <Input type="number" {...field} min="0" onWheel={(e) => (e.target as HTMLElement).blur()} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -393,7 +394,8 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const showOfficeNoteButton = isAdmin && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
 
           return (
-            <Card key={phase.id} className="bg-muted/30">
+            <React.Fragment key={phase.id}>
+            <Card className="bg-muted/30">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                   <div>
@@ -444,7 +446,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                 </div>
                 {phase.disbursementDate && (
                   <p className="text-sm text-muted-foreground">
-                    Disbursed on: {new Date(phase.disbursementDate).toLocaleDateString()}
+                    Disbursed on: {format(parseISO(phase.disbursementDate), "dd/MM/yyyy")}
                   </p>
                 )}
               </CardHeader>
@@ -521,7 +523,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                           <TableBody>
                             {phase.transactions?.map((transaction) => (
                               <TableRow key={transaction.id}>
-                                <TableCell>{new Date(transaction.dateOfTransaction).toLocaleDateString()}</TableCell>
+                                <TableCell>{format(parseISO(transaction.dateOfTransaction), "dd/MM/yyyy")}</TableCell>
                                 <TableCell>{transaction.vendorName}</TableCell>
                                 <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
                                 <TableCell>
@@ -580,6 +582,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                 )}
               </CardContent>
             </Card>
+            </React.Fragment>
           )
         })}
 
@@ -616,7 +619,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                       <FormItem>
                         <FormLabel>Amount (₹)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" {...field} />
+                          <Input type="number" step="0.01" {...field} min="0" onWheel={(e) => (e.target as HTMLElement).blur()} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -742,6 +745,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
 
       </CardContent>
     </Card>
-    </>
+    </React.Fragment>
   )
 }
