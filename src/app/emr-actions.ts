@@ -756,11 +756,9 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     if (!vadodaraEmail) {
       return {
         success: false,
-        error: "One or more staff email addresses are not configured on the server. Please add them to the .env file.",
+        error: "Staff email address is not configured on the server. Please add ALL_STAFF_EMAIL_VADODARA to the .env file.",
       }
     }
-    
-    const allStaffEmails = [vadodaraEmail];
 
     const callRef = adminDb.collection("fundingCalls").doc(callId)
     const callSnap = await callRef.get()
@@ -811,7 +809,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     `
 
     await sendEmailUtility({
-      to: allStaffEmails,
+      to: vadodaraEmail,
       subject: `New Funding Call: ${call.title}`,
       from: "Research & Development Cell",
       attachments: emailAttachments,
@@ -1424,6 +1422,7 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
 
 
     
+
 
 
 
