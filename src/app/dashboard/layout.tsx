@@ -62,6 +62,7 @@ import { collection, onSnapshot, query, where, doc, getDoc } from "firebase/fire
 import { getDefaultModulesForRole } from "@/lib/modules"
 import { saveSidebarOrder, getSystemSettings } from "@/app/actions"
 import { TutorialDialog } from "@/components/tutorial-dialog"
+import { HelpDialog } from "@/components/help-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -661,8 +662,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <SidebarTrigger className="md:hidden" />
               <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <TutorialDialog user={user} />
+              <HelpDialog />
               <ThemeToggle />
               <UserNav user={user} onLogout={attemptLogout} />
             </div>
