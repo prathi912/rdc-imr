@@ -3,7 +3,7 @@
 
 import { useState } from 'react';
 import { Button } from './ui/button';
-import { HelpCircle } from 'lucide-react';
+import { BookOpenCheck } from 'lucide-react';
 import { WelcomeTutorial } from './dashboard/welcome-tutorial';
 import type { User } from '@/types';
 
@@ -16,8 +16,8 @@ export function TutorialDialog({ user }: TutorialDialogProps) {
 
   return (
     <>
-        <Button variant="ghost" size="icon" aria-label="Help and Tutorial" onClick={() => setIsOpen(true)}>
-            <HelpCircle className="h-[1.2rem] w-[1.2rem]" />
+        <Button variant="ghost" size="icon" aria-label="View Tutorial" onClick={() => setIsOpen(true)}>
+            <BookOpenCheck className="h-[1.2rem] w-[1.2rem]" />
         </Button>
         {isOpen && <WelcomeTutorial user={user} isOpen={isOpen} onOpenChange={setIsOpen} />}
     </>
