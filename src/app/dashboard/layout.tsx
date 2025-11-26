@@ -500,7 +500,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     try {
       await signOut(auth)
-      // localStorage is cleared by onAuthStateChanged listener
+      localStorage.removeItem("user");
+      sessionStorage.clear();
       toast({ title: "Logged out successfully." })
     } catch (error) {
       console.error("Logout error:", error)
