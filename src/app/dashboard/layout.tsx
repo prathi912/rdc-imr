@@ -4,7 +4,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Image from "next/image"
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
@@ -35,6 +35,7 @@ import {
   Briefcase,
   BookUp,
   MessageCircle,
+  BookOpenCheck,
 } from "lucide-react"
 
 import {
@@ -358,10 +359,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       if (firebaseUser) {
         fetchUserProfile(firebaseUser)
       } else {
+        // This is the key change: ensure all state is reset on logout
+        setUser(null)
+        setMenuItems([])
+        setUnreadCount(0)
+        setPendingMeetingsCount(0)
+        setPendingIncentiveApprovalsCount(0)
+        setPendingBankClaimsCount(0)
         localStorage.removeItem("user")
         sessionStorage.clear()
         router.replace("/login")
-        setUser(null)
         setLoading(false)
       }
     })
@@ -500,9 +507,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     try {
       await signOut(auth)
-      localStorage.removeItem("user");
-      sessionStorage.clear();
-      toast({ title: "Logged out successfully." })
     } catch (error) {
       console.error("Logout error:", error)
       toast({
