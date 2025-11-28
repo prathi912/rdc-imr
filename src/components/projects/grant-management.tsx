@@ -808,5 +808,3 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     </React.Fragment>
   )
 }
-
-    
