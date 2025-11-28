@@ -565,12 +565,13 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                                     <span className="text-muted-foreground">No</span>
                                   )}
                                 </TableCell>
-                                <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
+                                <TableCell className="whitespace-normal break-words max-w-xs">{transaction.description}</TableCell>
                                 <TableCell>
                                   {transaction.invoiceUrl ? (
                                     <Link
                                       href={transaction.invoiceUrl}
                                       target="_blank"
+                                      rel="noopener noreferrer"
                                       className="text-blue-600 hover:underline"
                                     >
                                       View Invoice
