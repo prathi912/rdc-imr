@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useForm } from "react-hook-form"
@@ -565,7 +564,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                                     <span className="text-muted-foreground">No</span>
                                   )}
                                 </TableCell>
-                                <TableCell className="whitespace-normal break-words max-w-xs">{transaction.description}</TableCell>
+                                <TableCell className="whitespace-pre-wrap max-w-xs">{transaction.description}</TableCell>
                                 <TableCell>
                                   {transaction.invoiceUrl ? (
                                     <Link
