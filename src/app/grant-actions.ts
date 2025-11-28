@@ -313,7 +313,7 @@ export async function deleteTransaction(
         const projectRef = adminDb.collection('projects').doc(projectId);
         const projectSnap = await projectRef.get();
 
-        if (!projectSnap.exists()) {
+        if (!projectSnap.exists) {
             return { success: false, error: "Project not found." };
         }
 
@@ -481,3 +481,5 @@ export async function updatePhaseStatus(
     return { success: false, error: error.message || "Failed to update phase status." }
   }
 }
+
+    
