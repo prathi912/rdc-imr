@@ -1890,9 +1890,16 @@ export async function markImrAttendance(
 // Re-export addTransaction so it's available to client components through the main actions file
 export async function addTransaction(
     ...args: Parameters<typeof import('./grant-actions').addTransaction>
-) {
+): Promise<ReturnType<typeof import('./grant-actions').addTransaction>> {
     const { addTransaction: originalAddTransaction } = await import('./grant-actions');
     return originalAddTransaction(...args);
+}
+
+export async function deleteTransaction(
+    ...args: Parameters<typeof import('./grant-actions').deleteTransaction>
+): Promise<ReturnType<typeof import('./grant-actions').deleteTransaction>> {
+    const { deleteTransaction: originalDeleteTransaction } = await import('./grant-actions');
+    return originalDeleteTransaction(...args);
 }
 
 export async function notifySuperAdminsOnNewUser(userName: string, role: string) {

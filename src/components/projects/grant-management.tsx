@@ -10,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { addGrantPhase, addTransaction, updatePhaseStatus } from "@/app/actions"
+import { addGrantPhase, addTransaction, updatePhaseStatus, deleteTransaction } from "@/app/actions"
 import { generateInstallmentOfficeNoting } from "@/app/document-actions"
 import React, { useState } from "react"
 import {
@@ -24,6 +24,7 @@ import {
   ChevronDown,
   Download,
   Loader2,
+  Trash2,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
@@ -36,6 +37,16 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "../ui/textarea"
 import { Label } from "../ui/label"
 import { Switch } from "../ui/switch"
@@ -71,6 +82,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [currentPhaseId, setCurrentPhaseId] = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false);
   const [phaseForNoting, setPhaseForNoting] = useState<GrantPhase | null>(null);
+  const [transactionToDelete, setTransactionToDelete] = useState<{phaseId: string, transaction: Transaction} | null>(null);
 
   const grant = project.grant
   if (!grant) return null
@@ -272,6 +284,26 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     }
   };
 
+  const handleDeleteTransaction = async () => {
+    if (!transactionToDelete) return;
+    setIsSubmitting(true);
+    try {
+        const result = await deleteTransaction(project.id, transactionToDelete.phaseId, transactionToDelete.transaction.id);
+        if (result.success && result.updatedProject) {
+            onUpdate(result.updatedProject);
+            toast({ title: 'Transaction Deleted', description: 'The transaction has been removed.' });
+            setTransactionToDelete(null);
+        } else {
+            throw new Error(result.error || "Failed to delete transaction.");
+        }
+    } catch (error: any) {
+        console.error("Client error in handleDeleteTransaction:", error);
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to delete transaction.' });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
   const handlePhaseStatusUpdate = async (phaseId: string, newStatus: GrantPhase["status"]) => {
     if (!grant || !project.id) return;
     setIsSubmitting(true);
@@ -395,7 +427,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const showOfficeNoteButton = isAdmin && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
 
           return (
-            <Card key={index} className="bg-muted/30">
+            <Card key={phase.id} className="bg-muted/30">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                   <div>
@@ -517,7 +549,8 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                               <TableHead>Amount</TableHead>
                               <TableHead>GST</TableHead>
                               <TableHead>Description</TableHead>
-                              <TableHead>Invoice </TableHead>
+                              <TableHead>Invoice</TableHead>
+                              {(isPI || isAdmin) && <TableHead className="text-right">Action</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -547,6 +580,17 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                                     <span className="text-muted-foreground">N/A</span>
                                   )}
                                 </TableCell>
+                                {(isPI || isAdmin) && (
+                                    <TableCell className="text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => setTransactionToDelete({ phaseId: phase.id, transaction })}
+                                        >
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </TableCell>
+                                )}
                               </TableRow>
                             ))}
                           </TableBody>
@@ -709,6 +753,23 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={!!transactionToDelete} onOpenChange={() => setTransactionToDelete(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This will permanently delete the transaction of ₹{transactionToDelete?.transaction.amount.toLocaleString('en-IN')} for "{transactionToDelete?.transaction.vendorName}". This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteTransaction} className="bg-destructive hover:bg-destructive/90" disabled={isSubmitting}>
+                        {isSubmitting ? "Deleting..." : "Confirm Delete"}
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
 
         <Dialog open={!!phaseForNoting} onOpenChange={() => setPhaseForNoting(null)}>
             <DialogContent>

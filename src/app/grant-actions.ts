@@ -1,7 +1,7 @@
 
 'use server';
 
-import { adminDb } from "@/lib/admin";
+import { adminDb, adminStorage } from "@/lib/admin";
 import type { Project, GrantPhase, GrantDetails, User, Transaction } from "@/types";
 import { sendEmail as sendEmailUtility } from "@/lib/email";
 import { getSystemSettings, uploadFileToServer } from './actions';
@@ -296,6 +296,79 @@ export async function addTransaction(
     });
     return { success: false, error: error.message || "Failed to add transaction." };
   }
+}
+
+export async function deleteTransaction(
+    projectId: string, 
+    phaseId: string, 
+    transactionId: string
+): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
+    console.log("SERVER ACTION: deleteTransaction called with projectId:", projectId);
+    if (!projectId) {
+        console.error("SERVER ACTION ERROR: projectId is missing.");
+        return { success: false, error: "Project ID is missing. Cannot delete transaction." };
+    }
+    
+    try {
+        const projectRef = adminDb.collection('projects').doc(projectId);
+        const projectSnap = await projectRef.get();
+
+        if (!projectSnap.exists()) {
+            return { success: false, error: "Project not found." };
+        }
+
+        const project = projectSnap.data() as Project;
+        if (!project.grant || !project.grant.phases) {
+            return { success: false, error: "Grant details not found." };
+        }
+
+        let transactionToDelete: Transaction | undefined;
+        
+        const updatedPhases = project.grant.phases.map(phase => {
+            if (phase.id === phaseId) {
+                const newTransactions = phase.transactions?.filter(t => {
+                    if (t.id === transactionId) {
+                        transactionToDelete = t;
+                        return false;
+                    }
+                    return true;
+                });
+                return { ...phase, transactions: newTransactions };
+            }
+            return phase;
+        });
+
+        if (!transactionToDelete) {
+            return { success: false, error: "Transaction not found." };
+        }
+
+        const updatedGrant = { ...project.grant, phases: updatedPhases };
+        await projectRef.update({ grant: updatedGrant });
+        
+        // Delete invoice from storage if it exists
+        if (transactionToDelete.invoiceUrl) {
+            try {
+                const bucket = adminStorage.bucket();
+                const url = new URL(transactionToDelete.invoiceUrl);
+                const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf('/o/') + 3));
+                await bucket.file(filePath).delete();
+            } catch (storageError: any) {
+                // Log the error but don't fail the entire operation if the file is already gone
+                console.warn(`Could not delete invoice from storage: ${storageError.message}`);
+                await logActivity('WARNING', 'Failed to delete invoice from storage during transaction deletion', { projectId, transactionId, filePath: transactionToDelete.invoiceUrl, error: storageError.message });
+            }
+        }
+
+        await logActivity('INFO', 'Grant transaction deleted', { projectId, phaseId, transactionId });
+
+        const updatedProject = { ...project, grant: updatedGrant };
+        return { success: true, updatedProject };
+        
+    } catch (error: any) {
+        console.error("Error in deleteTransaction server action:", error);
+        await logActivity('ERROR', 'Failed to delete grant transaction', { projectId, transactionId, error: error.message });
+        return { success: false, error: error.message || "Failed to delete transaction." };
+    }
 }
 
 export async function updatePhaseStatus(
