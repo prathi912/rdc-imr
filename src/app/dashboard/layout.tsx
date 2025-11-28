@@ -383,21 +383,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (user) {
-      // Auto-logout logic
-      const lastActivity = localStorage.getItem('lastActivity');
-      if (lastActivity) {
-        const lastActivityDate = new Date(parseInt(lastActivity, 10));
-        const daysSinceLastActivity = differenceInDays(new Date(), lastActivityDate);
-        if (daysSinceLastActivity > 10) {
-          toast({
-            title: 'Session Expired',
-            description: 'You have been logged out due to inactivity.',
-            variant: 'destructive',
-          });
-          handleLogout();
-          return;
-        }
-      }
       // Update activity timestamp on every dashboard load
       localStorage.setItem('lastActivity', Date.now().toString());
 
