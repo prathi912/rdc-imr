@@ -10,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { addGrantPhase, addTransaction, updatePhaseStatus, deleteTransaction } from "@/app/actions"
+import { addGrantPhase, addTransaction, updatePhaseStatus, deleteTransaction } from "@/app/grant-actions"
 import { generateInstallmentOfficeNoting } from "@/app/document-actions"
 import React, { useState } from "react"
 import {
@@ -336,7 +336,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   };
 
   return (
-    <React.Fragment>
     <Card className="mt-8">
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -626,7 +625,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                 )}
               </CardContent>
             </Card>
-          )
+          );
         })}
 
         <Dialog open={isTransactionOpen} onOpenChange={setIsTransactionOpen}>
@@ -805,6 +804,5 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
 
       </CardContent>
     </Card>
-    </React.Fragment>
-  )
+  );
 }
