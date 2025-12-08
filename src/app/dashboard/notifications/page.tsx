@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from "@/components/ui/card";
-import { Bell, FileCheck2, GanttChartSquare, Loader2, Check, X } from "lucide-react";
+import { Bell, FileCheck2, GanttChartSquare, Loader2, Check, X, CalendarClock } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, doc, updateDoc, orderBy, onSnapshot, getDoc } from 'firebase/firestore';
@@ -167,17 +167,32 @@ export default function NotificationsPage() {
   }
 
   const getIcon = (title: string) => {
+    if (title.toLowerCase().includes('meeting')) return CalendarClock;
     if (title.includes('Recommended') || title.includes('Completed')) return FileCheck2;
     if (title.includes('Review') || title.includes('Not Recommended')) return GanttChartSquare;
     return Bell;
   }
   
-  const getNotificationLink = (notification: NotificationType) => {
-    if (!notification.projectId) return null;
-    if (notification.projectId.startsWith('/')) {
-      return notification.projectId;
-    }
-    return `/dashboard/project/${notification.projectId}`;
+  const getNotificationLink = (notification: NotificationType): string | null => {
+      // For EMR meeting notifications, link to the management page
+      if (notification.title.toLowerCase().includes('emr') && notification.title.toLowerCase().includes('scheduled')) {
+          const callId = notification.projectId; // projectId holds the callId in this case
+          if (callId) {
+            return `/dashboard/emr-management/${callId}`;
+          }
+      }
+      
+      // For general project notifications
+      if (notification.projectId && !notification.projectId.startsWith('/')) {
+        return `/dashboard/project/${notification.projectId}`;
+      }
+      
+      // For links that are already full paths
+      if (notification.projectId?.startsWith('/')) {
+        return notification.projectId;
+      }
+
+      return null;
   };
 
   const buttonText = `Confirm & Add as ${assignedRole}`
@@ -206,25 +221,26 @@ export default function NotificationsPage() {
                     
                     const NotificationContent = () => (
                       <div className="flex-1 min-w-0">
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                           <div className="flex-1">
-                             <p className="font-semibold break-words">{notification.title}</p>
-                             <p className="text-sm text-muted-foreground mt-1">
-                                 {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
-                             </p>
-                           </div>
-                           {!notification.isRead && notification.type !== 'coAuthorRequest' && (
-                             <Button variant="ghost" size="sm" onClick={() => handleMarkAsRead(notification.id)} className="self-start sm:self-center flex-shrink-0">
-                                 Mark as read
-                             </Button>
-                           )}
-                           {!notification.isRead && notification.type === 'coAuthorRequest' && (
-                                <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
-                                    <Button size="sm" onClick={() => handleOpenAcceptDialog(notification)}><Check className="h-4 w-4 mr-2"/>Accept</Button>
-                                    <Button size="sm" variant="destructive" onClick={() => setRequestToReject(notification)}><X className="h-4 w-4 mr-2"/>Reject</Button>
-                                </div>
-                           )}
-                        </div>
+                        <p className="font-semibold break-words">{notification.title}</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                            {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                        </p>
+                      </div>
+                    );
+
+                    const ActionButtons = () => (
+                      <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
+                        {!notification.isRead && notification.type !== 'coAuthorRequest' && (
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleMarkAsRead(notification.id); }}>
+                              Mark as read
+                          </Button>
+                        )}
+                        {!notification.isRead && notification.type === 'coAuthorRequest' && (
+                           <>
+                             <Button size="sm" onClick={(e) => { e.stopPropagation(); handleOpenAcceptDialog(notification); }}><Check className="h-4 w-4 mr-2"/>Accept</Button>
+                             <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); setRequestToReject(notification); }}><X className="h-4 w-4 mr-2"/>Reject</Button>
+                           </>
+                        )}
                       </div>
                     );
 
@@ -239,11 +255,17 @@ export default function NotificationsPage() {
                           <Icon className="h-5 w-5" />
                         </div>
                         {link && notification.type !== 'coAuthorRequest' ? (
-                          <Link href={link} className="flex-1 min-w-0" onClick={() => handleMarkAsRead(notification.id)}>
-                            <NotificationContent />
-                          </Link>
+                            <Link href={link} className="flex-1 min-w-0" onClick={() => handleMarkAsRead(notification.id)}>
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                  <NotificationContent />
+                                  <ActionButtons />
+                                </div>
+                            </Link>
                         ) : (
-                          <NotificationContent />
+                           <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                              <NotificationContent />
+                              <ActionButtons />
+                           </div>
                         )}
                       </div>
                     );
