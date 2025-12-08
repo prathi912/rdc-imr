@@ -67,6 +67,7 @@ export default function AnalyticsPage() {
   const projectsByGroupChartRef = useRef<HTMLDivElement>(null);
   const incentiveAmountChartRef = useRef<HTMLDivElement>(null);
   const activeUsersChartRef = useRef<HTMLDivElement>(null);
+  const fundingByAgencyChartRef = useRef<HTMLDivElement>(null);
 
   const handleExport = useCallback(async (ref: React.RefObject<HTMLDivElement>, fileName: string) => {
     if (!ref.current) {
@@ -333,6 +334,31 @@ export default function AnalyticsPage() {
   const projectsByGroupConfig = {
     projects: { label: 'Projects', color: 'hsl(var(--accent))' },
   } satisfies ChartConfig;
+
+  const fundingByAgencyData = useMemo(() => {
+    const agencyFunding = filteredEmrProjects
+        .filter(p => p.status === 'Sanctioned' && p.durationAmount && p.agency)
+        .reduce((acc, project) => {
+            const amountMatch = project.durationAmount?.match(/Amount:\s*([\d,]+)/);
+            if (amountMatch) {
+                const amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
+                if (project.agency) {
+                    acc[project.agency] = (acc[project.agency] || 0) + amount;
+                }
+            }
+            return acc;
+        }, {} as Record<string, number>);
+
+    return Object.entries(agencyFunding)
+        .map(([agency, amount]) => ({ agency, amount }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5);
+  }, [filteredEmrProjects]);
+
+  const fundingByAgencyConfig = {
+    amount: { label: 'Amount (₹)', color: 'hsl(var(--primary))' },
+  } satisfies ChartConfig;
+
 
   const statusDistributionData = useMemo(() => {
     const statusCounts = filteredProjects.reduce((acc, project) => {
@@ -670,6 +696,55 @@ export default function AnalyticsPage() {
             </ChartContainer>
             </div>
           </CardContent>
+        </Card>
+      </div>
+      <div className="mt-8">
+        <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <CardTitle>Top 5 EMR Funding Agencies</CardTitle>
+                    <Button variant="outline" size="icon" onClick={() => handleExport(fundingByAgencyChartRef, 'top_funding_agencies')}>
+                        <Download className="h-4 w-4" />
+                    </Button>
+                </div>
+                <CardDescription>Total sanctioned amount from the top 5 external funding agencies.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div ref={fundingByAgencyChartRef} className="p-4 bg-card">
+                    <ChartContainer config={fundingByAgencyConfig} className="h-[400px] w-full">
+                        <BarChart
+                            data={fundingByAgencyData}
+                            layout="vertical"
+                            margin={{ left: 100 }}
+                        >
+                            <CartesianGrid horizontal={false} />
+                            <YAxis
+                                dataKey="agency"
+                                type="category"
+                                tickLine={false}
+                                tickMargin={10}
+                                axisLine={false}
+                                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                            />
+                            <XAxis dataKey="amount" type="number" hide />
+                            <ChartTooltip
+                                cursor={{ fill: 'hsl(var(--muted))' }}
+                                content={<ChartTooltipContent formatter={(value) => `₹${Number(value).toLocaleString('en-IN')}`} />}
+                            />
+                            <Bar dataKey="amount" layout="vertical" fill="var(--color-amount)" radius={4}>
+                                <LabelList
+                                    dataKey="amount"
+                                    position="right"
+                                    offset={8}
+                                    className="fill-foreground"
+                                    fontSize={12}
+                                    formatter={(value: number) => `₹${value.toLocaleString('en-IN')}`}
+                                />
+                            </Bar>
+                        </BarChart>
+                    </ChartContainer>
+                </div>
+            </CardContent>
         </Card>
       </div>
     </div>
