@@ -211,6 +211,7 @@ export async function registerEmrInterest(
           batch.set(notificationRef, {
             uid: userDoc.id,
             title: notificationTitle,
+            projectId: callId, // Link notification to the call
             createdAt: new Date().toISOString(),
             isRead: false,
           })
@@ -1429,5 +1430,7 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
 
 
 
+
+    
 
     
