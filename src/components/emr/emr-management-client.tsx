@@ -2,7 +2,7 @@
 // src/components/emr/emr-management-client.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,7 @@ import { UploadPptDialog } from './upload-ppt-dialog';
 import { Checkbox } from '../ui/checkbox';
 import { findUserByMisId } from '@/app/userfinding';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { format, parseISO } from 'date-fns';
 
 
 interface EmrManagementClientProps {
@@ -522,6 +523,23 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
 
     return (
         <>
+        {meetingIsScheduled && (
+            <Card className="mb-8 bg-primary/10 border-primary/20">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <CalendarClock className="h-5 w-5" />
+                        Meeting Scheduled
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <p><strong>Date:</strong> {format(parseISO(call.meetingDetails!.date), 'PPP')}</p>
+                        <p><strong>Time:</strong> {call.meetingDetails!.time}</p>
+                        <p><strong>Venue:</strong> {call.meetingDetails!.venue}</p>
+                    </div>
+                </CardContent>
+            </Card>
+        )}
         <Card>
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
