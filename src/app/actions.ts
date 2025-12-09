@@ -57,6 +57,27 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
 
 export { awardInitialGrant, addGrantPhase, updatePhaseStatus, generateSanctionOrder };
 
+export async function getStorageUsage(): Promise<{ success: boolean; totalSizeMB?: number; error?: string }> {
+  try {
+    const bucket = adminStorage.bucket();
+    const [files] = await bucket.getFiles();
+    
+    let totalSizeBytes = 0;
+    files.forEach(file => {
+      totalSizeBytes += parseInt(file.metadata.size as string, 10);
+    });
+
+    const totalSizeMB = totalSizeBytes / (1024 * 1024);
+
+    return { success: true, totalSizeMB: parseFloat(totalSizeMB.toFixed(2)) };
+  } catch (error: any) {
+    console.error("Error calculating storage usage:", error);
+    await logActivity('ERROR', 'Failed to calculate storage usage', { error: error.message, stack: error.stack });
+    return { success: false, error: error.message || 'Could not calculate storage usage.' };
+  }
+}
+
+
 export async function deleteImrProject(
   projectId: string,
   reason: string,

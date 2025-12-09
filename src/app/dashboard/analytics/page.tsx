@@ -12,12 +12,13 @@ import { db } from '@/lib/config';
 import { collection, query, where, getDocs, onSnapshot, or, orderBy, Timestamp } from 'firebase/firestore';
 import { format, subMonths, startOfMonth, endOfMonth, parseISO, getYear, subDays, startOfDay } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Award, Download, Users, Loader2 } from 'lucide-react';
+import { Award, Download, Users, Loader2, FileArchive } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { toPng } from 'html-to-image';
 import { useRouter } from 'next/navigation';
+import { getStorageUsage } from '@/app/actions';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
@@ -51,6 +52,7 @@ export default function AnalyticsPage() {
   const [emrProjects, setEmrProjects] = useState<EmrInterest[]>([]);
   const [incentiveClaims, setIncentiveClaims] = useState<IncentiveClaim[]>([]);
   const [loginLogs, setLoginLogs] = useState<any[]>([]);
+  const [storageUsage, setStorageUsage] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [facultyFilter, setFacultyFilter] = useState('all');
@@ -158,6 +160,15 @@ export default function AnalyticsPage() {
         projectsQuery = query(projectsCollection);
         emrQuery = query(emrCollection, where('status', 'in', ['Sanctioned', 'Process Complete']));
         claimsQuery = query(claimsCollection);
+        
+        // Fetch storage usage only for super admins
+        if (user.role === 'Super-admin') {
+            getStorageUsage().then(result => {
+                if (result.success) {
+                    setStorageUsage(result.totalSizeMB || 0);
+                }
+            });
+        }
     }
     
     const unsubscribeProjects = onSnapshot(projectsQuery, (snapshot) => {
@@ -469,25 +480,6 @@ export default function AnalyticsPage() {
       </PageHeader>
       <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card>
-            <CardHeader>
-                <CardTitle>Daily Active Users</CardTitle>
-                <CardDescription>Unique user logins over the last 7 days.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <ChartContainer config={dailyActiveUsersConfig} className="h-[250px] w-full">
-                    <BarChart data={dailyActiveUsersData} margin={{ top: 20 }}>
-                        <CartesianGrid vertical={false} />
-                        <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip content={<ChartTooltipContent />} />
-                        <Bar dataKey="users" fill="var(--color-users)" radius={4}>
-                            <LabelList position="top" offset={5} className="fill-foreground" fontSize={12} />
-                        </Bar>
-                    </BarChart>
-                </ChartContainer>
-            </CardContent>
-        </Card>
-        <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Sanctioned Incentives</CardTitle>
                 <Award className="h-4 w-4 text-muted-foreground" />
@@ -497,6 +489,24 @@ export default function AnalyticsPage() {
                 <p className="text-xs text-muted-foreground">Across {incentiveClaims.filter(c => c.finalApprovedAmount).length} claims</p>
             </CardContent>
         </Card>
+        {user.role === 'Super-admin' && (
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Storage Used</CardTitle>
+                    <FileArchive className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                    {storageUsage !== null ? (
+                        <>
+                            <div className="text-2xl font-bold">{storageUsage} MB</div>
+                            <p className="text-xs text-muted-foreground">Used by all uploaded files.</p>
+                        </>
+                    ) : (
+                        <Skeleton className="h-8 w-24" />
+                    )}
+                </CardContent>
+            </Card>
+        )}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
