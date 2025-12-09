@@ -680,16 +680,14 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                          <Button variant="secondary" onClick={() => setIsRegisterUserDialogOpen(true)}>
                             <UserPlus className="mr-2 h-4 w-4" /> Register User
                          </Button>
+                         <Button variant="outline" onClick={handleSendPptReminders} disabled={isSendingReminders || pendingPptUploads === 0}>
+                            {isSendingReminders ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
+                            Remind ({pendingPptUploads})
+                        </Button>
                          {meetingIsScheduled && (
-                            <>
-                                <Button variant="outline" onClick={() => setIsAttendanceDialogOpen(true)}>
-                                    <UserCheck className="mr-2 h-4 w-4" /> Attendance
-                                </Button>
-                                <Button variant="outline" onClick={handleSendPptReminders} disabled={isSendingReminders || pendingPptUploads === 0}>
-                                    {isSendingReminders ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
-                                    Remind ({pendingPptUploads})
-                                </Button>
-                            </>
+                            <Button variant="outline" onClick={() => setIsAttendanceDialogOpen(true)}>
+                                <UserCheck className="mr-2 h-4 w-4" /> Attendance
+                            </Button>
                          )}
                         <Button variant="outline" onClick={handleExport} disabled={interests.length === 0}>
                             <Download className="mr-2 h-4 w-4" /> Export XLSX
