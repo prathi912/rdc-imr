@@ -1,5 +1,6 @@
 
 
+
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
@@ -1454,8 +1455,64 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
     }
 }
 
+export async function sendPptReminderEmails(callId: string): Promise<{ success: boolean, sentCount: number, error?: string }> {
+  try {
+    const callRef = adminDb.collection("fundingCalls").doc(callId);
+    const callSnap = await callRef.get();
+    if (!callSnap.exists) {
+        return { success: false, sentCount: 0, error: "Funding call not found." };
+    }
+    const call = callSnap.data() as FundingCall;
 
+    const interestsRef = adminDb.collection("emrInterests");
+    const q = query(
+      interestsRef,
+      where('callId', '==', callId),
+      where('status', '==', 'Evaluation Pending'), // Check for interests that are scheduled
+      where('pptUrl', '==', null) // Only select those who haven't uploaded
+    );
 
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+      return { success: true, sentCount: 0, error: 'All applicants have already uploaded their presentations.' };
+    }
+
+    const reminderPromises = snapshot.docs.map(doc => {
+      const interest = doc.data() as EmrInterest;
+      if (interest.userEmail && interest.meetingSlot) {
+        const deadline = new Date(interest.meetingSlot.pptDeadline);
+        const emailHtml = `
+            <div ${EMAIL_STYLES.background}>
+              <p style="color:#ffffff;">Dear ${interest.userName},</p>
+              <p style="color:#cccccc;">
+                This is a friendly reminder to upload your presentation for the EMR funding call, "<strong style="color:#ffffff;">${call.title}</strong>".
+              </p>
+              <p><strong style="color:#ffffff;">Your submission deadline is ${formatInTimeZone(deadline, 'Asia/Kolkata', 'PPpp (z)')}.</strong></p>
+              <p style="color:#cccccc;">Please upload your presentation from the EMR Calendar page on the portal as soon as possible.</p>
+              ${EMAIL_STYLES.footer}
+            </div>
+        `;
+        return sendEmailUtility({
+          to: interest.userEmail,
+          subject: `Reminder: EMR Presentation Submission for "${call.title}"`,
+          html: emailHtml,
+          from: 'default'
+        });
+      }
+      return Promise.resolve();
+    });
+
+    await Promise.all(reminderPromises);
+
+    await logActivity("INFO", `Sent ${reminderPromises.length} manual PPT reminders`, { callId });
+    return { success: true, sentCount: reminderPromises.length };
+
+  } catch (error: any) {
+    console.error('Error sending manual PPT reminders:', error);
+    await logActivity("ERROR", 'Failed to send manual PPT reminders', { callId, error: error.message, stack: error.stack });
+    return { success: false, sentCount: 0, error: 'Failed to send reminders.' };
+  }
+}
     
 
 
@@ -1467,4 +1524,5 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
     
 
     
+
 

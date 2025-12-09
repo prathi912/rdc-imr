@@ -10,3 +10,6 @@ scheduledJobs:
   - schedule: "every day 09:00"
     timeZone: "Asia/Kolkata"
     uri: /api/cron/send-meeting-reminders
+  - schedule: "every day 09:05"
+    timeZone: "Asia/Kolkata"
+    uri: /api/cron/send-ppt-reminders

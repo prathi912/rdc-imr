@@ -10,14 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search } from 'lucide-react';
+import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search, Send } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '../ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement, markEmrAttendance, registerEmrInterest } from '@/app/emr-actions';
+import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement, markEmrAttendance, registerEmrInterest, sendPptReminderEmails } from '@/app/emr-actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -341,30 +341,86 @@ function SignEndorsementDialog({ interest, isOpen, onOpenChange, onUpdate }: { i
     );
 }
 
-function BulkEditDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
+function BulkEditDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest: EmrInterest; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: (updatedInterest: EmrInterest) => void; }) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const form = useForm<z.infer<typeof bulkEditSchema>>({
-        resolver: zodResolver(bulkEditSchema),
-        defaultValues: {
-            durationAmount: interest.durationAmount || '',
-            isOpenToPi: interest.isOpenToPi || false,
-        },
-    });
+    const [title, setTitle] = useState(interest.callTitle || '');
+    const [agency, setAgency] = useState(interest.agency || '');
+    const [durationAmount, setDurationAmount] = useState(interest.durationAmount || '');
+    const [sanctionDate, setSanctionDate] = useState<Date | undefined>(interest.sanctionDate ? parseISO(interest.sanctionDate) : undefined);
+    const [proofFile, setProofFile] = useState<File | null>(null);
+    const [coPis, setCoPis] = useState<any[]>(interest.coPiDetails || []);
+    const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
+    const [foundCoPis, setFoundCoPis] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 
-    const handleSubmit = async (values: z.infer<typeof bulkEditSchema>) => {
+    const handleSearchCoPi = async () => {
+        if (!coPiSearchTerm) return;
+        setIsSearching(true);
+        try {
+            const result = await findUserByMisId(coPiSearchTerm);
+            if (result.success && result.users && result.users.length > 0) {
+                if (result.users.length === 1) {
+                    handleAddCoPi(result.users[0]);
+                } else {
+                    setFoundCoPis(result.users);
+                    setIsSelectionOpen(true);
+                }
+            } else {
+                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+            }
+        } finally { setIsSearching(false); }
+    };
+
+    const handleAddCoPi = (selectedUser: any) => {
+        if (selectedUser && !coPis.some(c => c.email === selectedUser.email)) {
+            setCoPis([...coPis, selectedUser]);
+        }
+        setCoPiSearchTerm('');
+        setFoundCoPis([]);
+        setIsSelectionOpen(false);
+    };
+
+    const handleRemoveCoPi = (email: string) => {
+        setCoPis(coPis.filter(c => c.email !== email));
+    };
+
+    const handleSave = async () => {
         setIsSubmitting(true);
         try {
-            const result = await updateEmrInterestDetails(interest.id, values);
+            let proofUrl = interest.proofUrl;
+            if (proofFile) {
+                const dataUrl = await fileToDataUrl(proofFile);
+                const path = `emr-proofs/${interest.id}/${proofFile.name}`;
+                const uploadResult = await uploadFileToServer(dataUrl, path);
+                if (uploadResult.success && uploadResult.url) {
+                    proofUrl = uploadResult.url;
+                } else {
+                    throw new Error(uploadResult.error || "Failed to upload proof.");
+                }
+            }
+
+            const updates: Partial<EmrInterest> = {
+                callTitle: title,
+                agency: agency,
+                durationAmount: durationAmount,
+                sanctionDate: sanctionDate ? sanctionDate.toISOString() : undefined,
+                coPiDetails: coPis,
+                coPiUids: coPis.map(c => c.uid).filter(Boolean) as string[],
+                coPiNames: coPis.map(c => c.name),
+                proofUrl,
+            };
+            const result = await updateEmrInterestDetails(interest.id, updates);
             if (result.success) {
                 toast({ title: 'Success', description: 'Project details updated.' });
-                onUpdate();
+                onUpdate({ ...interest, ...updates });
                 onOpenChange(false);
             } else {
                 throw new Error(result.error);
             }
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Update Failed', description: error.message || 'An unexpected error occurred.' });
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to save changes.' });
         } finally {
             setIsSubmitting(false);
         }
@@ -372,36 +428,78 @@ function BulkEditDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Edit Bulk Uploaded Project</DialogTitle>
-                    <DialogDescription>{interest.callTitle}</DialogDescription>
-                </DialogHeader>
-                <Form {...form}>
-                    <form id="bulk-edit-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-4">
-                        <FormField control={form.control} name="durationAmount" render={({ field }) => (
-                            <FormItem>
-                                <Label>Duration & Amount</Label>
-                                <Input {...field} placeholder="e.g., Amount: 50,00,000 | Duration: 3 Years" />
-                            </FormItem>
-                        )} />
-                        <FormField control={form.control} name="isOpenToPi" render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                                <div className="space-y-0.5">
-                                    <FormLabel>Open for PI to Edit</FormLabel>
-                                    <p className="text-[0.8rem] text-muted-foreground">Allows the PI to edit title, co-pis and upload proof.</p>
-                                </div>
-                                <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
-                            </FormItem>
-                        )} />
-                    </form>
-                </Form>
+            <DialogContent className="sm:max-w-xl">
+                <DialogHeader><DialogTitle>Edit EMR Project Details</DialogTitle></DialogHeader>
+                <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                    <div><Label>Project Title</Label><Input value={title} onChange={e => setTitle(e.target.value)} /></div>
+                    <div><Label>Funding Agency</Label><Input value={agency} onChange={e => setAgency(e.target.value)} /></div>
+                    <div><Label>Amount & Duration</Label><Input value={durationAmount} onChange={e => setDurationAmount(e.target.value)} placeholder="e.g., Amount: 50,00,000 | Duration: 3 Years"/></div>
+                    <div>
+                        <Label>Date of Sanction</Label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
+                                    className={cn("w-full justify-start text-left font-normal", !sanctionDate && "text-muted-foreground")}
+                                >
+                                    <CalendarDays className="mr-2 h-4 w-4" />
+                                    {sanctionDate ? format(sanctionDate, "PPP") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                                <Calendar 
+                                    mode="single" 
+                                    captionLayout="dropdown-buttons"
+                                    fromYear={2010}
+                                    toYear={new Date().getFullYear()}
+                                    selected={sanctionDate} 
+                                    onSelect={setSanctionDate} 
+                                    initialFocus 
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                     <div>
+                        <Label>Proof of Sanction (Below 5 MB)</Label>
+                        {interest.proofUrl && <a href={interest.proofUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block mb-2">View current proof</a>}
+                        <Input type="file" accept=".pdf" onChange={(e) => setProofFile(e.target.files?.[0] || null)} />
+                    </div>
+
+                    <div>
+                        <Label>Co-PIs</Label>
+                        <div className="flex gap-2 mt-1">
+                            <Input placeholder="Search Co-PI by MIS ID" value={coPiSearchTerm} onChange={e => setCoPiSearchTerm(e.target.value)} />
+                            <Button onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin"/> : "Search"}</Button>
+                        </div>
+                        <div className="space-y-2 mt-2">
+                            {coPis.map(c => <div key={c.email} className="flex justify-between items-center p-2 bg-muted rounded-md text-sm"><span>{c.name}</span><Button variant="ghost" size="sm" onClick={() => handleRemoveCoPi(c.email)}>Remove</Button></div>)}
+                        </div>
+                    </div>
+                </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button type="submit" form="bulk-edit-form" disabled={isSubmitting}>
-                        {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Saving...</> : 'Save Changes'}
-                    </Button>
+                    <Button onClick={handleSave} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save'}</Button>
                 </DialogFooter>
+                 <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Multiple Users Found</DialogTitle>
+                            <DialogDescription>Please select the correct user to add as a Co-PI.</DialogDescription>
+                        </DialogHeader>
+                        <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))} className="py-4 space-y-2">
+                            {foundCoPis.map((user, i) => (
+                                <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
+                                    <RadioGroupItem value={JSON.stringify(user)} id={`user-${i}`} />
+                                    <Label htmlFor={`user-${i}`} className="flex flex-col">
+                                        <span className="font-semibold">{user.name}</span>
+                                        <span className="text-muted-foreground text-xs">{user.email}</span>
+                                        <span className="text-muted-foreground text-xs">{user.campus}</span>
+                                    </Label>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                    </DialogContent>
+                </Dialog>
             </DialogContent>
         </Dialog>
     );
@@ -423,6 +521,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [interestForPptUpload, setInterestForPptUpload] = useState<EmrInterest | null>(null);
     const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isSendingReminders, setIsSendingReminders] = useState(false);
 
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
@@ -496,6 +595,17 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         setInterestForPptUpload(interest);
     };
 
+    const handleSendPptReminders = async () => {
+        setIsSendingReminders(true);
+        const result = await sendPptReminderEmails(call.id);
+        if (result.success) {
+            toast({ title: "Reminders Sent", description: `Emails have been sent to ${result.sentCount} applicants.` });
+        } else {
+            toast({ variant: "destructive", title: "Error", description: result.error });
+        }
+        setIsSendingReminders(false);
+    };
+
 
     const handleExport = () => {
         const dataToExport = interests.map(interest => {
@@ -530,6 +640,9 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     
     const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot && !i.wasAbsent);
     const meetingIsScheduled = !!call.meetingDetails?.date;
+    const pendingPptUploads = useMemo(() => {
+        return interests.filter(i => i.meetingSlot && !i.pptUrl).length;
+    }, [interests]);
 
 
     return (
@@ -568,9 +681,15 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                             <UserPlus className="mr-2 h-4 w-4" /> Register User
                          </Button>
                          {meetingIsScheduled && (
-                            <Button variant="outline" onClick={() => setIsAttendanceDialogOpen(true)}>
-                                <UserCheck className="mr-2 h-4 w-4" /> Attendance
-                            </Button>
+                            <>
+                                <Button variant="outline" onClick={() => setIsAttendanceDialogOpen(true)}>
+                                    <UserCheck className="mr-2 h-4 w-4" /> Attendance
+                                </Button>
+                                <Button variant="outline" onClick={handleSendPptReminders} disabled={isSendingReminders || pendingPptUploads === 0}>
+                                    {isSendingReminders ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
+                                    Remind ({pendingPptUploads})
+                                </Button>
+                            </>
                          )}
                         <Button variant="outline" onClick={handleExport} disabled={interests.length === 0}>
                             <Download className="mr-2 h-4 w-4" /> Export XLSX
