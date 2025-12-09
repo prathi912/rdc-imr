@@ -410,7 +410,7 @@ function BulkEditDialog({ interest, isOpen, onOpenChange, onUpdate }: { interest
 
 export function EmrManagementClient({ call, interests, allUsers, currentUser, onActionComplete }: EmrManagementClientProps) {
     const { toast } = useToast();
-    const userMap = new Map(allUsers.map(u => [u.uid, u]));
+    const userMap = useMemo(() => new Map(allUsers.map(u => [u.uid, u])), [allUsers]);
     const [isDeleting, setIsDeleting] = useState(false);
     const [interestToUpdate, setInterestToUpdate] = useState<EmrInterest | null>(null);
     const [statusToUpdate, setStatusToUpdate] = useState<EmrInterest['status'] | null>(null);
@@ -422,6 +422,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isSignEndorsementDialogOpen, setIsSignEndorsementDialogOpen] = useState(false);
     const [interestForPptUpload, setInterestForPptUpload] = useState<EmrInterest | null>(null);
     const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
@@ -516,6 +517,16 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         XLSX.writeFile(workbook, `registrations_${call.title.replace(/\s+/g, '_')}.xlsx`);
     };
     
+    const filteredInterests = useMemo(() => {
+        if (!searchTerm) return interests;
+        const lowerCaseSearch = searchTerm.toLowerCase();
+        return interests.filter(interest => {
+            const user = userMap.get(interest.userId);
+            return interest.userName.toLowerCase().includes(lowerCaseSearch) ||
+                   interest.userEmail.toLowerCase().includes(lowerCaseSearch) ||
+                   (user?.misId && user.misId.toLowerCase().includes(lowerCaseSearch));
+        });
+    }, [interests, searchTerm, userMap]);
     
     const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot && !i.wasAbsent);
     const meetingIsScheduled = !!call.meetingDetails?.date;
@@ -543,8 +554,11 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         <Card>
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <CardTitle>Applicant Registrations ({interests.length})</CardTitle>
-                    <div className="flex items-center gap-2">
+                    <div>
+                        <CardTitle>Applicant Registrations ({interests.length})</CardTitle>
+                        <CardDescription>Review and manage all applicants for this call.</CardDescription>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
                          {unscheduledApplicantsExist && currentUser.designation !== 'Head of Goa Campus' && (
                             <Button onClick={() => setIsScheduleDialogOpen(true)}>
                                 <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
@@ -563,9 +577,17 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                         </Button>
                     </div>
                 </div>
+                 <div className="mt-4">
+                    <Input
+                        placeholder="Search by PI Name, Email, or MIS ID..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="max-w-md"
+                    />
+                </div>
             </CardHeader>
             <CardContent className="overflow-x-auto">
-                 {interests.length > 0 ? (
+                 {filteredInterests.length > 0 ? (
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -577,7 +599,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {interests.map(interest => {
+                            {filteredInterests.map(interest => {
                                 const interestedUser = userMap.get(interest.userId);
                                 const isMeetingScheduled = !!interest.meetingSlot;
                                 const isPostDecision = ['Recommended', 'Not Recommended', 'Revision Needed', 'Endorsement Submitted', 'Endorsement Signed', 'Submitted to Agency'].includes(interest.status);
@@ -598,7 +620,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                         <TableCell>
                                             <div className="flex flex-col text-xs text-muted-foreground">
                                                 {(interest.coPiDetails || []).map(coPi => {
-                                                    const coPiUser = userMap.get(coPi.uid!);
+                                                    const coPiUser = allUsers.find(u => u.uid === coPi.uid);
                                                     return (
                                                         <div key={coPi.email} className="mb-1">
                                                             {coPiUser?.misId ? (
@@ -672,7 +694,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     </Table>
                 ) : (
                     <div className="text-center p-8 text-muted-foreground">
-                        No users have registered for this call yet.
+                        <p>No registered applicants match your search criteria.</p>
                     </div>
                 )}
             </CardContent>
