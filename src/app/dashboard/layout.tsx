@@ -138,7 +138,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const allNavItems = useMemo(
     (): NavItem[] => [
       { id: "dashboard", href: "/dashboard", tooltip: "Dashboard", icon: Home, label: "Dashboard", condition: true },
-      { id: "ai-chat", href: "/dashboard/ai-chat", tooltip: "AI Chat", icon: MessageCircle, label: "AI Chat Agent" },
       {
         id: "new-submission",
         href: "/dashboard/new-submission",

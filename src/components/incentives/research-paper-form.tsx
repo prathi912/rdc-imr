@@ -879,7 +879,7 @@ export function ResearchPaperForm() {
                     </FormItem>
                   )}
                 />
-                 {indexType !== 'other' && (
+                 {indexType !== 'other' ? (
                     <FormField
                         control={form.control}
                         name="doi"
@@ -904,8 +904,7 @@ export function ResearchPaperForm() {
                             </FormItem>
                         )}
                     />
-                 )}
-                 {indexType === 'other' && (
+                 ) : (
                      <FormField
                         control={form.control}
                         name="relevantLink"

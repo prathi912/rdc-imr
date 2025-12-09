@@ -1,9 +1,10 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import type { User, Project, EmrInterest, FundingCall, ResearchPaper, Author, CoPiDetails, IncentiveClaim } from '@/types';
-import { getResearchDomain, uploadFileToServer } from '@/app/actions';
+import { uploadFileToServer } from '@/app/actions';
 import { updateEmrInterestDetails } from '@/app/emr-actions';
 import { findUserByMisId } from '@/app/userfinding';
 import { addResearchPaper, checkUserOrStaff, updateResearchPaper, deleteResearchPaper, manageCoAuthorRequest } from '@/app/bulkpapers';
@@ -500,25 +501,6 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
         if (storedUser) { setSessionUser(JSON.parse(storedUser)); }
         fetchPapers();
     }, [user.uid]);
-
-    useEffect(() => {
-        const fetchDomain = async () => {
-            const imrTitles = projects.map(p => p.title);
-            const emrTitles = emrInterests.map(i => i.callTitle || fundingCalls.find(c => c.id === i.callId)?.title).filter(Boolean) as string[];
-            const paperTitles = researchPapers.map(p => p.title);
-            const allTitles = [...new Set([...imrTitles, ...emrTitles, ...paperTitles])];
-
-            if (allTitles.length > 0 && !user.researchDomain) {
-                setLoadingDomain(true);
-                try {
-                    const result = await getResearchDomain({ paperTitles: allTitles });
-                    if (result.success) { setDomain(result.domain); }
-                } catch (error) { console.error("Error fetching research domain:", error); } 
-                finally { setLoadingDomain(false); }
-            }
-        };
-        fetchDomain();
-    }, [projects, emrInterests, researchPapers, user.researchDomain, fundingCalls]);
     
     const handlePaperSuccess = (paper: ResearchPaper, isNew: boolean) => {
         if (isNew) { setResearchPapers(prev => [paper, ...prev]); } 
@@ -637,19 +619,6 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                 <ProfileDetail label="Vidwan ID" value={user.vidwanId} icon={BookCopy} />
                                 <ProfileDetail label="Google Scholar ID" value={user.googleScholarId} icon={BookCopy} />
                             </div>
-                        </div>
-                        <div className="space-y-4 md:col-span-2">
-                            <h3 className="font-semibold text-lg flex items-center gap-2"><Bot className="h-5 w-5" /> AI-Suggested Research Domain</h3>
-                            {loadingDomain ? (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                    <span>Analyzing publications...</span>
-                                </div>
-                            ) : domain ? (
-                                <Badge variant="secondary" className="text-base">{domain}</Badge>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">Not enough data to determine a domain.</p>
-                            )}
                         </div>
                     </div>
                 </CardContent>

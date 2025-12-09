@@ -1,9 +1,9 @@
 
+
 import type { User } from "@/types"
 
 export const ALL_MODULES = [
   { id: "dashboard", label: "Dashboard" },
-  { id: "ai-chat", label: "AI Chat Agent" },
   { id: "new-submission", label: "New Submission" },
   { id: "my-projects", label: "My Projects" },
   { id: "emr-calendar", label: "EMR Calendar" },
