@@ -4,7 +4,6 @@
 import { adminDb } from '@/lib/admin';
 import type { ResearchPaper, Author, User, Notification, IncentiveClaim } from '@/types';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getResearchDomainSuggestion } from '@/ai/flows/research-domain-suggestion';
 import admin from 'firebase-admin';
 import { sendEmail } from '@/app/actions';
 
@@ -94,29 +93,6 @@ export async function addResearchPaper(
       updatedAt: now,
     };
     
-    // AI Domain Suggestion
-    try {
-      if (authorUids.length > 0) {
-        const allPapersQuery = await adminDb.collection('papers').where('authorUids', 'array-contains-any', authorUids).get();
-        const existingTitles = allPapersQuery.docs.map(doc => doc.data().title);
-        const allTitles = [...new Set([title, ...existingTitles])];
-
-        if (allTitles.length > 0) {
-          const domainResult = await getResearchDomainSuggestion({ paperTitles: allTitles });
-          newPaperData.domain = domainResult.domain;
-
-          const batch = adminDb.batch();
-          const userDocs = await adminDb.collection('users').where(admin.firestore.FieldPath.documentId(), 'in', authorUids).get();
-            
-          userDocs.forEach(doc => {
-            batch.update(doc.ref, { researchDomain: domainResult.domain });
-          });
-          await batch.commit();
-        }
-      }
-    } catch (aiError: any) {
-      console.warn("AI domain suggestion failed, but proceeding to save paper. Error:", aiError.message);
-    }
 
     await paperRef.set(newPaperData);
 
