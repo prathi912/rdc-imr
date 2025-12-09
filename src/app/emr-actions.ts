@@ -1,6 +1,5 @@
 
 
-
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
@@ -1514,7 +1513,76 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
   }
 }
     
+export async function addSanctionedEmrProject(data: {
+    pi: { uid: string, name: string, email: string };
+    coPis: CoPiDetails[];
+    title: string;
+    agency: string;
+    sanctionDate?: Date;
+    durationAmount: string;
+}): Promise<{ success: boolean; error?: string }> {
+    try {
+        const piUserSnap = await adminDb.collection('users').doc(data.pi.uid).get();
+        if (!piUserSnap.exists) {
+            return { success: false, error: "Principal Investigator not found." };
+        }
+        const piUser = piUserSnap.data() as User;
 
+        const newInterestDoc: Omit<EmrInterest, "id"> = {
+            callId: "ADMIN_ADDED",
+            callTitle: data.title,
+            agency: data.agency,
+            userId: data.pi.uid,
+            userName: data.pi.name,
+            userEmail: data.pi.email,
+            faculty: piUser.faculty || 'N/A',
+            department: piUser.department || 'N/A',
+            registeredAt: new Date().toISOString(),
+            status: "Sanctioned",
+            durationAmount: data.durationAmount,
+            sanctionDate: data.sanctionDate?.toISOString(),
+            coPiDetails: data.coPis,
+            coPiUids: data.coPis.map(p => p.uid).filter(Boolean) as string[],
+            coPiNames: data.coPis.map(p => p.name),
+            coPiEmails: data.coPis.map(p => p.email),
+            isBulkUploaded: true, 
+            isOpenToPi: true, 
+        };
+
+        const docRef = await adminDb.collection("emrInterests").add(newInterestDoc);
+        
+        // Notify PI
+        const emailHtml = `
+            <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear ${data.pi.name},</p>
+                <p style="color:#e0e0e0;">An administrator has added your sanctioned Extramural Research (EMR) project, "<strong style="color:#ffffff;">${data.title}</strong>," to the R&D Portal.</p>
+                <p style="color:#e0e0e0; font-weight: bold; margin-top: 20px;">Action Required: Please log in to the portal to upload the sanction proof for this project.</p>
+                <p style="text-align:center; margin-top:25px;">
+                    <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/my-projects" style="background-color: #64B5F6; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                        Go to My Projects
+                    </a>
+                </p>
+                ${EMAIL_STYLES.footer}
+            </div>
+        `;
+
+        await sendEmailUtility({
+            to: data.pi.email,
+            subject: `Action Required: EMR Project "${data.title}" Added to Portal`,
+            html: emailHtml,
+            from: 'default',
+        });
+        
+        await logActivity('INFO', 'Admin manually added sanctioned EMR project', { projectId: docRef.id, title: data.title });
+
+        return { success: true };
+    } catch (error: any) {
+        console.error("Error adding sanctioned EMR project:", error);
+        await logActivity('ERROR', 'Failed to add sanctioned EMR project', { error: error.message });
+        return { success: false, error: 'Failed to add the project.' };
+    }
+}
 
 
 
@@ -1524,5 +1592,6 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
     
 
     
+
 
 
