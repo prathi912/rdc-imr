@@ -1,4 +1,5 @@
 
+
 // src/components/emr/emr-management-client.tsx
 'use client';
 
@@ -178,7 +179,11 @@ function AttendanceDialog({ call, interests, allUsers, isOpen, onOpenChange, onU
     const handleSubmit = async (values: z.infer<typeof attendanceSchema>) => {
         setIsSubmitting(true);
         try {
-            const result = await markEmrAttendance(call.id, values.absentApplicantIds, values.absentEvaluatorUids);
+            const result = await markEmrAttendance(
+                call.id,
+                values.absentApplicantIds,
+                values.absentEvaluatorUids
+            );
             if (result.success) {
                 toast({ title: 'Success', description: 'Attendance has been marked.' });
                 onUpdate();
@@ -640,6 +645,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     
     const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot && !i.wasAbsent);
     const meetingIsScheduled = !!call.meetingDetails?.date;
+    
     const pendingPptUploads = useMemo(() => {
         return interests.filter(i => !i.pptUrl).length;
     }, [interests]);
@@ -680,7 +686,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                          <Button variant="secondary" onClick={() => setIsRegisterUserDialogOpen(true)}>
                             <UserPlus className="mr-2 h-4 w-4" /> Register User
                          </Button>
-                         <Button variant="outline" onClick={handleSendPptReminders} disabled={isSendingReminders || pendingPptUploads === 0}>
+                        <Button variant="outline" onClick={handleSendPptReminders} disabled={isSendingReminders}>
                             {isSendingReminders ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
                             Remind ({pendingPptUploads})
                         </Button>
@@ -910,6 +916,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     interest={interestForPptUpload}
                     call={call}
                     user={userMap.get(interestForPptUpload.userId)!}
+                    adminUser={currentUser}
                     onUploadSuccess={onActionComplete}
                     isRevision={!!interestForPptUpload.pptUrl}
                 />

@@ -457,47 +457,72 @@ export async function uploadEmrPpt(
   interestId: string,
   pptDataUrl: string,
   originalFileName: string,
-  userName: string,
+  user: User,
+  adminName?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId || !pptDataUrl) {
-      return { success: false, error: "Interest ID and file data are required." }
+      return { success: false, error: "Interest ID and file data are required." };
     }
 
-    const interestRef = adminDb.collection("emrInterests").doc(interestId)
-    const interestSnap = await interestRef.get()
+    const interestRef = adminDb.collection("emrInterests").doc(interestId);
+    const interestSnap = await interestRef.get();
     if (!interestSnap.exists) {
-      return { success: false, error: "Interest registration not found." }
+      return { success: false, error: "Interest registration not found." };
     }
-    const interest = interestSnap.data() as EmrInterest
-
-    // Standardize the filename
-    const fileExtension = path.extname(originalFileName)
-    const standardizedName = `emr_${userName.replace(/\s+/g, "_")}${fileExtension}`
-
-    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`
-    const result = await uploadFileToServer(pptDataUrl, filePath)
+    const interest = interestSnap.data() as EmrInterest;
+    
+    const fileExtension = path.extname(originalFileName);
+    const standardizedName = `emr_${user.name.replace(/\s+/g, "_")}${fileExtension}`;
+    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`;
+    const result = await uploadFileToServer(pptDataUrl, filePath);
 
     if (!result.success || !result.url) {
-      throw new Error(result.error || "PPT upload failed.")
+      throw new Error(result.error || "PPT upload failed.");
     }
 
     await interestRef.update({
       pptUrl: result.url,
       pptSubmissionDate: new Date().toISOString(),
       status: "PPT Submitted",
-    })
+    });
 
-    await logActivity("INFO", "EMR presentation uploaded", { interestId, userId: interest.userId })
-    return { success: true }
+    if (adminName && interest.userEmail) {
+        const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
+        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
+        
+        const emailHtml = `
+            <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear ${interest.userName},</p>
+                <p style="color:#e0e0e0;">This is to inform you that an administrator, <strong>${adminName}</strong>, has uploaded a presentation on your behalf for the EMR call: "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
+                <p style="color:#e0e0e0;">The uploaded presentation is attached to this email for your reference.</p>
+                ${EMAIL_STYLES.footer}
+            </div>
+        `;
+        
+        await sendEmailUtility({
+            to: interest.userEmail,
+            subject: `Presentation Uploaded for EMR Call: ${callTitle}`,
+            html: emailHtml,
+            from: 'default',
+            attachments: [{
+                filename: originalFileName,
+                path: result.url,
+            }]
+        });
+    }
+
+    await logActivity("INFO", "EMR presentation uploaded", { interestId, userId: interest.userId, byAdmin: adminName });
+    return { success: true };
   } catch (error: any) {
-    console.error("Error uploading EMR presentation:", error)
+    console.error("Error uploading EMR presentation:", error);
     await logActivity("ERROR", "Failed to upload EMR presentation", {
       interestId,
       error: error.message,
       stack: error.stack,
-    })
-    return { success: false, error: error.message || "Failed to upload presentation." }
+    });
+    return { success: false, error: error.message || "Failed to upload presentation." };
   }
 }
 
@@ -954,46 +979,70 @@ export async function uploadRevisedEmrPpt(
   pptDataUrl: string,
   originalFileName: string,
   user: User,
+  adminName?: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId || !pptDataUrl) {
-      return { success: false, error: "Interest ID and file data are required." }
+      return { success: false, error: "Interest ID and file data are required." };
     }
 
-    const interestRef = adminDb.collection("emrInterests").doc(interestId)
-    const interestSnap = await interestRef.get()
+    const interestRef = adminDb.collection("emrInterests").doc(interestId);
+    const interestSnap = await interestRef.get();
     if (!interestSnap.exists) {
-        return { success: false, error: 'Interest registration not found.'}
+      return { success: false, error: "Interest registration not found." };
     }
     const interest = interestSnap.data() as EmrInterest;
-    const userName = user.name;
-
-    // Standardize the filename
-    const fileExtension = path.extname(originalFileName)
-    const standardizedName = `${userName.replace(/\s+/g, "_")}_revised_${new Date().getTime()}${fileExtension}`
-
-    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`
-    const result = await uploadFileToServer(pptDataUrl, filePath)
+    
+    const fileExtension = path.extname(originalFileName);
+    const standardizedName = `${user.name.replace(/\s+/g, "_")}_revised_${new Date().getTime()}${fileExtension}`;
+    const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`;
+    const result = await uploadFileToServer(pptDataUrl, filePath);
 
     if (!result.success || !result.url) {
-      throw new Error(result.error || "Revised PPT upload failed.")
+      throw new Error(result.error || "Revised PPT upload failed.");
     }
 
     await interestRef.update({
       revisedPptUrl: result.url,
       status: "Revision Submitted",
-    })
+    });
 
-    await logActivity("INFO", "Revised EMR presentation uploaded", { interestId, userId: interest.userId })
-    return { success: true }
+    if (adminName && interest.userEmail) {
+      const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
+      const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
+      
+      const emailHtml = `
+          <div ${EMAIL_STYLES.background}>
+              ${EMAIL_STYLES.logo}
+              <p style="color:#ffffff;">Dear ${interest.userName},</p>
+              <p style="color:#e0e0e0;">This is to inform you that an administrator, <strong>${adminName}</strong>, has uploaded a revised presentation on your behalf for the EMR call: "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
+              <p style="color:#e0e0e0;">The uploaded file is attached to this email for your reference.</p>
+              ${EMAIL_STYLES.footer}
+          </div>
+      `;
+      
+      await sendEmailUtility({
+          to: interest.userEmail,
+          subject: `Revised Presentation Uploaded for EMR Call: ${callTitle}`,
+          html: emailHtml,
+          from: 'default',
+          attachments: [{
+              filename: originalFileName,
+              path: result.url,
+          }]
+      });
+    }
+
+    await logActivity("INFO", "Revised EMR presentation uploaded", { interestId, userId: interest.userId, byAdmin: adminName });
+    return { success: true };
   } catch (error: any) {
-    console.error("Error uploading revised EMR presentation:", error)
+    console.error("Error uploading revised EMR presentation:", error);
     await logActivity("ERROR", "Failed to upload revised EMR presentation", {
       interestId,
       error: error.message,
       stack: error.stack,
-    })
-    return { success: false, error: error.message || "Failed to upload presentation." }
+    });
+    return { success: false, error: error.message || "Failed to upload presentation." };
   }
 }
 
@@ -1569,7 +1618,7 @@ export async function addSanctionedEmrProject(data: {
 
         await sendEmailUtility({
             to: data.pi.email,
-            subject: `Action Required: EMR Project "${data.title}" Added to Portal`,
+            subject: `Your EMR Project "${data.title}" has been Added to the R&D Portal`,
             html: emailHtml,
             from: 'default',
         });
@@ -1592,6 +1641,7 @@ export async function addSanctionedEmrProject(data: {
     
 
     
+
 
 
 

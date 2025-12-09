@@ -26,7 +26,8 @@ interface UploadPptDialogProps {
     onOpenChange: (open: boolean) => void;
     interest: EmrInterest;
     call: FundingCall;
-    user: User;
+    user: User; // The PI
+    adminUser?: User; // The admin performing the action, if any
     onUploadSuccess: () => void;
     isRevision?: boolean;
 }
@@ -40,7 +41,7 @@ const fileToDataUrl = (file: File): Promise<string> => {
     });
 };
 
-export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, onUploadSuccess, isRevision = false }: UploadPptDialogProps) {
+export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, adminUser, onUploadSuccess, isRevision = false }: UploadPptDialogProps) {
     const [pptFile, setPptFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const { toast } = useToast();
@@ -59,9 +60,9 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
             
             let result;
             if (isRevision) {
-                result = await uploadRevisedEmrPpt(interest.id, dataUrl, pptFile.name, user);
+                result = await uploadRevisedEmrPpt(interest.id, dataUrl, pptFile.name, user, adminUser?.name);
             } else {
-                result = await uploadEmrPpt(interest.id, dataUrl, pptFile.name, user.name);
+                result = await uploadEmrPpt(interest.id, dataUrl, pptFile.name, user, adminUser?.name);
             }
 
             if (result.success) {
@@ -97,7 +98,7 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
 
     const deadlineWithTime = interest.meetingSlot?.pptDeadline ? parseISO(interest.meetingSlot.pptDeadline) : null;
     const isDeadlinePast = deadlineWithTime ? isAfter(new Date(), deadlineWithTime) : false;
-    const isSuperAdmin = user.role === 'Super-admin';
+    const isSuperAdmin = adminUser?.role === 'Super-admin';
 
     // Super Admins are never disabled by deadlines.
     const isUploadDisabled = isDeadlinePast && !isSuperAdmin;
@@ -120,7 +121,7 @@ export function UploadPptDialog({ isOpen, onOpenChange, interest, call, user, on
                     <DialogTitle>{isRevision ? 'Submit Revised Presentation' : 'Manage Your Presentation'}</DialogTitle>
                     <DialogDescription>{dialogDescription}</DialogDescription>
                 </DialogHeader>
-                 {isUploadDisabled && !isRevision && (
+                 {isUploadDisabled && !isRevision && !isSuperAdmin && (
                     <Alert variant="destructive">
                       <MessageSquareWarning className="h-4 w-4" />
                       <AlertTitle>Deadline Passed</AlertTitle>
