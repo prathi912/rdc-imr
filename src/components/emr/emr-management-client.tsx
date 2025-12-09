@@ -194,7 +194,7 @@ function AttendanceDialog({ call, interests, allUsers, isOpen, onOpenChange, onU
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Mark Meeting Attendance</DialogTitle>
                     <DialogDescription>Select any applicants or evaluators who were absent from the meeting.</DialogDescription>
@@ -419,7 +419,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
     const [isSignEndorsementDialogOpen, setIsSignEndorsementDialogOpen] = useState(false);
-    const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
+    const [interestForPptUpload, setInterestForPptUpload] = useState<EmrInterest | null>(null);
     const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
 
 
@@ -490,9 +490,8 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
         setIsSignEndorsementDialogOpen(true);
     };
 
-    const handleOpenRevisionUpload = (interest: EmrInterest) => {
-        setInterestToUpdate(interest);
-        setIsRevisionUploadOpen(true);
+    const handleOpenPptUpload = (interest: EmrInterest) => {
+        setInterestForPptUpload(interest);
     };
 
 
@@ -616,8 +615,9 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                     <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onSelect={() => handleOpenRevisionUpload(interest)}>
-                                                        <Upload className="mr-2 h-4 w-4" /> Upload PPT on behalf
+                                                    <DropdownMenuItem onSelect={() => handleOpenPptUpload(interest)}>
+                                                        <Upload className="mr-2 h-4 w-4" /> 
+                                                        {interest.pptUrl ? 'Upload Revised PPT' : 'Upload PPT'}
                                                     </DropdownMenuItem>
                                                     {interest.isBulkUploaded && (
                                                         <DropdownMenuItem onSelect={() => handleOpenBulkEditDialog(interest)}>
@@ -744,17 +744,19 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                         onOpenChange={setIsSignEndorsementDialogOpen}
                         onUpdate={onActionComplete}
                     />
-                    <UploadPptDialog
-                        isOpen={isRevisionUploadOpen}
-                        onOpenChange={setIsRevisionUploadOpen}
-                        interest={interestToUpdate}
-                        call={call}
-                        user={userMap.get(interestToUpdate.userId)!} // Pass the applicant's user object
-                        onUploadSuccess={onActionComplete}
-                        isRevision={true}
-                    />
                  </>
              )}
+             {interestForPptUpload && (
+                <UploadPptDialog
+                    isOpen={!!interestForPptUpload}
+                    onOpenChange={() => setInterestForPptUpload(null)}
+                    interest={interestForPptUpload}
+                    call={call}
+                    user={userMap.get(interestForPptUpload.userId)!}
+                    onUploadSuccess={onActionComplete}
+                    isRevision={!!interestForPptUpload.pptUrl}
+                />
+            )}
         </Card>
         <RegisterUserDialog 
             call={call} 
