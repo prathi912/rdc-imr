@@ -641,7 +641,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot && !i.wasAbsent);
     const meetingIsScheduled = !!call.meetingDetails?.date;
     const pendingPptUploads = useMemo(() => {
-        return interests.filter(i => i.meetingSlot && !i.pptUrl).length;
+        return interests.filter(i => !i.pptUrl).length;
     }, [interests]);
 
 
