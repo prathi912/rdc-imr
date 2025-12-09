@@ -15,7 +15,7 @@ import type { Project, User, EmrInterest, FundingCall, CoPiDetails } from '@/typ
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2, Edit, Search, ChevronDown } from 'lucide-react';
+import { Download, Calendar as CalendarIcon, Eye, Upload, Loader2, Edit, Search, ChevronDown, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,7 +35,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { updateEmrFinalStatus, updateEmrInterestCoPis, updateEmrInterestDetails } from '@/app/emr-actions';
+import { updateEmrFinalStatus, updateEmrInterestCoPis, updateEmrInterestDetails, addSanctionedEmrProject } from '@/app/emr-actions';
 import { findUserByMisId } from '@/app/userfinding';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
@@ -74,6 +74,155 @@ const EMR_EXPORT_COLUMNS = [
     { id: 'sanctionDate', label: 'Sanction Date' },
     { id: 'durationAmount', label: 'Duration & Amount' },
 ];
+
+const addEmrSchema = z.object({
+    title: z.string().min(5, 'Project title is required.'),
+    agency: z.string().min(2, 'Funding agency is required.'),
+    sanctionDate: z.date().optional(),
+    durationAmount: z.string().min(3, 'Please provide amount and/or duration details.'),
+});
+
+function AddSanctionedEmrDialog({ isOpen, onOpenChange, onActionComplete }: { isOpen: boolean; onOpenChange: (open: boolean) => void; onActionComplete: () => void; }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [pi, setPi] = useState<any>(null);
+    const [coPis, setCoPis] = useState<CoPiDetails[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [foundUsers, setFoundUsers] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [searchFor, setSearchFor] = useState<'pi' | 'copi'>('pi');
+    const [isSelectionOpen, setIsSelectionOpen] = useState(false);
+
+    const form = useForm<z.infer<typeof addEmrSchema>>({
+        resolver: zodResolver(addEmrSchema),
+    });
+
+    const handleSearch = async () => {
+        if (!searchTerm) return;
+        setIsSearching(true);
+        try {
+            const result = await findUserByMisId(searchTerm);
+            if (result.success && result.users) {
+                if (result.users.length === 1) {
+                    handleUserSelect(result.users[0]);
+                } else {
+                    setFoundUsers(result.users);
+                    setIsSelectionOpen(true);
+                }
+            } else {
+                toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+            }
+        } finally { setIsSearching(false); }
+    };
+
+    const handleUserSelect = (user: any) => {
+        if (searchFor === 'pi') {
+            setPi(user);
+        } else {
+            if (!coPis.some(c => c.email === user.email)) {
+                setCoPis(prev => [...prev, user]);
+            }
+        }
+        setSearchTerm('');
+        setFoundUsers([]);
+        setIsSelectionOpen(false);
+    };
+
+    const handleSave = async (values: z.infer<typeof addEmrSchema>) => {
+        if (!pi) {
+            toast({ variant: 'destructive', title: 'PI Required', description: 'Please select a Principal Investigator.' });
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const result = await addSanctionedEmrProject({
+                ...values,
+                pi: { uid: pi.uid, name: pi.name, email: pi.email },
+                coPis,
+            });
+            if (result.success) {
+                toast({ title: 'Success', description: 'EMR project added and PI notified.' });
+                onActionComplete();
+                onOpenChange(false);
+            } else {
+                throw new Error(result.error);
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Save Failed', description: error.message });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+    
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Add Sanctioned EMR Project</DialogTitle>
+                    <DialogDescription>Manually add a historical or newly sanctioned EMR project.</DialogDescription>
+                </DialogHeader>
+                 <Form {...form}>
+                    <form id="add-emr-form" onSubmit={form.handleSubmit(handleSave)} className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
+                        <div className="space-y-2">
+                            <Label>Principal Investigator (PI) *</Label>
+                            {pi ? (
+                                <div className="flex justify-between items-center p-2 bg-muted rounded-md text-sm">
+                                    <span>{pi.name} ({pi.misId})</span>
+                                    <Button variant="ghost" size="sm" onClick={() => setPi(null)}>Change</Button>
+                                </div>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <Input placeholder="Search PI by MIS ID or Name..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setSearchFor('pi'); }} />
+                                    <Button onClick={handleSearch} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <Label>Co-Principal Investigators (Co-PIs)</Label>
+                            <div className="flex gap-2">
+                                <Input placeholder="Search Co-PI by MIS ID or Name..." value={searchTerm} onChange={e => { setSearchTerm(e.target.value); setSearchFor('copi'); }}/>
+                                <Button onClick={handleSearch} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                            </div>
+                             <div className="space-y-2 mt-2">
+                                {coPis.map(c => <div key={c.email} className="flex justify-between items-center p-2 bg-muted rounded-md text-sm"><span>{c.name}</span><Button variant="ghost" size="sm" onClick={() => setCoPis(coPis.filter(cp => cp.email !== c.email))}>Remove</Button></div>)}
+                            </div>
+                        </div>
+
+                        <FormField name="title" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Project Title *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="agency" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Funding Agency *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="sanctionDate" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Date of Sanction</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2015} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                        <FormField name="durationAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Duration & Amount *</FormLabel><FormControl><Input placeholder="e.g., Amount: 50,00,000 | Duration: 3 Years" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                    </form>
+                </Form>
+                 <DialogFooter>
+                    <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                    <Button type="submit" form="add-emr-form" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Add Project'}</Button>
+                </DialogFooter>
+
+                 <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Multiple Users Found</DialogTitle>
+                            <DialogDescription>Please select the correct user.</DialogDescription>
+                        </DialogHeader>
+                        <RadioGroup onValueChange={(value) => handleUserSelect(JSON.parse(value))} className="py-4 space-y-2">
+                            {foundUsers.map((user, i) => (
+                                <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
+                                    <RadioGroupItem value={JSON.stringify(user)} id={`user-${i}`} />
+                                    <Label htmlFor={`user-${i}`} className="flex flex-col">
+                                        <span className="font-semibold">{user.name}</span>
+                                        <span className="text-muted-foreground text-xs">{user.email} ({user.campus})</span>
+                                    </Label>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                    </DialogContent>
+                </Dialog>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 const editEmrSchema = z.object({
     status: z.enum(['Sanctioned', 'Not Sanctioned'], { required_error: 'Please select a final status.' }),
@@ -280,6 +429,7 @@ export default function AllProjectsPage() {
   const [facultyFilter, setFacultyFilter] = useState<string[]>(searchParams.get('faculty')?.split(',').filter(Boolean) || []);
   const [campusFilter, setCampusFilter] = useState(searchParams.get('campus') || 'all');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'imr');
+  const [isAddEmrDialogOpen, setIsAddEmrDialogOpen] = useState(false);
 
   const isMobile = useIsMobile();
 
@@ -390,7 +540,7 @@ export default function AllProjectsPage() {
   }, [user, fetchAllData]);
   
   const hasAdminView = ['Super-admin', 'admin', 'CRO', 'IQAC'].includes(user?.role || '') || user?.designation === 'Principal' || user?.designation === 'HOD' || user?.designation === 'Head of Goa Campus';
-  const canEditCoPis = user?.role === 'Super-admin';
+  const isSuperAdmin = user?.role === 'Super-admin';
 
   const allFaculties = useMemo(() => {
     const facultySet = new Set<string>();
@@ -519,52 +669,59 @@ export default function AllProjectsPage() {
     <>
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
-        {hasAdminView && (
-            <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
-                <DialogTrigger asChild>
-                    <Button disabled={loading || (activeTab === 'imr' && filteredImrProjects.length === 0) || (activeTab === 'emr' && filteredEmrProjects.length === 0)}>
-                        <Download className="mr-2 h-4 w-4" /> Export XLSX
-                    </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-3xl">
-                    <DialogHeader>
-                        <DialogTitle>Custom Export for {activeTab.toUpperCase()} Projects</DialogTitle>
-                        <DialogDescription>Select filters and columns for your Excel export.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-6 py-4">
-                        {activeTab === 'imr' && (
+        <div className="flex items-center gap-2">
+            {isSuperAdmin && activeTab === 'emr' && (
+                <Button onClick={() => setIsAddEmrDialogOpen(true)}>
+                    <Plus className="mr-2 h-4 w-4" /> Add Sanctioned EMR
+                </Button>
+            )}
+            {hasAdminView && (
+                <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button disabled={loading || (activeTab === 'imr' && filteredImrProjects.length === 0) || (activeTab === 'emr' && filteredEmrProjects.length === 0)}>
+                            <Download className="mr-2 h-4 w-4" /> Export XLSX
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-3xl">
+                        <DialogHeader>
+                            <DialogTitle>Custom Export for {activeTab.toUpperCase()} Projects</DialogTitle>
+                            <DialogDescription>Select filters and columns for your Excel export.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-6 py-4">
+                            {activeTab === 'imr' && (
+                                <div>
+                                    <Label>Filter by Submission Date</Label>
+                                    {isMobile ? (
+                                        <div className="flex items-center gap-2 mt-2">
+                                        <Input type="date" value={exportDateRange?.from ? format(exportDateRange.from, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, from: e.target.value ? parseISO(e.target.value) : undefined }))} />
+                                        <span>-</span>
+                                        <Input type="date" value={exportDateRange?.to ? format(exportDateRange.to, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, to: e.target.value ? parseISO(e.target.value) : undefined }))} />
+                                        </div>
+                                    ) : (
+                                        <Popover><PopoverTrigger asChild><Button id="date" variant={"outline"} className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{exportDateRange?.from ? (exportDateRange.to ? (`${format(exportDateRange.from, "LLL dd, y")} - ${format(exportDateRange.to, "LLL dd, y")}`) : format(exportDateRange.from, "LLL dd, y")) : (<span>Pick a date range</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2015} toYear={new Date().getFullYear()} initialFocus mode="range" defaultMonth={exportDateRange?.from} selected={exportDateRange} onSelect={setExportDateRange} /></PopoverContent></Popover>
+                                    )}
+                                </div>
+                            )}
                             <div>
-                                <Label>Filter by Submission Date</Label>
-                                {isMobile ? (
-                                    <div className="flex items-center gap-2 mt-2">
-                                    <Input type="date" value={exportDateRange?.from ? format(exportDateRange.from, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, from: e.target.value ? parseISO(e.target.value) : undefined }))} />
-                                    <span>-</span>
-                                    <Input type="date" value={exportDateRange?.to ? format(exportDateRange.to, 'yyyy-MM-dd') : ''} onChange={(e) => setExportDateRange(prev => ({ ...prev, to: e.target.value ? parseISO(e.target.value) : undefined }))} />
-                                    </div>
-                                ) : (
-                                    <Popover><PopoverTrigger asChild><Button id="date" variant={"outline"} className={cn("w-full justify-start text-left font-normal mt-2", !exportDateRange && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{exportDateRange?.from ? (exportDateRange.to ? (`${format(exportDateRange.from, "LLL dd, y")} - ${format(exportDateRange.to, "LLL dd, y")}`) : format(exportDateRange.from, "LLL dd, y")) : (<span>Pick a date range</span>)}</Button></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2015} toYear={new Date().getFullYear()} initialFocus mode="range" defaultMonth={exportDateRange?.from} selected={exportDateRange} onSelect={setExportDateRange} /></PopoverContent></Popover>
-                                )}
-                            </div>
-                        )}
-                        <div>
-                            <Label>Select Columns to Export</Label>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-2 p-4 border rounded-md max-h-60 overflow-y-auto">
-                                {EXPORT_COLUMNS.map(column => (
-                                    <div key={column.id} className="flex items-center space-x-2">
-                                        <Checkbox id={`col-${column.id}`} checked={selectedExportColumns.includes(column.id)} onCheckedChange={(checked) => handleColumnSelectionChange(column.id, !!checked)} />
-                                        <label htmlFor={`col-${column.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{column.label}</label>
-                                    </div>
-                                ))}
+                                <Label>Select Columns to Export</Label>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-2 p-4 border rounded-md max-h-60 overflow-y-auto">
+                                    {EXPORT_COLUMNS.map(column => (
+                                        <div key={column.id} className="flex items-center space-x-2">
+                                            <Checkbox id={`col-${column.id}`} checked={selectedExportColumns.includes(column.id)} onCheckedChange={(checked) => handleColumnSelectionChange(column.id, !!checked)} />
+                                            <label htmlFor={`col-${column.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">{column.label}</label>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    <DialogFooter>
-                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                        <Button onClick={handleConfirmExport}>Confirm & Export</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        )}
+                        <DialogFooter>
+                            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                            <Button onClick={handleConfirmExport}>Confirm & Export</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
+        </div>
       </PageHeader>
       
       <div className="flex flex-col sm:flex-row flex-wrap items-center py-4 gap-2 sm:gap-4">
@@ -664,7 +821,7 @@ export default function AllProjectsPage() {
                                             <TableCell>{p.sanctionDate ? format(parseISO(p.sanctionDate), 'PPP') : 'N/A'}</TableCell>
                                             <TableCell>{p.durationAmount || 'N/A'}</TableCell>
                                             <TableCell className="flex items-center gap-2">
-                                                {canEditCoPis && p.isBulkUploaded && (
+                                                {isSuperAdmin && p.isBulkUploaded && (
                                                     <Button variant="outline" size="sm" onClick={() => setProjectToEdit(p)}>
                                                         <Edit className="h-4 w-4 mr-2" /> Edit
                                                     </Button>
@@ -692,6 +849,11 @@ export default function AllProjectsPage() {
             onActionComplete={fetchAllData}
         />
     )}
+    <AddSanctionedEmrDialog 
+        isOpen={isAddEmrDialogOpen}
+        onOpenChange={setIsAddEmrDialogOpen}
+        onActionComplete={fetchAllData}
+    />
     </>
   );
 }
