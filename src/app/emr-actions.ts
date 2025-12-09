@@ -144,10 +144,10 @@ export async function registerEmrInterest(
   registeredByAdmin?: { adminUid: string, adminName: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    if (!user || !user.uid || !user.faculty || !user.department) {
+    if (!user || !user.uid) {
       return {
         success: false,
-        error: "User profile is incomplete. Please update their faculty and department in Settings.",
+        error: "User data is missing or invalid.",
       }
     }
 
@@ -180,8 +180,8 @@ export async function registerEmrInterest(
         userId: user.uid,
         userName: user.name,
         userEmail: user.email,
-        faculty: user.faculty!,
-        department: user.department!,
+        faculty: user.faculty || "N/A",
+        department: user.department || "N/A",
         registeredAt: new Date().toISOString(),
         status: "Registered",
         coPiDetails: coPis,
@@ -1467,3 +1467,4 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
     
 
     
+
