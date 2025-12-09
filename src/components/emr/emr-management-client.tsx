@@ -1,5 +1,4 @@
 
-
 // src/components/emr/emr-management-client.tsx
 'use client';
 
@@ -11,14 +10,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck } from 'lucide-react';
+import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '../ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement, markEmrAttendance } from '@/app/emr-actions';
+import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement, markEmrAttendance, registerEmrInterest } from '@/app/emr-actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +54,8 @@ import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { UploadPptDialog } from './upload-ppt-dialog';
 import { Checkbox } from '../ui/checkbox';
+import { findUserByMisId } from '@/app/userfinding';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 
 
 interface EmrManagementClientProps {
@@ -91,6 +92,73 @@ const attendanceSchema = z.object({
   absentApplicantIds: z.array(z.string()),
   absentEvaluatorUids: z.array(z.string()),
 });
+
+function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterSuccess }: { call: FundingCall, adminUser: User, isOpen: boolean, onOpenChange: (open: boolean) => void, onRegisterSuccess: () => void }) {
+    const { toast } = useToast();
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [foundUsers, setFoundUsers] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
+
+    const handleSearch = async () => {
+        if (!searchTerm.trim()) return;
+        setIsSearching(true);
+        const result = await findUserByMisId(searchTerm);
+        if (result.success && result.users) {
+            setFoundUsers(result.users);
+        } else {
+            toast({ variant: 'destructive', title: 'Not Found', description: result.error });
+            setFoundUsers([]);
+        }
+        setIsSearching(false);
+    };
+
+    const handleRegister = async (userToRegister: User) => {
+        setIsSubmitting(true);
+        try {
+            const result = await registerEmrInterest(call.id, userToRegister, [], { adminUid: adminUser.uid, adminName: adminUser.name });
+            if (result.success) {
+                toast({ title: 'Success', description: `${userToRegister.name} has been registered for the call.` });
+                onRegisterSuccess();
+                onOpenChange(false);
+            } else {
+                toast({ variant: 'destructive', title: 'Registration Failed', description: result.error });
+            }
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Register a User for: {call.title}</DialogTitle>
+                    <DialogDescription>Search for a user by their MIS ID to register them for this funding call.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Input placeholder="Enter user's MIS ID" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        <Button onClick={handleSearch} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                    </div>
+                    {foundUsers.length > 0 && (
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {foundUsers.map(user => (
+                                <div key={user.uid || user.email} className="flex justify-between items-center p-2 border rounded-md">
+                                    <div>
+                                        <p className="font-semibold">{user.name}</p>
+                                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                                    </div>
+                                    <Button size="sm" onClick={() => handleRegister(user)} disabled={isSubmitting}>Register</Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function AttendanceDialog({ call, interests, allUsers, isOpen, onOpenChange, onUpdate }: { call: FundingCall; interests: EmrInterest[]; allUsers: User[]; isOpen: boolean; onOpenChange: (open: boolean) => void; onUpdate: () => void; }) {
     const { toast } = useToast();
@@ -346,6 +414,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [interestToUpdate, setInterestToUpdate] = useState<EmrInterest | null>(null);
     const [statusToUpdate, setStatusToUpdate] = useState<EmrInterest['status'] | null>(null);
     const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+    const [isRegisterUserDialogOpen, setIsRegisterUserDialogOpen] = useState(false);
     const [isRemarksDialogOpen, setIsRemarksDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
@@ -453,6 +522,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
 
 
     return (
+        <>
         <Card>
             <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -463,6 +533,9 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                 <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
                             </Button>
                          )}
+                         <Button variant="secondary" onClick={() => setIsRegisterUserDialogOpen(true)}>
+                            <UserPlus className="mr-2 h-4 w-4" /> Register User
+                         </Button>
                          {meetingIsScheduled && (
                             <Button variant="outline" onClick={() => setIsAttendanceDialogOpen(true)}>
                                 <UserCheck className="mr-2 h-4 w-4" /> Attendance
@@ -683,5 +756,13 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                  </>
              )}
         </Card>
+        <RegisterUserDialog 
+            call={call} 
+            adminUser={currentUser} 
+            isOpen={isRegisterUserDialogOpen} 
+            onOpenChange={setIsRegisterUserDialogOpen} 
+            onRegisterSuccess={onActionComplete} 
+        />
+        </>
     );
 }
