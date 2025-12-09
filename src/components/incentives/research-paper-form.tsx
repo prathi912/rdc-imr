@@ -48,8 +48,8 @@ const ACCEPTED_FILE_TYPES = ["application/pdf"]
 const researchPaperSchema = z
   .object({
     publicationType: z.string({ required_error: "Please select a publication type." }),
-    indexType: z.enum(["wos", "scopus", "both", "sci"]).optional(),
-    doi: z.string().min(5, 'A valid DOI is required to fetch data.').optional().or(z.literal('')),
+    indexType: z.enum(["wos", "scopus", "both", "sci", "other"]).optional(),
+    doi: z.string().optional().or(z.literal('')),
     scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     wosLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"]).optional(),
@@ -88,6 +88,17 @@ const researchPaperSchema = z
     puStudentNames: z.string().optional(),
     autoFetchedFields: z.array(z.string()).optional(),
   })
+   .refine(
+    (data) => {
+        if (data.indexType !== 'other') {
+            return !!data.doi && data.doi.length >= 5;
+        }
+        return true;
+    }, {
+        message: 'A valid DOI is required for this indexing type.',
+        path: ['doi'],
+    }
+   )
   .refine(
     (data) => {
       if (data.indexType === "wos" || data.indexType === "both") {
@@ -180,6 +191,7 @@ const indexTypeOptions = [
   { value: "scopus", label: "Scopus" },
   { value: "both", label: "Both" },
   { value: "sci", label: "SCI" },
+  { value: 'other', label: 'Other'},
 ]
 const journalClassificationOptions = [
     { value: 'Nature/Science/Lancet', label: 'Nature/Science/Lancet' },
@@ -855,33 +867,35 @@ export function ResearchPaperForm() {
                     </FormItem>
                   )}
                 />
-                 <FormField
-                  control={form.control}
-                  name="journalClassification"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel>Q Rating of the Journal</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          className="flex flex-wrap items-center gap-x-6 gap-y-2"
-                          disabled={isSubmitting}
-                        >
-                          {availableClassifications.map((option) => (
-                            <FormItem key={option.value} className="flex items-center space-x-2 space-y-0">
-                              <FormControl>
-                                <RadioGroupItem value={option.value} />
-                              </FormControl>
-                              <FormLabel className="font-normal">{option.label}</FormLabel>
-                            </FormItem>
-                          ))}
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                 {indexType !== 'other' && (
+                    <FormField
+                    control={form.control}
+                    name="journalClassification"
+                    render={({ field }) => (
+                        <FormItem className="space-y-3">
+                        <FormLabel>Q Rating of the Journal</FormLabel>
+                        <FormControl>
+                            <RadioGroup
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            className="flex flex-wrap items-center gap-x-6 gap-y-2"
+                            disabled={isSubmitting}
+                            >
+                            {availableClassifications.map((option) => (
+                                <FormItem key={option.value} className="flex items-center space-x-2 space-y-0">
+                                    <FormControl>
+                                        <RadioGroupItem value={option.value} />
+                                    </FormControl>
+                                    <FormLabel className="font-normal">{option.label}</FormLabel>
+                                </FormItem>
+                            ))}
+                            </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                 )}
                  <FormField
                   control={form.control}
                   name="doi"
