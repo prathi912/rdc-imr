@@ -1865,3 +1865,123 @@ export async function notifySuperAdminsOnNewUser(userName: string, role: string)
     });
   }
 }
+
+type ProjectData = {
+  pi_email: string;
+  project_title: string;
+  status: string;
+  grant_amount: number;
+  sanction_date: string;
+  Name_of_staff: string;
+  Faculty: string;
+  Institute: string;
+  sanction_number: string;
+  Department?: string;
+};
+
+// Function to convert Excel serial date number to JS Date
+function excelDateToJSDate(serial: number) {
+  const utc_days = Math.floor(serial - 25569);
+  const utc_value = utc_days * 86400;
+  const date_info = new Date(utc_value * 1000);
+
+  const fractional_day = serial - Math.floor(serial) + 0.0000001;
+
+  let total_seconds = Math.floor(86400 * fractional_day);
+
+  const seconds = total_seconds % 60;
+  total_seconds -= seconds;
+
+  const hours = Math.floor(total_seconds / (60 * 60));
+  const minutes = Math.floor(total_seconds / 60) % 60;
+
+  return new Date(date_info.getFullYear(), date_info.getMonth(), date_info.getDate(), hours, minutes, seconds);
+}
+
+export async function bulkUploadProjects(
+  projectsData: ProjectData[]
+): Promise<{
+  success: boolean;
+  data: {
+    successfulCount: number;
+    failures: { projectTitle: string; piName: string; error: string }[];
+  };
+  error?: string;
+}> {
+  let successfulCount = 0;
+  const failures: { projectTitle: string; piName: string; error: string }[] = [];
+
+  for (const row of projectsData) {
+    try {
+      const {
+        pi_email,
+        project_title,
+        status,
+        grant_amount,
+        sanction_date,
+        Name_of_staff,
+        Faculty,
+        Institute,
+        sanction_number,
+        Department,
+      } = row;
+
+      if (!pi_email || !project_title || !status) {
+        failures.push({ projectTitle: project_title || 'Unknown', piName: Name_of_staff || 'Unknown', error: 'Missing required data (email, title, or status).' });
+        continue;
+      }
+
+      let submissionDate: Date;
+      if (sanction_date instanceof Date) {
+        submissionDate = sanction_date;
+      } else if (typeof sanction_date === 'number') {
+        submissionDate = excelDateToJSDate(sanction_date);
+      } else {
+        submissionDate = new Date();
+      }
+
+      const grant: GrantDetails = {
+        totalAmount: grant_amount || 0,
+        sanctionNumber: sanction_number || '',
+        status: grant_amount > 0 ? 'Awarded' : 'Pending',
+        phases: grant_amount > 0 ? [{
+            id: new Date().toISOString(),
+            name: "Phase 1",
+            amount: grant_amount,
+            status: "Disbursed",
+            disbursementDate: submissionDate.toISOString(),
+            transactions: []
+        }] : []
+      };
+
+      const project: Omit<Project, 'id'> = {
+        title: project_title,
+        pi: Name_of_staff,
+        pi_email: pi_email,
+        faculty: Faculty,
+        institute: Institute,
+        departmentName: Department || '',
+        submissionDate: submissionDate.toISOString(),
+        status: status as Project['status'],
+        type: 'Unidisciplinary',
+        abstract: 'Historical project data uploaded via bulk process.',
+        timelineAndOutcomes: 'Historically uploaded data.',
+        pi_uid: '',
+        isBulkUploaded: true,
+        grant: status !== 'Not Recommended' ? grant : undefined,
+      };
+
+      await adminDb.collection('projects').add(project);
+      successfulCount++;
+    } catch (error: any) {
+      failures.push({ projectTitle: row.project_title, piName: row.Name_of_staff, error: error.message || 'An unknown error occurred.' });
+    }
+  }
+
+  await logActivity('INFO', 'Bulk project upload completed', { successfulCount, failureCount: failures.length });
+  if (failures.length > 0) {
+    await logActivity('WARNING', 'Some projects failed during bulk upload', { failures });
+  }
+
+  return { success: true, data: { successfulCount, failures } };
+}

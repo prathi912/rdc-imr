@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import type { Project, User, Evaluation } from '@/types';
-import { getEvaluationPrompts, notifySuperAdminsOnEvaluation } from '@/app/actions';
+import { notifySuperAdminsOnEvaluation } from '@/app/actions';
 import { Loader2, Wand2, ThumbsUp, ThumbsDown, History } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -44,8 +44,6 @@ const recommendationOptions = [
 export function EvaluationForm({ project, user, onEvaluationSubmitted }: EvaluationFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [promptGuidance, setPromptGuidance] = useState<string | null>(null);
-  const [loadingPrompts, setLoadingPrompts] = useState(true);
   const [existingEvaluation, setExistingEvaluation] = useState<Evaluation | null>(null);
   const [loadingExisting, setLoadingExisting] = useState(true);
 
@@ -82,25 +80,6 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
     fetchExistingEvaluation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.id, user.uid]);
-
-  useEffect(() => {
-    async function fetchPrompts() {
-      setLoadingPrompts(true);
-      try {
-        const result = await getEvaluationPrompts({ title: project.title, abstract: project.abstract });
-        if (result.success) {
-          setPromptGuidance(result.prompts.guidance);
-        } else {
-          toast({ variant: 'destructive', title: 'AI Error', description: 'Could not load AI evaluation prompts.' });
-        }
-      } catch (error) {
-          console.error("Error fetching prompts:", error);
-      } finally {
-        setLoadingPrompts(false);
-      }
-    }
-    fetchPrompts();
-  }, [project.title, project.abstract, toast]);
 
   const handleSubmit = async (values: EvaluationFormData) => {
     setIsSubmitting(true);
@@ -194,14 +173,6 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Overall Comments</FormLabel>
-                  {loadingPrompts ? <Skeleton className="h-5 w-3/4 mb-2" /> : (
-                    promptGuidance && 
-                    <Alert variant="default" className="bg-muted/50">
-                        <Wand2 className="h-4 w-4" />
-                        <AlertTitle>AI Suggestion</AlertTitle>
-                        <AlertDescription>{promptGuidance}</AlertDescription>
-                    </Alert>
-                  )}
                   <FormControl>
                     <Textarea rows={5} {...field} disabled={isFormDisabled} />
                   </FormControl>
