@@ -953,7 +953,7 @@ export async function uploadRevisedEmrPpt(
   interestId: string,
   pptDataUrl: string,
   originalFileName: string,
-  userName: string,
+  user: User,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId || !pptDataUrl) {
@@ -966,6 +966,7 @@ export async function uploadRevisedEmrPpt(
         return { success: false, error: 'Interest registration not found.'}
     }
     const interest = interestSnap.data() as EmrInterest;
+    const userName = user.name;
 
     // Standardize the filename
     const fileExtension = path.extname(originalFileName)
