@@ -1557,7 +1557,7 @@ export async function addSanctionedEmrProject(data: {
                 ${EMAIL_STYLES.logo}
                 <p style="color:#ffffff;">Dear ${data.pi.name},</p>
                 <p style="color:#e0e0e0;">An administrator has added your sanctioned Extramural Research (EMR) project, "<strong style="color:#ffffff;">${data.title}</strong>," to the R&D Portal.</p>
-                <p style="color:#e0e0e0; font-weight: bold; margin-top: 20px;">Action Required: Please log in to the portal to upload the sanction proof for this project.</p>
+                <p style="color:#e0e0e0; font-weight: bold; margin-top: 20px;">You are requested to kindly upload the sanction proof of the project to the portal as per your earliest convenience.</p>
                 <p style="text-align:center; margin-top:25px;">
                     <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/my-projects" style="background-color: #64B5F6; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                         Go to My Projects
@@ -1592,6 +1592,7 @@ export async function addSanctionedEmrProject(data: {
     
 
     
+
 
 
 
