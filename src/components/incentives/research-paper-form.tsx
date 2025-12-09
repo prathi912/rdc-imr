@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -50,6 +49,7 @@ const researchPaperSchema = z
     publicationType: z.string({ required_error: "Please select a publication type." }),
     indexType: z.enum(["wos", "scopus", "both", "sci", "other"]).optional(),
     doi: z.string().optional().or(z.literal('')),
+    relevantLink: z.string().optional().or(z.literal('')),
     scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     wosLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"]).optional(),
@@ -88,6 +88,17 @@ const researchPaperSchema = z
     puStudentNames: z.string().optional(),
     autoFetchedFields: z.array(z.string()).optional(),
   })
+   .refine(
+    (data) => {
+        if (data.indexType === 'other') {
+            return !!data.relevantLink && data.relevantLink.length > 5 && data.relevantLink.startsWith('https://');
+        }
+        return true;
+    }, {
+        message: 'A valid article link is required for "Other" indexing type.',
+        path: ['relevantLink'],
+    }
+   )
    .refine(
     (data) => {
         if (data.indexType !== 'other') {
@@ -306,6 +317,7 @@ function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit
                 {renderDetail("Journal Name", data.journalName)}
                 {renderDetail("Journal Website", data.journalWebsite)}
                 {renderDetail("DOI", data.doi)}
+                {renderDetail("Article Link", data.relevantLink)}
                 {renderDetail("Scopus URL", data.scopusLink)}
                 {renderDetail("WoS URL", data.wosLink)}
                 {renderDetail("Journal Classification", data.journalClassification)}
@@ -869,57 +881,46 @@ export function ResearchPaperForm() {
                 />
                  {indexType !== 'other' && (
                     <FormField
-                    control={form.control}
-                    name="journalClassification"
-                    render={({ field }) => (
-                        <FormItem className="space-y-3">
-                        <FormLabel>Q Rating of the Journal</FormLabel>
-                        <FormControl>
-                            <RadioGroup
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            className="flex flex-wrap items-center gap-x-6 gap-y-2"
-                            disabled={isSubmitting}
-                            >
-                            {availableClassifications.map((option) => (
-                                <FormItem key={option.value} className="flex items-center space-x-2 space-y-0">
-                                    <FormControl>
-                                        <RadioGroupItem value={option.value} />
-                                    </FormControl>
-                                    <FormLabel className="font-normal">{option.label}</FormLabel>
-                                </FormItem>
-                            ))}
-                            </RadioGroup>
-                        </FormControl>
-                        <FormMessage />
-                        </FormItem>
-                    )}
+                        control={form.control}
+                        name="doi"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>DOI (Digital Object Identifier)</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormControl>
+                                    <Input placeholder="Enter DOI (e.g., 10.1038/nature12345)" {...field} disabled={isSubmitting} />
+                                </FormControl>
+                                {indexType === 'sci' ? (
+                                    <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
+                                ) : (
+                                    <>
+                                    <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
+                                    <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
+                                    </>
+                                )}
+                            </div>
+                            <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
                     />
                  )}
-                 <FormField
-                  control={form.control}
-                  name="doi"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>DOI (Digital Object Identifier)</FormLabel>
-                      <div className="flex items-center gap-2">
-                          <FormControl>
-                              <Input placeholder="Enter DOI (e.g., 10.1038/nature12345)" {...field} disabled={isSubmitting} />
-                          </FormControl>
-                          {indexType === 'sci' ? (
-                            <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
-                          ) : (
-                            <>
-                              <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
-                              <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
-                            </>
-                          )}
-                      </div>
-                      <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                 {indexType === 'other' && (
+                     <FormField
+                        control={form.control}
+                        name="relevantLink"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Link for Article</FormLabel>
+                             <FormControl>
+                                <Input placeholder="https://www.journal.com/article/123" {...field} disabled={isSubmitting} />
+                             </FormControl>
+                            <FormDescription>Please provide a direct link to the published article.</FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                 )}
                 
                 {(indexType === 'scopus' || indexType === 'both') && (
                   <FormField
