@@ -141,12 +141,13 @@ export async function registerEmrInterest(
   callId: string,
   user: User,
   coPis: CoPiDetails[] = [],
+  registeredByAdmin?: { adminUid: string, adminName: string }
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (!user || !user.uid || !user.faculty || !user.department) {
       return {
         success: false,
-        error: "User profile is incomplete. Please update your faculty and department in Settings.",
+        error: "User profile is incomplete. Please update their faculty and department in Settings.",
       }
     }
 
@@ -154,14 +155,14 @@ export async function registerEmrInterest(
     const q = interestsRef.where("callId", "==", callId).where("userId", "==", user.uid)
     const docSnap = await q.get()
     if (!docSnap.empty) {
-      return { success: false, error: "You have already registered your interest for this call." }
+      return { success: false, error: "This user has already registered interest for this call." }
     }
 
     const allInterestsForCallQuery = interestsRef.where("callId", "==", callId)
     const allInterestsSnapshot = await allInterestsForCallQuery.get()
     const isFirstInterest = allInterestsSnapshot.empty
 
-    const newInterest = await adminDb.runTransaction(async (transaction) => {
+    await adminDb.runTransaction(async (transaction) => {
       const counterRef = adminDb.collection("counters").doc("emrInterest")
       const counterDoc = await transaction.get(counterRef)
 
@@ -188,10 +189,13 @@ export async function registerEmrInterest(
         coPiNames: coPis.map((p) => p.name),
         coPiEmails: coPis.map((p) => p.email.toLowerCase()),
       }
+      
+      if (registeredByAdmin) {
+        newInterestDoc.adminRemarks = `Registered on behalf of the user by ${registeredByAdmin.adminName}.`;
+      }
 
       const interestRef = adminDb.collection("emrInterests").doc()
       transaction.set(interestRef, newInterestDoc)
-      return { id: interestRef.id, ...newInterestDoc }
     })
 
     const callSnap = await adminDb.collection("fundingCalls").doc(callId).get()
@@ -219,6 +223,34 @@ export async function registerEmrInterest(
         await batch.commit()
       }
     }
+    
+    // Notify the user who was registered, especially if done by an admin.
+    if (user.email) {
+      let emailHtml: string;
+      if (registeredByAdmin) {
+        emailHtml = `<div ${EMAIL_STYLES.background}>
+            ${EMAIL_STYLES.logo}
+            <p style="color:#ffffff;">Dear ${user.name},</p>
+            <p style="color:#e0e0e0;">This is to inform you that ${registeredByAdmin.adminName} has registered your interest on your behalf for the EMR funding call: "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
+            <p style="color:#e0e0e0;">You can view this application in the "My EMR Applications" section on the EMR Calendar page of the portal.</p>
+            ${EMAIL_STYLES.footer}
+        </div>`;
+      } else {
+        emailHtml = `<div ${EMAIL_STYLES.background}>
+            ${EMAIL_STYLES.logo}
+            <p style="color:#ffffff;">Dear ${user.name},</p>
+            <p style="color:#e0e0e0;">Your interest for the EMR funding call "<strong style="color:#ffffff;">${callTitle}</strong>" has been successfully registered.</p>
+            ${EMAIL_STYLES.footer}
+        </div>`;
+      }
+      await sendEmailUtility({
+        to: user.email,
+        subject: `Your EMR Interest Registration for: ${callTitle}`,
+        html: emailHtml,
+        from: 'default'
+      });
+    }
+
 
     if (coPis && coPis.length > 0) {
       const usersRef = adminDb.collection("users")
@@ -258,7 +290,7 @@ export async function registerEmrInterest(
       }
     }
 
-    await logActivity("INFO", "EMR interest registered", { callId, userId: user.uid })
+    await logActivity("INFO", "EMR interest registered", { callId, userId: user.uid, byAdmin: registeredByAdmin?.adminName })
     return { success: true }
   } catch (error: any) {
     console.error("Error registering EMR interest:", error)

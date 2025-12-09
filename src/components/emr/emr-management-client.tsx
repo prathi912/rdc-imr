@@ -1,4 +1,5 @@
 
+
 // src/components/emr/emr-management-client.tsx
 'use client';
 
@@ -98,7 +99,7 @@ function AttendanceDialog({ call, interests, allUsers, isOpen, onOpenChange, onU
         resolver: zodResolver(attendanceSchema),
         defaultValues: {
             absentApplicantIds: [],
-            absentEvaluatorUids: [],
+            absentEvaluatorUids: call.meetingDetails?.absentEvaluators || [],
         },
     });
 
@@ -542,14 +543,14 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                                                 <DropdownMenuContent align="end">
                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                     <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onSelect={() => handleOpenRevisionUpload(interest)}>
+                                                        <Upload className="mr-2 h-4 w-4" /> Upload PPT on behalf
+                                                    </DropdownMenuItem>
                                                     {interest.isBulkUploaded && (
                                                         <DropdownMenuItem onSelect={() => handleOpenBulkEditDialog(interest)}>
                                                             <Edit className="mr-2 h-4 w-4" /> Edit Bulk Data
                                                         </DropdownMenuItem>
                                                     )}
-                                                    <DropdownMenuItem onSelect={() => handleOpenRevisionUpload(interest)}>
-                                                        <Upload className="mr-2 h-4 w-4" /> Upload Revised PPT
-                                                    </DropdownMenuItem>
                                                     {isMeetingScheduled && (
                                                         <>
                                                             {interest.status === 'Endorsement Submitted' && (
