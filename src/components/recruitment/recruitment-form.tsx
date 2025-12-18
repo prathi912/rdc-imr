@@ -77,7 +77,15 @@ export function RecruitmentForm() {
     const form = useForm<RecruitmentFormValues>({
         resolver: zodResolver(recruitmentSchema),
         defaultValues: {
+            projectName: '',
+            positionTitle: '',
+            positionType: undefined,
+            jobDescription: '',
+            responsibilities: '',
+            qualifications: '',
             targetDepartments: [],
+            salary: '',
+            applicationDeadline: undefined,
         },
     });
 
