@@ -1,16 +1,16 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
-import { collection, addDoc, doc } from 'firebase/firestore';
-import type { User, ProjectRecruitment } from '@/types';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { collection, addDoc } from 'firebase/firestore';
+import type { User } from '@/types';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +21,15 @@ import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
+import { Badge } from '../ui/badge';
 
 const recruitmentSchema = z.object({
   projectName: z.string().min(5, 'Project name is required.'),
@@ -29,7 +38,6 @@ const recruitmentSchema = z.object({
   jobDescription: z.string().min(20, 'A brief job description is required.'),
   responsibilities: z.string().optional(),
   qualifications: z.string().min(10, 'Please list required qualifications.'),
-  targetBranches: z.array(z.string()).optional(),
   targetDepartments: z.array(z.string()).optional(),
   salary: z.string().optional(),
   applicationDeadline: z.date({ required_error: 'An application deadline is required.' }),
@@ -37,14 +45,12 @@ const recruitmentSchema = z.object({
 
 type RecruitmentFormValues = z.infer<typeof recruitmentSchema>;
 
-const branches = ["CSE", "IT", "Mechanical", "Electrical", "Civil", "Biotechnology", "Chemical"];
-const departments = ["Department of Computer Science", "Department of Biotechnology", "Department of Mechanical Engineering"];
-
 export function RecruitmentForm() {
     const { toast } = useToast();
     const router = useRouter();
     const [user, setUser] = useState<User | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [allDepartments, setAllDepartments] = useState<string[]>([]);
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
@@ -53,12 +59,24 @@ export function RecruitmentForm() {
         } else {
             router.push('/login');
         }
+
+        async function fetchDepartments() {
+            try {
+                const res = await fetch('/api/get-departments');
+                const result = await res.json();
+                if (result.success) {
+                    setAllDepartments(result.data);
+                }
+            } catch (error) {
+                console.error("Failed to fetch departments", error);
+            }
+        }
+        fetchDepartments();
     }, [router]);
 
     const form = useForm<RecruitmentFormValues>({
         resolver: zodResolver(recruitmentSchema),
         defaultValues: {
-            targetBranches: [],
             targetDepartments: [],
         },
     });
@@ -83,6 +101,8 @@ export function RecruitmentForm() {
             setIsSubmitting(false);
         }
     };
+    
+    const selectedDepartments = form.watch('targetDepartments') || [];
 
     return (
         <Card>
@@ -96,10 +116,58 @@ export function RecruitmentForm() {
                         </div>
                         <FormField name="jobDescription" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Job Description</FormLabel><FormControl><Textarea rows={4} {...field} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="qualifications" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Qualifications</FormLabel><FormControl><Textarea placeholder="List required skills, degrees, or experience..." {...field} /></FormControl><FormMessage /></FormItem> )} />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField name="targetBranches" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Target Branches</FormLabel><Select onValueChange={value => field.onChange([...(field.value || []), value])}><FormControl><SelectTrigger><SelectValue placeholder="Add branches..." /></SelectTrigger></FormControl><SelectContent>{branches.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent></Select><div className="flex flex-wrap gap-1 mt-2">{field.value?.map(b => <Badge key={b} variant="secondary">{b} <Button variant="ghost" size="icon" className="h-4 w-4 ml-1" onClick={() => field.onChange(field.value?.filter(i => i !== b))}><X className="h-3 w-3"/></Button></Badge>)}</div><FormMessage /></FormItem> )} />
-                            <FormField name="targetDepartments" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Target Departments</FormLabel><Select onValueChange={value => field.onChange([...(field.value || []), value])}><FormControl><SelectTrigger><SelectValue placeholder="Add departments..." /></SelectTrigger></FormControl><SelectContent>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select><div className="flex flex-wrap gap-1 mt-2">{field.value?.map(d => <Badge key={d} variant="secondary">{d} <Button variant="ghost" size="icon" className="h-4 w-4 ml-1" onClick={() => field.onChange(field.value?.filter(i => i !== d))}><X className="h-3 w-3"/></Button></Badge>)}</div><FormMessage /></FormItem> )} />
-                        </div>
+                        
+                        <FormField
+                            name="targetDepartments"
+                            control={form.control}
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Target Departments/Branches</FormLabel>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" className="w-full justify-start font-normal">
+                                                {selectedDepartments.length > 0 ? `${selectedDepartments.length} selected` : "Select departments..."}
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-60 overflow-y-auto">
+                                            <DropdownMenuLabel>Available Departments</DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            {allDepartments.map(dept => (
+                                                <DropdownMenuCheckboxItem
+                                                    key={dept}
+                                                    checked={field.value?.includes(dept)}
+                                                    onCheckedChange={(checked) => {
+                                                        const newValue = checked
+                                                            ? [...(field.value || []), dept]
+                                                            : (field.value || []).filter(d => d !== dept);
+                                                        field.onChange(newValue);
+                                                    }}
+                                                >
+                                                    {dept}
+                                                </DropdownMenuCheckboxItem>
+                                            ))}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <div className="flex flex-wrap gap-1 mt-2">
+                                        {selectedDepartments.map(dept => (
+                                            <Badge key={dept} variant="secondary">
+                                                {dept}
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-4 w-4 ml-1"
+                                                    onClick={() => field.onChange(selectedDepartments.filter(d => d !== dept))}
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </Button>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField name="salary" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Salary / Stipend (Optional)</FormLabel><FormControl><Input placeholder="e.g., As per university norms" {...field} /></FormControl><FormMessage /></FormItem> )} />
                             <FormField name="applicationDeadline" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Application Deadline</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
