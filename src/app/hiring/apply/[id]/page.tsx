@@ -164,7 +164,19 @@ export default function ApplyPage() {
                                         <FormField name="applicantEmail" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                         <FormField name="applicantPhone" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     </div>
-                                    <FormField name="cv" control={form.control} render={({ field: { onChange, ...rest }}) => ( <FormItem><FormLabel>Upload CV (PDF, max 5MB)</FormLabel><FormControl><Input type="file" accept=".pdf" onChange={e => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField
+                                        name="cv"
+                                        control={form.control}
+                                        render={({ field: { onChange, ...rest }}) => (
+                                            <FormItem>
+                                                <FormLabel>Upload CV (PDF, max 5MB)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="file" accept=".pdf" onChange={e => onChange(e.target.files)} {...rest} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                     <FormField name="coverLetter" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Cover Letter (Optional)</FormLabel><FormControl><Textarea rows={5} placeholder="Briefly explain why you are a good fit for this role..." {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     
                                     <Button type="submit" className="w-full" disabled={isSubmitting}>
