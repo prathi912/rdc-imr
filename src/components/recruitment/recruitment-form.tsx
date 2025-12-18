@@ -18,9 +18,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon, Loader2, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, X, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, startOfToday } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -36,11 +36,11 @@ const recruitmentSchema = z.object({
   positionTitle: z.string().min(3, 'Position title is required.'),
   positionType: z.enum(['Intern', 'Project Associate', 'JRF', 'SRF', 'Other'], { required_error: 'Please select a position type.' }),
   jobDescription: z.string().min(20, 'A brief job description is required.'),
-  responsibilities: z.string().optional(),
+  responsibilities: z.string().optional().default(''),
   qualifications: z.string().min(10, 'Please list required qualifications.'),
-  targetDepartments: z.array(z.string()).optional(),
-  salary: z.string().optional(),
-  applicationDeadline: z.date({ required_error: 'An application deadline is required.' }),
+  targetDepartments: z.array(z.string()).optional().default([]),
+  salary: z.string().optional().default(''),
+  applicationDeadline: z.date({ required_error: 'An application deadline is required.' }).min(startOfToday(), 'Application deadline must be in the future.'),
 });
 
 type RecruitmentFormValues = z.infer<typeof recruitmentSchema>;
@@ -135,6 +135,7 @@ export function RecruitmentForm() {
                                         <DropdownMenuTrigger asChild>
                                             <Button variant="outline" className="w-full justify-start font-normal">
                                                 {selectedDepartments.length > 0 ? `${selectedDepartments.length} selected` : "Select departments..."}
+                                                <ChevronDown className="h-4 w-4 opacity-50 ml-auto" />
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width] max-h-60 overflow-y-auto">
@@ -178,7 +179,7 @@ export function RecruitmentForm() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField name="salary" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Salary / Stipend (Optional)</FormLabel><FormControl><Input placeholder="e.g., As per university norms" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField name="applicationDeadline" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Application Deadline</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                            <FormField name="applicationDeadline" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Application Deadline</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < new Date()} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
                         </div>
                     </CardContent>
                     <CardFooter>
