@@ -31,12 +31,12 @@ export const ALL_MODULES = [
   { id: 'recruitment-approvals', label: 'Recruitment Approvals' },
 ]
 
-const coreModules = ["dashboard", "notifications", "settings", "emr-calendar"]
+const coreModules = ["dashboard", "notifications", "settings", "emr-calendar", "incentive-claim"]
 const facultyCoreModules = ["new-submission", "my-projects", "post-a-job"]
 const hierarchyCoreModules = ["analytics"]
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules]
-const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics", "incentive-claim"]
+const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics"]
 const iqacDefaults = [...coreModules, "all-projects", "analytics"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "emr-management", "manage-incentive-claims"]
 const superAdminDefaults = [...adminDefaults, "module-management", "recruitment-approvals"]
