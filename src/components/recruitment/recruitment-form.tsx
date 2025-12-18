@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -30,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { Badge } from '../ui/badge';
+import { notifyForRecruitmentApproval } from '@/app/actions';
 
 const recruitmentSchema = z.object({
   projectName: z.string().min(5, 'Project name is required.'),
@@ -101,6 +103,10 @@ export function RecruitmentForm() {
                 status: 'Pending Approval',
                 createdAt: new Date().toISOString(),
             });
+            
+            // Notify admins after successful submission
+            await notifyForRecruitmentApproval(data.positionTitle, user.name);
+
             toast({ title: 'Submitted for Approval', description: 'Your job posting has been sent to an administrator for review.' });
             router.push('/dashboard/post-a-job');
         } catch (error: any) {
@@ -179,7 +185,7 @@ export function RecruitmentForm() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField name="salary" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Salary / Stipend (Optional)</FormLabel><FormControl><Input placeholder="e.g., As per university norms" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                            <FormField name="applicationDeadline" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Application Deadline</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < new Date()} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+                            <FormField name="applicationDeadline" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Application Deadline</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
                         </div>
                     </CardContent>
                     <CardFooter>

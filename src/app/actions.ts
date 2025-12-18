@@ -802,7 +802,7 @@ export async function scheduleMeeting(
                       <p><strong style="color: #ffffff;">
                         ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
                       </strong> 
-                        ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
+                        ${meetingDetails.mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
                       </p>
                       <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
                       <ul style="list-style-type: none; padding-left: 0;">
@@ -2005,4 +2005,74 @@ export async function bulkUploadProjects(
   }
 
   return { success: true, data: { successfulCount, failures } };
+}
+
+export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const usersRef = adminDb.collection("users");
+    const q = usersRef.where("allowedModules", "array-contains", "recruitment-approvals");
+
+    const querySnapshot = await q.get();
+    if (querySnapshot.empty) {
+      console.log("No users with recruitment approval permissions found.");
+      return { success: true };
+    }
+
+    const batch = adminDb.batch();
+    const emailPromises = [];
+
+    for (const doc of querySnapshot.docs) {
+      const user = doc.data() as User;
+
+      // In-app notification
+      const notificationRef = adminDb.collection("notifications").doc();
+      batch.set(notificationRef, {
+        uid: user.uid,
+        title: `New Job Posting: "${jobTitle}" by ${postedBy} is awaiting approval.`,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+        projectId: '/dashboard/recruitment-approvals', // Link to the approvals page
+      });
+
+      // Email notification
+      if (user.email) {
+        const emailHtml = `
+          <div ${EMAIL_STYLES.background}>
+              ${EMAIL_STYLES.logo}
+              <p style="color:#ffffff;">Dear ${user.name},</p>
+              <p style="color:#e0e0e0;">
+                  A new job posting, "<strong style="color:#ffffff;">${jobTitle}</strong>," submitted by ${postedBy}, is awaiting your approval.
+              </p>
+              <p style="color:#e0e0e0;">
+                  Please visit the Recruitment Approvals page on the R&D Portal to review and take action.
+              </p>
+              <p style="text-align:center; margin-top:25px;">
+                  <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/recruitment-approvals" style="background-color: #64B5F6; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                      Review Posting
+                  </a>
+              </p>
+              ${EMAIL_STYLES.footer}
+          </div>
+        `;
+        emailPromises.push(
+          sendEmailUtility({
+            to: user.email,
+            subject: `Action Required: New Job Posting for Approval`,
+            html: emailHtml,
+            from: "default",
+          })
+        );
+      }
+    }
+
+    await batch.commit();
+    await Promise.all(emailPromises);
+    
+    await logActivity("INFO", `Notified ${querySnapshot.size} admins for recruitment approval`, { jobTitle, postedBy });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error notifying for recruitment approval:", error);
+    await logActivity("ERROR", "Failed to notify for recruitment approval", { jobTitle, error: error.message });
+    return { success: false, error: error.message || "Failed to send notifications." };
+  }
 }
