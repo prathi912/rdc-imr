@@ -36,6 +36,7 @@ import {
   BookUp,
   MessageCircle,
   BookOpenCheck,
+  Building,
 } from "lucide-react"
 
 import {
@@ -159,6 +160,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         tooltip: "Incentive Claims",
         icon: Award,
         label: "Incentive Claims",
+      },
+      {
+        id: 'post-a-job',
+        href: '/dashboard/post-a-job',
+        tooltip: 'Post a Job',
+        icon: Building,
+        label: 'Post a Job',
+      },
+      {
+        id: 'recruitment-approvals',
+        href: '/dashboard/recruitment-approvals',
+        tooltip: 'Recruitment Approvals',
+        icon: ClipboardCheck,
+        label: 'Recruitment Approvals',
       },
       {
         id: "incentive-approvals",

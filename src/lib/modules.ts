@@ -27,17 +27,19 @@ export const ALL_MODULES = [
   { id: "module-management", label: "Module Management" },
   { id: "notifications", label: "Notifications" },
   { id: "settings", label: "Settings" },
+  { id: 'post-a-job', label: 'Post a Job' },
+  { id: 'recruitment-approvals', label: 'Recruitment Approvals' },
 ]
 
 const coreModules = ["dashboard", "notifications", "settings", "emr-calendar"]
-const facultyCoreModules = ["new-submission", "my-projects"]
+const facultyCoreModules = ["new-submission", "my-projects", "post-a-job"]
 const hierarchyCoreModules = ["analytics"]
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules]
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics", "incentive-claim"]
 const iqacDefaults = [...coreModules, "all-projects", "analytics"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "emr-management", "manage-incentive-claims"]
-const superAdminDefaults = [...adminDefaults, "module-management"]
+const superAdminDefaults = [...adminDefaults, "module-management", "recruitment-approvals"]
 
 // Default modules for special designations who are otherwise 'faculty' role
 const principalDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"]

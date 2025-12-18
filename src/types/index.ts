@@ -1,4 +1,5 @@
 
+
 export type CoPiDetails = {
   uid?: string | null // Will exist for registered users
   name: string
@@ -246,7 +247,7 @@ export type IncentiveClaim = {
 
   // Research Paper Fields
   publicationType?: string;
-  indexType?: "wos" | "scopus" | "both" | "sci";
+  indexType?: "wos" | "scopus" | "both" | "sci" | "other";
   doi?: string;
   scopusLink?: string;
   wosLink?: string;
@@ -555,3 +556,37 @@ export type FoundUser = {
   misId: string;
   campus: string;
 }
+
+// New types for Project Recruitment
+export type ProjectRecruitment = {
+  id: string;
+  projectId: string; // IMR or EMR project ID
+  projectName: string;
+  positionTitle: string;
+  positionType: 'Intern' | 'Project Associate' | 'JRF' | 'SRF' | 'Other';
+  jobDescription: string;
+  responsibilities?: string;
+  qualifications: string;
+  targetBranches: string[];
+  targetDepartments: string[];
+  salary?: string;
+  applicationDeadline: string; // ISO String
+  postedByUid: string;
+  postedByName: string;
+  status: 'Draft' | 'Pending Approval' | 'Approved' | 'Rejected' | 'Closed';
+  createdAt: string; // ISO String
+  approvedAt?: string;
+  adminRemarks?: string;
+};
+
+export type RecruitmentApplication = {
+  id: string;
+  recruitmentId: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone: string;
+  applicantMisId?: string;
+  cvUrl: string;
+  coverLetter?: string;
+  appliedAt: string; // ISO String
+};

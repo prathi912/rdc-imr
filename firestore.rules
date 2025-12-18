@@ -1,4 +1,5 @@
 
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -115,6 +116,21 @@ service cloud.firestore {
             // Admins can read all evaluations.
             allow read: if isSignedIn() && isAdmin();
         }
+    }
+    
+    match /projectRecruitments/{recruitmentId} {
+      allow read: if true; // Publicly readable
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.postedByUid == request.auth.uid || isSuperAdmin());
+      allow delete: if isSignedIn() && (resource.data.postedByUid == request.auth.uid || isSuperAdmin());
+      
+      match /applications/{applicationId} {
+          allow create: if true; // Public can apply
+          allow read: if isSignedIn() && (
+            get(/databases/$(database)/documents/projectRecruitments/$(recruitmentId)).data.postedByUid == request.auth.uid ||
+            isSuperAdmin()
+          );
+      }
     }
 
     // Health check collection is open for testing purposes.
