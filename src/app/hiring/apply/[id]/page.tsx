@@ -52,6 +52,13 @@ export default function ApplyPage() {
     
     const form = useForm<ApplicationFormValues>({
         resolver: zodResolver(applicationSchema),
+        defaultValues: {
+            applicantName: '',
+            applicantEmail: '',
+            applicantPhone: '',
+            applicantMisId: '',
+            coverLetter: '',
+        },
     });
 
     useEffect(() => {
