@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Users } from 'lucide-react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/config';
 import type { ProjectRecruitment, User } from '@/types';
@@ -76,14 +76,23 @@ export default function PostAJobPage() {
                             <div className="space-y-4">
                                 {postings.map(job => (
                                     <div key={job.id} className="border p-4 rounded-lg flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                                        <div>
+                                        <div className="flex-1">
                                             <p className="font-semibold">{job.positionTitle}</p>
                                             <p className="text-sm text-muted-foreground">For: {job.projectName}</p>
                                             <p className="text-xs text-muted-foreground mt-1">
                                                 Created: {format(new Date(job.createdAt), 'PPP')} | Deadline: {format(new Date(job.applicationDeadline), 'PPP')}
                                             </p>
                                         </div>
-                                        <Badge variant={getStatusVariant(job.status)}>{job.status}</Badge>
+                                        <div className="flex items-center gap-2 self-start sm:self-center">
+                                            <Badge variant={getStatusVariant(job.status)}>{job.status}</Badge>
+                                            {job.status === 'Approved' && (
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link href={`/dashboard/recruitment/${job.id}`}>
+                                                        <Users className="mr-2 h-4 w-4" /> View Applicants
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
