@@ -586,7 +586,9 @@ export type RecruitmentApplication = {
   applicantEmail: string;
   applicantPhone: string;
   applicantMisId?: string;
+  department?: string;
+  institute?: string;
   cvUrl: string;
-  coverLetter?: string;
+  coverLetterUrl?: string;
   appliedAt: string; // ISO String
 };

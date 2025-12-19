@@ -26,6 +26,8 @@ const applicationSchema = z.object({
   applicantEmail: z.string().email('Please enter a valid email address.'),
   applicantPhone: z.string().min(10, 'Please enter a valid 10-digit phone number.').max(10, 'Please enter a valid 10-digit phone number.'),
   applicantMisId: z.string().optional(),
+  department: z.string().optional(),
+  institute: z.string().optional(),
   cv: z.any().refine(files => files?.length === 1, 'CV is required.').refine(files => files?.[0]?.size <= 5 * 1024 * 1024, `Max file size is 5MB.`),
   coverLetter: z.any().optional(),
 });
@@ -57,6 +59,8 @@ export default function ApplyPage() {
             applicantEmail: '',
             applicantPhone: '',
             applicantMisId: '',
+            department: '',
+            institute: '',
             coverLetter: '',
         },
     });
@@ -112,6 +116,8 @@ export default function ApplyPage() {
                 applicantEmail: data.applicantEmail,
                 applicantPhone: data.applicantPhone,
                 applicantMisId: data.applicantMisId,
+                department: data.department,
+                institute: data.institute,
                 cvUrl: cvUploadResult.url,
                 coverLetterUrl: coverLetterUrl,
                 appliedAt: new Date().toISOString(),
@@ -174,6 +180,10 @@ export default function ApplyPage() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormField name="applicantEmail" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />
                                         <FormField name="applicantPhone" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Phone Number</FormLabel><FormControl><Input type="tel" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <FormField name="institute" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Institute</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField name="department" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Department</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     </div>
                                     <FormField
                                         name="cv"

@@ -85,6 +85,8 @@ export default function ViewApplicationsPage() {
             'Email': app.applicantEmail,
             'Phone': app.applicantPhone,
             'MIS ID': app.applicantMisId || 'N/A',
+            'Institute': app.institute || 'N/A',
+            'Department': app.department || 'N/A',
             'Applied At': format(new Date(app.appliedAt), 'PPP p'),
             'CV Link': app.cvUrl,
             'Cover Letter Link': app.coverLetterUrl || 'N/A',
@@ -127,6 +129,7 @@ export default function ViewApplicationsPage() {
                                         <TableRow>
                                             <TableHead>Name</TableHead>
                                             <TableHead>Contact</TableHead>
+                                            <TableHead>Academics</TableHead>
                                             <TableHead>Applied On</TableHead>
                                             <TableHead>Documents</TableHead>
                                         </TableRow>
@@ -141,6 +144,10 @@ export default function ViewApplicationsPage() {
                                                 <TableCell>
                                                     <div className="text-sm">{app.applicantEmail}</div>
                                                     <div className="text-sm text-muted-foreground">{app.applicantPhone}</div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="text-sm">{app.institute || 'N/A'}</div>
+                                                    <div className="text-sm text-muted-foreground">{app.department || 'N/A'}</div>
                                                 </TableCell>
                                                 <TableCell>
                                                     {format(new Date(app.appliedAt), 'PPP')}
