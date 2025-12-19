@@ -61,7 +61,7 @@ export default function ApplyPage() {
             applicantMisId: '',
             department: '',
             institute: '',
-            coverLetter: '',
+            coverLetter: undefined,
         },
     });
 
@@ -175,7 +175,7 @@ export default function ApplyPage() {
                                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormField name="applicantName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                                        <FormField name="applicantMisId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>MIS ID (if applicable)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                        <FormField name="applicantMisId" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Enrollment Number (if applicable)</FormLabel><FormControl><Input placeholder="230502...." {...field} /></FormControl><FormMessage /></FormItem> )} />
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <FormField name="applicantEmail" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Email Address</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem> )} />

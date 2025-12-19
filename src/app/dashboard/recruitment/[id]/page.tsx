@@ -50,7 +50,7 @@ export default function ViewApplicationsPage() {
                     router.push('/dashboard/post-a-job');
                     return;
                 }
-                const jobData = { id: jobDocSnap.id, ...jobDocSnap.data() } as ProjectRecruitment;
+                const jobData = { id: jobDocSnap.id, ...docSnap.data() } as ProjectRecruitment;
 
                 const isOwner = user.uid === jobData.postedByUid;
                 const isAdmin = user.role === 'Super-admin' || user.role === 'admin';
@@ -84,7 +84,7 @@ export default function ViewApplicationsPage() {
             'Applicant Name': app.applicantName,
             'Email': app.applicantEmail,
             'Phone': app.applicantPhone,
-            'MIS ID': app.applicantMisId || 'N/A',
+            'Enrollment No.': app.applicantMisId || 'N/A',
             'Institute': app.institute || 'N/A',
             'Department': app.department || 'N/A',
             'Applied At': format(new Date(app.appliedAt), 'PPP p'),
