@@ -27,7 +27,7 @@ const applicationSchema = z.object({
   applicantPhone: z.string().min(10, 'Please enter a valid 10-digit phone number.').max(10, 'Please enter a valid 10-digit phone number.'),
   applicantMisId: z.string().optional(),
   cv: z.any().refine(files => files?.length === 1, 'CV is required.').refine(files => files?.[0]?.size <= 5 * 1024 * 1024, `Max file size is 5MB.`),
-  coverLetter: z.string().optional(),
+  coverLetter: z.any().optional(),
 });
 
 type ApplicationFormValues = z.infer<typeof applicationSchema>;
@@ -94,6 +94,17 @@ export default function ApplyPage() {
             if (!cvUploadResult.success || !cvUploadResult.url) {
                 throw new Error(cvUploadResult.error || 'Failed to upload CV.');
             }
+            
+            let coverLetterUrl: string | undefined;
+            const coverLetterFile = data.coverLetter?.[0];
+            if (coverLetterFile) {
+                const coverLetterDataUrl = await fileToDataUrl(coverLetterFile);
+                const coverLetterUploadResult = await uploadFileToServer(coverLetterDataUrl, `recruitment-cover-letters/${job.id}/${coverLetterFile.name}`);
+                if (!coverLetterUploadResult.success || !coverLetterUploadResult.url) {
+                    throw new Error(coverLetterUploadResult.error || 'Failed to upload Cover Letter.');
+                }
+                coverLetterUrl = coverLetterUploadResult.url;
+            }
 
             await addDoc(collection(db, 'projectRecruitments', job.id, 'applications'), {
                 recruitmentId: job.id,
@@ -102,7 +113,7 @@ export default function ApplyPage() {
                 applicantPhone: data.applicantPhone,
                 applicantMisId: data.applicantMisId,
                 cvUrl: cvUploadResult.url,
-                coverLetter: data.coverLetter,
+                coverLetterUrl: coverLetterUrl,
                 appliedAt: new Date().toISOString(),
             });
 
@@ -167,17 +178,29 @@ export default function ApplyPage() {
                                     <FormField
                                         name="cv"
                                         control={form.control}
-                                        render={({ field: { onChange, ...rest }}) => (
+                                        render={({ field: { onChange, value, ...rest }}) => (
                                             <FormItem>
                                                 <FormLabel>Upload CV (PDF, max 5MB)</FormLabel>
                                                 <FormControl>
-                                                    <Input type="file" accept=".pdf" onChange={e => onChange(e.target.files)} {...rest} />
+                                                    <Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...rest} />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
                                         )}
                                     />
-                                    <FormField name="coverLetter" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Cover Letter (Optional)</FormLabel><FormControl><Textarea rows={5} placeholder="Briefly explain why you are a good fit for this role..." {...field} /></FormControl><FormMessage /></FormItem> )} />
+                                    <FormField
+                                        name="coverLetter"
+                                        control={form.control}
+                                        render={({ field: { onChange, value, ...rest } }) => (
+                                            <FormItem>
+                                                <FormLabel>Cover Letter (Optional, PDF, max 5MB)</FormLabel>
+                                                <FormControl>
+                                                    <Input type="file" accept=".pdf" onChange={(e) => onChange(e.target.files)} {...rest} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                     
                                     <Button type="submit" className="w-full" disabled={isSubmitting}>
                                         {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Submitting...</> : 'Submit Application'}
