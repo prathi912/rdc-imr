@@ -5,6 +5,8 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, collection, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/config';
+import type { Metadata } from 'next';
+import { adminDb } from '@/lib/admin';
 import type { ProjectRecruitment } from '@/types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,6 +22,47 @@ import { Logo } from '@/components/logo';
 import Link from 'next/link';
 import { format, isAfter } from 'date-fns';
 import { uploadFileToServer } from '@/app/actions';
+
+type Props = {
+  params: { id: string };
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+    const id = params.id;
+    try {
+        const docRef = doc(adminDb, 'projectRecruitments', id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            const job = docSnap.data() as ProjectRecruitment;
+            const description = `Apply for the ${job.positionTitle} position on the ${job.projectName} project at Parul University. ${job.jobDescription.substring(0, 100)}...`;
+            return {
+                title: `${job.positionTitle} | ${job.projectName}`,
+                description: description,
+                openGraph: {
+                    title: `${job.positionTitle} | ${job.projectName}`,
+                    description: description,
+                },
+                twitter: {
+                     title: `${job.positionTitle} | ${job.projectName}`,
+                    description: description,
+                }
+            };
+        } else {
+            return {
+                title: 'Job Not Found',
+                description: 'This job opening could not be found.',
+            };
+        }
+    } catch (error) {
+        console.error("Error generating metadata for job page:", error);
+        return {
+            title: 'Error',
+            description: 'Could not load job details.',
+        };
+    }
+}
+
 
 const applicationSchema = z.object({
   applicantName: z.string().min(2, 'Your name is required.'),
@@ -201,7 +244,7 @@ export default function ApplyPage() {
                                     <FormField
                                         name="coverLetter"
                                         control={form.control}
-                                        render={({ field: { onChange, value, ...rest } }) => (
+                                        render={({ field: { value, onChange, ...rest } }) => (
                                             <FormItem>
                                                 <FormLabel>Cover Letter (Optional, PDF, max 5MB)</FormLabel>
                                                 <FormControl>
