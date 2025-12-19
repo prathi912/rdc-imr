@@ -13,33 +13,57 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
 
 export default function PostAJobPage() {
     const [user, setUser] = useState<User | null>(null);
     const [postings, setPostings] = useState<ProjectRecruitment[]>([]);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             const parsedUser = JSON.parse(storedUser);
             setUser(parsedUser);
-            
-            const fetchPostings = async () => {
-                const q = query(
-                    collection(db, 'projectRecruitments'),
-                    where('postedByUid', '==', parsedUser.uid),
-                    orderBy('createdAt', 'desc')
-                );
+        } else {
+            router.push('/login');
+        }
+    }, [router]);
+
+    useEffect(() => {
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+        
+        const fetchPostings = async () => {
+            setLoading(true);
+            try {
+                let q;
+                const postingsCollection = collection(db, 'projectRecruitments');
+                const isAdmin = user.role === 'admin' || user.role === 'Super-admin';
+
+                if (isAdmin) {
+                    q = query(postingsCollection, orderBy('createdAt', 'desc'));
+                } else {
+                    q = query(
+                        postingsCollection,
+                        where('postedByUid', '==', user.uid),
+                        orderBy('createdAt', 'desc')
+                    );
+                }
                 const querySnapshot = await getDocs(q);
                 setPostings(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ProjectRecruitment)));
+            } catch (error) {
+                console.error("Error fetching job postings:", error);
+            } finally {
                 setLoading(false);
-            };
-            fetchPostings();
-        } else {
-            setLoading(false);
-        }
-    }, []);
+            }
+        };
+
+        fetchPostings();
+    }, [user]);
 
     const getStatusVariant = (status: ProjectRecruitment['status']) => {
         switch (status) {
@@ -85,13 +109,11 @@ export default function PostAJobPage() {
                                         </div>
                                         <div className="flex items-center gap-2 self-start sm:self-center">
                                             <Badge variant={getStatusVariant(job.status)}>{job.status}</Badge>
-                                            {job.status === 'Approved' && (
-                                                <Button asChild variant="outline" size="sm">
-                                                    <Link href={`/dashboard/recruitment/${job.id}`}>
-                                                        <Users className="mr-2 h-4 w-4" /> View Applicants
-                                                    </Link>
-                                                </Button>
-                                            )}
+                                            <Button asChild variant="outline" size="sm">
+                                                <Link href={`/dashboard/recruitment/${job.id}`}>
+                                                    <Users className="mr-2 h-4 w-4" /> View Applicants
+                                                </Link>
+                                            </Button>
                                         </div>
                                     </div>
                                 ))}
