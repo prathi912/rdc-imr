@@ -531,7 +531,8 @@ export default function AllProjectsPage() {
   useEffect(() => {
       setSelectedExportColumns(activeTab === 'imr' ? IMR_EXPORT_COLUMNS.map(c => c.id) : EMR_EXPORT_COLUMNS.map(c => c.id));
       updateUrlParams({ tab: activeTab });
-  }, [activeTab, updateUrlParams]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   useEffect(() => {
     if(user) {
