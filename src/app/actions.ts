@@ -31,6 +31,7 @@ import PizZip from "pizzip"
 import Docxtemplater from "docxtemplater"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
 import { generateSanctionOrder } from "./document-actions"
+import { put } from '@vercel/blob';
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -832,7 +833,7 @@ export async function scheduleMeeting(
                       <p><strong style="color: #ffffff;">
                         ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
                       </strong> 
-                        ${meetingDetails.mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
+                        ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
                       </p>
                       <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
                       <ul style="list-style-type: none; padding-left: 0;">
@@ -881,45 +882,43 @@ export async function uploadFileToServer(
     if (!fileDataUrl || typeof fileDataUrl !== "string") {
       throw new Error("Invalid file data URL provided.");
     }
-
-    const bucket = adminStorage.bucket();
-    const file = bucket.file(path);
-
     const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/);
-    if (!match || match.length < 3) {
-      throw new Error("Invalid data URL format.");
+    if (!match) {
+        throw new Error("Invalid data URL format.");
     }
-
-    const mimeType = match[1];
-    const base64Data = match[2];
-
-    if (!mimeType || !base64Data) {
-      throw new Error("Could not extract file data from data URL.");
-    }
-
-    const buffer = Buffer.from(base64Data, "base64");
-
-    // The modern, correct way to upload and get a public URL
-    await file.save(buffer, {
-      metadata: {
-        contentType: mimeType,
-      },
-    });
-
-    // Make the file public
-    await file.makePublic();
+    const buffer = Buffer.from(match[2], 'base64');
     
-    // Get the public URL
-    const publicUrl = file.publicUrl();
-
-    console.log(`File uploaded successfully to ${path}, URL: ${publicUrl}`);
-
-    return { success: true, url: publicUrl };
-
+    // Try Firebase first
+    try {
+        const bucket = adminStorage.bucket();
+        const file = bucket.file(path);
+        await file.save(buffer, { metadata: { contentType: match[1] } });
+        await file.makePublic();
+        const publicUrl = file.publicUrl();
+        console.log(`File uploaded to Firebase Storage at ${path}`);
+        return { success: true, url: publicUrl };
+    } catch (firebaseError: any) {
+        console.warn("Firebase upload failed, falling back to Vercel Blob:", firebaseError.message);
+        await logActivity("WARNING", "Firebase upload failed, falling back to Vercel Blob", { path, error: firebaseError.message });
+        
+        // Fallback to Vercel Blob
+        try {
+            const blob = await put(path, buffer, {
+                access: 'public',
+                contentType: match[1],
+                token: process.env.RDC_READ_WRITE_TOKEN,
+            });
+            console.log(`File uploaded to Vercel Blob: ${blob.url}`);
+            return { success: true, url: blob.url };
+        } catch (blobError: any) {
+            console.error("FATAL: Both Firebase and Vercel Blob uploads failed:", blobError.message);
+            await logActivity("ERROR", "Vercel Blob upload failed after Firebase failure", { path, error: blobError.message });
+            return { success: false, error: blobError.message || "Both Firebase and Vercel Blob uploads failed." };
+        }
+    }
   } catch (error: any) {
-    console.error("Error uploading file via admin:", error);
-    await logActivity("ERROR", "File upload failed", { path, error: error.message, stack: error.stack });
-    return { success: false, error: error.message || "Failed to upload file." };
+      console.error("Unhandled error in uploadFileToServer:", error.message);
+      return { success: false, error: error.message || "An unexpected error occurred during file upload." };
   }
 }
 
