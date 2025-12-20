@@ -57,6 +57,36 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
 
 export { awardInitialGrant, addGrantPhase, updatePhaseStatus, generateSanctionOrder };
 
+export async function adminUploadProposal(
+  projectId: string,
+  proposalDataUrl: string,
+  fileName: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const filePath = `projects/${projectId}/proposal/${fileName}`;
+    const uploadResult = await uploadFileToServer(proposalDataUrl, filePath);
+
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(uploadResult.error || "Proposal upload failed.");
+    }
+
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    await projectRef.update({
+      proposalUrl: uploadResult.url,
+    });
+
+    await logActivity("INFO", "Admin uploaded proposal to draft project", { projectId });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in adminUploadProposal:", error);
+    await logActivity("ERROR", "Failed to upload proposal as admin", {
+      projectId,
+      error: error.message,
+    });
+    return { success: false, error: "Failed to upload proposal." };
+  }
+}
+
 export async function getStorageUsage(): Promise<{ success: boolean; totalSizeMB?: number; error?: string }> {
   try {
     const bucket = adminStorage.bucket();

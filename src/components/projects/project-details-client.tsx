@@ -28,6 +28,7 @@ import {
   markImrAttendance,
   getSystemSettings,
   generateSanctionOrder,
+  adminUploadProposal,
 } from "@/app/actions"
 import { generateRecommendationForm } from "@/app/document-actions"
 import { findUserByMisId } from '@/app/userfinding';
@@ -71,7 +72,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { useIsMobile } from "@/hooks/use-mobile"
 
-import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText, Trash2, UserCheck } from 'lucide-react'
+import { Check, ChevronDown, Clock, X, DollarSign, FileCheck2, CalendarIcon, Edit, UserCog, Banknote, AlertCircle, Users, Loader2, Printer, Download, Plus, FileText, Trash2, UserCheck, Upload } from 'lucide-react'
 
 import { GrantManagement } from "./grant-management"
 import { EvaluationForm } from "./evaluation-form"
@@ -309,6 +310,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [isAwarding, setIsAwarding] = useState(false);
   const [isDownloadingSanctionOrder, setIsDownloadingSanctionOrder] = useState(false);
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
+  const [isProposalUploadOpen, setIsProposalUploadOpen] = useState(false);
+  const [proposalFile, setProposalFile] = useState<File | null>(null);
+
   const isMobile = useIsMobile();
 
   // Co-PI management state
@@ -897,6 +901,29 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         setIsUpdating(false);
     }
   };
+  
+  const handleProposalUpload = async () => {
+    if (!proposalFile) {
+        toast({ variant: 'destructive', title: 'File Missing', description: 'Please select a proposal file to upload.' });
+        return;
+    }
+    setIsUpdating(true);
+    try {
+        const dataUrl = await fileToDataUrl(proposalFile);
+        const result = await adminUploadProposal(project.id, dataUrl, proposalFile.name);
+        if (result.success) {
+            toast({ title: 'Success', description: 'Proposal has been uploaded to the draft.' });
+            refetchProject();
+            setIsProposalUploadOpen(false);
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    } finally {
+        setIsUpdating(false);
+    }
+  };
 
   const canViewEvaluations = (isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive)) && !isHeadOfGoaCampus;
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
@@ -913,7 +940,33 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   return (
     <React.Fragment>
       <div className="flex items-center justify-between mb-4">
-        <div>{/* Spacer */}</div>
+        <div>
+          {isAdmin && project.status === 'Draft' && (
+              <Dialog open={isProposalUploadOpen} onOpenChange={setIsProposalUploadOpen}>
+                  <DialogTrigger asChild>
+                      <Button variant="outline">
+                          <Upload className="mr-2 h-4 w-4"/> Upload Proposal PDF
+                      </Button>
+                  </DialogTrigger>
+                   <DialogContent>
+                      <DialogHeader>
+                          <DialogTitle>Upload Proposal for Draft</DialogTitle>
+                          <DialogDescription>As an admin, you can upload a proposal file to this draft project on behalf of the PI.</DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4 space-y-2">
+                          <Label htmlFor="admin-proposal-upload">Proposal PDF</Label>
+                          <Input id="admin-proposal-upload" type="file" accept=".pdf" onChange={(e) => setProposalFile(e.target.files?.[0] || null)} />
+                      </div>
+                      <DialogFooter>
+                           <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                           <Button onClick={handleProposalUpload} disabled={isUpdating || !proposalFile}>
+                              {isUpdating ? <Loader2 className="h-4 w-4 animate-spin"/> : null} Upload
+                           </Button>
+                      </DialogFooter>
+                  </DialogContent>
+              </Dialog>
+          )}
+        </div>
         <div className="flex items-center gap-2">
             {showDownloadButton && (
                 <TooltipProvider>
