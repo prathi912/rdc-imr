@@ -84,7 +84,7 @@ const institutes = [
     "College of Agriculture", "Parul Institute of Allied & Healthcare Sciences", "Faculty of Library & Information Science",
     "Institute of Pharmaceutical Sciences", "Jawaharlal Nehru Homoeopathic Medical College", "Parul College of Pharmacy & Research",
     "Parul Institute of Applied Sciences (Ahmedabad Campus)", "Parul Institute of Applied Sciences (Vadodara Campus)", "Parul Institute of Architecture & Research",
-    "Parul Institute of Arts", "Parul Institute of Ayurveda", "Parul Institute of Ayurveda & Research", "Parul Institute of Business Administration",
+    "Parul Institute of Arts", "Parul Institute of Ayurveda", "Parul Institute of Ayurveda & Research", "Parul Ayurved Hospital", "Parul Institute of Business Administration",
     "Parul Institute of Commerce", "Parul Institute of Computer Application", "Parul Institute of Design", "Parul Institute of Engineering & Technology",
     "Parul Institute of Engineering & Technology (Diploma Studies)", "Parul Institute of Fine Arts", "Parul Institute of Homeopathy & Research",
     "Parul Institute of Hotel Management & Catering Technology", "Parul Institute of Law", "Parul Institute of Management", "Parul Institute of Management & Research",

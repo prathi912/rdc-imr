@@ -9,8 +9,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 
-import { PageHeader } from "@/components/page-header"
-import { Button } from "@/components/ui/button"
+import { PageHeader } from '@/components/page-header'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form"
@@ -148,6 +148,7 @@ const institutes = [
   "Parul Institute of Arts",
   "Parul Institute of Ayurveda",
   "Parul Institute of Ayurveda & Research",
+  "Parul Ayurved Hospital",
   "Parul Institute of Business Administration",
   "Parul Institute of Commerce",
   "Parul Institute of Computer Application",
