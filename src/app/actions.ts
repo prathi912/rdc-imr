@@ -1867,7 +1867,6 @@ export async function markImrAttendance(
   }
 }
 
-// Re-export addTransaction so it's available to client components through the main actions file
 export async function addTransaction(
     ...args: Parameters<typeof import('./grant-actions').addTransaction>
 ): Promise<ReturnType<typeof import('./grant-actions').addTransaction>> {
@@ -1881,6 +1880,7 @@ export async function deleteTransaction(
     const { deleteTransaction: originalDeleteTransaction } = await import('./grant-actions');
     return originalDeleteTransaction(...args);
 }
+
 
 export async function notifySuperAdminsOnNewUser(userName: string, role: string) {
   try {
@@ -2105,5 +2105,7 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
+
+    
 
     
