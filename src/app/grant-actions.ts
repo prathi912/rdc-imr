@@ -328,6 +328,10 @@ export async function deleteTransaction(
         
         const updatedPhases = project.grant.phases.map(phase => {
             if (phase.id === phaseId) {
+                // Cannot delete transaction if utilization is already submitted for this phase
+                if (phase.status === 'Utilization Submitted' || phase.status === 'Completed') {
+                    throw new Error("Cannot delete transaction from a phase with submitted utilization.");
+                }
                 const newTransactions = phase.transactions?.filter(t => {
                     if (t.id === transactionId) {
                         transactionToDelete = t;
@@ -355,9 +359,10 @@ export async function deleteTransaction(
                 const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf('/o/') + 3));
                 await bucket.file(filePath).delete();
             } catch (storageError: any) {
-                // Log the error but don't fail the entire operation if the file is already gone
-                console.warn(`Could not delete invoice from storage: ${storageError.message}`);
-                await logActivity('WARNING', 'Failed to delete invoice from storage during transaction deletion', { projectId, transactionId, filePath: transactionToDelete.invoiceUrl, error: storageError.message });
+                if (storageError.code !== 404) {
+                    console.warn(`Could not delete invoice from storage, but continuing: ${storageError.message}`);
+                    await logActivity('WARNING', 'Failed to delete invoice from storage during transaction deletion', { projectId, transactionId, filePath: transactionToDelete.invoiceUrl, error: storageError.message });
+                }
             }
         }
 

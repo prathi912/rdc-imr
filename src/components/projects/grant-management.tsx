@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useForm } from "react-hook-form"
@@ -247,7 +248,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const handleAddTransaction = async (values: z.infer<typeof transactionSchema>) => {
     if (!grant || !currentPhaseId) return;
     setIsSubmitting(true);
-    console.log("CLIENT: handleAddTransaction called with projectId:", project.id, "and phaseId:", currentPhaseId);
     try {
         const invoiceFile = values.invoice?.[0];
         if (!invoiceFile) {
@@ -548,7 +548,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                               <TableHead>GST</TableHead>
                               <TableHead>Description</TableHead>
                               <TableHead>Invoice</TableHead>
-                              {(isPI || isAdmin) && <TableHead className="text-right">Action</TableHead>}
+                              {(isPI || isCoPi) && <TableHead className="text-right">Action</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -579,7 +579,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                                     <span className="text-muted-foreground">N/A</span>
                                   )}
                                 </TableCell>
-                                {(isPI || isAdmin) && (
+                                {(isPI || isCoPi) && phase.status === 'Disbursed' && (
                                     <TableCell className="text-right">
                                         <Button
                                             variant="ghost"
