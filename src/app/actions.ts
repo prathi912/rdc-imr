@@ -1,5 +1,4 @@
 
-
 "use server"
 
 import { adminDb, adminStorage } from "@/lib/admin"
@@ -1868,17 +1867,30 @@ export async function markImrAttendance(
 }
 
 export async function addTransaction(
-    ...args: Parameters<typeof import('./grant-actions').addTransaction>
-): Promise<ReturnType<typeof import('./grant-actions').addTransaction>> {
+    projectId: string,
+    phaseId: string,
+    transactionData: {
+      dateOfTransaction: string;
+      amount: number;
+      vendorName: string;
+      isGstRegistered: boolean;
+      gstNumber?: string;
+      description?: string;
+      invoiceDataUrl: string;
+      invoiceFileName: string;
+    }
+): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
     const { addTransaction: originalAddTransaction } = await import('./grant-actions');
-    return originalAddTransaction(...args);
+    return originalAddTransaction(projectId, phaseId, transactionData);
 }
 
 export async function deleteTransaction(
-    ...args: Parameters<typeof import('./grant-actions').deleteTransaction>
-): Promise<ReturnType<typeof import('./grant-actions').deleteTransaction>> {
+    projectId: string, 
+    phaseId: string, 
+    transactionId: string
+): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
     const { deleteTransaction: originalDeleteTransaction } = await import('./grant-actions');
-    return originalDeleteTransaction(...args);
+    return originalDeleteTransaction(projectId, phaseId, transactionId);
 }
 
 

@@ -198,8 +198,9 @@ export async function addGrantPhase(
         });
     }
 
-    const updatedProject = { ...project, grant: updatedGrant }
-    return { success: true, updatedProject }
+    const updatedProjectSnap = await projectRef.get();
+    const updatedProject = { id: updatedProjectSnap.id, ...updatedProjectSnap.data() } as Project;
+    return { success: true, updatedProject };
   } catch (error: any) {
     console.error("Error adding grant phase:", error)
     await logActivity("ERROR", "Failed to add grant phase", { projectId, error: error.message, stack: error.stack })
@@ -231,7 +232,7 @@ export async function addTransaction(
     const projectRef = adminDb.collection("projects").doc(projectId);
     const projectSnap = await projectRef.get();
 
-    if (!projectSnap.exists) {
+    if (!projectSnap.exists()) {
       console.error("Project not found in Firestore for ID:", projectId);
       return { success: false, error: "Project not found." };
     }
@@ -283,8 +284,9 @@ export async function addTransaction(
     await projectRef.update({ grant: updatedGrant });
     
     await logActivity("INFO", "Grant transaction added", { projectId, phaseId, amount: newTransaction.amount });
-
-    const updatedProject = { ...project, grant: updatedGrant };
+    
+    const updatedProjectSnap = await projectRef.get();
+    const updatedProject = { id: updatedProjectSnap.id, ...updatedProjectSnap.data() } as Project;
     return { success: true, updatedProject };
   } catch (error: any) {
     console.error("Error in addTransaction server action:", error);
@@ -361,7 +363,8 @@ export async function deleteTransaction(
 
         await logActivity('INFO', 'Grant transaction deleted', { projectId, phaseId, transactionId });
 
-        const updatedProject = { ...project, grant: updatedGrant };
+        const updatedProjectSnap = await projectRef.get();
+        const updatedProject = { id: updatedProjectSnap.id, ...updatedProjectSnap.data() } as Project;
         return { success: true, updatedProject };
         
     } catch (error: any) {
@@ -468,8 +471,9 @@ export async function updatePhaseStatus(
       }
     }
 
-    const updatedProject = { ...project, grant: updatedGrant }
-    return { success: true, updatedProject }
+    const updatedProjectSnap = await projectRef.get();
+    const updatedProject = { id: updatedProjectSnap.id, ...updatedProjectSnap.data() } as Project;
+    return { success: true, updatedProject };
   } catch (error: any) {
     console.error("Error updating phase status:", error)
     await logActivity("ERROR", "Failed to update grant phase status", {
