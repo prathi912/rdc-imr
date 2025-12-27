@@ -19,6 +19,7 @@ This is the base role for all teaching and research staff.
 -   Submitting Intramural research project proposals (IMR).
 -   Registering interest in Extramural research funding calls (EMR).
 -   Applying for research-related incentives (e.g., for publications, patents).
+-   Posting job openings for research projects.
 -   Maintaining a public researcher profile and managing publications.
 
 ### Profile & Settings
@@ -89,6 +90,12 @@ This is the base role for all teaching and research staff.
 5.  **Track Status:**
     -   Go to the **My Claims** tab on the Incentive Claims page to track the status of all your submissions.
     -   If another author on a paper you co-authored submits a claim, it will appear in the **Co-Author Claims** tab, allowing you to apply for your share of the incentive.
+
+### Project Recruitment Workflow
+1.  **Create a Posting:** Navigate to **Post a Job** from the sidebar.
+2.  **Fill Details:** Click "Create New Posting" and fill out the form with the job title, description, qualifications, and application deadline.
+3.  **Submit for Approval:** Your job posting will be submitted to an administrator for review before it becomes public.
+4.  **Manage Postings:** You can view the status of your postings (Pending Approval, Approved, Rejected) on the "Post a Job" page. Once approved, you can view the list of applicants for each position.
 
 ### Public Profile & Publications
 -   Your public profile page is accessible to administrators and assigned evaluators for review purposes.
@@ -231,6 +238,11 @@ These roles have the highest level of access for managing the entire portal.
 
 4.  **Review Evaluations:**
     -   From the **EMR Evaluations** page, you can view all feedback and recommendations submitted by the committee for each applicant and make a final decision on their status.
+
+### Recruitment Management (Admins)
+-   Navigate to **Recruitment Approvals**.
+-   Review job postings submitted by faculty.
+-   You can approve a posting to make it public on the `/hiring` page or reject it.
 
 ### System Administration
 1.  **User Management:**
