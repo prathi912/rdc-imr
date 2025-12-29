@@ -232,7 +232,7 @@ export async function addTransaction(
     const projectRef = adminDb.collection("projects").doc(projectId);
     const projectSnap = await projectRef.get();
 
-    if (!projectSnap.exists()) {
+    if (!projectSnap.exists) {
       console.error("Project not found in Firestore for ID:", projectId);
       return { success: false, error: "Project not found." };
     }
@@ -490,5 +490,3 @@ export async function updatePhaseStatus(
     return { success: false, error: error.message || "Failed to update phase status." }
   }
 }
-
-    
