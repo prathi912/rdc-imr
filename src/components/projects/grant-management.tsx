@@ -10,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
-import { addGrantPhase, addTransaction, updatePhaseStatus, deleteTransaction } from "@/app/grant-actions"
+import { addGrantPhase, addTransaction, updatePhaseStatus, deleteTransaction, updateTransaction } from "@/app/actions"
 import { generateInstallmentOfficeNoting } from "@/app/document-actions"
 import React, { useState } from "react"
 import {
@@ -25,6 +25,7 @@ import {
   Download,
   Loader2,
   Trash2,
+  Edit,
 } from "lucide-react"
 import * as XLSX from "xlsx"
 import {
@@ -82,6 +83,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [currentPhaseId, setCurrentPhaseId] = useState<string | null>(null)
   const [isDownloading, setIsDownloading] = useState(false);
   const [phaseForNoting, setPhaseForNoting] = useState<GrantPhase | null>(null);
+  const [transactionToEdit, setTransactionToEdit] = useState<{phaseId: string, transaction: Transaction} | null>(null);
   const [transactionToDelete, setTransactionToDelete] = useState<{phaseId: string, transaction: Transaction} | null>(null);
 
   const grant = project.grant
@@ -110,10 +112,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       isGstRegistered: z.boolean().default(false),
       gstNumber: z.string().optional(),
       description: z.string().min(10, "Description is required."),
-      invoice: z.any()
-        .refine((files) => files?.length > 0, "An invoice file is required.")
-        .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, `File size must be less than 5MB.`)
-        .refine((files) => ACCEPTED_FILE_TYPES.includes(files?.[0]?.type), "Only .pdf files are accepted."),
+      invoice: z.any().optional(), // Optional on edit
     })
     .refine(
       (data) => {
@@ -147,15 +146,34 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
 
   const transactionForm = useForm<z.infer<typeof transactionSchema>>({
     resolver: zodResolver(transactionSchema),
-    defaultValues: {
-      dateOfTransaction: "",
-      amount: 0,
-      vendorName: "",
-      isGstRegistered: false,
-      gstNumber: "",
-      description: "",
-    },
   })
+
+  // Pre-fill form when editing
+  React.useEffect(() => {
+    if (transactionToEdit) {
+      transactionForm.reset({
+        dateOfTransaction: format(parseISO(transactionToEdit.transaction.dateOfTransaction), 'yyyy-MM-dd'),
+        amount: transactionToEdit.transaction.amount,
+        vendorName: transactionToEdit.transaction.vendorName,
+        isGstRegistered: transactionToEdit.transaction.isGstRegistered,
+        gstNumber: transactionToEdit.transaction.gstNumber,
+        description: transactionToEdit.transaction.description,
+        invoice: undefined, // Clear file input
+      });
+      setCurrentPhaseId(transactionToEdit.phaseId);
+      setIsTransactionOpen(true);
+    } else {
+      transactionForm.reset({
+        dateOfTransaction: "",
+        amount: 0,
+        vendorName: "",
+        isGstRegistered: false,
+        gstNumber: "",
+        description: "",
+        invoice: undefined,
+      });
+    }
+  }, [transactionToEdit, transactionForm]);
 
   const handleExportTransactions = (phase: GrantPhase) => {
     if (!phase.transactions || phase.transactions.length === 0) {
@@ -245,43 +263,52 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     }
   }
 
-  const handleAddTransaction = async (values: z.infer<typeof transactionSchema>) => {
+  const handleTransactionSubmit = async (values: z.infer<typeof transactionSchema>) => {
     if (!grant || !currentPhaseId) return;
     setIsSubmitting(true);
     try {
         const invoiceFile = values.invoice?.[0];
-        if (!invoiceFile) {
-            throw new Error("Invoice file is missing.");
+        let invoiceDataUrl, invoiceFileName;
+        if (invoiceFile) {
+            invoiceDataUrl = await fileToDataUrl(invoiceFile);
+            invoiceFileName = invoiceFile.name;
         }
-        const invoiceDataUrl = await fileToDataUrl(invoiceFile);
-
-        const result = await addTransaction(project.id, currentPhaseId, {
-            dateOfTransaction: values.dateOfTransaction,
-            amount: values.amount,
-            vendorName: values.vendorName,
-            isGstRegistered: values.isGstRegistered,
-            gstNumber: values.gstNumber,
-            description: values.description,
-            invoiceDataUrl: invoiceDataUrl,
-            invoiceFileName: invoiceFile.name,
-        });
+        
+        let result;
+        if (transactionToEdit) {
+            // Update existing transaction
+            result = await updateTransaction(project.id, transactionToEdit.phaseId, transactionToEdit.transaction.id, {
+                ...values,
+                invoiceDataUrl,
+                invoiceFileName,
+            });
+        } else {
+            // Add new transaction
+            if (!invoiceDataUrl || !invoiceFileName) {
+              throw new Error("Invoice file is required for new transactions.");
+            }
+            result = await addTransaction(project.id, currentPhaseId, {
+                ...values,
+                invoiceDataUrl,
+                invoiceFileName,
+            });
+        }
 
         if (result.success && result.updatedProject) {
             onUpdate(result.updatedProject);
-            toast({ title: "Success", description: "Transaction added successfully." });
-            transactionForm.reset();
-            setIsTransactionOpen(false);
-            setCurrentPhaseId(null);
+            toast({ title: "Success", description: `Transaction ${transactionToEdit ? 'updated' : 'added'} successfully.` });
+            closeTransactionDialog();
         } else {
-            throw new Error(result.error || "Failed to add transaction.");
+            throw new Error(result.error || `Failed to ${transactionToEdit ? 'update' : 'add'} transaction.`);
         }
     } catch (error: any) {
-        console.error("Client error in handleAddTransaction:", error);
-        toast({ variant: "destructive", title: "Error", description: error.message || "Failed to add transaction." });
+        console.error(`Client error in handleTransactionSubmit:`, error);
+        toast({ variant: "destructive", title: "Error", description: error.message || `Failed to ${transactionToEdit ? 'update' : 'add'} transaction.` });
     } finally {
         setIsSubmitting(false);
     }
   };
+
 
   const handleDeleteTransaction = async () => {
     if (!transactionToDelete) return;
@@ -321,6 +348,13 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       setIsSubmitting(false);
     }
   };
+
+  const closeTransactionDialog = () => {
+    setIsTransactionOpen(false);
+    setCurrentPhaseId(null);
+    setTransactionToEdit(null);
+    transactionForm.reset();
+  }
   
   const getPhaseBadgeVariant = (status: GrantPhase['status']) => {
     switch (status) {
@@ -419,7 +453,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1));
           
           const canRequestNextPhase = isPI && phase.status === "Disbursed" && hasReachedThreshold && hasRemainingGrant;
-          const canAddExpense = (isPI || isCoPi || isAdmin) && phase.status === "Disbursed";
+          const canManageExpenses = (isPI || isCoPi) && phase.status === 'Disbursed';
           
           const previousPhase = index > 0 ? grant.phases[index - 1] : null;
           const showOfficeNoteButton = isAdmin && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
@@ -512,7 +546,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                         Transactions ({phase.transactions?.length || 0})
                         </h4>
                          <div className="flex items-center gap-2">
-                            {canAddExpense && (
+                            {canManageExpenses && (
                               <Button
                                 size="sm"
                                 onClick={() => {
@@ -579,15 +613,16 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                                     <span className="text-muted-foreground">N/A</span>
                                   )}
                                 </TableCell>
-                                {(isPI || isCoPi) && phase.status === 'Disbursed' && (
+                                {canManageExpenses && (
                                     <TableCell className="text-right">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => setTransactionToDelete({ phaseId: phase.id, transaction })}
-                                        >
+                                        <div className="flex justify-end gap-1">
+                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToEdit({phaseId: phase.id, transaction})}>
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToDelete({phaseId: phase.id, transaction})}>
                                             <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
+                                          </Button>
+                                        </div>
                                     </TableCell>
                                 )}
                               </TableRow>
@@ -628,16 +663,16 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           );
         })}
 
-        <Dialog open={isTransactionOpen} onOpenChange={setIsTransactionOpen}>
+        <Dialog open={isTransactionOpen} onOpenChange={closeTransactionDialog}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Add Transaction</DialogTitle>
+              <DialogTitle>{transactionToEdit ? 'Edit' : 'Add'} Transaction</DialogTitle>
               <DialogDescription>Record a new expense for this grant phase.</DialogDescription>
             </DialogHeader>
             <Form {...transactionForm}>
               <form
                 id="add-transaction-form"
-                onSubmit={transactionForm.handleSubmit(handleAddTransaction)}
+                onSubmit={transactionForm.handleSubmit(handleTransactionSubmit)}
                 className="space-y-4 py-4"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -727,6 +762,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                   render={({ field: { onChange, value, ...field } }) => (
                     <FormItem>
                       <FormLabel>Invoice (PDF)</FormLabel>
+                      {transactionToEdit?.transaction.invoiceUrl && <p className="text-xs text-muted-foreground">Current invoice: <a href={transactionToEdit.transaction.invoiceUrl} target="_blank" rel="noopener noreferrer" className="underline">View</a>. Uploading a new file will replace it.</p>}
                       <FormControl>
                         <Input
                           type="file"
@@ -747,7 +783,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                 <Button variant="outline">Cancel</Button>
               </DialogClose>
               <Button type="submit" form="add-transaction-form" disabled={isSubmitting}>
-                {isSubmitting ? "Adding..." : "Add Transaction"}
+                {isSubmitting ? "Saving..." : (transactionToEdit ? 'Save Changes' : 'Add Transaction')}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -1866,17 +1866,23 @@ export async function markImrAttendance(
   }
 }
 
-export async function addTransaction(...args: Parameters<typeof import('./grant-actions').addTransaction>) {
+export async function addTransaction(
+  ...args: Parameters<typeof import('./grant-actions').addTransaction>
+): ReturnType<typeof import('./grant-actions').addTransaction> {
     const { addTransaction: originalAddTransaction } = await import('./grant-actions');
     return originalAddTransaction(...args);
 }
 
-export async function deleteTransaction(...args: Parameters<typeof import('./grant-actions').deleteTransaction>) {
+export async function deleteTransaction(
+  ...args: Parameters<typeof import('./grant-actions').deleteTransaction>
+): ReturnType<typeof import('./grant-actions').deleteTransaction> {
     const { deleteTransaction: originalDeleteTransaction } = await import('./grant-actions');
     return originalDeleteTransaction(...args);
 }
 
-export async function updateTransaction(...args: Parameters<typeof import('./grant-actions').updateTransaction>) {
+export async function updateTransaction(
+  ...args: Parameters<typeof import('./grant-actions').updateTransaction>
+): ReturnType<typeof import('./grant-actions').updateTransaction> {
     const { updateTransaction: originalUpdateTransaction } = await import('./grant-actions');
     return originalUpdateTransaction(...args);
 }
@@ -2105,5 +2111,3 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
-
-    
