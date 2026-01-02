@@ -222,9 +222,7 @@ export async function addTransaction(
     invoiceFileName: string;
   }
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
-  console.log("SERVER ACTION: addTransaction called with projectId:", projectId);
   if (!projectId) {
-    console.error("SERVER ACTION ERROR: projectId is missing.");
     return { success: false, error: "Project ID is missing. Cannot add transaction." };
   }
   
@@ -233,7 +231,6 @@ export async function addTransaction(
     const projectSnap = await projectRef.get();
 
     if (!projectSnap.exists) {
-      console.error("Project not found in Firestore for ID:", projectId);
       return { success: false, error: "Project not found." };
     }
 
@@ -250,7 +247,7 @@ export async function addTransaction(
     let invoiceUrl: string | undefined;
     if (transactionData.invoiceDataUrl) {
       const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
-      const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
+      const result = await uploadFileToServer(dataUrl, path);
 
       if (!result.success || !result.url) {
         throw new Error(result.error || "Invoice upload failed");
@@ -305,9 +302,7 @@ export async function deleteTransaction(
     phaseId: string, 
     transactionId: string
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
-    console.log("SERVER ACTION: deleteTransaction called with projectId:", projectId);
     if (!projectId) {
-        console.error("SERVER ACTION ERROR: projectId is missing.");
         return { success: false, error: "Project ID is missing. Cannot delete transaction." };
     }
     
@@ -328,7 +323,6 @@ export async function deleteTransaction(
         
         const updatedPhases = project.grant.phases.map(phase => {
             if (phase.id === phaseId) {
-                // Cannot delete transaction if utilization is already submitted for this phase
                 if (phase.status === 'Utilization Submitted' || phase.status === 'Completed') {
                     throw new Error("Cannot delete transaction from a phase with submitted utilization.");
                 }
@@ -351,7 +345,6 @@ export async function deleteTransaction(
         const updatedGrant = { ...project.grant, phases: updatedPhases };
         await projectRef.update({ grant: updatedGrant });
         
-        // Delete invoice from storage if it exists
         if (transactionToDelete.invoiceUrl) {
             try {
                 const bucket = adminStorage.bucket();
@@ -377,6 +370,109 @@ export async function deleteTransaction(
         await logActivity('ERROR', 'Failed to delete grant transaction', { projectId, transactionId, error: error.message });
         return { success: false, error: error.message || "Failed to delete transaction." };
     }
+}
+
+export async function updateTransaction(
+  projectId: string,
+  phaseId: string,
+  transactionId: string,
+  transactionData: {
+    dateOfTransaction: string;
+    amount: number;
+    vendorName: string;
+    isGstRegistered: boolean;
+    gstNumber?: string;
+    description?: string;
+    invoiceDataUrl?: string; // Optional: only provided if a new file is uploaded
+    invoiceFileName?: string;
+  }
+): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
+  if (!projectId) {
+    return { success: false, error: "Project ID is missing. Cannot update transaction." };
+  }
+
+  try {
+    const projectRef = adminDb.collection("projects").doc(projectId);
+    const projectSnap = await projectRef.get();
+
+    if (!projectSnap.exists) {
+      return { success: false, error: "Project not found." };
+    }
+
+    const project = projectSnap.data() as Project;
+    if (!project.grant || !project.grant.phases) {
+      return { success: false, error: "Grant details not found." };
+    }
+
+    const phaseIndex = project.grant.phases.findIndex((p) => p.id === phaseId);
+    if (phaseIndex === -1) {
+      return { success: false, error: "Phase not found." };
+    }
+
+    const phase = project.grant.phases[phaseIndex];
+    if (phase.status === 'Utilization Submitted' || phase.status === 'Completed') {
+      throw new Error("Cannot edit transaction in a phase with submitted utilization.");
+    }
+    
+    const transactionIndex = phase.transactions?.findIndex((t) => t.id === transactionId);
+    if (transactionIndex === -1 || !phase.transactions) {
+      return { success: false, error: "Transaction not found." };
+    }
+
+    const oldTransaction = phase.transactions[transactionIndex];
+    let newInvoiceUrl = oldTransaction.invoiceUrl;
+
+    // Handle file update
+    if (transactionData.invoiceDataUrl && transactionData.invoiceFileName) {
+      // Delete old file if it exists
+      if (oldTransaction.invoiceUrl) {
+         try {
+            const oldUrl = new URL(oldTransaction.invoiceUrl);
+            const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf('/o/') + 3));
+            await adminStorage.bucket().file(oldPath).delete();
+         } catch (e: any) {
+            if (e.code !== 404) console.warn("Could not delete old invoice file:", e.message);
+         }
+      }
+      
+      // Upload new file
+      const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
+      const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
+      if (!result.success || !result.url) {
+        throw new Error(result.error || "New invoice upload failed");
+      }
+      newInvoiceUrl = result.url;
+    }
+
+    const updatedTransaction: Transaction = {
+      ...oldTransaction,
+      dateOfTransaction: transactionData.dateOfTransaction,
+      amount: transactionData.amount,
+      vendorName: transactionData.vendorName,
+      isGstRegistered: transactionData.isGstRegistered,
+      gstNumber: transactionData.gstNumber,
+      description: transactionData.description || "",
+      invoiceUrl: newInvoiceUrl,
+    };
+
+    const updatedTransactions = [...phase.transactions];
+    updatedTransactions[transactionIndex] = updatedTransaction;
+
+    const updatedPhases = [...project.grant.phases];
+    updatedPhases[phaseIndex] = { ...phase, transactions: updatedTransactions };
+
+    await projectRef.update({ 'grant.phases': updatedPhases });
+    
+    await logActivity("INFO", "Grant transaction updated", { projectId, phaseId, transactionId });
+    
+    const updatedProjectSnap = await projectRef.get();
+    return { success: true, updatedProject: { id: updatedProjectSnap.id, ...updatedProjectSnap.data() } as Project };
+
+  } catch (error: any) {
+    console.error("Error in updateTransaction server action:", error);
+    await logActivity("ERROR", "Failed to update grant transaction", { projectId, transactionId, error: error.message });
+    return { success: false, error: error.message || "Failed to update transaction." };
+  }
 }
 
 export async function updatePhaseStatus(
@@ -490,3 +586,5 @@ export async function updatePhaseStatus(
     return { success: false, error: error.message || "Failed to update phase status." }
   }
 }
+
+    

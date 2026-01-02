@@ -1,5 +1,5 @@
 
-"use server"
+'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin"
 import { FieldValue } from "firebase-admin/firestore"
@@ -1866,31 +1866,19 @@ export async function markImrAttendance(
   }
 }
 
-export async function addTransaction(
-    projectId: string,
-    phaseId: string,
-    transactionData: {
-      dateOfTransaction: string;
-      amount: number;
-      vendorName: string;
-      isGstRegistered: boolean;
-      gstNumber?: string;
-      description?: string;
-      invoiceDataUrl: string;
-      invoiceFileName: string;
-    }
-): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
+export async function addTransaction(...args: Parameters<typeof import('./grant-actions').addTransaction>) {
     const { addTransaction: originalAddTransaction } = await import('./grant-actions');
-    return originalAddTransaction(projectId, phaseId, transactionData);
+    return originalAddTransaction(...args);
 }
 
-export async function deleteTransaction(
-    projectId: string, 
-    phaseId: string, 
-    transactionId: string
-): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
+export async function deleteTransaction(...args: Parameters<typeof import('./grant-actions').deleteTransaction>) {
     const { deleteTransaction: originalDeleteTransaction } = await import('./grant-actions');
-    return originalDeleteTransaction(projectId, phaseId, transactionId);
+    return originalDeleteTransaction(...args);
+}
+
+export async function updateTransaction(...args: Parameters<typeof import('./grant-actions').updateTransaction>) {
+    const { updateTransaction: originalUpdateTransaction } = await import('./grant-actions');
+    return originalUpdateTransaction(...args);
 }
 
 
@@ -2117,7 +2105,5 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
-
-    
 
     
