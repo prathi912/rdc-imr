@@ -132,7 +132,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const canChangeStatus = user.role === "admin" || user.role === "Super-admin"
   const isPI = user.uid === project.pi_uid || user.email === project.pi_email
   const isCoPi = project.coPiUids?.includes(user.uid) || false;
-  const isAdmin = user.role === 'admin' || user.role === 'Super-admin';
+  const isSuperAdmin = user.role === 'Super-admin';
 
   const phaseForm = useForm<z.infer<typeof addPhaseSchema>>({
     resolver: zodResolver(addPhaseSchema),
@@ -453,10 +453,10 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1));
           
           const canRequestNextPhase = isPI && phase.status === "Disbursed" && hasReachedThreshold && hasRemainingGrant;
-          const canManageExpenses = (isPI || isCoPi) && phase.status === 'Disbursed';
+          const canManageExpenses = (isPI || isCoPi || isSuperAdmin) && phase.status === 'Disbursed';
           
           const previousPhase = index > 0 ? grant.phases[index - 1] : null;
-          const showOfficeNoteButton = isAdmin && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
+          const showOfficeNoteButton = (user.role === "admin" || user.role === 'Super-admin') && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
 
           return (
             <Card key={phase.id} className="bg-muted/30">
@@ -582,7 +582,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                               <TableHead>GST</TableHead>
                               <TableHead>Description</TableHead>
                               <TableHead>Invoice</TableHead>
-                              {(isPI || isCoPi) && <TableHead className="text-right">Action</TableHead>}
+                              {(isPI || isCoPi || isSuperAdmin) && <TableHead className="text-right">Action</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
