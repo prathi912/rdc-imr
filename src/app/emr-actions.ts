@@ -1591,7 +1591,7 @@ export async function addSanctionedEmrProject(data: {
             durationAmount: data.durationAmount,
             sanctionDate: data.sanctionDate?.toISOString(),
             coPiDetails: data.coPis,
-            coPiUids: data.coPis.map(p => p.uid).filter(Boolean) as string[],
+            coPiUids: data.coPis.map(p => p.uid).filter((uid): uid is string => !!uid),
             coPiNames: data.coPis.map(p => p.name),
             coPiEmails: data.coPis.map(p => p.email),
             isBulkUploaded: true, 
@@ -1641,6 +1641,7 @@ export async function addSanctionedEmrProject(data: {
     
 
     
+
 
 
 
