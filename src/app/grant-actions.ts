@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
@@ -247,7 +248,7 @@ export async function addTransaction(
     let invoiceUrl: string | undefined;
     if (transactionData.invoiceDataUrl) {
       const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
-      const result = await uploadFileToServer(dataUrl, path);
+      const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
 
       if (!result.success || !result.url) {
         throw new Error(result.error || "Invoice upload failed");
