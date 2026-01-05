@@ -1,9 +1,12 @@
+
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
+import type { User } from '@/types';
+import { sendErrorEmail } from '@/app/actions';
 
 export default function Error({
   error,
@@ -12,9 +15,23 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [user, setUser] = useState<User | null>(null);
+
   useEffect(() => {
-    // Log the error to an error reporting service
+    // Log the error to the console for developers
     console.error(error);
+
+    // Get user details from local storage
+    const storedUser = localStorage.getItem('user');
+    const parsedUser = storedUser ? JSON.parse(storedUser) : null;
+    setUser(parsedUser);
+    
+    // Send email report
+    sendErrorEmail(
+      { message: error.message, digest: error.digest },
+      parsedUser
+    ).catch(e => console.error("Failed to send error report email:", e));
+
   }, [error]);
 
   return (
@@ -25,7 +42,7 @@ export default function Error({
                     <AlertTriangle className="h-6 w-6 text-destructive" />
                 </div>
                 <CardTitle className="mt-4 text-2xl">An Unexpected Error Occurred</CardTitle>
-                <CardDescription>We apologize for the inconvenience. Our team has been notified of this issue.</CardDescription>
+                <CardDescription>We apologize for the inconvenience. Our technical team has been automatically notified of this issue.</CardDescription>
             </CardHeader>
             <CardContent>
                 <p className="text-muted-foreground">
@@ -46,3 +63,5 @@ export default function Error({
     </div>
   );
 }
+
+    
