@@ -246,7 +246,7 @@ export async function addTransaction(
       return { success: false, error: "Phase not found." };
     }
 
-    let invoiceUrl: string | undefined;
+    let invoiceUrl: string | null = null;
     if (transactionData.invoiceDataUrl && transactionData.invoiceFileName) {
       const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
       const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
@@ -424,7 +424,7 @@ export async function updateTransaction(
     }
 
     const oldTransaction = phase.transactions[transactionIndex];
-    let newInvoiceUrl = oldTransaction.invoiceUrl;
+    let newInvoiceUrl = oldTransaction.invoiceUrl || null;
 
     // Handle file update
     if (transactionData.invoiceDataUrl && transactionData.invoiceFileName) {
