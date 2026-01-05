@@ -2,9 +2,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
-    serverActions: {
-      bodySizeLimit: '3mb',
-    },
   typescript: {
     ignoreBuildErrors: true,
   },

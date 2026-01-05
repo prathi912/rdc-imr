@@ -219,8 +219,9 @@ export async function addTransaction(
     isGstRegistered: boolean;
     gstNumber?: string;
     description?: string;
-    invoiceDataUrl: string;
-    invoiceFileName: string;
+    invoiceDataUrl?: string;
+    invoiceFileName?: string;
+    isDraft?: boolean;
   }
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
   if (!projectId) {
@@ -246,7 +247,7 @@ export async function addTransaction(
     }
 
     let invoiceUrl: string | undefined;
-    if (transactionData.invoiceDataUrl) {
+    if (transactionData.invoiceDataUrl && transactionData.invoiceFileName) {
       const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
       const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
 
@@ -266,6 +267,7 @@ export async function addTransaction(
       gstNumber: transactionData.gstNumber,
       description: transactionData.description || "",
       invoiceUrl: invoiceUrl,
+      isDraft: transactionData.isDraft ?? false,
     };
 
     const updatedPhases = project.grant.phases.map((phase, index) => {
@@ -281,7 +283,7 @@ export async function addTransaction(
     const updatedGrant = { ...project.grant, phases: updatedPhases };
     await projectRef.update({ grant: updatedGrant });
     
-    await logActivity("INFO", "Grant transaction added", { projectId, phaseId, amount: newTransaction.amount });
+    await logActivity("INFO", "Grant transaction added", { projectId, phaseId, amount: newTransaction.amount, isDraft: newTransaction.isDraft });
     
     const updatedProjectSnap = await projectRef.get();
     const updatedProject = { id: updatedProjectSnap.id, ...updatedProjectSnap.data() } as Project;
@@ -386,6 +388,7 @@ export async function updateTransaction(
     description?: string;
     invoiceDataUrl?: string; // Optional: only provided if a new file is uploaded
     invoiceFileName?: string;
+    isDraft?: boolean;
   }
 ): Promise<{ success: boolean; error?: string; updatedProject?: Project }> {
   if (!projectId) {
@@ -454,6 +457,7 @@ export async function updateTransaction(
       gstNumber: transactionData.gstNumber,
       description: transactionData.description || "",
       invoiceUrl: newInvoiceUrl,
+      isDraft: transactionData.isDraft ?? oldTransaction.isDraft ?? false,
     };
 
     const updatedTransactions = [...phase.transactions];
@@ -587,5 +591,3 @@ export async function updatePhaseStatus(
     return { success: false, error: error.message || "Failed to update phase status." }
   }
 }
-
-    

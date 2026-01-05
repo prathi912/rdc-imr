@@ -98,6 +98,7 @@ export type Transaction = {
   gstNumber?: string
   invoiceUrl?: string // URL to the uploaded invoice in Firebase Storage
   description: string
+  isDraft?: boolean;
 }
 
 export type GrantPhase = {

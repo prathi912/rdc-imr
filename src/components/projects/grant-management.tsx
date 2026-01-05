@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useForm } from "react-hook-form"
@@ -112,7 +113,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       isGstRegistered: z.boolean().default(false),
       gstNumber: z.string().optional(),
       description: z.string().min(10, "Description is required."),
-      invoice: z.any().optional(), // Optional on edit
+      invoice: z.any().optional(),
     })
     .refine(
       (data) => {
@@ -263,32 +264,56 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     }
   }
 
-  const handleTransactionSubmit = async (values: z.infer<typeof transactionSchema>) => {
+  const handleTransactionSubmit = async (values: Partial<z.infer<typeof transactionSchema>>, isDraft: boolean = false) => {
     if (!grant || !currentPhaseId) return;
+
+    // For final submission, validate all fields
+    if (!isDraft) {
+        const validationResult = transactionSchema.safeParse(values);
+        if (!validationResult.success) {
+            // @ts-ignore
+            Object.keys(validationResult.error.formErrors.fieldErrors).forEach((key: keyof z.infer<typeof transactionSchema>) => {
+                const message = validationResult.error.formErrors.fieldErrors[key]?.[0];
+                if (message) {
+                    transactionForm.setError(key, { type: 'manual', message });
+                }
+            });
+            return;
+        }
+    }
+
     setIsSubmitting(true);
     try {
-        const invoiceFile = values.invoice?.[0];
+        const invoiceFile = (values.invoice as FileList)?.[0];
         let invoiceDataUrl, invoiceFileName;
         if (invoiceFile) {
             invoiceDataUrl = await fileToDataUrl(invoiceFile);
             invoiceFileName = invoiceFile.name;
         }
         
+        const finalValues = {
+            dateOfTransaction: values.dateOfTransaction || '',
+            amount: values.amount || 0,
+            vendorName: values.vendorName || '',
+            isGstRegistered: values.isGstRegistered || false,
+            gstNumber: values.gstNumber || '',
+            description: values.description || '',
+        };
+        
         let result;
         if (transactionToEdit) {
             // Update existing transaction
             result = await updateTransaction(project.id, transactionToEdit.phaseId, transactionToEdit.transaction.id, {
-                ...values,
+                ...finalValues,
+                isDraft,
                 invoiceDataUrl,
                 invoiceFileName,
             });
         } else {
             // Add new transaction
-            if (!invoiceDataUrl || !invoiceFileName) {
-              throw new Error("Invoice file is required for new transactions.");
-            }
             result = await addTransaction(project.id, currentPhaseId, {
-                ...values,
+                ...finalValues,
+                isDraft,
                 invoiceDataUrl,
                 invoiceFileName,
             });
@@ -297,7 +322,9 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
         if (result.success && result.updatedProject) {
             onUpdate(result.updatedProject);
             toast({ title: "Success", description: `Transaction ${transactionToEdit ? 'updated' : 'added'} successfully.` });
-            closeTransactionDialog();
+            if (!isDraft) {
+                closeTransactionDialog();
+            }
         } else {
             throw new Error(result.error || `Failed to ${transactionToEdit ? 'update' : 'add'} transaction.`);
         }
@@ -588,7 +615,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                           </TableHeader>
                           <TableBody>
                             {phase.transactions?.map((transaction) => (
-                              <TableRow key={transaction.id}>
+                              <TableRow key={transaction.id} className={transaction.isDraft ? 'bg-yellow-100 dark:bg-yellow-900/20' : ''}>
                                 <TableCell>{format(parseISO(transaction.dateOfTransaction), "dd/MM/yyyy")}</TableCell>
                                 <TableCell>{transaction.vendorName}</TableCell>
                                 <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
@@ -674,7 +701,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             <Form {...transactionForm}>
               <form
                 id="add-transaction-form"
-                onSubmit={transactionForm.handleSubmit(handleTransactionSubmit)}
                 className="space-y-4 py-4"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -781,12 +807,15 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
               </form>
             </Form>
             <DialogFooter>
-              <DialogClose asChild>
-                <Button variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button type="submit" form="add-transaction-form" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : (transactionToEdit ? 'Save Changes' : 'Add Transaction')}
-              </Button>
+                <Button variant="outline" onClick={() => handleTransactionSubmit(transactionForm.getValues(), true)} disabled={isSubmitting}>
+                    {isSubmitting ? 'Saving...' : 'Save as Draft'}
+                </Button>
+                <div>
+                    <Button variant="ghost" onClick={closeTransactionDialog}>Cancel</Button>
+                    <Button onClick={() => handleTransactionSubmit(transactionForm.getValues())} disabled={isSubmitting}>
+                        {isSubmitting ? "Saving..." : (transactionToEdit ? 'Save Changes' : 'Add Transaction')}
+                    </Button>
+                </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
