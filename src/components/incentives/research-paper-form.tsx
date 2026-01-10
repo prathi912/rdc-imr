@@ -915,7 +915,7 @@ export function ResearchPaperForm() {
                         )}
                     />
                  )}
-                  <FormField
+                 <FormField
                   control={form.control}
                   name="paperTitle"
                   render={({ field }) => (
@@ -977,7 +977,7 @@ export function ResearchPaperForm() {
                       <FormItem>
                         <FormLabel>Scopus URL</FormLabel>
                         <FormControl>
-                            <Input placeholder="Enter full Scopus URL" {...field} disabled={isSubmitting} />
+                            <Input placeholder="https://www.scopus.com/pages/publications/" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1474,7 +1474,7 @@ export function ResearchPaperForm() {
               </Button>
                <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
                 Proceed to Review
-              </Button>
+            </Button>
             </CardFooter>
           </form>
         </Form>
