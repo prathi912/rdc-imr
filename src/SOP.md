@@ -1,4 +1,4 @@
-# Standard Operating Procedures (SOP) - R&D Portal
+# Standard Operating Procedures (SOP) - R&D Projects Portal
 
 This document outlines the standard operating procedures for various administrative and faculty roles within the Parul University Research & Development Portal.
 
@@ -81,15 +81,12 @@ This is the base role for all teaching and research staff.
     -   Before the deadline, you can view, replace, or remove your uploaded presentation using the "Manage PPT" button on your application card.
 
 ### Incentive Claim Workflow
+For a detailed guide on how to submit and manage incentive claims, please refer to the dedicated **[Incentive Claims SOP](src/INCENTIVE_SOP.md)**. The general process is:
 1.  **Access Portal:** Navigate to **Incentive Claims** from the sidebar.
-2.  **Select Claim Type:** Choose the category for which you are claiming an incentive (e.g., Research Papers, Patents, Books).
-3.  **Fill the Form:** Complete the detailed application form for your chosen category. You will be required to provide specific details and upload supporting documents (e.g., publication proofs, payment receipts).
-4.  **Save or Submit:**
-    -   You can **Save as Draft** at any point to save your progress.
-    -   Once complete, click **Submit Claim**.
-5.  **Track Status:**
-    -   Go to the **My Claims** tab on the Incentive Claims page to track the status of all your submissions.
-    -   If another author on a paper you co-authored submits a claim, it will appear in the **Co-Author Claims** tab, allowing you to apply for your share of the incentive.
+2.  **Select Claim Type:** Choose the category for your claim (e.g., Research Papers, Patents, Books).
+3.  **Fill & Submit:** Complete the form with all required details and proofs. You can save a draft at any time.
+4.  **Track Status:** Use the "My Claims" and "Co-Author Claims" tabs to monitor the progress of your applications.
+
 
 ### Project Recruitment Workflow
 1.  **Create a Posting:** Navigate to **Post a Job** from the sidebar.
