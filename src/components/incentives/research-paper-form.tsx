@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -50,10 +49,11 @@ const researchPaperSchema = z
     publicationType: z.string({ required_error: "Please select a publication type." }),
     indexType: z.enum(["wos", "scopus", "both", "sci", "other"]).optional(),
     doi: z.string().optional().or(z.literal('')),
+    wosAccessionNumber: z.string().optional().or(z.literal('')),
     relevantLink: z.string().optional().or(z.literal('')),
     scopusLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
     wosLink: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
-    journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"]).optional(),
+    journalClassification: z.enum(["Q1", "Q2", "Q3", "Q4", "Nature/Science/Lancet", "Top 1% Journals"], { required_error: 'Journal Classification (Q-rating) is required for Scopus/WoS indexed papers.' }),
     wosType: z.enum(["SCIE", "SSCI", "A&HCI"]).optional(),
     journalName: z.string().min(3, "Journal name is required."),
     journalWebsite: z.string().url("Please enter a valid URL.").optional().or(z.literal("")),
@@ -102,7 +102,7 @@ const researchPaperSchema = z
    )
    .refine(
     (data) => {
-        if (data.indexType !== 'other') {
+        if (data.indexType !== 'other' && data.indexType !== 'wos') { // WoS can use Accession Number instead
             return !!data.doi && data.doi.length >= 5;
         }
         return true;
@@ -114,9 +114,9 @@ const researchPaperSchema = z
   .refine(
     (data) => {
       if (data.indexType === "wos" || data.indexType === "both") {
-        return !!data.wosType
+        return !!data.wosType;
       }
-      return true
+      return true;
     },
     { message: "For WoS or Both, you must select a WoS Type.", path: ["wosType"] },
   )
@@ -156,18 +156,7 @@ const researchPaperSchema = z
       return true;
     },
     { message: "Only one author can be the Presenting Author for a conference proceeding.", path: ["authors"] }
-  )
-  .refine(
-    (data) => {
-        if (data.indexType === 'scopus' || data.indexType === 'both' || data.indexType === 'wos') {
-            return !!data.journalClassification;
-        }
-        return true;
-    }, {
-        message: 'Journal Classification (Q-rating) is required for Scopus/WoS indexed papers.',
-        path: ['journalClassification'],
-    }
-);
+  );
 
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>
 
@@ -329,6 +318,7 @@ function ReviewDetails({ data, onEdit }: { data: ResearchPaperFormValues; onEdit
                 {renderDetail("Journal Name", data.journalName)}
                 {renderDetail("Journal Website", data.journalWebsite)}
                 {renderDetail("DOI", data.doi)}
+                {renderDetail("WoS Accession No.", data.wosAccessionNumber)}
                 {renderDetail("Article Link", data.relevantLink)}
                 {renderDetail("Scopus URL", data.scopusLink)}
                 {renderDetail("WoS URL", data.wosLink)}
@@ -546,10 +536,18 @@ export function ResearchPaperForm() {
 
   const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
     const doi = form.getValues('doi');
-    if (!doi) {
-      toast({ variant: 'destructive', title: 'No DOI Provided', description: 'Please enter a DOI to fetch data.' });
+    const wosId = form.getValues('wosAccessionNumber');
+    let identifier = doi;
+
+    if (source === 'wos' && wosId) {
+      identifier = wosId;
+    }
+
+    if (!identifier) {
+      toast({ variant: 'destructive', title: 'No Identifier Provided', description: `Please enter a DOI or WoS Accession Number to fetch data.` });
       return;
     }
+
     if (!user) {
       toast({ variant: 'destructive', title: 'Not Logged In', description: 'Could not identify the claimant.' });
       return;
@@ -561,11 +559,11 @@ export function ResearchPaperForm() {
     try {
         let result;
         if (source === 'scopus') {
-            result = await fetchAdvancedScopusData(doi, user.name);
+            result = await fetchAdvancedScopusData(identifier, user.name);
         } else if (source === 'wos') {
-            result = await fetchWosDataByUrl(doi, user.name);
+            result = await fetchWosDataByUrl(identifier, user.name);
         } else {
-            result = await fetchScienceDirectData(doi, user.name);
+            result = await fetchScienceDirectData(identifier, user.name);
         }
 
         if (result.success && result.data) {
@@ -891,7 +889,7 @@ export function ResearchPaperForm() {
                     </FormItem>
                   )}
                 />
-                 {indexType !== 'other' ? (
+                 {indexType !== 'other' && (
                     <FormField
                         control={form.control}
                         name="doi"
@@ -905,10 +903,7 @@ export function ResearchPaperForm() {
                                 {indexType === 'sci' ? (
                                     <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
                                 ) : (
-                                    <>
                                     <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
-                                    <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
-                                    </>
                                 )}
                             </div>
                             <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
@@ -916,7 +911,27 @@ export function ResearchPaperForm() {
                             </FormItem>
                         )}
                     />
-                 ) : (
+                 )}
+                 {(indexType === 'wos' || indexType === 'both') && (
+                     <FormField
+                        control={form.control}
+                        name="wosAccessionNumber"
+                        render={({ field }) => (
+                            <FormItem>
+                            <FormLabel>Web of Science Accession Number</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormControl>
+                                    <Input placeholder="e.g., WOS:000581634500008" {...field} disabled={isSubmitting} />
+                                </FormControl>
+                                <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('wosAccessionNumber')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
+                            </div>
+                            <FormDescription>Use this if DOI fetch fails or is unavailable for WoS.</FormDescription>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                 )}
+                 {indexType === 'other' && (
                      <FormField
                         control={form.control}
                         name="relevantLink"
@@ -941,7 +956,7 @@ export function ResearchPaperForm() {
                       <FormItem>
                         <FormLabel>Scopus URL</FormLabel>
                         <FormControl>
-                            <Input placeholder="Enter full Scopus URL if DOI fetch fails" {...field} disabled={isSubmitting} />
+                            <Input placeholder="Enter full Scopus URL" {...field} disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -957,7 +972,7 @@ export function ResearchPaperForm() {
                       <FormItem>
                         <FormLabel>WoS URL</FormLabel>
                          <FormControl>
-                            <Input placeholder="Enter full WoS URL if DOI fetch fails" {...field} disabled={isSubmitting} />
+                            <Input placeholder="Enter full WoS URL" {...field} disabled={isSubmitting} />
                          </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1200,13 +1215,13 @@ export function ResearchPaperForm() {
                 </div>
                 
                 <div className="space-y-4 pt-4">
-                  <FormLabel>Author(s) & Roles</FormLabel>
+                  <FormLabel>Author(s) &amp; Roles</FormLabel>
                   {publicationType === 'Scopus Indexed Conference Proceedings' && (
                     <Alert variant="default">
                         <Info className="h-4 w-4" />
                         <AlertTitle>Conference Proceedings Policy</AlertTitle>
                         <AlertDescription>
-                            Only authors with the role of 'Presenting Author' or 'First & Presenting Author' are eligible for an incentive for this publication type. Other co-authors can be added for record-keeping.
+                            Only authors with the role of 'Presenting Author' or 'First &amp; Presenting Author' are eligible for an incentive for this publication type. Other co-authors can be added for record-keeping.
                         </AlertDescription>
                     </Alert>
                   )}
@@ -1453,5 +1468,3 @@ export function ResearchPaperForm() {
     </div>
   )
 }
-
-    
