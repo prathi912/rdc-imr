@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -918,15 +919,15 @@ export function ResearchPaperForm() {
                         name="wosAccessionNumber"
                         render={({ field }) => (
                             <FormItem>
-                            <FormLabel>Web of Science Accession Number</FormLabel>
-                            <div className="flex items-center gap-2">
-                                <FormControl>
-                                    <Input placeholder="e.g., WOS:000581634500008" {...field} disabled={isSubmitting} />
-                                </FormControl>
-                                <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('wosAccessionNumber')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
-                            </div>
-                            <FormDescription>Use this if DOI fetch fails or is unavailable for WoS.</FormDescription>
-                            <FormMessage />
+                                <FormLabel>Web of Science Accession Number</FormLabel>
+                                <div className="flex items-center gap-2">
+                                    <FormControl>
+                                        <Input placeholder="e.g., WOS:000581634500008" {...field} disabled={isSubmitting} />
+                                    </FormControl>
+                                    <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('wosAccessionNumber')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
+                                </div>
+                                <FormDescription>Use this if DOI fetch fails or is unavailable for WoS. Accession number can be found here: <a href="https://www.webofscience.com/wos/woscc/smart-search" target="_blank" rel="noopener noreferrer" className="underline">Web of Science</a></FormDescription>
+                                <FormMessage />
                             </FormItem>
                         )}
                     />

@@ -1,16 +1,43 @@
 'use server';
 
-import type { IncentiveClaim } from '@/types';
-
 type WoSAuthor = {
-  fullName?: string;
+  displayName?: string;
+  researcherId?: string;
 };
 
 type WoSRecord = {
+  uid?: string;
   title?: { value?: string };
-  source?: { sourceTitle?: string };
-  publicationInfo?: { year?: number };
-  names?: { authors?: WoSAuthor[] };
+  source?: {
+    sourceTitle?: string;
+    issn?: string[];
+    eissn?: string[];
+  };
+  identifiers?: {
+    doi?: string;
+    issn?: string[];
+  };
+  publicationInfo?: {
+    year?: number;
+    volume?: string;
+    issue?: string;
+    pages?: {
+      begin?: string;
+      end?: string;
+    };
+  };
+  names?: {
+    authors?: WoSAuthor[];
+  };
+  citations?: {
+    count?: number;
+    type?: string;
+  }[];
+  links?: {
+    record?: string;
+    citedReferences?: string;
+    relatedRecords?: string;
+  };
 };
 
 export async function fetchWosDataByUrl(
@@ -21,11 +48,16 @@ export async function fetchWosDataByUrl(
   data?: {
     paperTitle: string;
     journalName: string;
-    totalAuthors: number;
     publicationYear: string;
-    relevantLink: string;
+    isPuNameInPublication?: boolean;
+    printIssn?: string;
+    electronicIssn?: string;
+    wosUrl?: string;
+    publicationType?: string;
+    
   };
   error?: string;
+  warning?: string;
   claimantIsAuthor?: boolean;
 }> {
   const apiKey = process.env.WOS_API_KEY;
@@ -37,34 +69,27 @@ export async function fetchWosDataByUrl(
     };
   }
 
-  // Determine if the identifier is a DOI or a WoS Accession Number
-  let queryParam: string;
-  let relevantLink: string;
-
+  const isWosUid = /^WOS:\d+$/i.test(identifier);
   const doiMatch = identifier.match(/(10\.\d{4,9}\/[-._;()/:A-Z0-9]+)/i);
-  const wosIdMatch = identifier.match(/WOS:\d+/i);
 
-  if (wosIdMatch) {
-    queryParam = `UT=${encodeURIComponent(identifier)}`;
-    relevantLink = `https://www.webofscience.com/wos/woscc/full-record/${identifier}`;
+  let apiUrl: string;
+
+  if (isWosUid) {
+    apiUrl =
+      `https://api.clarivate.com/apis/wos-starter/v1/documents/${identifier}`;
   } else if (doiMatch) {
-    const doi = doiMatch[1];
-    queryParam = `DO=${encodeURIComponent(doi)}`;
-    relevantLink = `https://doi.org/${doi}`;
+    apiUrl =
+      `https://api.clarivate.com/apis/wos-starter/v1/documents` +
+      `?q=DO=${encodeURIComponent(doiMatch[1])}&limit=1`;
   } else {
-    // As a last resort, assume it's a raw DOI
-    queryParam = `DO=${encodeURIComponent(identifier)}`;
-    relevantLink = `https://doi.org/${identifier}`;
+    return {
+      success: false,
+      error: 'Identifier must be a valid DOI or Web of Science UID.',
+    };
   }
-  
-
-  const wosApiUrl =
-    `https://api.clarivate.com/apis/wos-starter/v1/documents` +
-    `?q=${queryParam}` +
-    `&db=WOS&limit=1`;
 
   try {
-    const response = await fetch(wosApiUrl, {
+    const response = await fetch(apiUrl, {
       headers: {
         'X-ApiKey': apiKey,
         Accept: 'application/json;charset=UTF-8',
@@ -75,20 +100,23 @@ export async function fetchWosDataByUrl(
       let message = 'Failed to fetch data from Web of Science.';
       try {
         const err = await response.json();
-        message = err?.error?.message || err?.message || message;
-      } catch {
-        // ignore JSON parse errors
-      }
+        message =
+          err?.error?.details ||
+          err?.error?.message ||
+          err?.message ||
+          message;
+      } catch {}
       return { success: false, error: `WoS API Error: ${message}` };
     }
 
     const payload = await response.json();
-    const record: WoSRecord | undefined = payload?.data?.[0];
+    const record: WoSRecord | undefined =
+      isWosUid ? payload : payload?.hits?.[0];
 
     if (!record) {
       return {
         success: false,
-        error: 'No matching record found in Web of Science for the provided identifier.',
+        error: 'No matching record found in Web of Science.',
       };
     }
 
@@ -98,39 +126,48 @@ export async function fetchWosDataByUrl(
       ? String(record.publicationInfo.year)
       : '';
 
+    const printIssn =
+      record.source?.issn?.[0] ?? record.identifiers?.issn?.[0];
+
+    const electronicIssn = record.source?.eissn?.[0];
+
     const authors = record.names?.authors ?? [];
-    const totalAuthors = authors.length;
 
     const claimantParts = claimantName.trim().toLowerCase().split(/\s+/);
     const claimantLastName = claimantParts.pop() ?? '';
     const claimantFirstInitial = claimantParts[0]?.charAt(0) ?? '';
 
     const claimantIsAuthor = authors.some((author) => {
-      const fullName = author.fullName?.toLowerCase() ?? '';
-      if (!fullName || !claimantLastName) return false;
-
-      // Expected WoS format: "lastname, firstname"
-      if (fullName.includes(',')) {
-        const [last, first] = fullName.split(',').map((p) => p.trim());
+      const name = author.displayName?.toLowerCase() ?? '';
+      if (!name || !claimantLastName) return false;
+      if (name.includes(',')) {
+        const [last, first] = name.split(',').map(p => p.trim());
         return (
           last === claimantLastName &&
           (!claimantFirstInitial ||
             first?.startsWith(claimantFirstInitial))
         );
       }
-
-      // Fallback for non-standard formats
-      return fullName.includes(claimantLastName);
+      return name.includes(claimantLastName);
     });
+
+    const isPuNameInPublication = authors.some((author) =>
+      author.displayName?.toLowerCase().includes('parul'),
+    );
+
 
     return {
       success: true,
       data: {
         paperTitle,
         journalName,
-        totalAuthors,
         publicationYear,
-        relevantLink,
+        isPuNameInPublication,
+        printIssn,
+        electronicIssn,
+        wosUrl: record.links?.record,
+        publicationType: 'Journal Article',
+   
       },
       claimantIsAuthor,
     };
@@ -139,7 +176,7 @@ export async function fetchWosDataByUrl(
       success: false,
       error:
         err?.message ||
-        'An unexpected error occurred while fetching WoS data.',
+        'An unexpected error occurred while fetching Web of Science data.',
     };
   }
 }
