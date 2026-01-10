@@ -928,7 +928,12 @@ export function ResearchPaperForm() {
                                     </FormControl>
                                     <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('wosAccessionNumber')} title="Fetch data from Web of Science"><Bot className="h-4 w-4" /> WoS</Button>
                                 </div>
-                                <FormDescription>Use this if DOI fetch fails or is unavailable for WoS. Accession number can be found here: <a href="https://www.webofscience.com/wos/woscc/smart-search" target="_blank" rel="noopener noreferrer" className="underline">Web of Science</a></FormDescription>
+                                <FormDescription>
+                                  WOS URl can be found using this:{" "}
+                                  <a href="https://www.webofscience.com/wos/woscc/smart-search?embedded=0" target="_blank" rel="noopener noreferrer" className="underline">
+                                    https://www.webofscience.com/wos/woscc/smart-search?embedded=0
+                                  </a>
+                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -975,8 +980,14 @@ export function ResearchPaperForm() {
                       <FormItem>
                         <FormLabel>WoS URL</FormLabel>
                          <FormControl>
-                            <Input placeholder="Enter full WoS URL" {...field} disabled={isSubmitting} />
+                            <Input placeholder="https://www.webofscience.com/wos/woscc/full-record/WOS:" {...field} disabled={isSubmitting} />
                          </FormControl>
+                        <FormDescription>
+                          WOS URL can be found using this:{" "}
+                          <a href="https://www.webofscience.com/wos/woscc/smart-search?embedded=0" target="_blank" rel="noopener noreferrer" className="underline">
+                            https://www.webofscience.com/wos/woscc/smart-search?embedded=0
+                          </a>
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1218,13 +1229,13 @@ export function ResearchPaperForm() {
                 </div>
                 
                 <div className="space-y-4 pt-4">
-                  <FormLabel>Author(s) &amp; Roles</FormLabel>
+                  <FormLabel>Author(s) & Roles</FormLabel>
                   {publicationType === 'Scopus Indexed Conference Proceedings' && (
                     <Alert variant="default">
                         <Info className="h-4 w-4" />
                         <AlertTitle>Conference Proceedings Policy</AlertTitle>
                         <AlertDescription>
-                            Only authors with the role of 'Presenting Author' or 'First &amp; Presenting Author' are eligible for an incentive for this publication type. Other co-authors can be added for record-keeping.
+                            Only authors with the role of 'Presenting Author' or 'First & Presenting Author' are eligible for an incentive for this publication type. Other co-authors can be added for record-keeping.
                         </AlertDescription>
                     </Alert>
                   )}
@@ -1471,5 +1482,3 @@ export function ResearchPaperForm() {
     </div>
   )
 }
-
-    
