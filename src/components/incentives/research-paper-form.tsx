@@ -359,6 +359,7 @@ export function ResearchPaperForm() {
   const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
+  const [showWosAccession, setShowWosAccession] = useState(false);
 
 
   const form = useForm<ResearchPaperFormValues>({
@@ -538,14 +539,10 @@ export function ResearchPaperForm() {
   const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
     const doi = form.getValues('doi');
     const wosId = form.getValues('wosAccessionNumber');
-    let identifier = doi;
-
-    if (source === 'wos' && wosId) {
-      identifier = wosId;
-    }
+    let identifier = source === 'wos' ? (doi || wosId) : doi;
 
     if (!identifier) {
-      toast({ variant: 'destructive', title: 'No Identifier Provided', description: `Please enter a DOI or WoS Accession Number to fetch data.` });
+      toast({ variant: 'destructive', title: 'No Identifier Provided', description: `Please enter a DOI${source === 'wos' ? ' or WoS Accession Number' : ''} to fetch data.` });
       return;
     }
 
@@ -563,6 +560,9 @@ export function ResearchPaperForm() {
             result = await fetchAdvancedScopusData(identifier, user.name);
         } else if (source === 'wos') {
             result = await fetchWosDataByUrl(identifier, user.name);
+            if (!result.success) {
+                setShowWosAccession(true); // Show fallback on failure
+            }
         } else {
             result = await fetchScienceDirectData(identifier, user.name);
         }
@@ -571,7 +571,7 @@ export function ResearchPaperForm() {
             const autoFetched: (keyof ResearchPaperFormValues)[] = [];
             
             Object.entries(result.data).forEach(([key, value]) => {
-                if (value !== undefined) {
+                if (value !== undefined && value !== null) {
                     form.setValue(key as keyof ResearchPaperFormValues, value, { shouldValidate: true });
                     autoFetched.push(key as keyof ResearchPaperFormValues);
                 }
@@ -592,9 +592,15 @@ export function ResearchPaperForm() {
 
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error || `Failed to fetch data from ${source.toUpperCase()}.` });
+            if (source === 'wos') {
+                setShowWosAccession(true);
+            }
         }
     } catch (error: any) {
         toast({ variant: 'destructive', title: 'Error', description: error.message || 'An unexpected error occurred.' });
+        if (source === 'wos') {
+            setShowWosAccession(true);
+        }
     } finally {
         setIsFetching(false);
     }
@@ -901,11 +907,7 @@ export function ResearchPaperForm() {
                                 <FormControl>
                                     <Input placeholder="Enter DOI (e.g., 10.1038/nature12345)" {...field} disabled={isSubmitting} />
                                 </FormControl>
-                                {indexType === 'sci' ? (
-                                    <Button type="button" variant="outline" onClick={() => handleFetchData('sciencedirect')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from ScienceDirect"><Bot className="h-4 w-4" /> ScienceDirect</Button>
-                                ) : (
-                                    <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch data from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
-                                )}
+                                <Button type="button" variant="outline" onClick={() => handleFetchData(indexType === 'wos' ? 'wos' : 'scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from Scopus or WoS"><Bot className="h-4 w-4" /> Fetch</Button>
                             </div>
                             <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
                             <FormMessage />
@@ -913,7 +915,7 @@ export function ResearchPaperForm() {
                         )}
                     />
                  )}
-                 {(indexType === 'wos' || indexType === 'both') && (
+                 {(indexType === 'wos' || indexType === 'both') && showWosAccession && (
                      <FormField
                         control={form.control}
                         name="wosAccessionNumber"
@@ -1469,3 +1471,5 @@ export function ResearchPaperForm() {
     </div>
   )
 }
+
+    
