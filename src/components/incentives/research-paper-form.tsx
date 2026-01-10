@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -101,9 +102,14 @@ const researchPaperSchema = z
         path: ['relevantLink'],
     }
    )
-   .refine(
+  .refine(
     (data) => {
-        if (data.indexType !== 'other' && data.indexType !== 'wos') { // WoS can use Accession Number instead
+        // DOI is not required if the type is WoS and an accession number is provided
+        if (data.indexType === 'wos' && data.wosAccessionNumber) {
+            return true;
+        }
+        // For other scopus/wos/both types, DOI is required
+        if (data.indexType !== 'other') {
             return !!data.doi && data.doi.length >= 5;
         }
         return true;
@@ -368,8 +374,8 @@ export function ResearchPaperForm() {
       publicationType: '',
       indexType: undefined,
       doi: '',
-      scopusLink: '',
-      wosLink: '',
+      scopusLink: 'https://www.scopus.com/pages/publications/',
+      wosLink: 'https://www.webofscience.com/wos/woscc/full-record/WOS:',
       journalClassification: undefined,
       wosType: undefined,
       journalName: '',
@@ -486,14 +492,15 @@ export function ResearchPaperForm() {
   }, [isSpecialFaculty]);
 
   const availableClassifications = useMemo(() => {
-      let options = journalClassificationOptions;
-      if (isPhdScholar) {
+    let options = journalClassificationOptions;
+    if (isPhdScholar) {
         options = options.filter(o => o.value === 'Q1' || o.value === 'Q2');
-      }
-      if (isSpecialFaculty && (indexType === "wos" || indexType === "both")) {
+    }
+    // Only filter for WoS if it's a special faculty, not for 'both'
+    if (isSpecialFaculty && indexType === "wos") {
         options = options.filter((o) => o.value === "Q1" || o.value === "Q2");
-      }
-      return options;
+    }
+    return options;
   }, [isSpecialFaculty, indexType, isPhdScholar]);
   
   const watchAuthors = form.watch('authors');
@@ -907,7 +914,8 @@ export function ResearchPaperForm() {
                                 <FormControl>
                                     <Input placeholder="Enter DOI (e.g., 10.1038/nature12345)" {...field} disabled={isSubmitting} />
                                 </FormControl>
-                                <Button type="button" variant="outline" onClick={() => handleFetchData(indexType === 'wos' ? 'wos' : 'scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from Scopus or WoS"><Bot className="h-4 w-4" /> Fetch</Button>
+                                <Button type="button" variant="outline" onClick={() => handleFetchData('scopus')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from Scopus"><Bot className="h-4 w-4" /> Scopus</Button>
+                                <Button type="button" variant="outline" onClick={() => handleFetchData('wos')} disabled={isSubmitting || isFetching || !form.getValues('doi')} title="Fetch from WoS"><Bot className="h-4 w-4" /> WoS</Button>
                             </div>
                             <FormDescription>This is the primary way we fetch and verify your publication details.</FormDescription>
                             <FormMessage />
@@ -943,8 +951,8 @@ export function ResearchPaperForm() {
                                 </div>
                                 <FormDescription>
                                   WOS URl can be found using this:{" "}
-                                  <a href="https://www.webofscience.com/wos/woscc/smart-search?embedded=0" target="_blank" rel="noopener noreferrer" className="underline">
-                                    https://www.webofscience.com/wos/woscc/smart-search?embedded=0
+                                  <a href="https://www.webofscience.com/wos/woscc/smart-search" target="_blank" rel="noopener noreferrer" className="underline">
+                                    https://www.webofscience.com/wos/woscc/smart-search
                                   </a>
                                 </FormDescription>
                                 <FormMessage />
@@ -1266,7 +1274,7 @@ export function ResearchPaperForm() {
                         <FormLabel className="text-sm">Add Internal Co-Author</FormLabel>
                          <div className="relative">
                             <Input
-                                placeholder="Search by Co-Author's Name"
+                                placeholder="Search by Co-Author's Name or MIS ID"
                                 value={coPiSearchTerm}
                                 onChange={(e) => {
                                     setCoPiSearchTerm(e.target.value);
