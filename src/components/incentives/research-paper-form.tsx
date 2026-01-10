@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useForm, useFieldArray } from "react-hook-form"
@@ -155,7 +156,18 @@ const researchPaperSchema = z
       return true;
     },
     { message: "Only one author can be the Presenting Author for a conference proceeding.", path: ["authors"] }
-  );
+  )
+  .refine(
+    (data) => {
+        if (data.indexType === 'scopus' || data.indexType === 'both' || data.indexType === 'wos') {
+            return !!data.journalClassification;
+        }
+        return true;
+    }, {
+        message: 'Journal Classification (Q-rating) is required for Scopus/WoS indexed papers.',
+        path: ['journalClassification'],
+    }
+);
 
 type ResearchPaperFormValues = z.infer<typeof researchPaperSchema>
 
@@ -394,7 +406,7 @@ export function ResearchPaperForm() {
   
   const formValues = form.watch();
   
-  const isPhdScholar = user?.designation === 'Ph.D Scholar';
+  const isPhdScholar = user?.designation === 'Ph.D. Scholar';
 
   const calculate = useCallback(async () => {
     if (!user || !user.faculty) return;
@@ -953,6 +965,25 @@ export function ResearchPaperForm() {
                   />
                 )}
 
+                {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both') && (
+                    <FormField
+                        control={form.control}
+                        name="journalClassification"
+                        render={({ field }) => (
+                            <FormItem className="space-y-3">
+                            <FormLabel>Journal Classification</FormLabel>
+                            <FormControl>
+                                <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>
+                                {availableClassifications.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}
+                                </RadioGroup>
+                            </FormControl>
+                            <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
+
+
                 {(indexType === "wos" || indexType === "both") && (
                   <FormField
                     control={form.control}
@@ -1422,3 +1453,5 @@ export function ResearchPaperForm() {
     </div>
   )
 }
+
+    

@@ -32,7 +32,7 @@ The process for submitting any incentive claim follows these general steps:
 
 ## 2. Managing Co-Authors
 
-For collaborative works like research papers and books, it is essential to add all co-authors accurately. The system uses this information to calculate incentive distribution as per the university's policy.
+For collaborative works like research papers and books, it is essential to add all authors accurately. The system uses this information to calculate incentive distribution as per the university's policy.
 
 ### How to Add Co-Authors:
 The primary author submitting the claim is responsible for adding all other authors.
@@ -58,7 +58,7 @@ The primary author submitting the claim is responsible for adding all other auth
 ## 3. Claim-Specific Instructions
 
 ### A. Research Papers
--   **Auto-fill Data**: Use the **"Fetch from..."** buttons (Scopus, WoS, ScienceDirect) by providing a DOI or URL. This will pre-fill most of the required information.
+-   **Auto-fill Data**: Use the **"Fetch from..."** buttons (Scopus, WoS ) by providing a DOI or URL. This will pre-fill most of the required information.
 -   **Author Roles**: Accurately set your role and the roles of all co-authors. This directly impacts the incentive calculation.
 -   **PU Name**: You must confirm if "Parul University" is mentioned in the publication's affiliation. If not, the incentive is reduced by 50%.
 -   **APC Payment**: Declare if the Article Processing Charge (APC) was paid by the university, as this also reduces the incentive by 50%.
@@ -94,4 +94,4 @@ The primary author submitting the claim is responsible for adding all other auth
 -   **Co-Author Claims**: This tab appears if a primary author has submitted a claim and listed you as a co-author. You must go here and click **"View & Apply"** to submit your individual claim for your share of the incentive. Your claim will not be processed until you do so.
 -   **Drafts**: Access and continue any claims you have saved as a draft.
 
-For further details on the specific calculation logic for each category, please refer to the official **Research Incentive Policy** document.
+For further details on the specific calculation logic for each category, please refer to the official **Research Policy of Parul University** document.
