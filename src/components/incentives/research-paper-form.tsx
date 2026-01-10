@@ -539,7 +539,7 @@ export function ResearchPaperForm() {
   const handleFetchData = async (source: 'scopus' | 'wos' | 'sciencedirect') => {
     const doi = form.getValues('doi');
     const wosId = form.getValues('wosAccessionNumber');
-    let identifier = source === 'wos' ? (doi || wosId) : doi;
+    let identifier = source === 'wos' ? (wosId || doi) : doi;
 
     if (!identifier) {
       toast({ variant: 'destructive', title: 'No Identifier Provided', description: `Please enter a DOI${source === 'wos' ? ' or WoS Accession Number' : ''} to fetch data.` });
@@ -915,6 +915,19 @@ export function ResearchPaperForm() {
                         )}
                     />
                  )}
+                  <FormField
+                  control={form.control}
+                  name="paperTitle"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title of the Paper published</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                  {(indexType === 'wos' || indexType === 'both') && showWosAccession && (
                      <FormField
                         control={form.control}
@@ -1000,7 +1013,7 @@ export function ResearchPaperForm() {
                         name="journalClassification"
                         render={({ field }) => (
                             <FormItem className="space-y-3">
-                            <FormLabel>Journal Classification</FormLabel>
+                            <FormLabel>Journal Classification (Q-rating)</FormLabel>
                             <FormControl>
                                 <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap items-center gap-x-6 gap-y-2" disabled={isSubmitting}>
                                 {availableClassifications.map((option) => (<FormItem key={option.value} className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value={option.value} /></FormControl><FormLabel className="font-normal">{option.label}</FormLabel></FormItem>))}
@@ -1101,19 +1114,6 @@ export function ResearchPaperForm() {
                       <FormLabel>Journal Website Link</FormLabel>
                       <FormControl>
                         <Input placeholder="https://www.examplejournal.com" {...field} disabled={isSubmitting} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="paperTitle"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title of the Paper published</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Enter the full title of your paper" {...field} disabled={isSubmitting} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1256,7 +1256,7 @@ export function ResearchPaperForm() {
                             <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                         </Select>
                         {field.email.toLowerCase() !== user?.email.toLowerCase() && (
-                          <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeAuthor(index)}><Trash2 className="h-4 w-4" /></Button>
                         )}
                       </div>
                     </div>
