@@ -56,9 +56,9 @@ import { Alert, AlertDescription, AlertTitle } from "../ui/alert"
 import Link from "next/link"
 import { Badge } from "../ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
-import { uploadFileToServer } from "@/app/actions"
 import { format, parseISO, isValid } from "date-fns"
 import { Separator } from "../ui/separator"
+import { uploadFileToApi, validateFile } from "@/lib/upload-client"
 
 
 interface GrantManagementProps {
@@ -67,14 +67,7 @@ interface GrantManagementProps {
   onUpdate: (updatedProject: Project) => void
 }
 
-const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-    });
-};
+// File is now uploaded directly via API, no need for DataUrl conversion
 
 export function GrantManagement({ project, user, onUpdate }: GrantManagementProps) {
   const { toast } = useToast()
@@ -285,10 +278,23 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     setIsSubmitting(true);
     try {
         const invoiceFile = (values.invoice as FileList)?.[0];
-        let invoiceDataUrl: string | undefined;
+        let invoiceUrl: string | undefined;
         let invoiceFileName: string | undefined;
+        
+        // Upload file to new API endpoint if provided
         if (invoiceFile) {
-            invoiceDataUrl = await fileToDataUrl(invoiceFile);
+            // Validate file before upload
+            const validation = validateFile(invoiceFile);
+            if (!validation.valid) {
+                throw new Error(validation.error || "File validation failed");
+            }
+
+            // Upload file to API
+            const uploadResult = await uploadFileToApi(invoiceFile);
+            if (!uploadResult.success) {
+                throw new Error(uploadResult.error || "Failed to upload invoice");
+            }
+            invoiceUrl = uploadResult.url;
             invoiceFileName = invoiceFile.name;
         }
         
@@ -307,7 +313,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             result = await updateTransaction(project.id, transactionToEdit.phaseId, transactionToEdit.transaction.id, {
                 ...finalValues,
                 isDraft,
-                invoiceDataUrl,
+                invoiceUrl,
                 invoiceFileName,
             });
         } else {
@@ -315,7 +321,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             result = await addTransaction(project.id, currentPhaseId, {
                 ...finalValues,
                 isDraft,
-                invoiceDataUrl,
+                invoiceUrl,
                 invoiceFileName,
             });
         }

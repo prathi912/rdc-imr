@@ -1,11 +1,10 @@
 
-
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin";
 import type { Project, GrantPhase, GrantDetails, User, Transaction } from "@/types";
 import { sendEmail as sendEmailUtility } from "@/lib/email";
-import { getSystemSettings, uploadFileToServer } from './actions';
+import { getSystemSettings } from './actions';
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
   try {
@@ -219,7 +218,7 @@ export async function addTransaction(
     isGstRegistered: boolean;
     gstNumber?: string;
     description?: string;
-    invoiceDataUrl?: string;
+    invoiceUrl?: string;
     invoiceFileName?: string;
     isDraft?: boolean;
   }
@@ -246,16 +245,8 @@ export async function addTransaction(
       return { success: false, error: "Phase not found." };
     }
 
-    let invoiceUrl: string | null = null;
-    if (transactionData.invoiceDataUrl && transactionData.invoiceFileName) {
-      const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
-      const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
-
-      if (!result.success || !result.url) {
-        throw new Error(result.error || "Invoice upload failed");
-      }
-      invoiceUrl = result.url;
-    }
+    // Invoice is now pre-uploaded via /api/upload, so we just use the URL directly
+    const invoiceUrl = transactionData.invoiceUrl || null;
 
     const newTransaction: Transaction = {
       id: new Date().toISOString() + Math.random(),
@@ -386,7 +377,7 @@ export async function updateTransaction(
     isGstRegistered: boolean;
     gstNumber?: string;
     description?: string;
-    invoiceDataUrl?: string; // Optional: only provided if a new file is uploaded
+    invoiceUrl?: string; // Pre-uploaded via /api/upload
     invoiceFileName?: string;
     isDraft?: boolean;
   }
@@ -424,29 +415,9 @@ export async function updateTransaction(
     }
 
     const oldTransaction = phase.transactions[transactionIndex];
-    let newInvoiceUrl = oldTransaction.invoiceUrl || null;
-
-    // Handle file update
-    if (transactionData.invoiceDataUrl && transactionData.invoiceFileName) {
-      // Delete old file if it exists
-      if (oldTransaction.invoiceUrl) {
-         try {
-            const oldUrl = new URL(oldTransaction.invoiceUrl);
-            const oldPath = decodeURIComponent(oldUrl.pathname.substring(oldUrl.pathname.indexOf('/o/') + 3));
-            await adminStorage.bucket().file(oldPath).delete();
-         } catch (e: any) {
-            if (e.code !== 404) console.warn("Could not delete old invoice file:", e.message);
-         }
-      }
-      
-      // Upload new file
-      const path = `invoices/${projectId}/${phaseId}/${new Date().toISOString()}-${transactionData.invoiceFileName}`;
-      const result = await uploadFileToServer(transactionData.invoiceDataUrl, path);
-      if (!result.success || !result.url) {
-        throw new Error(result.error || "New invoice upload failed");
-      }
-      newInvoiceUrl = result.url;
-    }
+    
+    // Use the new invoice URL if provided, otherwise keep the old one
+    const newInvoiceUrl = transactionData.invoiceUrl ?? oldTransaction.invoiceUrl ?? null;
 
     const updatedTransaction: Transaction = {
       ...oldTransaction,
