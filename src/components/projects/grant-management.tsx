@@ -477,7 +477,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       </CardHeader>
       <CardContent className="space-y-6">
         {(grant.phases || []).map((phase, index) => {
-          const totalUtilized = phase.transactions?.reduce((acc, t) => acc + (t?.amount || 0), 0) || 0;
+          const totalUtilized = phase.transactions?.reduce((acc, t) => acc + Number(t?.amount || 0), 0) || 0;
           const utilizationPercentage = phase.amount > 0 ? (totalUtilized / phase.amount) * 100 : 0;
           const hasReachedThreshold = utilizationPercentage >= 80;
           const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1));
@@ -489,7 +489,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
           const showOfficeNoteButton = (user.role === "admin" || user.role === 'Super-admin') && index > 0 && previousPhase && ['Utilization Submitted', 'Completed'].includes(previousPhase.status);
 
           return (
-            <React.Fragment key={phase.id}>
+            <React.Fragment key={`${phase.id}-${index}`}>
               <Card className="bg-muted/30">
                 <CardHeader>
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
