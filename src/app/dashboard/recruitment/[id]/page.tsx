@@ -50,7 +50,7 @@ export default function ViewApplicationsPage() {
                     router.push('/dashboard/post-a-job');
                     return;
                 }
-                const jobData = { id: jobDocSnap.id, ...docSnap.data() } as ProjectRecruitment;
+                const jobData = { id: jobDocSnap.id, ...jobDocSnap.data() } as ProjectRecruitment;
 
                 const isOwner = user.uid === jobData.postedByUid;
                 const isAdmin = user.role === 'Super-admin' || user.role === 'admin';

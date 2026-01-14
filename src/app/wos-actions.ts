@@ -170,6 +170,7 @@ export async function fetchWosDataByUrl(
    
       },
       claimantIsAuthor,
+    
     };
   } catch (err: any) {
     return {
