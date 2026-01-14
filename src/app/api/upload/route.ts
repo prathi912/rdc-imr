@@ -17,7 +17,7 @@ if (!firebaseApps.length) {
 }
 
 // Configuration
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100 MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
   "image/jpeg",
