@@ -58,7 +58,7 @@ import Link from "next/link"
 import { Badge } from "../ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
 import { uploadFileToServer } from "@/app/actions"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, isValid } from "date-fns"
 
 
 interface GrantManagementProps {
@@ -223,7 +223,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `Office_Note_Installment_${project.pi.replace(/\s+/g, '_')}.docx`;
+            a.download = `Office_Note_Installment_${project.pi.replace(/\s/g, '_')}.docx`;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -614,47 +614,49 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {phase.transactions?.map((transaction) => (
-                              <TableRow key={transaction.id} className={transaction.isDraft ? 'bg-yellow-100 dark:bg-yellow-900/20' : ''}>
-                                <TableCell>{format(parseISO(transaction.dateOfTransaction), "dd/MM/yyyy")}</TableCell>
-                                <TableCell>{transaction.vendorName}</TableCell>
-                                <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
-                                <TableCell>
-                                  {transaction.isGstRegistered ? (
-                                    <span className="text-green-600">Yes ({transaction.gstNumber})</span>
-                                  ) : (
-                                    <span className="text-muted-foreground">No</span>
-                                  )}
-                                </TableCell>
-                                <TableCell className="whitespace-pre-wrap max-w-xs">{transaction.description}</TableCell>
-                                <TableCell>
-                                  {transaction.invoiceUrl ? (
-                                    <Link
-                                      href={transaction.invoiceUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-blue-600 hover:underline"
-                                    >
-                                      View Invoice
-                                    </Link>
-                                  ) : (
-                                    <span className="text-muted-foreground">N/A</span>
-                                  )}
-                                </TableCell>
-                                {canManageExpenses && (
-                                    <TableCell className="text-right">
-                                        <div className="flex justify-end gap-1">
-                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToEdit({phaseId: phase.id, transaction})}>
-                                            <Edit className="h-4 w-4" />
-                                          </Button>
-                                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToDelete({phaseId: phase.id, transaction})}>
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                          </Button>
-                                        </div>
+                            {phase.transactions?.map((transaction) => {
+                                const date = parseISO(transaction.dateOfTransaction);
+                                return (
+                                <TableRow key={transaction.id} className={transaction.isDraft ? 'bg-yellow-100 dark:bg-yellow-900/20' : ''}>
+                                    <TableCell>{isValid(date) ? format(date, "dd/MM/yyyy") : transaction.dateOfTransaction}</TableCell>
+                                    <TableCell>{transaction.vendorName}</TableCell>
+                                    <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
+                                    <TableCell>
+                                    {transaction.isGstRegistered ? (
+                                        <span className="text-green-600">Yes ({transaction.gstNumber})</span>
+                                    ) : (
+                                        <span className="text-muted-foreground">No</span>
+                                    )}
                                     </TableCell>
-                                )}
-                              </TableRow>
-                            ))}
+                                    <TableCell className="whitespace-pre-wrap max-w-xs">{transaction.description}</TableCell>
+                                    <TableCell>
+                                    {transaction.invoiceUrl ? (
+                                        <Link
+                                        href={transaction.invoiceUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:underline"
+                                        >
+                                        View Invoice
+                                        </Link>
+                                    ) : (
+                                        <span className="text-muted-foreground">N/A</span>
+                                    )}
+                                    </TableCell>
+                                    {canManageExpenses && (
+                                        <TableCell className="text-right">
+                                            <div className="flex justify-end gap-1">
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToEdit({phaseId: phase.id, transaction})}>
+                                                <Edit className="h-4 w-4" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToDelete({phaseId: phase.id, transaction})}>
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                            </Button>
+                                            </div>
+                                        </TableCell>
+                                    )}
+                                </TableRow>
+                            )})}
                           </TableBody>
                         </Table>
                       </div>
