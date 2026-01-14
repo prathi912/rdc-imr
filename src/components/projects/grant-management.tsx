@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useForm } from "react-hook-form"
@@ -89,10 +88,11 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
   const [transactionToDelete, setTransactionToDelete] = useState<{phaseId: string, transaction: Transaction} | null>(null);
 
   const grant = project.grant
-  if (!grant) return null
+  
+  const canAddPhase = (user.role === "admin" || user.role === "Super-admin") && (project.isBulkUploaded || (grant && grant.totalAmount > 0));
 
-  const totalDisbursed = grant.phases?.reduce((acc, phase) => acc + phase.amount, 0) || 0;
-  const remainingAmount = grant.totalAmount - totalDisbursed;
+  const totalDisbursed = grant?.phases?.reduce((acc, phase) => acc + phase.amount, 0) || 0;
+  const remainingAmount = (grant?.totalAmount || 0) - totalDisbursed;
 
   const addPhaseSchema = z.object({
     installmentRefNumber: z.string().min(3, "Installment Ref. No. is required."),
@@ -130,7 +130,6 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     )
   
 
-  const canAddPhase = user.role === "admin" || user.role === "Super-admin"
   const canChangeStatus = user.role === "admin" || user.role === "Super-admin"
   const isPI = user.uid === project.pi_uid || user.email === project.pi_email
   const isCoPi = project.coPiUids?.includes(user.uid) || false;
@@ -397,6 +396,8 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     }
   };
 
+  if (!grant) return null
+
   return (
     <Card className="mt-8">
       <CardHeader>
@@ -405,7 +406,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
             <DollarSign className="h-6 w-6" />
             <CardTitle>Grant Management</CardTitle>
           </div>
-          {canAddPhase && remainingAmount > 0 && (
+          {canAddPhase && (grant.phases?.length || 0) < 5 && remainingAmount > 0 && (
             <Dialog open={isAddPhaseOpen} onOpenChange={setIsAddPhaseOpen}>
               <DialogTrigger asChild>
                 <Button>
@@ -476,7 +477,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       </CardHeader>
       <CardContent className="space-y-6">
         {(grant.phases || []).map((phase, index) => {
-          const totalUtilized = phase.transactions?.reduce((acc, t) => acc + (t.amount || 0), 0) || 0;
+          const totalUtilized = phase.transactions?.reduce((acc, t) => acc + (t?.amount || 0), 0) || 0;
           const utilizationPercentage = phase.amount > 0 ? (totalUtilized / phase.amount) * 100 : 0;
           const hasReachedThreshold = utilizationPercentage >= 80;
           const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1));
@@ -617,10 +618,11 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                           </TableHeader>
                           <TableBody>
                             {phase.transactions?.map((transaction) => {
-                                const date = parseISO(transaction.dateOfTransaction);
+                                const dateString = transaction.dateOfTransaction;
+                                const date = dateString ? parseISO(dateString) : null;
                                 return (
                                 <TableRow key={transaction.id} className={transaction.isDraft ? 'bg-yellow-100 dark:bg-yellow-900/20' : ''}>
-                                  <TableCell>{isValid(date) ? format(date, "dd/MM/yyyy") : transaction.dateOfTransaction}</TableCell>
+                                  <TableCell>{date && isValid(date) ? format(date, "dd/MM/yyyy") : dateString}</TableCell>
                                   <TableCell>{transaction.vendorName}</TableCell>
                                   <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
                                   <TableCell>
@@ -692,7 +694,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                 )}
               </CardContent>
             </Card>
-            {index < (grant.phases.length -1) && <Separator key={`${phase.id}-separator`} />}
+            {index < ((grant.phases || []).length - 1) && <Separator key={`${phase.id}-separator`} />}
             </React.Fragment>
           );
         })}
