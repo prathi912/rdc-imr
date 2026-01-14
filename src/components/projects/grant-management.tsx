@@ -1,6 +1,6 @@
 
 
-"use client"
+'use client'
 
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -59,6 +59,7 @@ import { Badge } from "../ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
 import { uploadFileToServer } from "@/app/actions"
 import { format, parseISO, isValid } from "date-fns"
+import { Separator } from "../ui/separator"
 
 
 interface GrantManagementProps {
@@ -285,7 +286,8 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
     setIsSubmitting(true);
     try {
         const invoiceFile = (values.invoice as FileList)?.[0];
-        let invoiceDataUrl, invoiceFileName;
+        let invoiceDataUrl: string | undefined;
+        let invoiceFileName: string | undefined;
         if (invoiceFile) {
             invoiceDataUrl = await fileToDataUrl(invoiceFile);
             invoiceFileName = invoiceFile.name;
@@ -487,116 +489,116 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
 
           return (
             <React.Fragment key={phase.id}>
-            <Card className="bg-muted/30">
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                  <div>
-                    <CardTitle className="text-lg">{phase.name}</CardTitle>
-                    <CardDescription className="mt-1">
-                      Amount:{" "}
-                      <span className="font-semibold text-foreground">₹{phase.amount.toLocaleString("en-IN")}</span>
-                       {phase.installmentRefNumber && ` | Ref: ${phase.installmentRefNumber}`}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={getPhaseBadgeVariant(phase.status)}>{phase.status}</Badge>
-                    {canChangeStatus && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" size="sm" disabled={isSubmitting}>
-                            Change Status <ChevronDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                          <DropdownMenuItem
-                            onClick={() => handlePhaseStatusUpdate(phase.id, "Pending Disbursement")}
-                            disabled={phase.status === "Pending Disbursement"}
-                          >
-                            Pending Disbursement
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handlePhaseStatusUpdate(phase.id, "Disbursed")}
-                            disabled={phase.status === "Disbursed"}
-                          >
-                            Disbursed
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handlePhaseStatusUpdate(phase.id, "Completed")}
-                            disabled={phase.status === "Completed"}
-                          >
-                            Completed
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                    {showOfficeNoteButton && (
+              <Card className="bg-muted/30">
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-lg">{phase.name}</CardTitle>
+                      <CardDescription className="mt-1">
+                        Amount:{" "}
+                        <span className="font-semibold text-foreground">₹{phase.amount.toLocaleString("en-IN")}</span>
+                        {phase.installmentRefNumber && ` | Ref: ${phase.installmentRefNumber}`}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={getPhaseBadgeVariant(phase.status)}>{phase.status}</Badge>
+                      {canChangeStatus && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" disabled={isSubmitting}>
+                              Change Status <ChevronDown className="ml-2 h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem
+                              onClick={() => handlePhaseStatusUpdate(phase.id, "Pending Disbursement")}
+                              disabled={phase.status === "Pending Disbursement"}
+                            >
+                              Pending Disbursement
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handlePhaseStatusUpdate(phase.id, "Disbursed")}
+                              disabled={phase.status === "Disbursed"}
+                            >
+                              Disbursed
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handlePhaseStatusUpdate(phase.id, "Completed")}
+                              disabled={phase.status === "Completed"}
+                            >
+                              Completed
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                      {showOfficeNoteButton && (
                         <Button variant="outline" size="sm" onClick={() => setPhaseForNoting(phase)}>
-                            <Download className="mr-2 h-4 w-4" /> Office Note
+                          <Download className="mr-2 h-4 w-4" /> Office Note
                         </Button>
-                    )}
-                  </div>
-                </div>
-                {phase.disbursementDate && (
-                  <p className="text-sm text-muted-foreground">
-                    Disbursed on: {format(parseISO(phase.disbursementDate), "dd/MM/yyyy")}
-                  </p>
-                )}
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                  <div className="flex items-center gap-2">
-                    <Banknote className="h-4 w-4 text-green-600" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Allocated</p>
-                      <p className="font-semibold">₹{phase.amount.toLocaleString("en-IN")}</p>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <BadgeCent className="h-4 w-4 text-blue-600" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Utilized ({utilizationPercentage.toFixed(2)}%)</p>
-                      <p className="font-semibold">₹{totalUtilized.toLocaleString("en-IN")}</p>
+                  {phase.disbursementDate && (
+                    <p className="text-sm text-muted-foreground">
+                      Disbursed on: {format(parseISO(phase.disbursementDate), "dd/MM/yyyy")}
+                    </p>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Allocated</p>
+                        <p className="font-semibold">₹{phase.amount.toLocaleString("en-IN")}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <BadgeCent className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Utilized ({utilizationPercentage.toFixed(2)}%)</p>
+                        <p className="font-semibold">₹{totalUtilized.toLocaleString("en-IN")}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-orange-600" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Remaining</p>
+                        <p className="font-semibold">₹{(phase.amount - totalUtilized).toLocaleString("en-IN")}</p>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-orange-600" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Remaining</p>
-                      <p className="font-semibold">₹{(phase.amount - totalUtilized).toLocaleString("en-IN")}</p>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="space-y-4">
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <h4 className="font-semibold flex items-center gap-2">
+                      <h4 className="font-semibold flex items-center gap-2">
                         <FileText className="h-4 w-4" />
                         Transactions ({phase.transactions?.length || 0})
-                        </h4>
-                         <div className="flex items-center gap-2">
-                            {canManageExpenses && (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setCurrentPhaseId(phase.id)
-                                  setIsTransactionOpen(true)
-                                }}
-                              >
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Add Expense
-                              </Button>
-                            )}
-                            {(phase.transactions?.length || 0) > 0 && (
-                                <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleExportTransactions(phase)}
-                                >
-                                <Download className="mr-2 h-4 w-4" />
-                                Export
-                                </Button>
-                            )}
-                        </div>
+                      </h4>
+                      <div className="flex items-center gap-2">
+                        {canManageExpenses && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setCurrentPhaseId(phase.id)
+                              setIsTransactionOpen(true)
+                            }}
+                          >
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add Expense
+                          </Button>
+                        )}
+                        {(phase.transactions?.length || 0) > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleExportTransactions(phase)}
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Export
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     
                     {(phase.transactions?.length || 0) > 0 ? (
@@ -618,43 +620,43 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                                 const date = parseISO(transaction.dateOfTransaction);
                                 return (
                                 <TableRow key={transaction.id} className={transaction.isDraft ? 'bg-yellow-100 dark:bg-yellow-900/20' : ''}>
-                                    <TableCell>{isValid(date) ? format(date, "dd/MM/yyyy") : transaction.dateOfTransaction}</TableCell>
-                                    <TableCell>{transaction.vendorName}</TableCell>
-                                    <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
-                                    <TableCell>
+                                  <TableCell>{isValid(date) ? format(date, "dd/MM/yyyy") : transaction.dateOfTransaction}</TableCell>
+                                  <TableCell>{transaction.vendorName}</TableCell>
+                                  <TableCell>₹{transaction.amount.toLocaleString("en-IN")}</TableCell>
+                                  <TableCell>
                                     {transaction.isGstRegistered ? (
-                                        <span className="text-green-600">Yes ({transaction.gstNumber})</span>
+                                      <span className="text-green-600">Yes ({transaction.gstNumber})</span>
                                     ) : (
-                                        <span className="text-muted-foreground">No</span>
+                                      <span className="text-muted-foreground">No</span>
                                     )}
-                                    </TableCell>
-                                    <TableCell className="whitespace-pre-wrap max-w-xs">{transaction.description}</TableCell>
-                                    <TableCell>
+                                  </TableCell>
+                                  <TableCell className="whitespace-pre-wrap max-w-xs">{transaction.description}</TableCell>
+                                  <TableCell>
                                     {transaction.invoiceUrl ? (
-                                        <Link
+                                      <Link
                                         href={transaction.invoiceUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-blue-600 hover:underline"
-                                        >
+                                      >
                                         View Invoice
-                                        </Link>
+                                      </Link>
                                     ) : (
-                                        <span className="text-muted-foreground">N/A</span>
+                                      <span className="text-muted-foreground">N/A</span>
                                     )}
+                                  </TableCell>
+                                  {canManageExpenses && (
+                                    <TableCell className="text-right">
+                                      <div className="flex justify-end gap-1">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToEdit({phaseId: phase.id, transaction})}>
+                                          <Edit className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToDelete({phaseId: phase.id, transaction})}>
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
                                     </TableCell>
-                                    {canManageExpenses && (
-                                        <TableCell className="text-right">
-                                            <div className="flex justify-end gap-1">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToEdit({phaseId: phase.id, transaction})}>
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setTransactionToDelete({phaseId: phase.id, transaction})}>
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
-                                            </div>
-                                        </TableCell>
-                                    )}
+                                  )}
                                 </TableRow>
                             )})}
                           </TableBody>
@@ -690,6 +692,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
                 )}
               </CardContent>
             </Card>
+            {index < (grant.phases.length -1) && <Separator key={`${phase.id}-separator`} />}
             </React.Fragment>
           );
         })}
