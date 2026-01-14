@@ -1,6 +1,6 @@
 
 
-'use client'
+'use client';
 
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -476,7 +476,7 @@ export function GrantManagement({ project, user, onUpdate }: GrantManagementProp
       </CardHeader>
       <CardContent className="space-y-6">
         {(grant.phases || []).map((phase, index) => {
-          const totalUtilized = phase.transactions?.reduce((acc, t) => acc + t.amount, 0) || 0
+          const totalUtilized = phase.transactions?.reduce((acc, t) => acc + (t.amount || 0), 0) || 0;
           const utilizationPercentage = phase.amount > 0 ? (totalUtilized / phase.amount) * 100 : 0;
           const hasReachedThreshold = utilizationPercentage >= 80;
           const hasRemainingGrant = remainingAmount > 0 || (index < (grant.phases.length - 1));
