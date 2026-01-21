@@ -31,8 +31,6 @@ import Docxtemplater from "docxtemplater"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
 import { generateSanctionOrder } from "./document-actions"
 import { put } from '@vercel/blob';
-import { google } from 'googleapis';
-import { Readable } from 'stream';
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -60,6 +58,9 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
 // --- Google Drive Upload Logic ---
 async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string, filePath: string): Promise<{ success: boolean; url?: string; error?: string }> {
     try {
+        const { google } = await import('googleapis');
+        const { Readable } = await import('stream');
+
         const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
         const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
@@ -2274,3 +2275,5 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
+
+    
