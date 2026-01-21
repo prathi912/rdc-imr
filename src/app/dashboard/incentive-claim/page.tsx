@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -456,20 +457,6 @@ export default function IncentiveClaimPage() {
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   }, [searchParams, pathname, router]);
 
-  useEffect(() => {
-    const currentTab = searchParams.get('tab');
-    if (currentTab) {
-      setActiveTab(currentTab);
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    if (activeTab) {
-      updateUrl(activeTab);
-    }
-  }, [activeTab, updateUrl]);
-
-
   const fetchAllData = useCallback(async (uid: string) => {
       setLoading(true);
       try {
@@ -510,14 +497,28 @@ export default function IncentiveClaimPage() {
           const settings = await getSystemSettings();
           setSystemSettings(settings);
 
-      } catch (error) {
+      } catch (error: any) {
           console.error("Error fetching data:", error);
-          toast({ variant: 'destructive', title: "Error", description: "Could not fetch your data." });
+          toast({ variant: 'destructive', title: "Error", description: "Could not fetch your data: " + error.message });
       } finally {
           setLoading(false);
       }
-  }, [toast]);
-  
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const currentTab = searchParams.get('tab');
+    if (currentTab) {
+      setActiveTab(currentTab);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab) {
+      updateUrl(activeTab);
+    }
+  }, [activeTab, updateUrl]);
+
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
@@ -703,6 +704,7 @@ export default function IncentiveClaimPage() {
         onOpenChange={setIsDetailsOpen}
         currentUser={user}
         claimant={user} // On this page, the claimant is always the current user
+        onTakeAction={undefined}
     />
      <AlertDialog open={!!claimToDelete} onOpenChange={() => setClaimToDelete(null)}>
         <AlertDialogContent>
@@ -722,3 +724,4 @@ export default function IncentiveClaimPage() {
     </>
   );
 }
+
