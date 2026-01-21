@@ -542,6 +542,7 @@ export type SystemSettings = {
   dndEmail?: string;
   templateUrls?: TemplateUrls;
   apiIntegrations?: ApiIntegrations;
+  driveParentFolderId?: string;
 }
 
 export type LoginOtp = {

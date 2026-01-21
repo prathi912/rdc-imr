@@ -78,34 +78,47 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string,
 
         const drive = google.drive({ version: 'v3', auth });
 
-        // 1. Find or create the main folder
+        // --- Find or create the main folder ---
         let parentFolderId: string | undefined;
         const mainFolderName = 'R&D Portal Incentive Proofs';
         
-        const folderRes = await drive.files.list({
-            q: `mimeType='application/vnd.google-apps.folder' and name='${mainFolderName}' and trashed=false`,
-            fields: 'files(id)',
-        });
+        // 1. Check Firestore for the stored folder ID
+        const settings = await getSystemSettings();
+        parentFolderId = settings.driveParentFolderId;
 
-        if (folderRes.data.files && folderRes.data.files.length > 0) {
-            parentFolderId = folderRes.data.files[0].id!;
-        } else {
-            const fileMetadata = {
-                name: mainFolderName,
-                mimeType: 'application/vnd.google-apps.folder',
-            };
-            const newFolder = await drive.files.create({
-                resource: fileMetadata,
-                fields: 'id',
+        // 2. If not in Firestore, search or create on Drive
+        if (!parentFolderId) {
+            const folderRes = await drive.files.list({
+                q: `mimeType='application/vnd.google-apps.folder' and name='${mainFolderName}' and trashed=false`,
+                fields: 'files(id, name)',
+                spaces: 'drive',
             });
-            parentFolderId = newFolder.data.id!;
+
+            if (folderRes.data.files && folderRes.data.files.length > 0) {
+                parentFolderId = folderRes.data.files[0].id!;
+            } else {
+                const fileMetadata = {
+                    name: mainFolderName,
+                    mimeType: 'application/vnd.google-apps.folder',
+                };
+                const newFolder = await drive.files.create({
+                    resource: fileMetadata,
+                    fields: 'id',
+                });
+                parentFolderId = newFolder.data.id!;
+            }
+            
+            // 3. If we found or created it, save the ID to Firestore for next time
+            if (parentFolderId) {
+                await updateSystemSettings({ ...settings, driveParentFolderId: parentFolderId });
+            }
         }
         
         if (!parentFolderId) {
             throw new Error("Could not find or create the parent folder in Google Drive.");
         }
 
-        // 2. Upload the file
+        // 4. Upload the file
         const fileMetadata = {
             name: fileName,
             parents: [parentFolderId],
@@ -126,7 +139,7 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string,
             throw new Error("File upload to Google Drive failed, no file ID returned.");
         }
 
-        // 3. Make the file publicly readable
+        // 5. Make the file publicly readable
         await drive.permissions.create({
             fileId: fileId,
             resource: {
@@ -145,8 +158,7 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string,
     } catch (error: any) {
         console.error("Google Drive upload error:", error);
         await logActivity('ERROR', 'Google Drive upload failed', { path: filePath, error: error.message });
-        // Fallback to Firebase Storage on Drive failure
-        return { success: false, error: `Google Drive upload failed: ${error.message}. Falling back to default storage.` };
+        return { success: false, error: `Google Drive upload failed: ${error.message}.` };
     }
 }
 
@@ -1048,7 +1060,9 @@ export async function uploadFileToServer(
             return driveResult;
         }
         // If Drive upload fails, log it and fall through to the default (Firebase) method.
-        console.warn(`Google Drive upload failed. Falling back to default storage for ${path}. Error: ${driveResult.error}`);
+        const errorMessage = `Google Drive upload failed. Falling back to default storage for ${path}. Error: ${driveResult.error}`;
+        console.warn(errorMessage);
+        await logActivity("WARNING", "Google Drive upload failed; falling back to default storage", { path, driveError: driveResult.error });
     }
 
     // Try Firebase first
@@ -2275,5 +2289,3 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
-
-    
