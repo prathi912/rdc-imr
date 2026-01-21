@@ -31,6 +31,8 @@ import Docxtemplater from "docxtemplater"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
 import { generateSanctionOrder } from "./document-actions"
 import { put } from '@vercel/blob';
+import { google } from 'googleapis';
+import { Readable } from 'stream';
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -54,6 +56,99 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
     console.error("Original Log Entry:", { level, message, context })
   }
 }
+
+// --- Google Drive Upload Logic ---
+async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string, filePath: string): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+        const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+        if (!clientEmail || !privateKey) {
+            throw new Error('Google Drive API credentials are not configured on the server.');
+        }
+
+        const auth = new google.auth.GoogleAuth({
+            credentials: {
+                client_email: clientEmail,
+                private_key: privateKey,
+            },
+            scopes: ['https://www.googleapis.com/auth/drive.file'],
+        });
+
+        const drive = google.drive({ version: 'v3', auth });
+
+        // 1. Find or create the main folder
+        let parentFolderId: string | undefined;
+        const mainFolderName = 'R&D Portal Incentive Proofs';
+        
+        const folderRes = await drive.files.list({
+            q: `mimeType='application/vnd.google-apps.folder' and name='${mainFolderName}' and trashed=false`,
+            fields: 'files(id)',
+        });
+
+        if (folderRes.data.files && folderRes.data.files.length > 0) {
+            parentFolderId = folderRes.data.files[0].id!;
+        } else {
+            const fileMetadata = {
+                name: mainFolderName,
+                mimeType: 'application/vnd.google-apps.folder',
+            };
+            const newFolder = await drive.files.create({
+                resource: fileMetadata,
+                fields: 'id',
+            });
+            parentFolderId = newFolder.data.id!;
+        }
+        
+        if (!parentFolderId) {
+            throw new Error("Could not find or create the parent folder in Google Drive.");
+        }
+
+        // 2. Upload the file
+        const fileMetadata = {
+            name: fileName,
+            parents: [parentFolderId],
+        };
+        const media = {
+            mimeType: mimeType,
+            body: Readable.from(buffer),
+        };
+
+        const file = await drive.files.create({
+            resource: fileMetadata,
+            media: media,
+            fields: 'id, webViewLink',
+        });
+        
+        const fileId = file.data.id;
+        if (!fileId) {
+            throw new Error("File upload to Google Drive failed, no file ID returned.");
+        }
+
+        // 3. Make the file publicly readable
+        await drive.permissions.create({
+            fileId: fileId,
+            resource: {
+                role: 'reader',
+                type: 'anyone',
+            },
+        });
+        
+        const webViewLink = file.data.webViewLink;
+
+        if (!webViewLink) {
+            throw new Error("Could not retrieve a shareable link for the uploaded file.");
+        }
+
+        return { success: true, url: webViewLink };
+    } catch (error: any) {
+        console.error("Google Drive upload error:", error);
+        await logActivity('ERROR', 'Google Drive upload failed', { path: filePath, error: error.message });
+        // Fallback to Firebase Storage on Drive failure
+        return { success: false, error: `Google Drive upload failed: ${error.message}. Falling back to default storage.` };
+    }
+}
+
 
 export { awardInitialGrant, addGrantPhase, updatePhaseStatus, generateSanctionOrder };
 
@@ -941,12 +1036,25 @@ export async function uploadFileToServer(
         throw new Error("Invalid data URL format.");
     }
     const buffer = Buffer.from(match[2], 'base64');
-    
+    const mimeType = match[1];
+    const fileName = path.split('/').pop() || 'uploaded-file';
+
+    // If the path is for an incentive proof, use Google Drive
+    if (path.startsWith('incentive-proofs/')) {
+        console.log(`Uploading incentive proof to Google Drive: ${fileName}`);
+        const driveResult = await uploadToDrive(buffer, fileName, mimeType, path);
+        if (driveResult.success) {
+            return driveResult;
+        }
+        // If Drive upload fails, log it and fall through to the default (Firebase) method.
+        console.warn(`Google Drive upload failed. Falling back to default storage for ${path}. Error: ${driveResult.error}`);
+    }
+
     // Try Firebase first
     try {
         const bucket = adminStorage.bucket();
         const file = bucket.file(path);
-        await file.save(buffer, { metadata: { contentType: match[1] } });
+        await file.save(buffer, { metadata: { contentType: mimeType } });
         await file.makePublic();
         const publicUrl = file.publicUrl();
         console.log(`File uploaded to Firebase Storage at ${path}`);
@@ -959,7 +1067,7 @@ export async function uploadFileToServer(
         try {
             const blob = await put(path, buffer, {
                 access: 'public',
-                contentType: match[1],
+                contentType: mimeType,
                 token: process.env.RDC_READ_WRITE_TOKEN,
             });
             console.log(`File uploaded to Vercel Blob: ${blob.url}`);
@@ -1746,13 +1854,13 @@ export async function generateOfficeNotingForm(
 
     const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true })
 
-    const coPiData: { [key: string]: string } = {}
+    const coPiData: { [key: string]: string } = {};
     const coPiNames = project.coPiDetails?.map((c) => c.name) || []
     for (let i = 0; i < 4; i++) {
       coPiData[`co-pi${i + 1}`] = coPiNames[i] || "N/A"
     }
 
-    const phaseData: { [key: string]: string } = {}
+    const phaseData: { [key: string]: string } = {};
     let totalAmount = 0
     for (let i = 0; i < 4; i++) {
       if (formData.phases[i]) {
@@ -2166,5 +2274,3 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
-
-    
