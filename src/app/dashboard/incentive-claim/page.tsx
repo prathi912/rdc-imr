@@ -451,12 +451,6 @@ export default function IncentiveClaimPage() {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'apply');
   const isMobile = useIsMobile();
 
-  const updateUrl = useCallback((tab: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', tab);
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-  }, [searchParams, pathname, router]);
-
   const fetchAllData = useCallback(async (uid: string) => {
       setLoading(true);
       try {
@@ -514,10 +508,14 @@ export default function IncentiveClaimPage() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (activeTab) {
-      updateUrl(activeTab);
+    const currentTabInUrl = searchParams.get('tab');
+    if (activeTab && activeTab !== currentTabInUrl) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('tab', activeTab);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     }
-  }, [activeTab, updateUrl]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -724,4 +722,3 @@ export default function IncentiveClaimPage() {
     </>
   );
 }
-
