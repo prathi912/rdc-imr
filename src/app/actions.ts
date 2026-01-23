@@ -21,16 +21,11 @@ import type {
   Author,
 } from "@/types"
 import { sendEmail as sendEmailUtility } from "@/lib/email"
-import fs from "fs"
-import path from "path"
 import { addDays, setHours, setMinutes, setSeconds, isToday, format, parseISO, addHours } from "date-fns"
 import { formatInTimeZone, toDate } from "date-fns-tz"
 import type * as z from "zod"
-import PizZip from "pizzip"
-import Docxtemplater from "docxtemplater"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
 import { generateSanctionOrder } from "./document-actions"
-import { put } from '@vercel/blob';
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -995,7 +990,7 @@ export async function scheduleMeeting(
                       <p><strong style="color: #ffffff;">
                         ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
                       </strong> 
-                        ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
+                        ${meetingDetails.mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : meetingDetails.venue}
                       </p>
                       <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
                       <ul style="list-style-type: none; padding-left: 0;">
@@ -1041,6 +1036,8 @@ export async function uploadFileToServer(
   path: string,
 ): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
+    const { put } = await import('@vercel/blob');
+
     if (!fileDataUrl || typeof fileDataUrl !== "string") {
       throw new Error("Invalid file data URL provided.");
     }
@@ -1839,6 +1836,11 @@ export async function generateOfficeNotingForm(
   },
 ): Promise<{ success: boolean; fileData?: string; error?: string }> {
   try {
+    const PizZip = (await import("pizzip")).default;
+    const Docxtemplater = (await import("docxtemplater")).default;
+    const fs = (await import("fs")).default;
+    const path = (await import("path")).default;
+
     const projectRef = adminDb.collection("projects").doc(projectId)
     const projectSnap = await projectRef.get()
     if (!projectSnap.exists) {
