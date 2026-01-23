@@ -1118,7 +1118,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                   </DropdownMenu>
                 </TooltipProvider>
               )}
-              {isPI && project.status === "Revision Needed" && (
+              {(isPI || isSuperAdmin) && project.status === "Revision Needed" && (
                 <Dialog open={isRevisionDialogOpen} onOpenChange={setIsRevisionDialogOpen}>
                   <DialogTrigger asChild>
                     <Button variant="outline">
@@ -1129,7 +1129,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     <DialogHeader>
                       <DialogTitle>Submit Revised Proposal</DialogTitle>
                       <DialogDescription>
-                        Upload your revised proposal based on the feedback from the IMR evaluation meeting.
+                        {isSuperAdmin && !isPI
+                            ? "As an admin, you are uploading a revised proposal on behalf of the PI."
+                            : "Upload your revised proposal based on the feedback from the IMR evaluation meeting."}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -1765,3 +1767,4 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
+
