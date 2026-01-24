@@ -47,7 +47,7 @@ const nextConfig: NextConfig = {
       dirs: ['./src/templates'],
     },
     serverActions: {
-      bodySizeLimit: '5mb',
+      bodySizeLimit: '10mb',
     },
   },
 };
