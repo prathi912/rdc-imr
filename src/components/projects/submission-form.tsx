@@ -19,7 +19,8 @@ import type { User, Project, CoPiDetails } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDocs, query, where } from 'firebase/firestore';
-import { uploadFileToServer, saveProjectSubmission } from '@/app/actions';
+import { saveProjectSubmission } from '@/app/actions';
+import { uploadFileToApi } from '@/lib/upload-client';
 import { findUserByMisId } from '@/app/userfinding';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import Link from 'next/link';
@@ -64,14 +65,6 @@ const sdgGoalsList = [
   "Goal 17: Partnerships for the Goals",
 ];
 
-const fileToDataUrl = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = error => reject(error);
-    reader.readAsDataURL(file);
-  });
-};
 
 export function SubmissionForm({ project }: SubmissionFormProps) {
   const [currentStep, setCurrentStep] = useState(1);
@@ -242,7 +235,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     if (!file) {
       if (email) {
         const newCvFiles = { ...coPiCvFiles };
-        delete newCvFiles[email];
+        delete newCvFiles[emailToRemove];
         setCoPiCvFiles(newCvFiles);
       } else {
         setPiCvFile(null);
@@ -317,11 +310,9 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
 
     try {
       let projectId = project?.id || doc(collection(db, 'projects')).id;
-
-      const uploadFile = async (file: File, folder: string): Promise<string> => {
-        const dataUrl = await fileToDataUrl(file);
-        const path = `projects/${projectId}/${folder}/${file.name}`;
-        const result = await uploadFileToServer(dataUrl, path);
+      
+      const uploadFile = async (file: File): Promise<string> => {
+        const result = await uploadFileToApi(file);
         if (result.success && result.url) return result.url;
         throw new Error(result.error || `Failed to upload ${file.name}`);
       };
@@ -329,7 +320,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
       // Upload PI CV
       let piCvUrl = project?.piCvUrl;
       if (piCvFile) {
-        piCvUrl = await uploadFile(piCvFile, `pi-cv`);
+        piCvUrl = await uploadFile(piCvFile);
         setProgress(15);
       }
 
@@ -343,7 +334,7 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
         
         if (cvFile) {
           try {
-            const cvUrl = await uploadFile(cvFile, `copi-cvs/${coPi.email.replace('@', '_at_')}`);
+            const cvUrl = await uploadFile(cvFile);
             updatedCoPiList[i] = {
               ...coPi,
               cvUrl,
@@ -366,13 +357,13 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
 
       let proposalUrl = project?.proposalUrl;
       if (data.proposalUpload?.[0]) {
-        proposalUrl = await uploadFile(data.proposalUpload[0], 'proposal');
+        proposalUrl = await uploadFile(data.proposalUpload[0]);
         setProgress(70);
       }
 
       let ethicsUrl = project?.ethicsUrl;
       if (data.ethicsUpload?.[0]) {
-        ethicsUrl = await uploadFile(data.ethicsUpload[0], 'ethics');
+        ethicsUrl = await uploadFile(data.ethicsUpload[0]);
         setProgress(90);
       }
       
@@ -697,3 +688,5 @@ export function SubmissionForm({ project }: SubmissionFormProps) {
     </Card>
   );
 }
+
+    
