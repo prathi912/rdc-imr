@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -177,6 +176,7 @@ export default function ScheduleMeetingPage() {
   const [activeTab, setActiveTab] = useState('new-submissions');
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
+  const [midTermSearchTerm, setMidTermSearchTerm] = useState('');
 
   const form = useForm<z.infer<typeof scheduleSchema>>({
     resolver: zodResolver(scheduleSchema),
@@ -287,8 +287,16 @@ export default function ScheduleMeetingPage() {
     return isAfter(thresholdDate, parseISO(grantStartDate));
   });
 
+  const filteredMidTermProjects = useMemo(() => {
+    if (!midTermSearchTerm) return midTermReviewProjects;
+    const lowerCaseSearch = midTermSearchTerm.toLowerCase();
+    return midTermReviewProjects.filter(p => 
+        p.title.toLowerCase().includes(lowerCaseSearch) ||
+        p.pi.toLowerCase().includes(lowerCaseSearch)
+    );
+  }, [midTermReviewProjects, midTermSearchTerm]);
 
-  const projectsForCurrentTab = activeTab === 'new-submissions' ? newSubmissions : midTermReviewProjects;
+  const projectsForCurrentTab = activeTab === 'new-submissions' ? newSubmissions : filteredMidTermProjects;
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -392,9 +400,15 @@ export default function ScheduleMeetingPage() {
                             dateColumnHeader="Submission Date"
                         />
                     </TabsContent>
-                    <TabsContent value="mid-term-review" className="mt-4">
+                    <TabsContent value="mid-term-review" className="mt-4 space-y-4">
+                         <Input
+                            placeholder="Search by title or PI..."
+                            value={midTermSearchTerm}
+                            onChange={e => setMidTermSearchTerm(e.target.value)}
+                            className="max-w-sm"
+                         />
                          <ProjectListTable
-                            projects={midTermReviewProjects}
+                            projects={filteredMidTermProjects}
                             selectedProjects={selectedProjects}
                             onSelectAll={handleSelectAll}
                             onSelectOne={handleSelectOne}
@@ -510,3 +524,5 @@ export default function ScheduleMeetingPage() {
     </div>
   );
 }
+
+    
