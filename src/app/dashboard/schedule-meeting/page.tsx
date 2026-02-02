@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -64,6 +65,7 @@ function ProjectListTable({
     onSelectAll, 
     onSelectOne,
     usersMap,
+    usersByEmailMap,
     title,
     description,
     dateColumnHeader
@@ -73,6 +75,7 @@ function ProjectListTable({
     onSelectAll: (checked: boolean) => void,
     onSelectOne: (id: string, checked: boolean) => void,
     usersMap: Map<string, User>,
+    usersByEmailMap: Map<string, User>,
     title: string,
     description: string,
     dateColumnHeader: string
@@ -102,7 +105,7 @@ function ProjectListTable({
                         </TableHeader>
                         <TableBody>
                             {projects.map(project => {
-                                const piUser = usersMap.get(project.pi_uid);
+                                const piUser = usersMap.get(project.pi_uid) || (project.pi_email ? usersByEmailMap.get(project.pi_email.toLowerCase()) : undefined);
                                 const profileLink = piUser?.campus === 'Goa' ? `/goa/${piUser.misId}` : `/profile/${piUser?.misId}`;
                                 
                                 let displayDate;
@@ -139,7 +142,7 @@ function ProjectListTable({
                                     <TableCell>
                                         <div>
                                             {piUser?.misId ? (
-                                                <Link href={profileLink} target="_blank" className="text-primary hover:underline">
+                                                <Link href={profileLink} target="_blank" className="text-primary hover:underline" rel="noopener noreferrer">
                                                     {project.pi}
                                                 </Link>
                                             ) : (
@@ -355,7 +358,9 @@ export default function ScheduleMeetingPage() {
     }
   };
   
-  const usersMap = new Map(allUsers.map(u => [u.uid, u]));
+  const usersMap = useMemo(() => new Map(allUsers.map(u => [u.uid, u])), [allUsers]);
+  const usersByEmailMap = useMemo(() => new Map(allUsers.map(u => [u.email.toLowerCase(), u])), [allUsers]);
+
 
   if (loading || !user) {
     return (
@@ -395,6 +400,7 @@ export default function ScheduleMeetingPage() {
                             onSelectAll={handleSelectAll}
                             onSelectOne={handleSelectOne}
                             usersMap={usersMap}
+                            usersByEmailMap={usersByEmailMap}
                             title="Projects Awaiting Meeting"
                             description="Select new submissions to schedule for their initial evaluation meeting."
                             dateColumnHeader="Submission Date"
@@ -413,6 +419,7 @@ export default function ScheduleMeetingPage() {
                             onSelectAll={handleSelectAll}
                             onSelectOne={handleSelectOne}
                             usersMap={usersMap}
+                            usersByEmailMap={usersByEmailMap}
                             title="Projects Due for Mid-term Review"
                             description={`These projects were funded at least ${systemSettings?.imrMidTermReviewMonths ?? 6} months ago and are due for a progress review.`}
                             dateColumnHeader="Last Disbursement Date"
@@ -525,4 +532,3 @@ export default function ScheduleMeetingPage() {
   );
 }
 
-    
