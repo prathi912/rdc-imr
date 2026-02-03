@@ -101,12 +101,16 @@ service cloud.firestore {
     }
     
     match /emrInterests/{interestId} {
-        // Users can create/delete their own interest registrations.
-        // Admins can delete any registration.
-        allow create, delete: if isSignedIn() && (isOwner(request.resource.data.userId) || isAdmin());
+        // Users can create their own interest registrations. Admins can create on behalf of users.
+        allow create: if isSignedIn() && (isOwner(request.resource.data.userId) || isAdmin());
+        
+        // Users can delete their own interest registrations. Admins can delete any registration.
+        allow delete: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+
         // Users can update their own registrations (e.g., upload PPT).
         // Admins can update any registration (e.g., set status).
         allow update: if isSignedIn() && (isOwner(resource.data.userId) || isAdmin());
+        
         // All signed-in users can read EMR interests.
         allow read: if isSignedIn();
         

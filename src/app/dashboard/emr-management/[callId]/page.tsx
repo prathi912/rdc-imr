@@ -10,6 +10,7 @@ import { PageHeader } from '@/components/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EmrManagementClient } from '@/components/emr/emr-management-client';
 import { format, parseISO } from 'date-fns';
+import { Popover } from '@/components/ui/popover'; // Fix: Added Popover import
 
 export default function EmrManagementPage() {
     const params = useParams();
