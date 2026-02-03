@@ -58,6 +58,9 @@ import { Checkbox } from '../ui/checkbox';
 import { findUserByMisId } from '@/app/userfinding';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { format, parseISO } from 'date-fns';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 
 
 interface EmrManagementClientProps {
@@ -918,7 +921,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                     user={userMap.get(interestForPptUpload.userId)!}
                     adminUser={currentUser}
                     onUploadSuccess={onActionComplete}
-                    isRevision={!!interestForPptUpload.pptUrl}
+                    isRevision={!!interestForPptUpload.revisedPptUrl}
                 />
             )}
         </Card>
