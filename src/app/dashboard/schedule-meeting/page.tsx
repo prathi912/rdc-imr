@@ -169,6 +169,71 @@ function ProjectListTable({
     );
 }
 
+function HistoryTable({ projects, usersMap }: { projects: Project[], usersMap: Map<string, User> }) {
+    const sortedProjects = [...projects].sort((a, b) => {
+        const dateA = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
+        const dateB = b.meetingDetails?.date ? parseISO(b.meetingDetails.date).getTime() : 0;
+        return dateB - dateA;
+    });
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Scheduled Meetings History</CardTitle>
+                <CardDescription>A log of all past and future scheduled IMR meetings.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 {sortedProjects.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Project Title</TableHead>
+                                <TableHead>PI</TableHead>
+                                <TableHead>Meeting Date & Time</TableHead>
+                                <TableHead>Venue / Mode</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedProjects.map(project => {
+                                const piUser = usersMap.get(project.pi_uid);
+                                const profileLink = piUser?.campus === 'Goa' ? `/goa/${piUser.misId}` : `/profile/${piUser?.misId}`;
+
+                                return (
+                                    <TableRow key={project.id}>
+                                        <TableCell>
+                                            <Link href={`/dashboard/project/${project.id}`} className="hover:underline text-primary" target="_blank">
+                                                {project.title}
+                                            </Link>
+                                        </TableCell>
+                                        <TableCell>
+                                            {piUser?.misId ? (
+                                                <Link href={profileLink} target="_blank" className="text-primary hover:underline" rel="noopener noreferrer">
+                                                    {project.pi}
+                                                </Link>
+                                            ) : project.pi}
+                                        </TableCell>
+                                        <TableCell>
+                                            {project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'PPP') : 'N/A'}
+                                            {' @ '}{project.meetingDetails?.time || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {project.meetingDetails?.venue} ({project.meetingDetails?.mode})
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="text-center py-10 text-muted-foreground">
+                        <p>No meetings have been scheduled yet.</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function ScheduleMeetingPage() {
   const [allProjects, setAllProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -237,12 +302,7 @@ export default function ScheduleMeetingPage() {
       const settings = await getSystemSettings();
       setSystemSettings(settings);
 
-      const projectsQuery = query(
-        collection(db, 'projects'),
-        where('status', 'in', ['Submitted', 'In Progress', 'Sanctioned', 'SANCTIONED']),
-        orderBy('submissionDate', 'desc')
-      );
-      
+      const projectsQuery = query(collection(db, 'projects'), orderBy('submissionDate', 'desc'));
       const usersQuery = query(collection(db, 'users'));
 
       const [projectsSnapshot, usersSnapshot] = await Promise.all([
@@ -298,6 +358,8 @@ export default function ScheduleMeetingPage() {
         p.pi.toLowerCase().includes(lowerCaseSearch)
     );
   }, [midTermReviewProjects, midTermSearchTerm]);
+  
+  const scheduledMeetingsHistory = allProjects.filter(p => p.meetingDetails && ['Under Review', 'Recommended', 'Not Recommended', 'Completed', 'In Progress', 'Pending Completion Approval', 'Sanctioned', 'SANCTIONED'].includes(p.status));
 
   const projectsForCurrentTab = activeTab === 'new-submissions' ? newSubmissions : filteredMidTermProjects;
 
@@ -389,9 +451,10 @@ export default function ScheduleMeetingPage() {
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="new-submissions">New Submissions ({newSubmissions.length})</TabsTrigger>
                         <TabsTrigger value="mid-term-review">Mid-term Review ({midTermReviewProjects.length})</TabsTrigger>
+                        <TabsTrigger value="history">History ({scheduledMeetingsHistory.length})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="new-submissions" className="mt-4">
                         <ProjectListTable
@@ -424,6 +487,9 @@ export default function ScheduleMeetingPage() {
                             description={`These projects were funded at least ${systemSettings?.imrMidTermReviewMonths ?? 6} months ago and are due for a progress review.`}
                             dateColumnHeader="Last Disbursement Date"
                         />
+                    </TabsContent>
+                    <TabsContent value="history" className="mt-4">
+                        <HistoryTable projects={scheduledMeetingsHistory} usersMap={usersMap} />
                     </TabsContent>
                 </Tabs>
             </div>
@@ -531,4 +597,3 @@ export default function ScheduleMeetingPage() {
     </div>
   );
 }
-
