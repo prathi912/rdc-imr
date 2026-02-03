@@ -489,59 +489,54 @@ export default function ScheduleMeetingPage() {
             title="Schedule IMR Meeting"
             description="Select projects to schedule an initial submission meeting or a mid-term review."
         />
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className={cn(
-                "lg:col-span-2",
-                activeTab === 'history' && "lg:col-span-3"
-            )}>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="new-submissions">New Submissions ({newSubmissions.length})</TabsTrigger>
-                        <TabsTrigger value="mid-term-review">Mid-term Review ({midTermReviewProjects.length})</TabsTrigger>
-                        <TabsTrigger value="history">History ({scheduledMeetingsHistory.length})</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="new-submissions" className="mt-4">
-                        <ProjectListTable
-                            projects={newSubmissions}
-                            selectedProjects={selectedProjects}
-                            onSelectAll={handleSelectAll}
-                            onSelectOne={handleSelectOne}
-                            usersMap={usersMap}
-                            usersByEmailMap={usersByEmailMap}
-                            title="Projects Awaiting Meeting"
-                            description="Select new submissions to schedule for their initial evaluation meeting."
-                            dateColumnHeader="Submission Date"
-                        />
-                    </TabsContent>
-                    <TabsContent value="mid-term-review" className="mt-4 space-y-4">
-                         <Input
-                            placeholder="Search by title or PI..."
-                            value={midTermSearchTerm}
-                            onChange={e => setMidTermSearchTerm(e.target.value)}
-                            className="max-w-sm"
-                         />
-                         <ProjectListTable
-                            projects={filteredMidTermProjects}
-                            selectedProjects={selectedProjects}
-                            onSelectAll={handleSelectAll}
-                            onSelectOne={handleSelectOne}
-                            usersMap={usersMap}
-                            usersByEmailMap={usersByEmailMap}
-                            title="Projects Due for Mid-term Review"
-                            description={`These projects were funded at least ${systemSettings?.imrMidTermReviewMonths ?? 6} months ago and are due for a progress review.`}
-                            dateColumnHeader="Last Disbursement Date"
-                        />
-                    </TabsContent>
-                    <TabsContent value="history" className="mt-4">
-                        <HistoryTable 
-                            projects={filteredHistory} 
-                            usersMap={usersMap} 
-                            filter={historyFilter}
-                            onFilterChange={setHistoryFilter}
-                        />
-                    </TabsContent>
-                </Tabs>
-            </div>
+        <div className="mt-8 space-y-8">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="new-submissions">New Submissions ({newSubmissions.length})</TabsTrigger>
+                    <TabsTrigger value="mid-term-review">Mid-term Review ({midTermReviewProjects.length})</TabsTrigger>
+                    <TabsTrigger value="history">History ({scheduledMeetingsHistory.length})</TabsTrigger>
+                </TabsList>
+                <TabsContent value="new-submissions" className="mt-4">
+                    <ProjectListTable
+                        projects={newSubmissions}
+                        selectedProjects={selectedProjects}
+                        onSelectAll={handleSelectAll}
+                        onSelectOne={handleSelectOne}
+                        usersMap={usersMap}
+                        usersByEmailMap={usersByEmailMap}
+                        title="Projects Awaiting Meeting"
+                        description="Select new submissions to schedule for their initial evaluation meeting."
+                        dateColumnHeader="Submission Date"
+                    />
+                </TabsContent>
+                <TabsContent value="mid-term-review" className="mt-4 space-y-4">
+                     <Input
+                        placeholder="Search by title or PI..."
+                        value={midTermSearchTerm}
+                        onChange={e => setMidTermSearchTerm(e.target.value)}
+                        className="max-w-sm"
+                     />
+                     <ProjectListTable
+                        projects={filteredMidTermProjects}
+                        selectedProjects={selectedProjects}
+                        onSelectAll={handleSelectAll}
+                        onSelectOne={handleSelectOne}
+                        usersMap={usersMap}
+                        usersByEmailMap={usersByEmailMap}
+                        title="Projects Due for Mid-term Review"
+                        description={`These projects were funded at least ${systemSettings?.imrMidTermReviewMonths ?? 6} months ago and are due for a progress review.`}
+                        dateColumnHeader="Last Disbursement Date"
+                    />
+                </TabsContent>
+                <TabsContent value="history" className="mt-4">
+                    <HistoryTable 
+                        projects={filteredHistory} 
+                        usersMap={usersMap} 
+                        filter={historyFilter}
+                        onFilterChange={setHistoryFilter}
+                    />
+                </TabsContent>
+            </Tabs>
             
             {activeTab !== 'history' && (
                 <Card>
@@ -555,7 +550,7 @@ export default function ScheduleMeetingPage() {
                         <FormField name="date" control={form.control} render={({ field }) => ( 
                             <FormItem className="flex flex-col">
                                 <FormLabel>Meeting Date</FormLabel>
-                                <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2015} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus /></PopoverContent></Popover>
+                                <Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus /></PopoverContent></Popover>
                                 <FormMessage />
                             </FormItem> 
                         )} />
