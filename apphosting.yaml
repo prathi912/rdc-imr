@@ -16,3 +16,6 @@ scheduledJobs:
   - schedule: "every day 09:10"
     timeZone: "Asia/Kolkata"
     uri: /api/cron/send-emr-interest-reminders
+  - schedule: "every day 09:15"
+    timeZone: "Asia/Kolkata"
+    uri: /api/cron/send-evaluation-reminders
