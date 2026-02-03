@@ -15,7 +15,7 @@ import { db } from '@/lib/config';
 import { doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
 import type { Project, User, Evaluation } from '@/types';
 import { notifySuperAdminsOnEvaluation } from '@/app/actions';
-import { Loader2, Wand2, ThumbsUp, ThumbsDown, History } from 'lucide-react';
+import { Loader2, Wand2, ThumbsUp, ThumbsDown, History, AlertCircle } from 'lucide-react';
 import { Skeleton } from '../ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
@@ -23,6 +23,7 @@ interface EvaluationFormProps {
   project: Project;
   user: User;
   onEvaluationSubmitted: () => void;
+  isEvaluationPeriodActive: boolean;
 }
 
 const evaluationSchema = z.object({
@@ -41,7 +42,7 @@ const recommendationOptions = [
 ] as const;
 
 
-export function EvaluationForm({ project, user, onEvaluationSubmitted }: EvaluationFormProps) {
+export function EvaluationForm({ project, user, onEvaluationSubmitted, isEvaluationPeriodActive }: EvaluationFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingEvaluation, setExistingEvaluation] = useState<Evaluation | null>(null);
@@ -113,7 +114,7 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
     }
   };
   
-  const isFormDisabled = isSubmitting || loadingExisting || !!existingEvaluation;
+  const isFormDisabled = isSubmitting || loadingExisting || !!existingEvaluation || !isEvaluationPeriodActive;
 
   return (
     <Card className="mt-8 border-primary/50">
@@ -129,6 +130,15 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted }: Evaluat
         </CardDescription>
       </CardHeader>
       <CardContent>
+         {!isEvaluationPeriodActive && !existingEvaluation && (
+            <Alert variant="destructive" className="mb-6">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Evaluation Period Expired</AlertTitle>
+                <AlertDescription>
+                The deadline for submitting this evaluation has passed. Please contact the RDC office for assistance.
+                </AlertDescription>
+            </Alert>
+        )}
         {loadingExisting ? (
              <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />

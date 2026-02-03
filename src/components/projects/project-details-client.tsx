@@ -28,7 +28,6 @@ import {
   getSystemSettings,
   generateSanctionOrder,
   adminUploadProposal,
-  uploadFileToServer,
 } from "@/app/actions"
 import { generateRecommendationForm } from "@/app/document-actions"
 import { findUserByMisId } from '@/app/userfinding';
@@ -83,6 +82,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Checkbox } from "../ui/checkbox"
+import { uploadFileToServer } from '@/app/actions';
 
 interface ProjectDetailsClientProps {
   project: Project
@@ -459,7 +459,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     return !isBefore(today, meetingDate) && !isAfter(today, deadline);
   }, [project.meetingDetails?.date, systemSettings]);
   
-  const showEvaluationForm = user && isAssignedEvaluator && isEvaluationPeriodActive;
+  const showEvaluationForm = user && isAssignedEvaluator && project.status === 'Under Review';
 
   const assignedEvaluatorsCount = project.meetingDetails?.assignedEvaluators?.length ?? 0;
   const absentEvaluatorsCount = project.meetingDetails?.absentEvaluators?.length ?? 0;
@@ -723,9 +723,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
     setIsSubmittingRevision(true)
     try {
-      const dataUrl = await fileToDataUrl(revisedProposalFile)
-      const path = `revisions/${project.id}/${revisedProposalFile.name}`
-      const uploadResult = await uploadFileToServer(dataUrl, path)
+      const dataUrl = await fileToDataUrl(revisedProposalFile);
+      const path = `revisions/${project.id}/${revisedProposalFile.name}`;
+      const uploadResult = await uploadFileToServer(dataUrl, path);
 
       if (!uploadResult.success || !uploadResult.url) {
         throw new Error(uploadResult.error || "Revision upload failed")
@@ -925,7 +925,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
   };
 
-  const canViewEvaluations = (isAdmin || (isAssignedEvaluator && isEvaluationPeriodActive)) && !isHeadOfGoaCampus;
+  const canViewEvaluations = (isAdmin || isAssignedEvaluator) && !isHeadOfGoaCampus;
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
   const canManageCoPi = (isPI || isAdmin) && project.status !== 'Not Recommended';
 
@@ -1563,7 +1563,12 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
       )}
       
       {showEvaluationForm && user && (
-        <EvaluationForm project={project} user={user} onEvaluationSubmitted={refetchEvaluations} />
+        <EvaluationForm 
+          project={project} 
+          user={user} 
+          onEvaluationSubmitted={refetchEvaluations} 
+          isEvaluationPeriodActive={isEvaluationPeriodActive}
+        />
       )}
 
       {project.grant && user && canManageGrants && (
