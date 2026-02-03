@@ -67,6 +67,10 @@ export async function GET(request: NextRequest) {
                   <p style="margin-top:30px; color:#aaaaaa;">For any queries, please write a reply to this mail.</p>
                   <p style="margin-top:10px; color:#aaaaaa;">Thank you,</p>
                   <p style="color:#aaaaaa;">Research & Development Cell Team</p>
+                  <hr style="border-top: 1px solid #4f5b62; margin-top: 20px;">
+                  <p style="font-size:10px; color:#999999; text-align:center; margin-top:10px;">
+                      This is a system generated automatic email.
+                  </p>
                 </div>
             `;
             
