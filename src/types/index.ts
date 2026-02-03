@@ -472,6 +472,8 @@ export type EmrInterest = {
     time: string // HH:mm
     pptDeadline: string; // ISO string
   }
+  assignedEvaluators?: string[];
+  evaluatedBy?: string[];
   endorsementFormUrl?: string
   signedEndorsementUrl?: string
   endorsementSignedAt?: string

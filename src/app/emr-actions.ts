@@ -350,6 +350,7 @@ export async function scheduleEmrMeeting(
       batch.update(interestRef, {
         meetingSlot: { date, time, pptDeadline },
         status: "Evaluation Pending",
+        assignedEvaluators: evaluatorUids,
       })
 
       const notificationRef = adminDb.collection("notifications").doc()
@@ -702,7 +703,13 @@ export async function addEmrEvaluation(
       ...evaluationData,
     }
 
-    await evaluationRef.set(newEvaluation, { merge: true })
+    await evaluationRef.set(newEvaluation, { merge: true });
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId);
+    await interestRef.update({
+        evaluatedBy: FieldValue.arrayUnion(evaluator.uid)
+    });
+
     await logActivity("INFO", "EMR evaluation added", { interestId, evaluatorUid: evaluator.uid })
 
     // Notify Super Admins
@@ -1641,6 +1648,7 @@ export async function addSanctionedEmrProject(data: {
     
 
     
+
 
 
 

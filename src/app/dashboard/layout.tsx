@@ -54,7 +54,7 @@ import {
 import { UserNav } from "@/components/user-nav"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Logo } from "@/components/logo"
-import type { User, SystemSettings } from "@/types"
+import type { User, SystemSettings, Project, EmrInterest } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { auth, db } from "@/lib/config"
@@ -124,6 +124,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [pendingMeetingsCount, setPendingMeetingsCount] = useState(0)
   const [pendingIncentiveApprovalsCount, setPendingIncentiveApprovalsCount] = useState(0)
   const [pendingBankClaimsCount, setPendingBankClaimsCount] = useState(0)
+  const [pendingEvaluationsCount, setPendingEvaluationsCount] = useState(0);
   const [menuItems, setMenuItems] = useState<NavItem[]>([])
   const [isDirty, setIsDirty] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -189,6 +190,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         tooltip: "Evaluation Queue",
         icon: ClipboardCheck,
         label: "Evaluation Queue",
+        badge: pendingEvaluationsCount,
       },
       {
         id: "my-evaluations",
@@ -309,7 +311,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         condition: true,
       },
     ],
-    [unreadCount, pendingMeetingsCount, pendingIncentiveApprovalsCount, pendingBankClaimsCount],
+    [unreadCount, pendingMeetingsCount, pendingIncentiveApprovalsCount, pendingBankClaimsCount, pendingEvaluationsCount],
   )
 
   useEffect(() => {
@@ -498,6 +500,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setPendingBankClaimsCount(snapshot.size)
         }),
       )
+    }
+    
+    // Pending Evaluations listener
+    if (user.allowedModules?.includes("evaluator-dashboard")) {
+        let imrCount = 0;
+        let emrCount = 0;
+        const updateCounts = () => setPendingEvaluationsCount(imrCount + emrCount);
+        
+        const imrQuery = query(collection(db, "projects"), where("status", "==", "Under Review"), where("meetingDetails.assignedEvaluators", "array-contains", user.uid));
+        unsubscribes.push(
+            onSnapshot(imrQuery, (snapshot) => {
+                imrCount = snapshot.docs.filter(doc => {
+                    const project = doc.data() as Project;
+                    return !project.evaluatedBy?.includes(user.uid) && !project.wasAbsent;
+                }).length;
+                updateCounts();
+            })
+        );
+        
+        const emrQuery = query(collection(db, "emrInterests"), where("status", "==", "Evaluation Pending"), where("assignedEvaluators", "array-contains", user.uid));
+        unsubscribes.push(
+            onSnapshot(emrQuery, (snapshot) => {
+                emrCount = snapshot.docs.filter(doc => {
+                    const interest = doc.data() as EmrInterest;
+                    return !interest.evaluatedBy?.includes(user.uid) && !interest.wasAbsent;
+                }).length;
+                updateCounts();
+            })
+        );
     }
 
     return () => unsubscribes.forEach((unsub) => unsub())
