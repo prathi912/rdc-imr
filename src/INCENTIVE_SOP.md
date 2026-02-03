@@ -6,12 +6,12 @@ This document provides detailed instructions for faculty members on how to apply
 1.  [General Workflow](#1-general-workflow)
 2.  [Managing Co-Authors](#2-managing-co-authors)
 3.  [Claim-Specific Instructions](#3-claim-specific-instructions)
-    -   [Research Papers](#a-research-papers)
-    -   [Patents](#b-patents)
-    -   [Books & Book Chapters](#c-books--book-chapters)
-    -   [Conference Presentations](#d-conference-presentations)
-    -   [Seed Money for APC](#e-seed-money-for-apc)
-    -   [Membership of Professional Bodies](#f-membership-of-professional-bodies)
+    -   [A. Research Papers](#a-research-papers)
+    -   [B. Patents](#b-patents)
+    -   [C. Books & Book Chapters](#c-books--book-chapters)
+    -   [D. Conference Presentations](#d-conference-presentations)
+    -   [E. Seed Money for APC](#e-seed-money-for-apc)
+    -   [F. Membership of Professional Bodies](#f-membership-of-professional-bodies)
 4.  [Tracking Your Claims](#4-tracking-your-claims)
 
 ---
@@ -94,4 +94,4 @@ The primary author submitting the claim is responsible for adding all other auth
 -   **Co-Author Claims**: This tab appears if a primary author has submitted a claim and listed you as a co-author. You must go here and click **"View & Apply"** to submit your individual claim for your share of the incentive. Your claim will not be processed until you do so.
 -   **Drafts**: Access and continue any claims you have saved as a draft.
 
-For further details on the specific calculation logic for each category, please refer to the official **Research Policy of Parul University** document.
+For further details on the specific calculation logic for each category, please refer to the official **[Research Incentive Policy](INCENTIVE_POLICY.md)** document.
