@@ -1,8 +1,7 @@
 
-
 # Research & Development Portal - Parul University
 
-This is a comprehensive, full-stack web application designed to streamline and manage the entire research lifecycle at Parul University. It serves as a central hub for faculty, evaluators, and administrators to handle Intramural (IMR) and Extramural (EMR) research projects, user management, and grant tracking.
+This is a comprehensive, full-stack web application designed to streamline and manage the entire research lifecycle at Parul University. It serves as a central hub for faculty, evaluators, and administrators to handle Intramural (IMR) and Extramural (EMR) research projects, user management, incentive claims, and grant tracking.
 
 The portal is built with a modern tech stack, leveraging the power of Next.js for the frontend and backend, Firebase for its powerful suite of backend services, and Google's Genkit for integrating cutting-edge AI features.
 
@@ -18,7 +17,7 @@ The portal provides a tailored experience for each user role, ensuring users onl
 
 ### 2. Intramural Research (IMR) Project Management
 A complete workflow for managing internal research project funding from submission to completion.
--   **Guided Proposal Submission:** A multi-step form for submitting detailed project proposals, including team information, abstracts, and necessary file uploads (proposal PDF, team CVs, ethics approvals).
+-   **Guided Proposal Submission:** A multi-step form for submitting detailed project proposals, including team information, abstracts, and necessary file uploads (proposal PDF, team member CVs, ethics approvals).
 -   **Status Tracking:** Real-time tracking of project status (Draft, Submitted, Under Review, Recommended, Not Recommended, In Progress, Completed, etc.).
 -   **AI-Assisted Evaluation:** AI-generated prompts to help evaluators assess projects based on key criteria like relevance, methodology, feasibility, and innovation.
 -   **Meeting Scheduling:** Admins and CROs can schedule IMR evaluation meetings for multiple submitted projects at once and automatically notify the Principal Investigators (PIs) via email.
@@ -31,21 +30,29 @@ A dedicated module to manage the lifecycle of externally funded research opportu
 -   **Presentation Workflow:** A streamlined process for scheduling presentation slots, assigning evaluators, and allowing faculty to upload their presentation files before a hard deadline.
 -   **Admin Oversight:** Super-admins can manage the entire EMR lifecycle, from adding new funding calls to tracking evaluation outcomes.
 
-### 4. User Profiles & Publication Tracking
--   **Public Profiles:** Faculty can maintain a public-facing profile showcasing their research contributions, projects, and a comprehensive list of their publications. This profile is viewable by administrators and assigned evaluators.
--   **Publication Management:** A dedicated system for faculty to add, edit, and delete their research papers. The system intelligently handles co-authors, ensuring a single paper entry appears on the profiles of all its authors to reduce data redundancy.
--   **Automated Co-Author Linking:** When adding a paper, the system automatically checks for existing users or staff members by their university email, linking profiles and fetching names to streamline the process.
+### 4. Incentive Claim Workflow
+A complete digital process for submitting, tracking, and approving research incentives.
+-   **Multi-Category Claims:** Faculty can apply for incentives for Research Papers, Patents, Books, Conference Presentations, Professional Memberships, and Article Processing Charges (APC).
+-   **Automated Calculation:** The system automatically calculates the tentative incentive amount based on the university's policy, considering factors like author roles, publication quality (Q-rating), and publisher type.
+-   **Multi-Stage Approval:** Claims are routed through a configurable multi-stage approval workflow, ensuring proper verification at each level (e.g., HOD, CRO, RDC Head).
+-   **Co-Author Management:** The system intelligently handles claims for publications with multiple authors, allowing each co-author to claim their respective share.
 
-### 5. AI Integration (Powered by Google Genkit)
+### 5. User Profiles & Publication Tracking
+-   **Public Profiles:** Faculty can maintain a public-facing profile showcasing their research contributions, projects, and a comprehensive list of their publications. This profile is viewable by administrators and assigned evaluators.
+-   **Publication Management:** A dedicated system for faculty to add, edit, and delete their research papers, books, and patents.
+-   **Automated Co-Author Linking:** When adding a paper, the system automatically checks for existing users by email, linking profiles to ensure a single paper entry appears for all its internal authors, reducing data redundancy.
+
+### 6. AI Integration (Powered by Google Genkit)
 -   **Project Summarization:** Instantly generate concise summaries of complex project proposals to aid in quick reviews.
 -   **Research Domain Suggestion:** AI analyzes a faculty member's publication history to suggest their core research domain for their public profile.
 -   **Journal Website Finder:** An AI tool to find the official website of an academic journal based on its name, helping to verify publication sources.
 
-### 6. System Administration
+### 7. System Administration
 -   **User Management:** Admins can manage user roles and permissions, including assigning CROs to specific faculties.
 -   **Module Management:** A Super-admin exclusive feature to dynamically assign access to different parts of the portal for each user.
 -   **System Health Dashboard:** A dedicated page to monitor the connectivity and status of all integrated Firebase services (Firestore, Auth, Storage) in real-time.
--   **Bulk Data Upload:** Admins can upload historical project data from a formatted Excel file to integrate past records into the system.
+-   **Bulk Data Upload:** Admins can upload historical project and incentive data from a formatted Excel file to integrate past records into the system.
+-   **Recruitment Management:** A workflow for faculty to post job openings for their projects and for admins to approve these postings before they go live on a public hiring page.
 
 ## 🛠️ Tech Stack
 
@@ -156,7 +163,7 @@ The application should now be running at [http://localhost:9002](http://localhos
 -   `public/`: Static assets like images and logos.
 -   `firestore.rules`: Security rules for the Firestore database.
 -   `apphosting.yaml`: Configuration for deployment to Firebase App Hosting.
--   `staffdata.xlsx`, `goastaffdata.xlsx`: These files in the root directory contain historical user and academic data used to pre-fill profiles.
+-   `staffdata.xlsx`: This file in the root directory contains historical user and academic data used to pre-fill profiles.
 
 ## ☁️ Deployment
 
