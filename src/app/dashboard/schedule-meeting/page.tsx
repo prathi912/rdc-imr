@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
@@ -168,7 +169,17 @@ function ProjectListTable({
     );
 }
 
-function HistoryTable({ projects, usersMap }: { projects: Project[], usersMap: Map<string, User> }) {
+function HistoryTable({ 
+    projects, 
+    usersMap,
+    filter,
+    onFilterChange 
+}: { 
+    projects: Project[], 
+    usersMap: Map<string, User>,
+    filter: 'all' | 'regular' | 'mid-term',
+    onFilterChange: (value: 'all' | 'regular' | 'mid-term') => void 
+}) {
     const sortedProjects = [...projects].sort((a, b) => {
         const dateA = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
         const dateB = b.meetingDetails?.date ? parseISO(b.meetingDetails.date).getTime() : 0;
@@ -178,8 +189,22 @@ function HistoryTable({ projects, usersMap }: { projects: Project[], usersMap: M
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Scheduled Meetings History</CardTitle>
-                <CardDescription>A log of all past and future scheduled IMR meetings.</CardDescription>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <CardTitle>Scheduled Meetings History</CardTitle>
+                        <CardDescription>A log of all past and future scheduled IMR meetings.</CardDescription>
+                    </div>
+                    <Select value={filter} onValueChange={(value) => onFilterChange(value as any)}>
+                        <SelectTrigger className="w-full sm:w-[240px]">
+                            <SelectValue placeholder="Filter by meeting type..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Meetings</SelectItem>
+                            <SelectItem value="regular">Regular Submissions</SelectItem>
+                            <SelectItem value="mid-term">Mid-term Reviews</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
             </CardHeader>
             <CardContent>
                  {sortedProjects.length > 0 ? (
@@ -231,7 +256,7 @@ function HistoryTable({ projects, usersMap }: { projects: Project[], usersMap: M
                     </Table>
                 ) : (
                     <div className="text-center py-10 text-muted-foreground">
-                        <p>No meetings have been scheduled yet.</p>
+                        <p>No meetings match the selected filter.</p>
                     </div>
                 )}
             </CardContent>
@@ -247,6 +272,7 @@ export default function ScheduleMeetingPage() {
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('new-submissions');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'regular' | 'mid-term'>('all');
   const [user, setUser] = useState<User | null>(null);
   const router = useRouter();
   const [midTermSearchTerm, setMidTermSearchTerm] = useState('');
@@ -365,6 +391,16 @@ export default function ScheduleMeetingPage() {
   }, [midTermReviewProjects, midTermSearchTerm]);
   
   const scheduledMeetingsHistory = allProjects.filter(p => p.meetingDetails && ['Under Review', 'Recommended', 'Not Recommended', 'Completed', 'In Progress', 'Pending Completion Approval', 'Sanctioned', 'SANCTIONED'].includes(p.status));
+
+  const filteredHistory = useMemo(() => {
+    if (historyFilter === 'regular') {
+        return scheduledMeetingsHistory.filter(p => !p.hasHadMidTermReview);
+    }
+    if (historyFilter === 'mid-term') {
+        return scheduledMeetingsHistory.filter(p => p.hasHadMidTermReview === true);
+    }
+    return scheduledMeetingsHistory; // 'all'
+  }, [scheduledMeetingsHistory, historyFilter]);
 
   const projectsForCurrentTab = activeTab === 'new-submissions' ? newSubmissions : filteredMidTermProjects;
 
@@ -497,7 +533,12 @@ export default function ScheduleMeetingPage() {
                         />
                     </TabsContent>
                     <TabsContent value="history" className="mt-4">
-                        <HistoryTable projects={scheduledMeetingsHistory} usersMap={usersMap} />
+                        <HistoryTable 
+                            projects={filteredHistory} 
+                            usersMap={usersMap} 
+                            filter={historyFilter}
+                            onFilterChange={setHistoryFilter}
+                        />
                     </TabsContent>
                 </Tabs>
             </div>
