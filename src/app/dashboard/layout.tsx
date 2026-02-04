@@ -1,3 +1,4 @@
+
 'use client'
 
 import type React from "react"
@@ -61,7 +62,7 @@ import { useToast } from "@/hooks/use-toast"
 import { collection, onSnapshot, query, where, doc, getDoc } from "firebase/firestore"
 import { getDefaultModulesForRole } from "@/lib/modules"
 import { saveSidebarOrder, getSystemSettings } from "@/app/actions"
-import { TutorialDialog } from "@/components/tutorial-dialog"
+import { WelcomeTutorial } from "@/components/tutorial-dialog"
 import { HelpDialog } from "@/components/help-dialog"
 import {
   AlertDialog,
@@ -696,7 +697,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <h1 className="text-xl font-semibold">{getPageTitle()}</h1>
             </div>
             <div className="flex items-center gap-2">
-              <TutorialDialog user={user} />
+              <WelcomeTutorial user={user} />
               <HelpDialog />
               <ThemeToggle />
               <UserNav user={user} onLogout={attemptLogout} />
@@ -740,3 +741,5 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </>
   )
 }
+
+    
