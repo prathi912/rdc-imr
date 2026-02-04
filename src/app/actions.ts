@@ -1042,7 +1042,7 @@ export async function scheduleMeeting(
                   `SUMMARY:IMR Evaluation Committee Meeting`,
                   `DESCRIPTION:You are assigned to evaluate IMR projects including: ${projectsToSchedule.map(p => p.title).join(', ')}`,
                   `LOCATION:${meetingDetails.venue}`,
-                  `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'rdc@paruluniversity.ac.in'}`,
+                  `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'helpdesk.rdc@paruluniversity.ac.in'}`,
                   `ATTENDEE;CN=${evaluator.name};RSVP=TRUE:mailto:${evaluator.email}`,
                   'END:VEVENT',
                   'END:VCALENDAR'
