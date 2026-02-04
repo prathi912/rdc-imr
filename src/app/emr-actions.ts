@@ -396,7 +396,7 @@ export async function scheduleEmrMeeting(
           `SUMMARY:EMR Presentation: ${call.title}`,
           `DESCRIPTION:Your presentation for the EMR funding call titled '${call.title}' has been scheduled.`,
           `LOCATION:${venue}`,
-          `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'helpdesk.rdc@paruluniversity.ac.in'}`,
+          `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER || 'helpdesk.rdc@paruluniversity.ac.in'}`,
           `ATTENDEE;CN=${interest.userName};RSVP=TRUE:mailto:${interest.userEmail}`,
           'END:VEVENT',
           'END:VCALENDAR'
@@ -464,7 +464,7 @@ export async function scheduleEmrMeeting(
               `SUMMARY:EMR Evaluation Meeting: ${call.title}`,
               `DESCRIPTION:Evaluation meeting for EMR call: ${call.title}.`,
               `LOCATION:${venue}`,
-              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'helpdesk.rdc@paruluniversity.ac.in'}`,
+              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER || 'helpdesk.rdc@paruluniversity.ac.in'}`,
               `ATTENDEE;CN=${evaluator.name};RSVP=TRUE:mailto:${evaluator.email}`,
               'END:VEVENT',
               'END:VCALENDAR'
