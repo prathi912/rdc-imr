@@ -405,7 +405,7 @@ export async function scheduleEmrMeeting(
       if (interest.userEmail) {
         emailPromises.push(
           sendEmailUtility({
-            to: interest.userEmail,,
+            to: interest.userEmail,
             subject: `Your EMR Presentation Slot for: ${call.title}${subjectOnlineIndicator}`,
             html: emailHtml,
             from: "default",
