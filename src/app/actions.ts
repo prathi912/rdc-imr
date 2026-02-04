@@ -959,7 +959,7 @@ export async function scheduleMeeting(
               `SUMMARY:${subjectPrefix}: ${projectData.title}`,
               `DESCRIPTION:Your presentation for the project titled '${projectData.title}' has been scheduled.`,
               `LOCATION:${meetingDetails.venue}`,
-              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'rdc@paruluniversity.ac.in'}`,
+              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'helpdesk.rdc@paruluniversity.ac.in'}`,
               `ATTENDEE;CN=${projectData.pi};RSVP=TRUE:mailto:${projectData.pi_email}`,
               'END:VEVENT',
               'END:VCALENDAR'
