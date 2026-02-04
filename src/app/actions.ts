@@ -2061,6 +2061,8 @@ export async function markImrAttendance(
         const projectRef = projectsRef.doc(absentProject.projectId);
         batch.update(projectRef, {
           wasAbsent: true,
+          status: "Submitted", // Reset status to allow rescheduling
+          meetingDetails: FieldValue.delete(), // Clear meeting details
         });
       }
     }
