@@ -478,7 +478,7 @@ const EMAIL_STYLES = {
     </p>`,
 }
 
-export async function sendEmail(options: { to: string; subject: string; html: string; from: "default" | "rdc" }) {
+export async function sendEmail(options: { to: string; subject: string; html: string; from: "default" | "rdc", icalEvent?: any }) {
   return await sendEmailUtility(options)
 }
 
@@ -884,8 +884,11 @@ export async function scheduleMeeting(
     const subjectOnlineIndicator = meetingDetails.mode === 'Online' ? ' (Online)' : '';
 
     const meetingDate = toDate(meetingDateTimeString, { timeZone });
-    const startTime = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
-    const endTime = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
+    
+    // Format for ICS
+    const startTimeUTC = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
+    const endTimeUTC = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
+    const dtstamp = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
 
     for (const projectData of projectsToSchedule) {
       const projectRef = adminDb.collection("projects").doc(projectData.id)
@@ -918,8 +921,6 @@ export async function scheduleMeeting(
       })
 
       if (projectData.pi_email) {
-          const calendarLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${subjectPrefix}: ${projectData.title}`)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(`For project: ${projectData.title}`)}&location=${encodeURIComponent(meetingDetails.venue)}`;
-
           const emailHtml = `
             <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
@@ -935,7 +936,6 @@ export async function scheduleMeeting(
               </strong> 
                 ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
               </p>
-              <a href="${calendarLink}" target="_blank" style="display: inline-block; background-color: #4285F4; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Save to Google Calendar</a>
               <p style="color: #cccccc; margin-top: 15px;">
                 Please prepare for your presentation. You can view more details on the 
                 <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectData.id}" style="color: #64b5f6; text-decoration: underline;">
@@ -945,12 +945,37 @@ export async function scheduleMeeting(
               ${EMAIL_STYLES.footer}
             </div>
           `;
-        await sendEmailUtility({
-          to: projectData.pi_email,
-          subject: `${subjectPrefix} Scheduled for Your Project: ${projectData.title}${subjectOnlineIndicator}`,
-          html: emailHtml,
-          from: "default",
-        })
+          
+           const icalContent = [
+              'BEGIN:VCALENDAR',
+              'VERSION:2.0',
+              'PRODID:-//ParulUniversity//RDC-Portal//EN',
+              'METHOD:REQUEST',
+              'BEGIN:VEVENT',
+              `UID:${projectData.id}@paruluniversity.ac.in`,
+              `DTSTAMP:${dtstamp}`,
+              `DTSTART:${startTimeUTC}`,
+              `DTEND:${endTimeUTC}`,
+              `SUMMARY:${subjectPrefix}: ${projectData.title}`,
+              `DESCRIPTION:Your presentation for the project titled '${projectData.title}' has been scheduled.`,
+              `LOCATION:${meetingDetails.venue}`,
+              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'rdc@paruluniversity.ac.in'}`,
+              `ATTENDEE;CN=${projectData.pi};RSVP=TRUE:mailto:${projectData.pi_email}`,
+              'END:VEVENT',
+              'END:VCALENDAR'
+            ].join('\r\n');
+            
+            await sendEmailUtility({
+                to: projectData.pi_email,
+                subject: `${subjectPrefix} Scheduled for Your Project: ${projectData.title}${subjectOnlineIndicator}`,
+                html: emailHtml,
+                from: "default",
+                icalEvent: {
+                    filename: 'invite.ics',
+                    method: 'REQUEST',
+                    content: icalContent,
+                }
+            });
       }
     }
 
@@ -966,8 +991,6 @@ export async function scheduleMeeting(
         if (evaluatorDocSnapshot.exists) {
           const evaluator = evaluatorDocSnapshot.data() as User
           
-           const calendarLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`${meetingType} Committee`)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(`Reviewing projects including: ${projectsToSchedule[0].title}`)}&location=${encodeURIComponent(meetingDetails.venue)}`;
-
           const evaluatorNotificationRef = adminDb.collection("notifications").doc()
           batch.set(evaluatorNotificationRef, {
             uid: evaluator.uid,
@@ -996,7 +1019,6 @@ export async function scheduleMeeting(
                       <ul style="list-style-type: none; padding-left: 0;">
                           ${projectTitles}
                       </ul>
-                       <a href="${calendarLink}" target="_blank" style="display: inline-block; background-color: #4285F4; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Save to Google Calendar</a>
                       <p style="color: #cccccc; margin-top: 15px;">
                           You can access your evaluation queue on the
                           <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="color: #64b5f6; text-decoration: underline;">
@@ -1006,12 +1028,36 @@ export async function scheduleMeeting(
                       ${EMAIL_STYLES.footer}
                   </div>
               `;
+              
+              const icalContent = [
+                  'BEGIN:VCALENDAR',
+                  'VERSION:2.0',
+                  'PRODID:-//ParulUniversity//RDC-Portal//EN',
+                  'METHOD:REQUEST',
+                  'BEGIN:VEVENT',
+                  `UID:meeting-${meetingDetails.date}-${evaluator.uid}@paruluniversity.ac.in`,
+                  `DTSTAMP:${dtstamp}`,
+                  `DTSTART:${startTimeUTC}`,
+                  `DTEND:${endTimeUTC}`,
+                  `SUMMARY:IMR Evaluation Committee Meeting`,
+                  `DESCRIPTION:You are assigned to evaluate IMR projects including: ${projectsToSchedule.map(p => p.title).join(', ')}`,
+                  `LOCATION:${meetingDetails.venue}`,
+                  `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'rdc@paruluniversity.ac.in'}`,
+                  `ATTENDEE;CN=${evaluator.name};RSVP=TRUE:mailto:${evaluator.email}`,
+                  'END:VEVENT',
+                  'END:VCALENDAR'
+                ].join('\r\n');
 
             await sendEmailUtility({
               to: evaluator.email,
               subject: `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term Review' : 'New Submission'})${subjectOnlineIndicator}`,
               html: emailHtml,
               from: "default",
+              icalEvent: {
+                  filename: 'invite.ics',
+                  method: 'REQUEST',
+                  content: icalContent,
+              }
             })
           }
         }
@@ -2257,9 +2303,6 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
               <p style="color:#ffffff;">Dear ${user.name},</p>
               <p style="color:#e0e0e0;">
                   A new job posting, "<strong style="color:#ffffff;">${jobTitle}</strong>," submitted by ${postedBy}, is awaiting your approval.
-              </p>
-              <p style="color:#e0e0e0;">
-                  Please visit the Recruitment Approvals page on the R&D Portal to review and take action.
               </p>
               <p style="text-align:center; margin-top:25px;">
                   <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/recruitment-approvals" style="background-color: #64B5F6; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">

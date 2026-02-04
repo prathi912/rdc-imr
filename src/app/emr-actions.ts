@@ -8,7 +8,7 @@ import path from 'path';
 import { sendEmail as sendEmailUtility } from "@/lib/email";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import type * as z from 'zod';
-import { addDays, setHours, setMinutes, setSeconds, addHours } from "date-fns";
+import { addDays, setHours, setMinutes, setSeconds, addHours, format } from "date-fns";
 import * as XLSX from 'xlsx';
 
 // --- Centralized Logging Service ---
@@ -332,8 +332,12 @@ export async function scheduleEmrMeeting(
     const subjectOnlineIndicator = mode === 'Online' ? ' (Online)' : '';
 
     const meetingDate = toDate(meetingDateTimeString, { timeZone });
-    const startTime = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
-    const endTime = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
+    
+    // Format for ICS
+    const startTimeUTC = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
+    const endTimeUTC = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
+    const dtstamp = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
+
 
     for (const userId of applicantUids) {
       const interestsRef = adminDb.collection("emrInterests")
@@ -360,8 +364,6 @@ export async function scheduleEmrMeeting(
         isRead: false,
       })
 
-      const calendarLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`EMR Presentation: ${call.title}`)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(`Presentation for funding call: ${call.title}`)}&location=${encodeURIComponent(venue)}`;
-
       const emailHtml = `
           <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
@@ -374,13 +376,31 @@ export async function scheduleEmrMeeting(
               <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
                 ${mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
               </p>
-               <a href="${calendarLink}" target="_blank" style="display: inline-block; background-color: #4285F4; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Save to Google Calendar</a>
               <p style="color: #e0e0e0; margin-top: 15px;">
                 Please upload your presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(pptDeadlineString, timeZone, "PPpp (z)")}</strong>.
               </p>
               ${EMAIL_STYLES.footer}
           </div>
       `
+      
+      const icalContent = [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//ParulUniversity//RDC-Portal//EN',
+          'METHOD:REQUEST',
+          'BEGIN:VEVENT',
+          `UID:${interest.id}@paruluniversity.ac.in`,
+          `DTSTAMP:${dtstamp}`,
+          `DTSTART:${startTimeUTC}`,
+          `DTEND:${endTimeUTC}`,
+          `SUMMARY:EMR Presentation: ${call.title}`,
+          `DESCRIPTION:Your presentation for the EMR funding call titled '${call.title}' has been scheduled.`,
+          `LOCATION:${venue}`,
+          `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'rdc@paruluniversity.ac.in'}`,
+          `ATTENDEE;CN=${interest.userName};RSVP=TRUE:mailto:${interest.userEmail}`,
+          'END:VEVENT',
+          'END:VCALENDAR'
+        ].join('\r\n');
 
       if (interest.userEmail) {
         emailPromises.push(
@@ -390,6 +410,11 @@ export async function scheduleEmrMeeting(
             subject: `Your EMR Presentation Slot for: ${call.title}${subjectOnlineIndicator}`,
             html: emailHtml,
             from: "default",
+            icalEvent: {
+              filename: 'invite.ics',
+              method: 'REQUEST',
+              content: icalContent
+            }
           }),
         )
       }
@@ -410,30 +435,53 @@ export async function scheduleEmrMeeting(
             createdAt: new Date().toISOString(),
             isRead: false,
           })
-
-          const calendarLink = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`EMR Evaluation: ${call.title}`)}&dates=${startTime}/${endTime}&details=${encodeURIComponent(`Evaluation meeting for EMR call: ${call.title}`)}&location=${encodeURIComponent(venue)}`;
-
+          
           if (evaluator.email) {
+            const emailHtml = `
+              <div ${EMAIL_STYLES.background}>
+                  ${EMAIL_STYLES.logo}
+                  <p style="color: #ffffff;">Dear Evaluator,</p>
+                  <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
+                  <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
+                  <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
+                  <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
+                      ${mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
+                  </p>
+                  <p style="color: #cccccc; margin-top: 15px;">Please review the assigned presentations on the PU Research Projects Portal.</p>
+                  ${EMAIL_STYLES.footer}
+              </div>
+            `;
+
+            const icalContent = [
+              'BEGIN:VCALENDAR',
+              'VERSION:2.0',
+              'PRODID:-//ParulUniversity//RDC-Portal//EN',
+              'METHOD:REQUEST',
+              'BEGIN:VEVENT',
+              `UID:emr-meeting-${call.id}-${evaluator.uid}@paruluniversity.ac.in`,
+              `DTSTAMP:${dtstamp}`,
+              `DTSTART:${startTimeUTC}`,
+              `DTEND:${endTimeUTC}`,
+              `SUMMARY:EMR Evaluation Meeting: ${call.title}`,
+              `DESCRIPTION:Evaluation meeting for EMR call: ${call.title}.`,
+              `LOCATION:${venue}`,
+              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.RDC_EMAIL || 'rdc@paruluniversity.ac.in'}`,
+              `ATTENDEE;CN=${evaluator.name};RSVP=TRUE:mailto:${evaluator.email}`,
+              'END:VEVENT',
+              'END:VCALENDAR'
+            ].join('\r\n');
+
             emailPromises.push(
               sendEmailUtility({
                 to: evaluator.email,
                 subject: `EMR Evaluation Assignment: ${call.title}${subjectOnlineIndicator}`,
-                html: `
-                <div ${EMAIL_STYLES.background}>
-                    ${EMAIL_STYLES.logo}
-                    <p style="color: #ffffff;">Dear Evaluator,</p>
-                    <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
-                    <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
-                    <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
-                    <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
-                       ${mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
-                    </p>
-                    <a href="${calendarLink}" target="_blank" style="display: inline-block; background-color: #4285F4; color: white; padding: 8px 12px; text-decoration: none; border-radius: 4px; margin-top: 10px;">Save to Google Calendar</a>
-                    <p style="color: #cccccc; margin-top: 15px;">Please review the assigned presentations on the PU Research Projects Portal.</p>
-                    ${EMAIL_STYLES.footer}
-                </div>
-              `,
+                html: emailHtml,
                 from: "default",
+                icalEvent: {
+                  filename: 'invite.ics',
+                  method: 'REQUEST',
+                  content: icalContent,
+                }
               }),
             )
           }
@@ -1647,6 +1695,7 @@ export async function addSanctionedEmrProject(data: {
     
 
     
+
 
 
 
