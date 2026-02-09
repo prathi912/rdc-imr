@@ -20,4 +20,7 @@ scheduledJobs:
   - schedule: "every day 09:15"
     timeZone: "Asia/Kolkata"
     uri: /api/cron/send-evaluation-reminders
+  - schedule: "every day 09:20"
+    timeZone: "Asia/Kolkata"
+    uri: /api/cron/send-post-evaluation-reminders
 
