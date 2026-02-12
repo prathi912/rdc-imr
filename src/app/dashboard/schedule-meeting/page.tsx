@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -38,7 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
@@ -606,5 +607,3 @@ export default function ScheduleMeetingPage() {
     </>
   );
 }
-
-```
