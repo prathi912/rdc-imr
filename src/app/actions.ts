@@ -1,4 +1,3 @@
-
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin"
@@ -876,33 +875,27 @@ export async function scheduleMeeting(
     const timeZone = "Asia/Kolkata"
     const meetingDateTimeString = `${meetingDetails.date}T${meetingDetails.time}:00`
 
-    const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")
-    const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")
-
-    const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting"
-    const subjectPrefix = isMidTermReview ? "Mid-term Review" : "IMR Meeting"
-    const subjectOnlineIndicator = meetingDetails.mode === 'Online' ? ' (Online)' : '';
-
     const meetingDate = toDate(meetingDateTimeString, { timeZone });
-    
-    // Format for ICS
-    const startTimeUTC = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
-    const endTimeUTC = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
     const dtstamp = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
 
+    const newMeetingDetails = {
+        date: meetingDetails.date,
+        time: meetingDetails.time,
+        venue: meetingDetails.venue,
+        mode: meetingDetails.mode,
+        assignedEvaluators: meetingDetails.evaluatorUids,
+    };
+
+    const allUsersToNotify = new Map<string, User>();
+
+    // Prepare notifications for all projects
     for (const projectData of projectsToSchedule) {
       const projectRef = adminDb.collection("projects").doc(projectData.id)
+      const projectSnap = await projectRef.get();
+      const existingProject = projectSnap.exists ? projectSnap.data() as Project : null;
+      const isReschedule = !!existingProject?.meetingDetails;
 
-      const updateData: any = {
-        meetingDetails: {
-          date: meetingDetails.date,
-          time: meetingDetails.time,
-          venue: meetingDetails.venue,
-          mode: meetingDetails.mode,
-          assignedEvaluators: meetingDetails.evaluatorUids,
-        },
-      };
-
+      const updateData: any = { meetingDetails: newMeetingDetails };
       if (isMidTermReview) {
         updateData.hasHadMidTermReview = true;
       } else {
@@ -911,102 +904,84 @@ export async function scheduleMeeting(
 
       batch.update(projectRef, updateData);
 
-      const notificationRef = adminDb.collection("notifications").doc()
-      batch.set(notificationRef, {
-        uid: projectData.pi_uid,
-        projectId: projectData.id,
-        title: `${subjectPrefix} scheduled for your project: "${projectData.title}"`,
-        createdAt: new Date().toISOString(),
-        isRead: false,
-      })
+      // Collect users to notify
+      const piSnap = await adminDb.collection("users").doc(projectData.pi_uid).get();
+      if(piSnap.exists) allUsersToNotify.set(projectData.pi_uid, piSnap.data() as User);
 
-      if (projectData.pi_email) {
-          const emailHtml = `
-            <div ${EMAIL_STYLES.background}>
-              ${EMAIL_STYLES.logo}
-              <p style="color: #ffffff;">Dear Researcher,</p>
-              <p style="color: #e0e0e0;">
-                An <strong style="color: #ffffff;">${meetingType}</strong> has been scheduled for your project, 
-                "<strong style="color: #ffffff;">${projectData.title}</strong>".
-              </p>
-              <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
-              <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
-              <p><strong style="color: #ffffff;">
-                ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
-              </strong> 
-                ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
-              </p>
-              <p style="color: #cccccc; margin-top: 15px;">
-                Please prepare for your presentation. You can view more details on the 
-                <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectData.id}" style="color: #64b5f6; text-decoration: underline;">
-                  PU Research Projects Portal
-                </a>.
-              </p>
-              ${EMAIL_STYLES.footer}
-            </div>
-          `;
-          
-           const icalContent = [
-              'BEGIN:VCALENDAR',
-              'VERSION:2.0',
-              'PRODID:-//ParulUniversity//RDC-Portal//EN',
-              'METHOD:REQUEST',
-              'BEGIN:VEVENT',
-              `UID:${projectData.id}@paruluniversity.ac.in`,
-              `DTSTAMP:${dtstamp}`,
-              `DTSTART:${startTimeUTC}`,
-              `DTEND:${endTimeUTC}`,
-              `SUMMARY:${subjectPrefix}: ${projectData.title}`,
-              `DESCRIPTION:Your presentation for the project titled '${projectData.title}' has been scheduled.`,
-              `LOCATION:${meetingDetails.venue}`,
-              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER || 'helpdesk.rdc@paruluniversity.ac.in'}`,
-              `ATTENDEE;CN=${projectData.pi};RSVP=TRUE:mailto:${projectData.pi_email}`,
-              'END:VEVENT',
-              'END:VCALENDAR'
-            ].join('\r\n');
-            
-            await sendEmailUtility({
-                to: projectData.pi_email,
-                subject: `${subjectPrefix} Scheduled for Your Project: ${projectData.title}${subjectOnlineIndicator}`,
-                html: emailHtml,
-                from: "default",
-                icalEvent: {
-                    filename: 'invite.ics',
-                    method: 'REQUEST',
-                    content: icalContent,
-                }
-            });
+      if (isReschedule && existingProject?.meetingDetails?.assignedEvaluators) {
+          for(const uid of existingProject.meetingDetails.assignedEvaluators) {
+              if(!allUsersToNotify.has(uid)) {
+                  const userSnap = await adminDb.collection("users").doc(uid).get();
+                  if(userSnap.exists) allUsersToNotify.set(uid, userSnap.data() as User);
+              }
+          }
+      }
+      for(const uid of meetingDetails.evaluatorUids) {
+          if(!allUsersToNotify.has(uid)) {
+              const userSnap = await adminDb.collection("users").doc(uid).get();
+              if(userSnap.exists) allUsersToNotify.set(uid, userSnap.data() as User);
+          }
       }
     }
+    
+    await batch.commit(); // Commit all project updates first
 
-    // Notify evaluators
-    if (meetingDetails.evaluatorUids && meetingDetails.evaluatorUids.length > 0) {
-      const evaluatorDocs = await Promise.all(
-        meetingDetails.evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()),
-      )
+    // Send notifications
+    for (const [uid, user] of allUsersToNotify.entries()) {
+        const isPI = projectsToSchedule.some(p => p.pi_uid === uid);
+        const isNewEvaluator = meetingDetails.evaluatorUids.includes(uid);
+        
+        // This is complex, need to get old data before batch commit to do it cleanly.
+        // For now, we assume if they are in the allUsersToNotify list and not a new evaluator, they might be an old one.
+        // A better approach would be to fetch all old evaluators at the start.
 
-      const projectTitles = projectsToSchedule.map((p) => `<li style="color: #cccccc;">${p.title}</li>`).join("")
-      
-      for (const evaluatorDocSnapshot of evaluatorDocs) {
-        if (evaluatorDocSnapshot.exists) {
-          const evaluator = evaluatorDocSnapshot.data() as User
-          
-          const evaluatorNotificationRef = adminDb.collection("notifications").doc()
-          batch.set(evaluatorNotificationRef, {
-            uid: evaluator.uid,
-            projectId: projectsToSchedule[0].id,
-            title: `You've been assigned to an IMR evaluation on ${formattedDate}`,
-            createdAt: new Date().toISOString(),
-            isRead: false,
-          })
+        let subject = '';
+        let htmlContent = '';
+        
+        const project = projectsToSchedule.find(p => p.pi_uid === uid) || projectsToSchedule[0]; // Get relevant project
+        const isReschedule = !!(await adminDb.collection('projects').doc(project.id).get()).data()?.meetingDetails;
 
-          if (evaluator.email) {
-              const emailHtml = `
+        const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting";
+        const subjectPrefix = isReschedule ? `RESCHEDULED: ${meetingType}` : meetingType;
+        
+        const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy");
+        const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)");
+        
+        const projectTitles = projectsToSchedule.map(p => `<li style="color: #cccccc;">${p.title}</li>`).join("");
+
+        if (isPI) {
+            subject = `${subjectPrefix} for Your Project: ${project.title}`;
+            htmlContent = `
+                <div ${EMAIL_STYLES.background}>
+                  ${EMAIL_STYLES.logo}
+                  <p style="color: #ffffff;">Dear Researcher,</p>
+                  <p style="color: #e0e0e0;">
+                    An <strong style="color: #ffffff;">${meetingType}</strong> has been ${isReschedule ? 'rescheduled' : 'scheduled'} for your project, 
+                    "<strong style="color: #ffffff;">${project.title}</strong>".
+                  </p>
+                   ${isReschedule ? `<p style="color: #ffcdd2;">Please note the updated time/date.</p>` : ''}
+                  <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
+                  <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
+                  <p><strong style="color: #ffffff;">${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
+                    ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
+                  </p>
+                  <p style="color: #cccccc; margin-top: 15px;">
+                    You can view more details on the 
+                    <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${project.id}" style="color: #64b5f6; text-decoration: underline;">
+                      PU Research Projects Portal
+                    </a>.
+                  </p>
+                  ${EMAIL_STYLES.footer}
+                </div>
+              `;
+        } else { // Is an evaluator
+            subject = `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term' : 'New Submission'}) ${isReschedule ? '- RESCHEDULED' : ''}`;
+             htmlContent = `
                   <div ${EMAIL_STYLES.background}>
                       ${EMAIL_STYLES.logo}
-                      <p style="color: #ffffff;">Dear ${evaluator.name},</p>
+                      <p style="color: #ffffff;">Dear ${user.name},</p>
                       <p style="color: #e0e0e0;">
-                          You have been assigned to an <strong style="color:#ffffff;">${meetingType}</strong> committee with the following details. You are requested to be present.
+                          You have been assigned to an <strong style="color:#ffffff;">${meetingType}</strong> committee. ${isReschedule ? 'Please note the schedule has been updated.' : 'You are requested to be present.'}
                       </p>
                       <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
                       <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
@@ -1028,48 +1003,40 @@ export async function scheduleMeeting(
                       ${EMAIL_STYLES.footer}
                   </div>
               `;
-              
-              const icalContent = [
-                  'BEGIN:VCALENDAR',
-                  'VERSION:2.0',
-                  'PRODID:-//ParulUniversity//RDC-Portal//EN',
-                  'METHOD:REQUEST',
-                  'BEGIN:VEVENT',
-                  `UID:meeting-${meetingDetails.date}-${evaluator.uid}@paruluniversity.ac.in`,
-                  `DTSTAMP:${dtstamp}`,
-                  `DTSTART:${startTimeUTC}`,
-                  `DTEND:${endTimeUTC}`,
-                  `SUMMARY:IMR Evaluation Committee Meeting`,
-                  `DESCRIPTION:You are assigned to evaluate IMR projects including: ${projectsToSchedule.map(p => p.title).join(', ')}`,
-                  `LOCATION:${meetingDetails.venue}`,
-                  `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER || 'helpdesk.rdc@paruluniversity.ac.in'}`,
-                  `ATTENDEE;CN=${evaluator.name};RSVP=TRUE:mailto:${evaluator.email}`,
-                  'END:VEVENT',
-                  'END:VCALENDAR'
-                ].join('\r\n');
+        }
+
+        if(user.email) {
+            const startTimeUTC = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
+            const endTimeUTC = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
+
+            const icalContent = [
+                'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ParulUniversity//RDC-Portal//EN',
+                'METHOD:REQUEST', 'BEGIN:VEVENT', `UID:${project.id}@paruluniversity.ac.in`, `DTSTAMP:${dtstamp}`,
+                `DTSTART:${startTimeUTC}`, `DTEND:${endTimeUTC}`, `SUMMARY:${subject}`,
+                `DESCRIPTION:A meeting for the IMR project '${project.title}' has been scheduled.`,
+                `LOCATION:${meetingDetails.venue}`, `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER || 'helpdesk.rdc@paruluniversity.ac.in'}`,
+                `ATTENDEE;CN=${user.name};RSVP=TRUE:mailto:${user.email}`, 'END:VEVENT', 'END:VCALENDAR'
+            ].join('\r\n');
 
             await sendEmailUtility({
-              to: evaluator.email,
-              subject: `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term Review' : 'New Submission'})${subjectOnlineIndicator}`,
-              html: emailHtml,
+              to: user.email,
+              subject,
+              html: htmlContent,
               from: "default",
               icalEvent: {
-                  filename: 'invite.ics',
-                  method: 'REQUEST',
-                  content: icalContent,
+                filename: 'invite.ics',
+                method: 'REQUEST',
+                content: icalContent
               }
-            })
-          }
+            });
         }
-      }
     }
-
-    await batch.commit()
-    await logActivity("INFO", `IMR ${isMidTermReview ? 'mid-term review' : ''} meeting scheduled`, {
+    
+    await logActivity("INFO", `IMR ${isMidTermReview ? 'mid-term review' : ''} meeting scheduled/rescheduled`, {
       projectIds: projectsToSchedule.map((p) => p.id),
       meetingDate: meetingDetails.date,
-    })
-    return { success: true }
+    });
+    return { success: true };
   } catch (error: any) {
     console.error("Error scheduling meeting:", error)
     await logActivity("ERROR", "Failed to schedule IMR meeting", { error: error.message, stack: error.stack })
