@@ -78,6 +78,7 @@ function HistoryTable({
     currentUser,
     onRemind,
     isReminding,
+    onEdit,
 }: { 
     projects: Project[], 
     usersMap: Map<string, User>,
@@ -86,6 +87,7 @@ function HistoryTable({
     currentUser: User,
     onRemind: () => void,
     isReminding: boolean,
+    onEdit: (project: Project) => void,
 }) {
     const sortedProjects = [...projects].sort((a, b) => {
         const dateA = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
@@ -133,6 +135,7 @@ function HistoryTable({
                                 <TableHead>Venue / Mode</TableHead>
                                 <TableHead>Pending Evaluators</TableHead>
                                 <TableHead>Completed Evaluators</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -182,6 +185,13 @@ function HistoryTable({
                                         </TableCell>
                                         <TableCell>
                                             {completedEvaluators.length > 0 ? completedEvaluators.join(', ') : <span className="text-muted-foreground">None</span>}
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            {isSuperAdmin && project.meetingDetails?.date && isFuture(parseISO(project.meetingDetails.date)) && (
+                                                <Button variant="ghost" size="icon" onClick={() => onEdit(project)}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                            )}
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -630,7 +640,16 @@ export default function ScheduleMeetingPage() {
                 />
               </TabsContent>
               <TabsContent value="history" className="mt-0">
-                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} currentUser={user} onRemind={handleGlobalReminder} isReminding={isSendingGlobalReminders} />
+                <HistoryTable 
+                    projects={filteredHistory} 
+                    usersMap={usersMap} 
+                    filter={historyFilter} 
+                    onFilterChange={setHistoryFilter} 
+                    currentUser={user} 
+                    onRemind={handleGlobalReminder} 
+                    isReminding={isSendingGlobalReminders}
+                    onEdit={setMeetingToEdit}
+                />
               </TabsContent>
             </div>
             
@@ -651,3 +670,4 @@ export default function ScheduleMeetingPage() {
     </>
   );
 }
+
