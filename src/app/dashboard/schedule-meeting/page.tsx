@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -184,7 +185,6 @@ function HistoryTable({
     usersMap,
     filter,
     onFilterChange,
-    onEditMeeting,
     currentUser,
     onRemind,
     isReminding,
@@ -193,7 +193,6 @@ function HistoryTable({
     usersMap: Map<string, User>,
     filter: 'all' | 'regular' | 'mid-term',
     onFilterChange: (value: 'all' | 'regular' | 'mid-term') => void,
-    onEditMeeting: (project: Project) => void,
     currentUser: User,
     onRemind: () => void,
     isReminding: boolean,
@@ -239,12 +238,10 @@ function HistoryTable({
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Project Title</TableHead>
-                                <TableHead>PI</TableHead>
+                                <TableHead>Project / PI</TableHead>
                                 <TableHead>Meeting Date & Time</TableHead>
                                 <TableHead>Venue / Mode</TableHead>
                                 <TableHead>Evaluators</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -255,21 +252,23 @@ function HistoryTable({
                                     ?.map(uid => usersMap.get(uid)?.name)
                                     .filter(Boolean)
                                     .join(', ');
-                                const isFutureMeeting = project.meetingDetails?.date && isFuture(parseISO(project.meetingDetails.date));
 
                                 return (
                                     <TableRow key={project.id}>
                                         <TableCell>
-                                            <Link href={`/dashboard/project/${project.id}`} className="hover:underline text-primary" target="_blank">
-                                                {project.title}
-                                            </Link>
-                                        </TableCell>
-                                        <TableCell>
-                                            {piUser?.misId ? (
-                                                <Link href={profileLink} target="_blank" className="text-primary hover:underline" rel="noopener noreferrer">
-                                                    {project.pi}
+                                            <div>
+                                                <Link href={`/dashboard/project/${project.id}`} className="hover:underline text-primary" target="_blank">
+                                                    {project.title}
                                                 </Link>
-                                            ) : project.pi}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                by{' '}
+                                                {piUser?.misId ? (
+                                                    <Link href={profileLink} target="_blank" className="text-primary hover:underline" rel="noopener noreferrer">
+                                                        {project.pi}
+                                                    </Link>
+                                                ) : project.pi}
+                                            </div>
                                         </TableCell>
                                         <TableCell>
                                             {project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'PPP') : 'N/A'}
@@ -279,13 +278,6 @@ function HistoryTable({
                                             {project.meetingDetails?.venue} ({project.meetingDetails?.mode})
                                         </TableCell>
                                         <TableCell>{assignedEvaluatorNames || 'N/A'}</TableCell>
-                                        <TableCell className="text-right flex items-center justify-end gap-2">
-                                            {isFutureMeeting && (
-                                                <Button variant="outline" size="sm" onClick={() => onEditMeeting(project)}>
-                                                    <Edit className="mr-2 h-4 w-4" /> Edit
-                                                </Button>
-                                            )}
-                                        </TableCell>
                                     </TableRow>
                                 );
                             })}
@@ -623,7 +615,7 @@ export default function ScheduleMeetingPage() {
                 />
               </TabsContent>
               <TabsContent value="history" className="mt-0">
-                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} onEditMeeting={setMeetingToEdit} currentUser={user} onRemind={handleGlobalReminder} isReminding={isSendingGlobalReminders} />
+                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} currentUser={user} onRemind={handleGlobalReminder} isReminding={isSendingGlobalReminders} />
               </TabsContent>
             </div>
             
