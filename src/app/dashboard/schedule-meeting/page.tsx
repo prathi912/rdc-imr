@@ -70,6 +70,134 @@ const scheduleSchema = z.object({
     path: ['time'],
 });
 
+function HistoryTable({ 
+    projects, 
+    usersMap,
+    filter,
+    onFilterChange,
+    currentUser,
+    onRemind,
+    isReminding,
+}: { 
+    projects: Project[], 
+    usersMap: Map<string, User>,
+    filter: 'all' | 'regular' | 'mid-term',
+    onFilterChange: (value: 'all' | 'regular' | 'mid-term') => void,
+    currentUser: User,
+    onRemind: () => void,
+    isReminding: boolean,
+}) {
+    const sortedProjects = [...projects].sort((a, b) => {
+        const dateA = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
+        const dateB = b.meetingDetails?.date ? parseISO(b.meetingDetails.date).getTime() : 0;
+        return dateB - dateA;
+    });
+
+    const isSuperAdmin = currentUser.role === 'Super-admin';
+
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    <div>
+                        <CardTitle>Scheduled Meetings History</CardTitle>
+                        <CardDescription>A log of all past and future scheduled IMR meetings.</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Select value={filter} onValueChange={(value) => onFilterChange(value as any)}>
+                            <SelectTrigger className="w-full sm:w-[240px]">
+                                <SelectValue placeholder="Filter by meeting type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Meetings</SelectItem>
+                                <SelectItem value="regular">Regular Submissions</SelectItem>
+                                <SelectItem value="mid-term">Mid-term Reviews</SelectItem>
+                            </SelectContent>
+                        </Select>
+                         {isSuperAdmin && (
+                            <Button onClick={onRemind} disabled={isReminding}>
+                                {isReminding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                Remind All
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent>
+                 {sortedProjects.length > 0 ? (
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Project / PI</TableHead>
+                                <TableHead>Meeting Date & Time</TableHead>
+                                <TableHead>Venue / Mode</TableHead>
+                                <TableHead>Pending Evaluators</TableHead>
+                                <TableHead>Completed Evaluators</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {sortedProjects.map(project => {
+                                const piUser = usersMap.get(project.pi_uid);
+                                const profileLink = piUser?.campus === 'Goa' ? `/goa/${piUser.misId}` : `/profile/${piUser?.misId}`;
+
+                                const assignedEvaluators = project.meetingDetails?.assignedEvaluators || [];
+                                const evaluatedBy = project.evaluatedBy || [];
+
+                                const pendingEvaluators = assignedEvaluators
+                                    .filter(uid => !evaluatedBy.includes(uid))
+                                    .map(uid => usersMap.get(uid)?.name)
+                                    .filter(Boolean);
+
+                                const completedEvaluators = assignedEvaluators
+                                    .filter(uid => evaluatedBy.includes(uid))
+                                    .map(uid => usersMap.get(uid)?.name)
+                                    .filter(Boolean);
+
+                                return (
+                                    <TableRow key={project.id}>
+                                        <TableCell>
+                                            <div>
+                                                <Link href={`/dashboard/project/${project.id}`} className="hover:underline text-primary" target="_blank">
+                                                    {project.title}
+                                                </Link>
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                by{' '}
+                                                {piUser?.misId ? (
+                                                    <Link href={profileLink} target="_blank" className="text-primary hover:underline" rel="noopener noreferrer">
+                                                        {project.pi}
+                                                    </Link>
+                                                ) : project.pi}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'PPP') : 'N/A'}
+                                            {' @ '}{project.meetingDetails?.time || 'N/A'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {project.meetingDetails?.venue} ({project.meetingDetails?.mode})
+                                        </TableCell>
+                                        <TableCell>
+                                            {pendingEvaluators.length > 0 ? pendingEvaluators.join(', ') : <span className="text-muted-foreground">None</span>}
+                                        </TableCell>
+                                        <TableCell>
+                                            {completedEvaluators.length > 0 ? completedEvaluators.join(', ') : <span className="text-muted-foreground">None</span>}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                ) : (
+                    <div className="text-center py-10 text-muted-foreground">
+                        <p>No meetings match the selected filter.</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 function ProjectListTable({ 
     projects, 
     selectedProjects, 
@@ -173,119 +301,6 @@ function ProjectListTable({
                 ) : (
                     <div className="text-center py-10 text-muted-foreground">
                         <p>There are no projects currently in this category.</p>
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-function HistoryTable({ 
-    projects, 
-    usersMap,
-    filter,
-    onFilterChange,
-    currentUser,
-    onRemind,
-    isReminding,
-}: { 
-    projects: Project[], 
-    usersMap: Map<string, User>,
-    filter: 'all' | 'regular' | 'mid-term',
-    onFilterChange: (value: 'all' | 'regular' | 'mid-term') => void,
-    currentUser: User,
-    onRemind: () => void,
-    isReminding: boolean,
-}) {
-    const sortedProjects = [...projects].sort((a, b) => {
-        const dateA = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
-        const dateB = b.meetingDetails?.date ? parseISO(b.meetingDetails.date).getTime() : 0;
-        return dateB - dateA;
-    });
-
-    const isSuperAdmin = currentUser.role === 'Super-admin';
-
-    return (
-        <Card>
-            <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <CardTitle>Scheduled Meetings History</CardTitle>
-                        <CardDescription>A log of all past and future scheduled IMR meetings.</CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Select value={filter} onValueChange={(value) => onFilterChange(value as any)}>
-                            <SelectTrigger className="w-full sm:w-[240px]">
-                                <SelectValue placeholder="Filter by meeting type..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All Meetings</SelectItem>
-                                <SelectItem value="regular">Regular Submissions</SelectItem>
-                                <SelectItem value="mid-term">Mid-term Reviews</SelectItem>
-                            </SelectContent>
-                        </Select>
-                         {isSuperAdmin && (
-                            <Button onClick={onRemind} disabled={isReminding}>
-                                {isReminding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                Remind All
-                            </Button>
-                        )}
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent>
-                 {sortedProjects.length > 0 ? (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Project / PI</TableHead>
-                                <TableHead>Meeting Date & Time</TableHead>
-                                <TableHead>Venue / Mode</TableHead>
-                                <TableHead>Evaluators</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {sortedProjects.map(project => {
-                                const piUser = usersMap.get(project.pi_uid);
-                                const profileLink = piUser?.campus === 'Goa' ? `/goa/${piUser.misId}` : `/profile/${piUser?.misId}`;
-                                const assignedEvaluatorNames = project.meetingDetails?.assignedEvaluators
-                                    ?.map(uid => usersMap.get(uid)?.name)
-                                    .filter(Boolean)
-                                    .join(', ');
-
-                                return (
-                                    <TableRow key={project.id}>
-                                        <TableCell>
-                                            <div>
-                                                <Link href={`/dashboard/project/${project.id}`} className="hover:underline text-primary" target="_blank">
-                                                    {project.title}
-                                                </Link>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                by{' '}
-                                                {piUser?.misId ? (
-                                                    <Link href={profileLink} target="_blank" className="text-primary hover:underline" rel="noopener noreferrer">
-                                                        {project.pi}
-                                                    </Link>
-                                                ) : project.pi}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {project.meetingDetails?.date ? format(parseISO(project.meetingDetails.date), 'PPP') : 'N/A'}
-                                            {' @ '}{project.meetingDetails?.time || 'N/A'}
-                                        </TableCell>
-                                        <TableCell>
-                                            {project.meetingDetails?.venue} ({project.meetingDetails?.mode})
-                                        </TableCell>
-                                        <TableCell>{assignedEvaluatorNames || 'N/A'}</TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                ) : (
-                    <div className="text-center py-10 text-muted-foreground">
-                        <p>No meetings match the selected filter.</p>
                     </div>
                 )}
             </CardContent>
