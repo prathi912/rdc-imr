@@ -2063,104 +2063,109 @@ export async function markImrAttendance(
   }
 }
 
-export async function sendImrEvaluationReminders(
-  meetingIdentifier: { date: string; time: string; venue: string; },
-  adminName: string
-): Promise<{ success: boolean; sentCount: number; error?: string }> {
-  try {
-    const projectsRef = adminDb.collection('projects');
-    const q = projectsRef
-        .where('meetingDetails.date', '==', meetingIdentifier.date)
-        .where('meetingDetails.time', '==', meetingIdentifier.time)
-        .where('meetingDetails.venue', '==', meetingIdentifier.venue);
+export async function sendGlobalEvaluationReminders(adminName: string): Promise<{ success: boolean; sentCount: number; error?: string }> {
+    try {
+        const projectsRef = adminDb.collection('projects');
+        const q = projectsRef.where('status', '==', 'Under Review');
+        const projectsSnapshot = await q.get();
 
-    const meetingSnapshot = await q.get();
-    if (meetingSnapshot.empty) {
-      return { success: false, sentCount: 0, error: "No projects found for this meeting." };
-    }
+        if (projectsSnapshot.empty) {
+            return { success: true, sentCount: 0, error: "No projects are currently under review." };
+        }
 
-    const projectsInMeeting = meetingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-    const allEvaluatorUids = [...new Set(projectsInMeeting.flatMap(p => p.meetingDetails?.assignedEvaluators || []))];
+        const projectsToReview = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        const pendingEvaluationsMap = new Map<string, { evaluator: User, projects: Project[] }>();
 
-    if (allEvaluatorUids.length === 0) {
-      return { success: true, sentCount: 0 };
-    }
+        // Get all potential evaluators in one go to minimize reads
+        const allPotentialEvaluatorUids = [...new Set(projectsToReview.flatMap(p => p.meetingDetails?.assignedEvaluators || []))];
+        if (allPotentialEvaluatorUids.length === 0) {
+            return { success: true, sentCount: 0 };
+        }
+        
+        // Firestore 'in' query has a limit of 30 elements, so we need to chunk it.
+        const usersRef = adminDb.collection('users');
+        const evaluatorsMap = new Map<string, User>();
+        const chunkSize = 30;
+        for (let i = 0; i < allPotentialEvaluatorUids.length; i += chunkSize) {
+            const chunk = allPotentialEvaluatorUids.slice(i, i + chunkSize);
+            const evaluatorsSnapshot = await usersRef.where('__name__', 'in', chunk).get();
+            evaluatorsSnapshot.forEach(doc => evaluatorsMap.set(doc.id, doc.data() as User));
+        }
 
-    // Fetch all evaluator details in one go
-    const usersRef = adminDb.collection('users');
-    const evaluatorsSnapshot = await usersRef.where('__name__', 'in', allEvaluatorUids).get();
-    const evaluatorsMap = new Map<string, User>(evaluatorsSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
+        // Determine pending evaluations for each evaluator across all projects
+        for (const project of projectsToReview) {
+            const assigned = project.meetingDetails?.assignedEvaluators || [];
+            const evaluated = project.evaluatedBy || [];
 
-    const pendingEvaluationsMap = new Map<string, { evaluator: User, projects: Project[] }>();
-
-    // Determine pending evaluations for each evaluator
-    for (const project of projectsInMeeting) {
-      const assigned = project.meetingDetails?.assignedEvaluators || [];
-      const evaluated = project.evaluatedBy || [];
-      for (const evaluatorUid of assigned) {
-        if (!evaluated.includes(evaluatorUid)) {
-          const evaluator = evaluatorsMap.get(evaluatorUid);
-          if (evaluator) {
-            if (!pendingEvaluationsMap.has(evaluatorUid)) {
-              pendingEvaluationsMap.set(evaluatorUid, { evaluator, projects: [] });
+            for (const evaluatorUid of assigned) {
+                if (!evaluated.includes(evaluatorUid)) {
+                    const evaluator = evaluatorsMap.get(evaluatorUid);
+                    if (evaluator) {
+                        if (!pendingEvaluationsMap.has(evaluatorUid)) {
+                            pendingEvaluationsMap.set(evaluatorUid, { evaluator, projects: [] });
+                        }
+                        pendingEvaluationsMap.get(evaluatorUid)!.projects.push(project);
+                    }
+                }
             }
-            pendingEvaluationsMap.get(evaluatorUid)!.projects.push(project);
-          }
         }
-      }
-    }
-    
-    let emailsSentCount = 0;
-    const emailPromises = [];
+        
+        let emailsSentCount = 0;
+        const emailPromises = [];
 
-    // Send grouped emails
-    for (const { evaluator, projects } of pendingEvaluationsMap.values()) {
-        if (evaluator.email && projects.length > 0) {
-            const projectListHtml = projects.map(p => `<li style="color: #cccccc;">${p.title} (PI: ${p.pi})</li>`).join('');
-            
-            const emailHtml = `
-                <div ${EMAIL_STYLES.background}>
-                    ${EMAIL_STYLES.logo}
-                    <h2 style="color:#ffffff;">Gentle Reminder: IMR Evaluation Submission</h2>
-                    <p style="color:#cccccc;">Dear ${evaluator.name},</p>
-                    <p style="color:#cccccc;">
-                        This is a friendly reminder to please submit your evaluation for the following IMR project(s) from the meeting held on ${format(parseISO(meetingIdentifier.date), 'PPP')}:
-                    </p>
-                    <ul style="padding-left: 20px;">
-                        ${projectListHtml}
-                    </ul>
-                    <p style="color:#cccccc;">
-                        Please complete the evaluations at your earliest convenience from the "Evaluation Queue" on the R&D Portal. Your timely feedback is greatly appreciated.
-                    </p>
-                    <p style="text-align:center; margin-top:25px;">
-                        <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                            Go to Evaluation Queue
-                        </a>
-                    </p>
-                    ${EMAIL_STYLES.footer}
-                </div>
-            `;
-            
-            emailPromises.push(sendEmailUtility({
-                to: evaluator.email,
-                subject: `Reminder: Please Submit Your IMR Evaluations`,
-                html: emailHtml,
-                from: 'default'
-            }));
-            emailsSentCount++;
+        // Send grouped emails
+        for (const { evaluator, projects } of pendingEvaluationsMap.values()) {
+            if (evaluator.email && projects.length > 0) {
+                const projectListHtml = projects.map(p => 
+                    `<li style="color: #cccccc;">
+                        <strong>${p.title}</strong> (PI: ${p.pi}) - Meeting on ${format(parseISO(p.meetingDetails!.date), 'PPP')}
+                    </li>`
+                ).join('');
+                
+                const emailHtml = `
+                    <div ${EMAIL_STYLES.background}>
+                        ${EMAIL_STYLES.logo}
+                        <h2 style="color:#ffffff;">Gentle Reminder: Pending IMR Evaluations</h2>
+                        <p style="color:#cccccc;">Dear ${evaluator.name},</p>
+                        <p style="color:#cccccc;">
+                            This is a friendly reminder to please submit your evaluation for the following IMR project(s):
+                        </p>
+                        <ul style="padding-left: 20px;">
+                            ${projectListHtml}
+                        </ul>
+                        <p style="color:#cccccc;">
+                            Please complete the evaluations at your earliest convenience from the "Evaluation Queue" on the R&D Portal. Your timely feedback is greatly appreciated.
+                        </p>
+                        <p style="text-align:center; margin-top:25px;">
+                            <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                                Go to Evaluation Queue
+                            </a>
+                        </p>
+                        ${EMAIL_STYLES.footer}
+                    </div>
+                `;
+                
+                emailPromises.push(sendEmailUtility({
+                    to: evaluator.email,
+                    subject: `Reminder: You have ${projects.length} pending IMR evaluations`,
+                    html: emailHtml,
+                    from: 'default'
+                }));
+                emailsSentCount++;
+            }
         }
+        
+        await Promise.all(emailPromises);
+        await logActivity('INFO', `${adminName} sent ${emailsSentCount} global IMR evaluation reminders`, { sentCount: emailsSentCount });
+        
+        return { success: true, sentCount: emailsSentCount };
+    } catch (error: any) {
+        console.error('Error sending global IMR evaluation reminders:', error);
+        await logActivity('ERROR', 'Failed to send global IMR evaluation reminders', { error: error.message });
+        return { success: false, sentCount: 0, error: error.message || 'An unknown server error occurred.' };
     }
-    
-    await Promise.all(emailPromises);
-    await logActivity('INFO', `${adminName} sent IMR evaluation reminders`, { meetingIdentifier, sentCount: emailsSentCount });
-    
-    return { success: true, sentCount: emailsSentCount };
-  } catch (error: any) {
-    console.error('Error sending IMR evaluation reminders:', error);
-    await logActivity('ERROR', 'Failed to send IMR evaluation reminders', { error: error.message });
-    return { success: false, sentCount: 0, error: error.message || 'An unknown server error occurred.' };
-  }
 }
+
 
 export async function addTransaction(
   ...args: Parameters<typeof import('./grant-actions').addTransaction>
@@ -2404,5 +2409,3 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
-
-    

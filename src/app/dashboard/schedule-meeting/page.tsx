@@ -25,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { scheduleMeeting, getSystemSettings, sendImrEvaluationReminders } from '@/app/actions';
+import { scheduleMeeting, getSystemSettings, sendGlobalEvaluationReminders } from '@/app/actions';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   DropdownMenu,
@@ -185,8 +185,6 @@ function HistoryTable({
     filter,
     onFilterChange,
     onEditMeeting,
-    onSendReminders,
-    sendingReminderFor,
     currentUser,
 }: { 
     projects: Project[], 
@@ -194,8 +192,6 @@ function HistoryTable({
     filter: 'all' | 'regular' | 'mid-term',
     onFilterChange: (value: 'all' | 'regular' | 'mid-term') => void,
     onEditMeeting: (project: Project) => void,
-    onSendReminders: (project: Project) => void,
-    sendingReminderFor: string | null,
     currentUser: User,
 }) {
     const sortedProjects = [...projects].sort((a, b) => {
@@ -248,7 +244,6 @@ function HistoryTable({
                                     .filter(Boolean)
                                     .join(', ');
                                 const isFutureMeeting = project.meetingDetails?.date && isFuture(parseISO(project.meetingDetails.date));
-                                const allEvaluationsDone = (project.evaluatedBy || []).length >= (project.meetingDetails?.assignedEvaluators || []).length;
 
                                 return (
                                     <TableRow key={project.id}>
@@ -273,21 +268,6 @@ function HistoryTable({
                                         </TableCell>
                                         <TableCell>{assignedEvaluatorNames || 'N/A'}</TableCell>
                                         <TableCell className="text-right flex items-center justify-end gap-2">
-                                            {isSuperAdmin && project.status === 'Under Review' && (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => onSendReminders(project)}
-                                                    disabled={sendingReminderFor === project.id || allEvaluationsDone}
-                                                >
-                                                    {sendingReminderFor === project.id ? (
-                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                        <Send className="mr-2 h-4 w-4" />
-                                                    )}
-                                                    Reminders
-                                                </Button>
-                                            )}
                                             {isFutureMeeting && (
                                                 <Button variant="outline" size="sm" onClick={() => onEditMeeting(project)}>
                                                     <Edit className="mr-2 h-4 w-4" /> Edit
@@ -322,7 +302,7 @@ export default function ScheduleMeetingPage() {
   const router = useRouter();
   const [midTermSearchTerm, setMidTermSearchTerm] = useState('');
   const [meetingToEdit, setMeetingToEdit] = useState<Project | null>(null);
-  const [sendingReminderFor, setSendingReminderFor] = useState<string | null>(null);
+  const [isSendingGlobalReminders, setIsSendingGlobalReminders] = useState(false);
 
   const form = useForm<z.infer<typeof scheduleSchema>>({
     resolver: zodResolver(scheduleSchema),
@@ -478,27 +458,6 @@ export default function ScheduleMeetingPage() {
       setSelectedProjects(selectedProjects.filter(pId => pId !== id));
     }
   };
-  
-  const handleSendReminders = async (project: Project) => {
-    if (!project.meetingDetails || !user) return;
-    setSendingReminderFor(project.id);
-    try {
-        const result = await sendImrEvaluationReminders(project.meetingDetails, user.name);
-        if (result.success) {
-            if (result.sentCount > 0) {
-                toast({ title: 'Reminders Sent', description: `${result.sentCount} reminder email(s) have been sent.` });
-            } else {
-                toast({ title: 'No Reminders Needed', description: 'All evaluators for this meeting have already submitted their feedback.' });
-            }
-        } else {
-            throw new Error(result.error);
-        }
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send reminders.' });
-    } finally {
-        setSendingReminderFor(null);
-    }
-  };
 
   useEffect(() => {
     setSelectedProjects([]);
@@ -546,6 +505,27 @@ export default function ScheduleMeetingPage() {
       await fetchRequiredData();
     } else {
       toast({ variant: 'destructive', title: 'Scheduling Failed', description: result.error || 'An unknown error occurred.' });
+    }
+  };
+  
+  const handleGlobalReminder = async () => {
+    if (!user) return;
+    setIsSendingGlobalReminders(true);
+    try {
+        const result = await sendGlobalEvaluationReminders(user.name);
+        if (result.success) {
+            if (result.sentCount > 0) {
+                toast({ title: 'Reminders Sent', description: `${result.sentCount} reminder email(s) have been sent to evaluators.` });
+            } else {
+                toast({ title: 'No Reminders Sent', description: result.error || 'All evaluations are up to date.' });
+            }
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send reminders.' });
+    } finally {
+        setIsSendingGlobalReminders(false);
     }
   };
   
@@ -603,7 +583,14 @@ export default function ScheduleMeetingPage() {
       <PageHeader
         title="Schedule IMR Meeting"
         description="Select projects to schedule an initial submission meeting or a mid-term review."
-      />
+      >
+          {user?.role === 'Super-admin' && (
+            <Button onClick={handleGlobalReminder} disabled={isSendingGlobalReminders}>
+                {isSendingGlobalReminders ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                Remind Evaluators
+            </Button>
+          )}
+      </PageHeader>
       <div className="mt-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
@@ -631,7 +618,7 @@ export default function ScheduleMeetingPage() {
                 />
               </TabsContent>
               <TabsContent value="history" className="mt-0">
-                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} onEditMeeting={setMeetingToEdit} onSendReminders={handleSendReminders} sendingReminderFor={sendingReminderFor} currentUser={user} />
+                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} onEditMeeting={setMeetingToEdit} currentUser={user} />
               </TabsContent>
             </div>
             
@@ -652,5 +639,3 @@ export default function ScheduleMeetingPage() {
     </>
   );
 }
-
-    
