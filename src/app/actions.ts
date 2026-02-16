@@ -1,3 +1,4 @@
+
 'use server';
 
 import { adminDb, adminStorage } from "@/lib/admin"
@@ -939,7 +940,8 @@ export async function scheduleMeeting(
         let htmlContent = '';
         
         const project = projectsToSchedule.find(p => p.pi_uid === uid) || projectsToSchedule[0]; // Get relevant project
-        const isReschedule = !!(await adminDb.collection('projects').doc(project.id).get()).data()?.meetingDetails;
+        const projectSnap = await adminDb.collection('projects').doc(project.id).get();
+        const isReschedule = !!(projectSnap.exists() && projectSnap.data()?.meetingDetails);
 
         const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting";
         const subjectPrefix = isReschedule ? `RESCHEDULED: ${meetingType}` : meetingType;
@@ -2061,6 +2063,105 @@ export async function markImrAttendance(
   }
 }
 
+export async function sendImrEvaluationReminders(
+  meetingIdentifier: { date: string; time: string; venue: string; },
+  adminName: string
+): Promise<{ success: boolean; sentCount: number; error?: string }> {
+  try {
+    const projectsRef = adminDb.collection('projects');
+    const q = projectsRef
+        .where('meetingDetails.date', '==', meetingIdentifier.date)
+        .where('meetingDetails.time', '==', meetingIdentifier.time)
+        .where('meetingDetails.venue', '==', meetingIdentifier.venue);
+
+    const meetingSnapshot = await q.get();
+    if (meetingSnapshot.empty) {
+      return { success: false, sentCount: 0, error: "No projects found for this meeting." };
+    }
+
+    const projectsInMeeting = meetingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+    const allEvaluatorUids = [...new Set(projectsInMeeting.flatMap(p => p.meetingDetails?.assignedEvaluators || []))];
+
+    if (allEvaluatorUids.length === 0) {
+      return { success: true, sentCount: 0 };
+    }
+
+    // Fetch all evaluator details in one go
+    const usersRef = adminDb.collection('users');
+    const evaluatorsSnapshot = await usersRef.where('__name__', 'in', allEvaluatorUids).get();
+    const evaluatorsMap = new Map<string, User>(evaluatorsSnapshot.docs.map(doc => [doc.id, doc.data() as User]));
+
+    const pendingEvaluationsMap = new Map<string, { evaluator: User, projects: Project[] }>();
+
+    // Determine pending evaluations for each evaluator
+    for (const project of projectsInMeeting) {
+      const assigned = project.meetingDetails?.assignedEvaluators || [];
+      const evaluated = project.evaluatedBy || [];
+      for (const evaluatorUid of assigned) {
+        if (!evaluated.includes(evaluatorUid)) {
+          const evaluator = evaluatorsMap.get(evaluatorUid);
+          if (evaluator) {
+            if (!pendingEvaluationsMap.has(evaluatorUid)) {
+              pendingEvaluationsMap.set(evaluatorUid, { evaluator, projects: [] });
+            }
+            pendingEvaluationsMap.get(evaluatorUid)!.projects.push(project);
+          }
+        }
+      }
+    }
+    
+    let emailsSentCount = 0;
+    const emailPromises = [];
+
+    // Send grouped emails
+    for (const { evaluator, projects } of pendingEvaluationsMap.values()) {
+        if (evaluator.email && projects.length > 0) {
+            const projectListHtml = projects.map(p => `<li style="color: #cccccc;">${p.title} (PI: ${p.pi})</li>`).join('');
+            
+            const emailHtml = `
+                <div ${EMAIL_STYLES.background}>
+                    ${EMAIL_STYLES.logo}
+                    <h2 style="color:#ffffff;">Gentle Reminder: IMR Evaluation Submission</h2>
+                    <p style="color:#cccccc;">Dear ${evaluator.name},</p>
+                    <p style="color:#cccccc;">
+                        This is a friendly reminder to please submit your evaluation for the following IMR project(s) from the meeting held on ${format(parseISO(meetingIdentifier.date), 'PPP')}:
+                    </p>
+                    <ul style="padding-left: 20px;">
+                        ${projectListHtml}
+                    </ul>
+                    <p style="color:#cccccc;">
+                        Please complete the evaluations at your earliest convenience from the "Evaluation Queue" on the R&D Portal. Your timely feedback is greatly appreciated.
+                    </p>
+                    <p style="text-align:center; margin-top:25px;">
+                        <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                            Go to Evaluation Queue
+                        </a>
+                    </p>
+                    ${EMAIL_STYLES.footer}
+                </div>
+            `;
+            
+            emailPromises.push(sendEmailUtility({
+                to: evaluator.email,
+                subject: `Reminder: Please Submit Your IMR Evaluations`,
+                html: emailHtml,
+                from: 'default'
+            }));
+            emailsSentCount++;
+        }
+    }
+    
+    await Promise.all(emailPromises);
+    await logActivity('INFO', `${adminName} sent IMR evaluation reminders`, { meetingIdentifier, sentCount: emailsSentCount });
+    
+    return { success: true, sentCount: emailsSentCount };
+  } catch (error: any) {
+    console.error('Error sending IMR evaluation reminders:', error);
+    await logActivity('ERROR', 'Failed to send IMR evaluation reminders', { error: error.message });
+    return { success: false, sentCount: 0, error: error.message || 'An unknown server error occurred.' };
+  }
+}
+
 export async function addTransaction(
   ...args: Parameters<typeof import('./grant-actions').addTransaction>
 ): ReturnType<typeof import('./grant-actions').addTransaction> {
@@ -2303,3 +2404,5 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
+
+    

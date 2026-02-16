@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -8,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { format, startOfToday, subMonths, parseISO, isAfter, isToday, parse, isFuture } from 'date-fns';
-import { Calendar as CalendarIcon, Loader2, ChevronDown, Info, Edit } from 'lucide-react';
+import { Calendar as CalendarIcon, Loader2, ChevronDown, Info, Edit, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -26,7 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { scheduleMeeting, getSystemSettings } from '@/app/actions';
+import { scheduleMeeting, getSystemSettings, sendImrEvaluationReminders } from '@/app/actions';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   DropdownMenu,
@@ -185,19 +184,27 @@ function HistoryTable({
     usersMap,
     filter,
     onFilterChange,
-    onEditMeeting
+    onEditMeeting,
+    onSendReminders,
+    sendingReminderFor,
+    currentUser,
 }: { 
     projects: Project[], 
     usersMap: Map<string, User>,
     filter: 'all' | 'regular' | 'mid-term',
     onFilterChange: (value: 'all' | 'regular' | 'mid-term') => void,
-    onEditMeeting: (project: Project) => void
+    onEditMeeting: (project: Project) => void,
+    onSendReminders: (project: Project) => void,
+    sendingReminderFor: string | null,
+    currentUser: User,
 }) {
     const sortedProjects = [...projects].sort((a, b) => {
         const dateA = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
         const dateB = b.meetingDetails?.date ? parseISO(b.meetingDetails.date).getTime() : 0;
         return dateB - dateA;
     });
+
+    const isSuperAdmin = currentUser.role === 'Super-admin';
 
     return (
         <Card>
@@ -241,6 +248,7 @@ function HistoryTable({
                                     .filter(Boolean)
                                     .join(', ');
                                 const isFutureMeeting = project.meetingDetails?.date && isFuture(parseISO(project.meetingDetails.date));
+                                const allEvaluationsDone = (project.evaluatedBy || []).length >= (project.meetingDetails?.assignedEvaluators || []).length;
 
                                 return (
                                     <TableRow key={project.id}>
@@ -264,7 +272,22 @@ function HistoryTable({
                                             {project.meetingDetails?.venue} ({project.meetingDetails?.mode})
                                         </TableCell>
                                         <TableCell>{assignedEvaluatorNames || 'N/A'}</TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="text-right flex items-center justify-end gap-2">
+                                            {isSuperAdmin && project.status === 'Under Review' && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => onSendReminders(project)}
+                                                    disabled={sendingReminderFor === project.id || allEvaluationsDone}
+                                                >
+                                                    {sendingReminderFor === project.id ? (
+                                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <Send className="mr-2 h-4 w-4" />
+                                                    )}
+                                                    Reminders
+                                                </Button>
+                                            )}
                                             {isFutureMeeting && (
                                                 <Button variant="outline" size="sm" onClick={() => onEditMeeting(project)}>
                                                     <Edit className="mr-2 h-4 w-4" /> Edit
@@ -299,6 +322,7 @@ export default function ScheduleMeetingPage() {
   const router = useRouter();
   const [midTermSearchTerm, setMidTermSearchTerm] = useState('');
   const [meetingToEdit, setMeetingToEdit] = useState<Project | null>(null);
+  const [sendingReminderFor, setSendingReminderFor] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof scheduleSchema>>({
     resolver: zodResolver(scheduleSchema),
@@ -454,6 +478,27 @@ export default function ScheduleMeetingPage() {
       setSelectedProjects(selectedProjects.filter(pId => pId !== id));
     }
   };
+  
+  const handleSendReminders = async (project: Project) => {
+    if (!project.meetingDetails || !user) return;
+    setSendingReminderFor(project.id);
+    try {
+        const result = await sendImrEvaluationReminders(project.meetingDetails, user.name);
+        if (result.success) {
+            if (result.sentCount > 0) {
+                toast({ title: 'Reminders Sent', description: `${result.sentCount} reminder email(s) have been sent.` });
+            } else {
+                toast({ title: 'No Reminders Needed', description: 'All evaluators for this meeting have already submitted their feedback.' });
+            }
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send reminders.' });
+    } finally {
+        setSendingReminderFor(null);
+    }
+  };
 
   useEffect(() => {
     setSelectedProjects([]);
@@ -586,7 +631,7 @@ export default function ScheduleMeetingPage() {
                 />
               </TabsContent>
               <TabsContent value="history" className="mt-0">
-                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} onEditMeeting={setMeetingToEdit} />
+                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} onEditMeeting={setMeetingToEdit} onSendReminders={handleSendReminders} sendingReminderFor={sendingReminderFor} currentUser={user} />
               </TabsContent>
             </div>
             
@@ -607,3 +652,5 @@ export default function ScheduleMeetingPage() {
     </>
   );
 }
+
+    
