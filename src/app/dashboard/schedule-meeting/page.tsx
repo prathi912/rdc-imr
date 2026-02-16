@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -37,9 +36,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 
 const scheduleSchema = z.object({
   date: z.date({ required_error: 'A meeting date is required.' }),
@@ -155,6 +154,8 @@ function HistoryTable({
                                     .filter(uid => evaluatedBy.includes(uid))
                                     .map(uid => usersMap.get(uid)?.name)
                                     .filter(Boolean);
+                                
+                                const isUpcoming = project.meetingDetails?.date && isAfter(parseISO(project.meetingDetails.date), subDays(new Date(),1));
 
                                 return (
                                     <TableRow key={project.id}>
@@ -187,7 +188,7 @@ function HistoryTable({
                                             {completedEvaluators.length > 0 ? completedEvaluators.join(', ') : <span className="text-muted-foreground">None</span>}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {isSuperAdmin && project.meetingDetails?.date && isAfter(parseISO(project.meetingDetails.date), subDays(new Date(),1)) && (
+                                            {isSuperAdmin && isUpcoming && (
                                                 <Button variant="ghost" size="icon" onClick={() => onEdit(project)}>
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
@@ -670,3 +671,5 @@ export default function ScheduleMeetingPage() {
     </>
   );
 }
+
+    
