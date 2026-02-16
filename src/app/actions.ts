@@ -2073,7 +2073,21 @@ export async function sendGlobalEvaluationReminders(adminName: string): Promise<
             return { success: true, sentCount: 0, error: "No projects are currently under review." };
         }
 
-        const projectsToReview = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        const projectsToReview = projectsSnapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() } as Project))
+            .filter(project => {
+                if (!project.meetingDetails?.date) {
+                    return true; // Should not happen for "Under Review" projects, but as a safeguard.
+                }
+                const meetingDate = parseISO(project.meetingDetails.date);
+                // Exclude projects with meetings scheduled for today to avoid sending nuisance reminders.
+                return !isToday(meetingDate);
+            });
+            
+        if (projectsToReview.length === 0) {
+            return { success: true, sentCount: 0, error: "No projects with past meetings need reminders." };
+        }
+
         const pendingEvaluationsMap = new Map<string, { evaluator: User, projects: Project[] }>();
 
         // Get all potential evaluators in one go to minimize reads
@@ -2088,6 +2102,7 @@ export async function sendGlobalEvaluationReminders(adminName: string): Promise<
         const chunkSize = 30;
         for (let i = 0; i < allPotentialEvaluatorUids.length; i += chunkSize) {
             const chunk = allPotentialEvaluatorUids.slice(i, i + chunkSize);
+            if (chunk.length === 0) continue;
             const evaluatorsSnapshot = await usersRef.where('__name__', 'in', chunk).get();
             evaluatorsSnapshot.forEach(doc => evaluatorsMap.set(doc.id, doc.data() as User));
         }
@@ -2409,3 +2424,5 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
+
+    
