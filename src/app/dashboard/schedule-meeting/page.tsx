@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { format, startOfToday, subMonths, parseISO, isAfter, isToday, parse, isFuture } from 'date-fns';
+import { format, startOfToday, subMonths, parseISO, isAfter, isToday, parse, isFuture, subDays } from 'date-fns';
 import { Calendar as CalendarIcon, Loader2, ChevronDown, Info, Edit, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -187,7 +187,7 @@ function HistoryTable({
                                             {completedEvaluators.length > 0 ? completedEvaluators.join(', ') : <span className="text-muted-foreground">None</span>}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            {isSuperAdmin && project.meetingDetails?.date && isFuture(parseISO(project.meetingDetails.date)) && (
+                                            {isSuperAdmin && project.meetingDetails?.date && isAfter(parseISO(project.meetingDetails.date), subDays(new Date(),1)) && (
                                                 <Button variant="ghost" size="icon" onClick={() => onEdit(project)}>
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
@@ -670,4 +670,3 @@ export default function ScheduleMeetingPage() {
     </>
   );
 }
-
