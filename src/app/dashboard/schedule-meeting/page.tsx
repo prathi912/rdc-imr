@@ -186,6 +186,8 @@ function HistoryTable({
     onFilterChange,
     onEditMeeting,
     currentUser,
+    onRemind,
+    isReminding,
 }: { 
     projects: Project[], 
     usersMap: Map<string, User>,
@@ -193,6 +195,8 @@ function HistoryTable({
     onFilterChange: (value: 'all' | 'regular' | 'mid-term') => void,
     onEditMeeting: (project: Project) => void,
     currentUser: User,
+    onRemind: () => void,
+    isReminding: boolean,
 }) {
     const sortedProjects = [...projects].sort((a, b) => {
         const dateA = a.meetingDetails?.date ? parseISO(a.meetingDetails.date).getTime() : 0;
@@ -210,16 +214,24 @@ function HistoryTable({
                         <CardTitle>Scheduled Meetings History</CardTitle>
                         <CardDescription>A log of all past and future scheduled IMR meetings.</CardDescription>
                     </div>
-                    <Select value={filter} onValueChange={(value) => onFilterChange(value as any)}>
-                        <SelectTrigger className="w-full sm:w-[240px]">
-                            <SelectValue placeholder="Filter by meeting type..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Meetings</SelectItem>
-                            <SelectItem value="regular">Regular Submissions</SelectItem>
-                            <SelectItem value="mid-term">Mid-term Reviews</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                        <Select value={filter} onValueChange={(value) => onFilterChange(value as any)}>
+                            <SelectTrigger className="w-full sm:w-[240px]">
+                                <SelectValue placeholder="Filter by meeting type..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Meetings</SelectItem>
+                                <SelectItem value="regular">Regular Submissions</SelectItem>
+                                <SelectItem value="mid-term">Mid-term Reviews</SelectItem>
+                            </SelectContent>
+                        </Select>
+                         {isSuperAdmin && (
+                            <Button onClick={onRemind} disabled={isReminding}>
+                                {isReminding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                Remind All
+                            </Button>
+                        )}
+                    </div>
                 </div>
             </CardHeader>
             <CardContent>
@@ -583,14 +595,7 @@ export default function ScheduleMeetingPage() {
       <PageHeader
         title="Schedule IMR Meeting"
         description="Select projects to schedule an initial submission meeting or a mid-term review."
-      >
-          {user?.role === 'Super-admin' && (
-            <Button onClick={handleGlobalReminder} disabled={isSendingGlobalReminders}>
-                {isSendingGlobalReminders ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                Remind Evaluators
-            </Button>
-          )}
-      </PageHeader>
+      />
       <div className="mt-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
@@ -618,7 +623,7 @@ export default function ScheduleMeetingPage() {
                 />
               </TabsContent>
               <TabsContent value="history" className="mt-0">
-                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} onEditMeeting={setMeetingToEdit} currentUser={user} />
+                <HistoryTable projects={filteredHistory} usersMap={usersMap} filter={historyFilter} onFilterChange={setHistoryFilter} onEditMeeting={setMeetingToEdit} currentUser={user} onRemind={handleGlobalReminder} isReminding={isSendingGlobalReminders} />
               </TabsContent>
             </div>
             
