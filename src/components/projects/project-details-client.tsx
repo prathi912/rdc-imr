@@ -89,6 +89,7 @@ interface ProjectDetailsClientProps {
   allUsers: User[]
   piUser: User | null
   onProjectUpdate: (project: Project) => void;
+  isEvaluationPeriodActive: boolean;
 }
 
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" | "outline" } = {
@@ -283,7 +284,7 @@ function AttendanceDialog({ isOpen, onOpenChange, project, allUsers, onUpdate }:
     );
 }
 
-export function ProjectDetailsClient({ project: initialProject, allUsers, piUser, onProjectUpdate }: ProjectDetailsClientProps) {
+export function ProjectDetailsClient({ project: initialProject, allUsers, piUser, onProjectUpdate, isEvaluationPeriodActive }: ProjectDetailsClientProps) {
   const [project, setProject] = useState(initialProject)
   const [evaluations, setEvaluations] = useState<Evaluation[]>([])
   const [user, setUser] = useState<User | null>(null)
@@ -448,16 +449,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
     return false
   }, [user, isSuperAdmin, isAssignedEvaluator, project.meetingDetails, systemSettings])
-  
-  const isEvaluationPeriodActive = useMemo(() => {
-    if (!project.meetingDetails?.date) return false;
-    const meetingDate = parseISO(project.meetingDetails.date);
-    const today = startOfToday();
-    const evaluationDays = systemSettings?.imrEvaluationDays ?? 0;
-    const deadline = addDays(meetingDate, evaluationDays);
-
-    return !isBefore(today, meetingDate) && !isAfter(today, deadline);
-  }, [project.meetingDetails?.date, systemSettings]);
   
   const showEvaluationForm = user && isAssignedEvaluator && project.status === 'Under Review';
 
@@ -1772,4 +1763,3 @@ function OfficeNotingDialog({ isOpen, onOpenChange, onSubmit, isPrinting, form }
         </Dialog>
     );
 }
-
