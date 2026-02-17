@@ -130,15 +130,6 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted, isEvaluat
         </CardDescription>
       </CardHeader>
       <CardContent>
-         {!isEvaluationPeriodActive && !existingEvaluation && (
-            <Alert variant="destructive" className="mb-6">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Evaluation Period Expired</AlertTitle>
-                <AlertDescription>
-                The deadline for submitting this evaluation has passed. Please contact the RDC office for assistance.
-                </AlertDescription>
-            </Alert>
-        )}
         {loadingExisting ? (
              <div className="flex items-center justify-center p-8">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
