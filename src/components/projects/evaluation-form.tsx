@@ -114,7 +114,7 @@ export function EvaluationForm({ project, user, onEvaluationSubmitted, isEvaluat
     }
   };
   
-  const isFormDisabled = isSubmitting || loadingExisting || !!existingEvaluation || !isEvaluationPeriodActive;
+  const isFormDisabled = isSubmitting || loadingExisting || !!existingEvaluation;
 
   return (
     <Card className="mt-8 border-primary/50">
