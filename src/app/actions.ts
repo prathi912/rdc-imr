@@ -21,7 +21,7 @@ import type {
   Author,
 } from "@/types"
 import { sendEmail as sendEmailUtility } from "@/lib/email"
-import { addDays, setHours, setMinutes, setSeconds, isToday, format, parseISO, addHours } from "date-fns"
+import { addDays, setHours, setMinutes, setSeconds, isToday, format, parseISO, addHours, subDays } from "date-fns"
 import { formatInTimeZone, toDate } from "date-fns-tz"
 import type * as z from "zod"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
@@ -888,6 +888,7 @@ export async function scheduleMeeting(
     };
 
     const allUsersToNotify = new Map<string, User>();
+    const rescheduleMap = new Map<string, boolean>();
 
     // Prepare notifications for all projects
     for (const projectData of projectsToSchedule) {
@@ -895,6 +896,7 @@ export async function scheduleMeeting(
       const projectSnap = await projectRef.get();
       const existingProject = projectSnap.exists ? projectSnap.data() as Project : null;
       const isReschedule = !!existingProject?.meetingDetails;
+      rescheduleMap.set(projectData.id, isReschedule);
 
       const updateData: any = { meetingDetails: newMeetingDetails };
       if (isMidTermReview) {
@@ -930,18 +932,9 @@ export async function scheduleMeeting(
     // Send notifications
     for (const [uid, user] of allUsersToNotify.entries()) {
         const isPI = projectsToSchedule.some(p => p.pi_uid === uid);
-        const isNewEvaluator = meetingDetails.evaluatorUids.includes(uid);
-        
-        // This is complex, need to get old data before batch commit to do it cleanly.
-        // For now, we assume if they are in the allUsersToNotify list and not a new evaluator, they might be an old one.
-        // A better approach would be to fetch all old evaluators at the start.
-
-        let subject = '';
-        let htmlContent = '';
         
         const project = projectsToSchedule.find(p => p.pi_uid === uid) || projectsToSchedule[0]; // Get relevant project
-        const projectSnap = await adminDb.collection('projects').doc(project.id).get();
-        const isReschedule = !!(projectSnap.exists() && projectSnap.data()?.meetingDetails);
+        const isReschedule = rescheduleMap.get(project.id) || false;
 
         const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting";
         const subjectPrefix = isReschedule ? `RESCHEDULED: ${meetingType}` : meetingType;
@@ -950,6 +943,9 @@ export async function scheduleMeeting(
         const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)");
         
         const projectTitles = projectsToSchedule.map(p => `<li style="color: #cccccc;">${p.title}</li>`).join("");
+        
+        let subject = '';
+        let htmlContent = '';
 
         if (isPI) {
             subject = `${subjectPrefix} for Your Project: ${project.title}`;
@@ -2424,5 +2420,4 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
-
     
