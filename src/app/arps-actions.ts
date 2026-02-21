@@ -148,14 +148,18 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, year: number
         
         const amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
         const isPI = project.userId === userId;
+        const isCoPi = project.coPiUids?.includes(userId) && !isPI;
 
         let projectScore = 0;
         if (amount >= 2000000 && amount <= 5000000) {
-            projectScore = isPI ? 50 : 15;
+            if (isPI) projectScore = 50;
+            else if (isCoPi) projectScore = 15;
         } else if (amount > 5000000 && amount <= 10000000) {
-            projectScore = isPI ? 70 : 20;
+            if (isPI) projectScore = 70;
+            else if (isCoPi) projectScore = 20;
         } else if (amount > 10000000) {
-            projectScore = isPI ? 100 : 25;
+            if (isPI) projectScore = 100;
+            else if (isCoPi) projectScore = 25;
         }
 
         if (projectScore > 0) {
@@ -219,15 +223,15 @@ export async function calculateArpsForUser(userId: string, year: number) {
 
     // Apply Capping
     const finalPubScore = Math.min(weightedPub, 50);
-    const finalPatentScore = Math.min(weightedPatent, 15);
-    const finalEmrScore = Math.min(weightedEmr, 15);
+    const finalPatentScore = Math.min(weightedPatent, 10);
+    const finalEmrScore = Math.min(weightedEmr, 20);
     
     // Total ARPS (out of 80 since consultancy and research activities are not included)
     const totalArps = finalPubScore + finalPatentScore + finalEmrScore;
 
     // Determine Grade
     let grade = 'DME';
-    if (totalArps >= 80) grade = 'SEE'; // This grade is unreachable with the current criteria (max 80)
+    if (totalArps >= 80) grade = 'SEE';
     else if (totalArps >= 50) grade = 'EE';
     else if (totalArps >= 30) grade = 'ME';
     
