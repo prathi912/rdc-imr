@@ -963,7 +963,7 @@ export async function scheduleMeeting(
                   <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
                   <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
                   <p><strong style="color: #ffffff;">${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
-                    ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : venue}
+                    ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
                   </p>
                   <p style="color: #cccccc; margin-top: 15px;">
                     You can view more details on the 
@@ -988,7 +988,7 @@ export async function scheduleMeeting(
                       <p><strong style="color: #ffffff;">
                         ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
                       </strong> 
-                        ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : venue}
+                        ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
                       </p>
                       <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
                       <ul style="list-style-type: none; padding-left: 0;">
@@ -1055,7 +1055,7 @@ export async function scheduleMeeting(
               <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
               <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
               <p><strong style="color: #ffffff;">${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
-                ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : venue}
+                ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
               </p>
               <p style="color: #cccccc; margin-top: 15px;">
                 You can view more details on the 
