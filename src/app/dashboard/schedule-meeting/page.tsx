@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -41,7 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 
 const scheduleSchema = z.object({
-  date: z.date({ required_error: 'A meeting date is required.' }),
+  date: z.date({ required_error: 'A meeting date is required.' }).min(startOfToday(), "Meeting date cannot be in the past."),
   time: z.string().min(1, 'Meeting time is required.'),
   evaluatorUids: z.array(z.string()).min(1, 'Please select at least one evaluator.'),
   mode: z.enum(['Offline', 'Online'], { required_error: 'Please select a meeting mode.' }),
@@ -104,7 +105,7 @@ function HistoryTable({
                         <CardTitle>Scheduled Meetings History</CardTitle>
                         <CardDescription>A log of all past and future scheduled IMR meetings.</CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                     <div className="flex items-center gap-2">
                         <Select value={filter} onValueChange={(value) => onFilterChange(value as any)}>
                             <SelectTrigger className="w-full sm:w-[240px]">
                                 <SelectValue placeholder="Filter by meeting type..." />
@@ -118,7 +119,7 @@ function HistoryTable({
                          {isSuperAdmin && (
                             <Button onClick={onRemind} disabled={isReminding}>
                                 {isReminding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                Remind All
+                                Remind Evaluators
                             </Button>
                         )}
                     </div>
@@ -160,7 +161,7 @@ function HistoryTable({
                                 return (
                                     <TableRow key={project.id}>
                                         <TableCell>
-                                            <div>
+                                            <div className="font-medium">
                                                 <Link href={`/dashboard/project/${project.id}`} className="hover:underline text-primary" target="_blank">
                                                     {project.title}
                                                 </Link>
@@ -665,6 +666,12 @@ export default function ScheduleMeetingPage() {
     </div>
     <Dialog open={!!meetingToEdit} onOpenChange={() => setMeetingToEdit(null)}>
         <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Reschedule Meeting</DialogTitle>
+                <DialogDescription>
+                    Update the details for this meeting. All participants will be re-notified.
+                </DialogDescription>
+            </DialogHeader>
             <ScheduleForm isEditing={true} />
         </DialogContent>
     </Dialog>
