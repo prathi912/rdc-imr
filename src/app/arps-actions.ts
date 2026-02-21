@@ -8,7 +8,8 @@ import { startOfYear, endOfYear, parseISO } from 'date-fns';
 
 // --- Helper Functions ---
 
-function getAuthorPositionMultiplier(claimantRole: Author['role'], authorPosition?: string): number {
+// Multiplier for Journal Publications (Policy 5.2.3)
+function getJournalAuthorPositionMultiplier(claimantRole: Author['role'], authorPosition?: string): number {
     const position = parseInt(authorPosition || '0', 10);
     if (claimantRole === 'First Author' || claimantRole === 'Corresponding Author' || claimantRole === 'First & Corresponding Author') {
         return 0.7;
@@ -19,6 +20,21 @@ function getAuthorPositionMultiplier(claimantRole: Author['role'], authorPositio
     }
     return 0.3; // Default for co-authors if position is not specified
 }
+
+// Multiplier for Books, Chapters, and Conference Proceedings (Policy 5.1.2)
+function getBookConfAuthorPositionMultiplier(claimantRole: Author['role'], authorPosition?: string): number {
+    const position = parseInt(authorPosition || '0', 10);
+     if (claimantRole === 'First Author' || claimantRole === 'Corresponding Author' || claimantRole === 'First & Corresponding Author') {
+        return 0.7;
+    }
+    if (claimantRole === 'Co-Author') {
+        // The policy states "up to 5", so we'll assume it applies to positions 1-5.
+        if (position > 0 && position <= 5) return 0.3;
+    }
+    // If the role or position doesn't match, the multiplier is 0 for this category.
+    return 0;
+}
+
 
 function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: number } {
     const { publicationType, journalClassification } = claim;
@@ -46,29 +62,32 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
     let score = 0;
     const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
+    const approvedStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
+
 
     for (const claim of claims) {
-        if (claim.status !== 'Payment Completed') continue;
+        if (!approvedStatuses.includes(claim.status)) continue;
 
         const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
         if (!claimantAuthorInfo) continue;
 
         let claimScore = 0;
-        const authorPositionMultiplier = getAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
 
         switch (claim.claimType) {
             case 'Books':
                 if (claim.isScopusIndexed) {
-                    claimScore = claim.bookApplicationType === 'Book' ? 10 : 5;
-                    claimScore *= authorPositionMultiplier;
+                    const multiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
+                    claimScore = (claim.bookApplicationType === 'Book' ? 10 : 5) * multiplier;
                 }
                 break;
             case 'Conference Presentations':
                 if (claim.publicationType === 'Scopus Indexed Conference Proceedings') {
-                    claimScore = 2 * authorPositionMultiplier;
+                    const multiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
+                    claimScore = 2 * multiplier;
                 }
                 break;
             case 'Research Papers':
+                const authorPositionMultiplier = getJournalAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
                 const { points, multiplier } = getJournalPoints(claim);
                 claimScore = (points * multiplier) * authorPositionMultiplier;
                 break;
@@ -84,9 +103,10 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { 
 function calculatePatentScore(claims: IncentiveClaim[]): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
     let score = 0;
     const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
+    const approvedStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
 
     for (const claim of claims) {
-        if (claim.status !== 'Payment Completed' || claim.claimType !== 'Patents') continue;
+        if (!approvedStatuses.includes(claim.status) || claim.claimType !== 'Patents') continue;
 
         let basePoints = 0;
         if (claim.currentStatus === 'Published') basePoints = 10;
