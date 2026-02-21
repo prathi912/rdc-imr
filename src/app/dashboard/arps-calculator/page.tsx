@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { getAllUsers } from '@/app/actions';
 import { Combobox } from '@/components/ui/combobox';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
 
 export default function ArpsCalculatorPage() {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -69,7 +70,6 @@ export default function ArpsCalculatorPage() {
         if (result.success) {
             setResults(result.data!);
         } else {
-            console.error(result.error);
             toast({
                 variant: 'destructive',
                 title: 'Error Calculating Score',
