@@ -178,6 +178,8 @@ function ModuleManagerDialog({ user, open, onOpenChange, onUpdate }: { user: Use
     const [userModules, setUserModules] = useState<string[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
+    const sortedModules = useMemo(() => [...ALL_MODULES].sort((a, b) => a.label.localeCompare(b.label)), []);
+
     useEffect(() => {
         if (user) {
             setUserModules(user.allowedModules || getDefaultModulesForRole(user.role, user.designation));
@@ -214,7 +216,7 @@ function ModuleManagerDialog({ user, open, onOpenChange, onUpdate }: { user: Use
                 </DialogHeader>
                 <div className="py-4 max-h-[60vh] overflow-y-auto pr-4">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                        {ALL_MODULES.map((module) => (
+                        {sortedModules.map((module) => (
                             <div key={module.id} className="flex items-center space-x-2">
                                 <Checkbox
                                     id={`${user.uid}-${module.id}`}
