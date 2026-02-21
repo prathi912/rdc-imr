@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import type { IncentiveClaim, EmrInterest } from '@/types';
@@ -221,6 +221,11 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                         <p className="text-muted-foreground">Performance Grade</p>
                         <Badge variant={getGradeVariant(results.grade)} className="text-2xl px-4 py-1 mt-2">{results.grade}</Badge>
                     </CardContent>
+                    <CardFooter className="p-4 text-center">
+                        <p className="text-xs text-muted-foreground">
+                            This is an intermediate score as Research Activities and Consultancy are not considered (out of 70).
+                        </p>
+                    </CardFooter>
                 </Card>
             </div>
         </div>
