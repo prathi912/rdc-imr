@@ -215,7 +215,10 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                 <Card className="sticky top-24">
                     <CardHeader className="text-center">
                         <CardDescription>Final Annual Research Performance Score (ARPS)</CardDescription>
-                        <CardTitle className="text-6xl">{results.totalArps.toFixed(2)}</CardTitle>
+                        <CardTitle className="text-6xl flex items-baseline justify-center">
+                            {results.totalArps.toFixed(2)}
+                            <span className="text-2xl text-muted-foreground">/70</span>
+                        </CardTitle>
                     </CardHeader>
                     <CardContent className="text-center">
                         <p className="text-muted-foreground">Performance Grade</p>
@@ -223,7 +226,7 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     </CardContent>
                     <CardFooter className="p-4 text-center">
                         <p className="text-xs text-muted-foreground">
-                            This is an intermediate score as Research Activities and Consultancy are not considered (out of 70).
+                            This is an intermediate score as Research Activities and Consultancy are not considered.
                         </p>
                     </CardFooter>
                 </Card>
