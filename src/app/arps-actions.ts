@@ -42,7 +42,6 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
     let multiplier = 0;
 
     switch (publicationType) {
-        case 'Original Research Article': 
         case 'Research Articles/Short Communications':
             points = 8; 
             break;
