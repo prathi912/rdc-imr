@@ -4,7 +4,7 @@
 
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, EmrInterest, User, Author } from '@/types';
-import { startOfYear, endOfYear } from 'date-fns';
+import { startOfYear, endOfYear, parseISO } from 'date-fns';
 
 // --- Helper Functions ---
 
@@ -108,12 +108,20 @@ function calculatePatentScore(claims: IncentiveClaim[]): { score: number; contri
     return { score, contributingClaims };
 }
 
-function calculateEmrScore(projects: EmrInterest[], userId: string): { score: number; contributingProjects: { project: EmrInterest, score: number }[] } {
+function calculateEmrScore(projects: EmrInterest[], userId: string, year: number): { score: number; contributingProjects: { project: EmrInterest, score: number }[] } {
     let score = 0;
     const contributingProjects: { project: EmrInterest, score: number }[] = [];
+    const startDate = startOfYear(new Date(year, 0, 1));
+    const endDate = endOfYear(new Date(year, 11, 31));
     
     for (const project of projects) {
+        // Status is pre-filtered, but double-checking is safe.
         if (project.status !== 'Sanctioned' && project.status !== 'SANCTIONED') continue;
+
+        // Date filtering now happens here
+        if (!project.sanctionDate) continue;
+        const sanctionDate = parseISO(project.sanctionDate);
+        if (sanctionDate < startDate || sanctionDate > endDate) continue;
 
         const amountMatch = project.durationAmount?.match(/Amount:\s*([\d,]+)/);
         if (!amountMatch) continue;
@@ -153,19 +161,36 @@ export async function calculateArpsForUser(userId: string, year: number) {
                                  .where('submissionDate', '<=', endDate.toISOString());
     
     const emrRef = adminDb.collection('emrInterests');
-    const emrQuery = emrRef.where('userId', '==', userId)
-                             .where('sanctionDate', '>=', startDate.toISOString())
-                             .where('sanctionDate', '<=', endDate.toISOString());
+    const sanctionedStatuses = ['Sanctioned', 'SANCTIONED'];
 
-    const [claimsSnapshot, emrSnapshot] = await Promise.all([claimsQuery.get(), emrQuery.get()]);
+    // Query for projects where the user is the PI
+    const emrPiQuery = emrRef.where('userId', '==', userId).where('status', 'in', sanctionedStatuses);
+
+    // Query for projects where the user is a Co-PI
+    const emrCoPiQuery = emrRef.where('coPiUids', 'array-contains', userId).where('status', 'in', sanctionedStatuses);
+
+    const [claimsSnapshot, emrPiSnapshot, emrCoPiSnapshot] = await Promise.all([
+      claimsQuery.get(),
+      emrPiQuery.get(),
+      emrCoPiQuery.get(),
+    ]);
 
     const allClaims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
-    const allEmrProjects = emrSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+    
+    const piProjects = emrPiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+    const coPiProjects = emrCoPiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+
+    // Combine and deduplicate EMR projects
+    const allEmrProjects = new Map<string, EmrInterest>();
+    piProjects.forEach(p => allEmrProjects.set(p.id, p));
+    coPiProjects.forEach(p => allEmrProjects.set(p.id, p));
+    const uniqueEmrProjects = Array.from(allEmrProjects.values());
+
 
     // Calculate Raw Scores
     const { score: rawPubScore, contributingClaims: pubClaims } = calculatePublicationScore(allClaims, userId);
     const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(allClaims);
-    const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(allEmrProjects, userId);
+    const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, year);
 
     // Apply Weighting
     const weightedPub = rawPubScore * 0.50;
