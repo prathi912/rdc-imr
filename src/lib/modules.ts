@@ -33,10 +33,10 @@ export const ALL_MODULES = [
 ]
 
 const coreModules = ["dashboard", "notifications", "settings", "emr-calendar", "incentive-claim"]
-const facultyCoreModules = ["new-submission", "my-projects"]
+const facultyCoreModules = ["new-submissiogin", "my-projects"]
 const hierarchyCoreModules = ["analytics"]
 
-const facultyDefaults = [...coreModules, ...facultyCoreModules, "arps-calculator"]
+const facultyDefaults = [...coreModules, ...facultyCoreModules]
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics"]
 const iqacDefaults = [...coreModules, "all-projects", "analytics"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "emr-management", "manage-incentive-claims"]
