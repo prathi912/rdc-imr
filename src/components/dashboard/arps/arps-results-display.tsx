@@ -2,7 +2,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import type { IncentiveClaim, EmrInterest } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -71,6 +71,9 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
         return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || 'N/A';
     };
 
+    const totalRaw = results.publications.raw + results.patents.raw + results.emr.raw;
+    const totalWeighted = results.publications.weighted + results.patents.weighted + results.emr.weighted;
+
     return (
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
             <div className="lg:col-span-2 space-y-8">
@@ -109,6 +112,14 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                                     <TableCell className="text-right font-bold">{results.emr.final.toFixed(2)}</TableCell>
                                 </TableRow>
                             </TableBody>
+                             <TableFooter>
+                                <TableRow>
+                                    <TableCell className="font-bold">Total</TableCell>
+                                    <TableCell className="text-right font-bold">{totalRaw.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-bold">{totalWeighted.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-bold">{results.totalArps.toFixed(2)}</TableCell>
+                                </TableRow>
+                            </TableFooter>
                         </Table>
                     </CardContent>
                 </Card>
