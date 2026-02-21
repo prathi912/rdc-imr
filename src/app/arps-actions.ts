@@ -100,39 +100,28 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 }
 
 function getClaimDate(claim: IncentiveClaim): Date | null {
-    switch (claim.claimType) {
-        case 'Research Papers':
-            if (claim.publicationYear && claim.publicationMonth) {
-                const monthMap: { [key: string]: number } = {'january':0, 'february':1, 'march':2, 'april':3, 'may':4, 'june':5, 'july':6, 'august':7, 'september':8, 'october':9, 'november':10, 'december':11};
-                const monthIndex = monthMap[claim.publicationMonth.toLowerCase()];
-                if (monthIndex !== undefined) {
-                    return new Date(claim.publicationYear, monthIndex, 15); // Use mid-month to be safe
-                }
-            }
-            break;
-        case 'Patents':
-            // Use the most relevant date based on status
-            if (claim.currentStatus === 'Granted' && claim.grantDate) return parseISO(claim.grantDate);
-            if (claim.currentStatus === 'Published' && claim.publicationDate) return parseISO(claim.publicationDate);
-            if (claim.currentStatus === 'Filed' && claim.filingDate) return parseISO(claim.filingDate);
-            break;
-        case 'Conference Presentations':
-            if (claim.presentationDate) return parseISO(claim.presentationDate);
-            if (claim.conferenceDate) return parseISO(claim.conferenceDate);
-            break;
-        case 'Books':
-             if (claim.publicationYear) {
-                return new Date(claim.publicationYear, 5, 1); // Mid-year
-             }
-             break;
-        case 'Membership of Professional Bodies':
-            if (claim.membershipPaymentDate) return parseISO(claim.membershipPaymentDate);
-            break;
-        case 'Seed Money for APC':
-            // This one is tricky. Let's fall back to submission date.
-            break;
+    // For Research Papers, the publication date is the most relevant date.
+    if (claim.claimType === 'Research Papers' && claim.publicationYear && claim.publicationMonth) {
+        const monthMap: { [key: string]: number } = {
+            'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
+            'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11
+        };
+        const monthIndex = monthMap[claim.publicationMonth.toLowerCase()];
+        if (monthIndex !== undefined) {
+            return new Date(claim.publicationYear, monthIndex, 15);
+        }
     }
-    // Fallback for all cases where a specific date isn't found
+    
+    // For other claim types, or as a fallback, use the final approval date if available.
+    const finalApproval = (claim.approvals || [])
+        .filter((a): a is ApprovalStage => a !== null && a.status === 'Approved')
+        .sort((a, b) => b.stage - a.stage)[0];
+        
+    if (finalApproval) {
+        return parseISO(finalApproval.timestamp);
+    }
+    
+    // Final fallback to the original submission date of the claim.
     return parseISO(claim.submissionDate);
 }
 
@@ -387,3 +376,4 @@ type CalculationDetails = {
     applicantMultiplier?: number;
     rolePoints?: number;
 };
+
