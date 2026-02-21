@@ -6,7 +6,24 @@ import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, EmrInterest, User, Author, ApprovalStage } from '@/types';
 import { parseISO, getYear } from 'date-fns';
 
+// --- Policy Constants ---
+const POLICY = {
+    WEIGHTAGE: {
+        PUBLICATION: 0.50,
+        PATENT: 0.15,
+        EMR: 0.15,
+    },
+    CAPS: {
+        PUBLICATION: 50,
+        PATENT: 15,
+        EMR: 15,
+    },
+    MIN_PUBLICATIONS_REQUIRED: 10,
+};
+
 // --- Helper Functions ---
+
+const round = (n: number) => Math.round(n * 100) / 100;
 
 // Multiplier for Journal Publications (Policy 5.2.3)
 function getJournalAuthorPositionMultiplier(claimantRole: Author['role'], authorPosition?: string): number {
@@ -15,10 +32,9 @@ function getJournalAuthorPositionMultiplier(claimantRole: Author['role'], author
         return 0.7;
     }
     if (claimantRole === 'Co-Author') {
-        if (position > 0 && position <= 5) return 0.3;
+        if (!authorPosition || position <= 0) return 0; // Position must be specified for co-authors
+        if (position <= 5) return 0.3;
         if (position > 5) return 0.1;
-        // Default for co-authors if position is not specified but role is correct
-        return 0.3;
     }
     return 0; // Return 0 for any other role
 }
@@ -30,11 +46,9 @@ function getBookConfAuthorPositionMultiplier(claimantRole: Author['role'], autho
         return 0.7;
     }
     if (claimantRole === 'Co-Author') {
-        if (position > 0 && position <= 5) return 0.3;
-        // To ensure all co-authors are "considered", we'll mirror the journal policy's 0.1 multiplier for positions > 5 as a reasonable default.
+        if (!authorPosition || position <= 0) return 0; // Position must be specified for co-authors
+        if (position <= 5) return 0.3;
         if (position > 5) return 0.1;
-        // Default for co-authors if position is not specified but role is correct
-        return 0.3;
     }
     return 0;
 }
@@ -46,26 +60,41 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
     let multiplier = 0;
 
     switch (publicationType) {
-        case 'Research Articles/Short Communications':
-        case 'Short Communication': 
+        case 'Research Articles/Short Communications': // Assuming this is 'Original Research Article'
             points = 8; 
+            break;
+        case 'Short Communication': 
+            points = 6;
             break;
         case 'Review Articles':
         case 'Review Article':
-            points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6; 
-            break;
+             // The base points are already adjusted, so the multiplier is always 1 here to avoid double-penalty.
+             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6;
+             multiplier = 1.0; // Multiplier is applied later based on quartile, so set to 1 to not interfere
+             break;
         case 'Case Report / Case Study': 
         case 'Case Reports/Short Surveys':
             points = 7; 
             break;
     }
 
-    switch (journalClassification) {
-        case 'Q1': multiplier = 1.0; break;
-        case 'Q2': multiplier = 0.7; break;
-        case 'Q3': multiplier = 0.4; break;
-        case 'Q4': multiplier = 0.3; break;
+    // This multiplier should apply to all types except Review Articles where points are already adjusted.
+    if (publicationType !== 'Review Articles' && publicationType !== 'Review Article') {
+        switch (journalClassification) {
+            case 'Q1': multiplier = 1.0; break;
+            case 'Q2': multiplier = 0.7; break;
+            case 'Q3': multiplier = 0.4; break;
+            case 'Q4': multiplier = 0.3; break;
+        }
+    } else if (!multiplier) { // For Review Articles, if multiplier is not set above, set it based on quartile
+         switch (journalClassification) {
+            case 'Q1': multiplier = 1.0; break;
+            case 'Q2': multiplier = 1.0; break; // Q1/Q2 for reviews get full points (8), so multiplier is 1.
+            case 'Q3': multiplier = 1.0; break; // Q3/Q4 get 6 points, multiplier is 1. The base point already reflects the reduction.
+            case 'Q4': multiplier = 1.0; break;
+        }
     }
+
     return { points, multiplier };
 }
 
@@ -73,6 +102,7 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 
 function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { 
     score: number; 
+    count: number;
     contributingClaims: { 
         claim: IncentiveClaim, 
         score: number,
@@ -81,45 +111,47 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): {
 } {
     let score = 0;
     const contributingClaims: { claim: IncentiveClaim, score: number, calculation: { base: number, multiplier: number, authorMultiplier: number } }[] = [];
+    const processedDois = new Set<string>();
+    let publicationCount = 0;
 
     for (const claim of claims) {
-        // Find the claimant in the author list for this specific claim
+        if (claim.claimType !== 'Research Papers') continue;
+        
+        // Indexing Validation
+        if (!claim.indexType || !['scopus', 'wos', 'both', 'sci'].includes(claim.indexType)) {
+            continue;
+        }
+        
+        // Deduplication by DOI
+        if (claim.doi) {
+            const normalizedDoi = claim.doi.toLowerCase().trim();
+            if (processedDois.has(normalizedDoi)) {
+                continue;
+            }
+            processedDois.add(normalizedDoi);
+        }
+        
+        publicationCount++;
+
         const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
         if (!claimantAuthorInfo) continue;
+        
+        if (!claim.journalClassification) continue; // Quartile undefined guard
 
         let claimScore = 0;
-        let calculation = { base: 0, multiplier: 1, authorMultiplier: 0 };
-
-        switch (claim.claimType) {
-            case 'Books':
-                if (claim.isScopusIndexed) {
-                    const authorMultiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
-                    const basePoints = claim.bookApplicationType === 'Book' ? 10 : 5;
-                    claimScore = basePoints * authorMultiplier;
-                    calculation = { base: basePoints, multiplier: 1, authorMultiplier };
-                }
-                break;
-            case 'Conference Presentations':
-                if (claim.publicationType === 'Scopus Indexed Conference Proceedings') {
-                    const authorMultiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
-                    const basePoints = 2;
-                    claimScore = basePoints * authorMultiplier;
-                    calculation = { base: basePoints, multiplier: 1, authorMultiplier };
-                }
-                break;
-            case 'Research Papers':
-                const authorMultiplier = getJournalAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
-                const { points, multiplier: quartileMultiplier } = getJournalPoints(claim);
-                claimScore = (points * quartileMultiplier) * authorMultiplier;
-                calculation = { base: points, multiplier: quartileMultiplier, authorMultiplier };
-                break;
-        }
+        
+        const authorMultiplier = getJournalAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
+        const { points, multiplier: quartileMultiplier } = getJournalPoints(claim);
+        claimScore = (points * quartileMultiplier) * authorMultiplier;
+        
+        const calculation = { base: points, multiplier: quartileMultiplier, authorMultiplier };
+        
         if (claimScore > 0) {
             score += claimScore;
             contributingClaims.push({ claim, score: claimScore, calculation });
         }
     }
-    return { score, contributingClaims };
+    return { score: round(score), count: publicationCount, contributingClaims };
 }
 
 function calculatePatentScore(claims: IncentiveClaim[], userId: string): { 
@@ -136,7 +168,6 @@ function calculatePatentScore(claims: IncentiveClaim[], userId: string): {
     for (const claim of claims) {
         if (claim.claimType !== 'Patents') continue;
         
-        // Ensure this user is actually an inventor on this patent claim
         if (!claim.patentInventors?.some(inv => inv.uid === userId)) continue;
 
         let basePoints = 0;
@@ -156,7 +187,7 @@ function calculatePatentScore(claims: IncentiveClaim[], userId: string): {
             contributingClaims.push({ claim, score: claimScore, calculation: { base: basePoints, applicantMultiplier } });
         }
     }
-    return { score, contributingClaims };
+    return { score: round(score), contributingClaims };
 }
 
 
@@ -172,20 +203,25 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: D
     const contributingProjects: { project: EmrInterest, score: number, calculation: { rolePoints: number } }[] = [];
     
     for (const project of projects) {
-        // Status is pre-filtered, but double-checking is safe.
         if (project.status !== 'Sanctioned' && project.status !== 'SANCTIONED') continue;
-
-        // Date filtering now happens here
         if (!project.sanctionDate) continue;
         const sanctionDate = parseISO(project.sanctionDate);
         if (sanctionDate < startDate || sanctionDate > endDate) continue;
 
-        const amountMatch = project.durationAmount?.match(/Amount:\s*([\d,]+)/);
-        if (!amountMatch) continue;
-        
-        const amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
+        // Use structured data if available, otherwise parse the string
+        let amount = 0;
+        if (project.sanctionAmount) {
+            amount = project.sanctionAmount;
+        } else if (project.durationAmount) {
+            const amountMatch = project.durationAmount.match(/Amount:\s*([\d,]+)/);
+            if (amountMatch) {
+                amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
+            }
+        }
+        if (amount === 0) continue;
+
         const isPI = project.userId === userId;
-        const isCoPi = project.coPiUids?.includes(userId) && !isPI;
+        const isCoPi = !isPI && project.coPiUids?.includes(userId);
 
         let projectScore = 0;
         if (amount >= 2000000 && amount <= 5000000) {
@@ -204,7 +240,7 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: D
             contributingProjects.push({ project, score: projectScore, calculation: { rolePoints: projectScore } });
         }
     }
-    return { score, contributingProjects };
+    return { score: round(score), contributingProjects };
 }
 
 
@@ -249,7 +285,6 @@ export async function calculateArpsForUser(userId: string, year: number) {
             }
         }
         
-        // Fallback ONLY for claims with a final status but an empty or incomplete approval array (legacy data)
         if (!acceptanceDate && approvedClaimStatuses.includes(claim.status)) {
             acceptanceDate = parseISO(claim.submissionDate);
         }
@@ -268,19 +303,33 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const uniqueEmrProjects = Array.from(allEmrProjects.values());
 
 
-    const { score: rawPubScore, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId);
+    const { score: rawPubScore, count: pubCount, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId);
+
+    if (pubCount < POLICY.MIN_PUBLICATIONS_REQUIRED) {
+        return {
+            success: true,
+            data: {
+                publications: { raw: 0, weighted: 0, final: 0, contributingClaims: [] },
+                patents: { raw: 0, weighted: 0, final: 0, contributingClaims: [] },
+                emr: { raw: 0, weighted: 0, final: 0, contributingProjects: [] },
+                totalArps: 0,
+                grade: 'DME (Minimum 10 publications required)',
+            }
+        };
+    }
+    
     const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId);
     const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, startDate, endDate);
 
-    const weightedPub = rawPubScore * 0.50;
-    const weightedPatent = rawPatentScore * 0.15;
-    const weightedEmr = rawEmrScore * 0.15;
+    const weightedPub = rawPubScore * POLICY.WEIGHTAGE.PUBLICATION;
+    const weightedPatent = rawPatentScore * POLICY.WEIGHTAGE.PATENT;
+    const weightedEmr = rawEmrScore * POLICY.WEIGHTAGE.EMR;
 
-    const finalPubScore = Math.min(weightedPub, 50);
-    const finalPatentScore = Math.min(weightedPatent, 15);
-    const finalEmrScore = Math.min(weightedEmr, 15);
+    const finalPubScore = Math.min(weightedPub, POLICY.CAPS.PUBLICATION);
+    const finalPatentScore = Math.min(weightedPatent, POLICY.CAPS.PATENT);
+    const finalEmrScore = Math.min(weightedEmr, POLICY.CAPS.EMR);
     
-    const totalArps = finalPubScore + finalPatentScore + finalEmrScore;
+    const totalArps = round(finalPubScore + finalPatentScore + finalEmrScore);
 
     let grade = 'DME';
     if (totalArps >= 80) grade = 'SEE';
@@ -290,9 +339,9 @@ export async function calculateArpsForUser(userId: string, year: number) {
     return {
         success: true,
         data: {
-            publications: { raw: rawPubScore, weighted: weightedPub, final: finalPubScore, contributingClaims: pubClaims },
-            patents: { raw: rawPatentScore, weighted: weightedPatent, final: finalPatentScore, contributingClaims: patentClaims },
-            emr: { raw: rawEmrScore, weighted: weightedEmr, final: finalEmrScore, contributingProjects: emrProjects },
+            publications: { raw: round(rawPubScore), weighted: round(weightedPub), final: round(finalPubScore), contributingClaims: pubClaims },
+            patents: { raw: round(rawPatentScore), weighted: round(weightedPatent), final: round(finalPatentScore), contributingClaims: patentClaims },
+            emr: { raw: round(rawEmrScore), weighted: round(weightedEmr), final: round(finalEmrScore), contributingProjects: emrProjects },
             totalArps: totalArps,
             grade: grade,
         }
