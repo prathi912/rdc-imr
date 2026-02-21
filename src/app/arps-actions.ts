@@ -60,14 +60,15 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
     let multiplier = 0;
 
     switch (publicationType) {
-        case 'Research Articles/Short Communications': // Assuming this is 'Original Research Article'
+        case 'Original Research Article':
+        case 'Research Articles/Short Communications': // Handling both singular and plural forms
             points = 8; 
             break;
         case 'Short Communication': 
             points = 6;
             break;
-        case 'Review Articles':
         case 'Review Article':
+        case 'Review Articles':
              // The base points are already adjusted, so the multiplier is always 1 here to avoid double-penalty.
              points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6;
              multiplier = 1.0; // Multiplier is applied later based on quartile, so set to 1 to not interfere
@@ -106,11 +107,11 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): {
     contributingClaims: { 
         claim: IncentiveClaim, 
         score: number,
-        calculation: { base: number, multiplier: number, authorMultiplier: number } 
+        calculation: CalculationDetails
     }[] 
 } {
     let score = 0;
-    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: { base: number, multiplier: number, authorMultiplier: number } }[] = [];
+    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: CalculationDetails }[] = [];
     const processedDois = new Set<string>();
     let publicationCount = 0;
 
@@ -159,11 +160,11 @@ function calculatePatentScore(claims: IncentiveClaim[], userId: string): {
     contributingClaims: { 
         claim: IncentiveClaim, 
         score: number,
-        calculation: { base: number, applicantMultiplier: number } 
+        calculation: CalculationDetails 
     }[] 
 } {
     let score = 0;
-    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: { base: number, applicantMultiplier: number } }[] = [];
+    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: CalculationDetails }[] = [];
 
     for (const claim of claims) {
         if (claim.claimType !== 'Patents') continue;
@@ -196,11 +197,11 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: D
     contributingProjects: { 
         project: EmrInterest, 
         score: number,
-        calculation: { rolePoints: number } 
+        calculation: CalculationDetails 
     }[] 
 } {
     let score = 0;
-    const contributingProjects: { project: EmrInterest, score: number, calculation: { rolePoints: number } }[] = [];
+    const contributingProjects: { project: EmrInterest, score: number, calculation: CalculationDetails }[] = [];
     
     for (const project of projects) {
         if (project.status !== 'Sanctioned' && project.status !== 'SANCTIONED') continue;
@@ -273,25 +274,11 @@ export async function calculateArpsForUser(userId: string, year: number) {
       .filter(claim => {
         if (!approvedClaimStatuses.includes(claim.status)) return false;
 
-        let acceptanceDate: Date | null = null;
+        const submissionDate = parseISO(claim.submissionDate);
         
-        if (claim.approvals && claim.approvals.length > 0) {
-            const finalApprovalEntry = [...claim.approvals]
-                .filter((a): a is ApprovalStage => a !== null && !!a.timestamp && a.status === 'Approved')
-                .sort((a, b) => b.stage - a.stage)[0];
-            
-            if (finalApprovalEntry) {
-                acceptanceDate = parseISO(finalApprovalEntry.timestamp);
-            }
-        }
-        
-        if (!acceptanceDate && approvedClaimStatuses.includes(claim.status)) {
-            acceptanceDate = parseISO(claim.submissionDate);
-        }
+        if (!submissionDate) return false;
 
-        if (!acceptanceDate) return false;
-
-        return acceptanceDate >= startDate && acceptanceDate <= endDate;
+        return submissionDate >= startDate && submissionDate <= endDate;
       });
     
     const piProjects = emrPiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
@@ -352,3 +339,4 @@ export async function calculateArpsForUser(userId: string, year: number) {
     return { success: false, error: "Failed to calculate ARPS score." };
   }
 }
+
