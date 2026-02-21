@@ -456,13 +456,11 @@ export default function IncentiveClaimPage() {
       try {
           const claimsCollection = collection(db, 'incentiveClaims');
           
-          // User's own claims
           const userClaimsQuery = query(claimsCollection, where('uid', '==', uid), orderBy('submissionDate', 'desc'));
           const userClaimSnapshot = await getDocs(userClaimsQuery);
           const userClaimList = userClaimSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim));
           setUserClaims(userClaimList);
 
-          // Check for membership claim eligibility
           const lastMembershipClaim = userClaimList
             .filter(c => c.claimType === 'Membership of Professional Bodies' && c.status !== 'Draft' && c.status !== 'Rejected')
             .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())[0];
@@ -479,15 +477,13 @@ export default function IncentiveClaimPage() {
             }
           }
 
-          // Co-author claims
           const coAuthorClaimsQuery = query(claimsCollection, where('authorUids', 'array-contains', uid));
           const coAuthorSnapshot = await getDocs(coAuthorClaimsQuery);
           const coAuthorClaimList = coAuthorSnapshot.docs
               .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
-              .filter(claim => claim.uid !== uid); // Ensure it's not the user's own claim
+              .filter(claim => claim.uid !== uid);
           setCoAuthorClaims(coAuthorClaimList);
 
-          // System Settings
           const settings = await getSystemSettings();
           setSystemSettings(settings);
 
@@ -497,8 +493,22 @@ export default function IncentiveClaimPage() {
       } finally {
           setLoading(false);
       }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [toast]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    } else {
+        setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (user) {
+        fetchAllData(user.uid);
+    }
+  }, [user, fetchAllData]);
 
   useEffect(() => {
     const currentTab = searchParams.get('tab');
@@ -514,19 +524,7 @@ export default function IncentiveClaimPage() {
       params.set('tab', activeTab);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
-
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      fetchAllData(parsedUser.uid);
-    } else {
-        setLoading(false);
-    }
-  }, [fetchAllData]);
+  }, [activeTab, pathname, router, searchParams]);
 
   const handleViewDetails = (claim: IncentiveClaim) => {
     setSelectedClaim(claim);
