@@ -8,6 +8,7 @@ export const ALL_MODULES = [
   { id: "my-projects", label: "My Projects" },
   { id: "emr-calendar", label: "EMR Calendar" },
   { id: "incentive-claim", label: "Incentive Claims" },
+  { id: "arps-calculator", label: "ARPS Calculator" },
   { id: "incentive-approvals", label: "Incentive Approvals" },
   { id: "evaluator-dashboard", label: "Evaluation Queue" },
   { id: "my-evaluations", label: "My IMR Evaluations" },
@@ -39,7 +40,7 @@ const facultyDefaults = [...coreModules, ...facultyCoreModules]
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics"]
 const iqacDefaults = [...coreModules, "all-projects", "analytics"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "emr-management", "manage-incentive-claims"]
-const superAdminDefaults = [...adminDefaults, "module-management"]
+const superAdminDefaults = [...adminDefaults, "module-management", "arps-calculator"]
 
 // Default modules for special designations who are otherwise 'faculty' role
 const principalDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"]

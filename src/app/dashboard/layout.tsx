@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import type React from "react"
@@ -36,6 +37,7 @@ import {
   MessageCircle,
   BookOpenCheck,
   Building,
+  Calculator,
 } from "lucide-react"
 
 import {
@@ -173,6 +175,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         tooltip: 'Recruitment Approvals',
         icon: ClipboardCheck,
         label: 'Recruitment Approvals',
+      },
+      {
+        id: "arps-calculator",
+        href: "/dashboard/arps-calculator",
+        tooltip: "ARPS Calculator",
+        icon: Calculator,
+        label: "ARPS Calculator",
       },
       {
         id: "incentive-approvals",
