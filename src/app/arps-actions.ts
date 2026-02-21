@@ -3,7 +3,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import type { IncentiveClaim, EmrInterest, User, Author } from '@/types';
+import type { IncentiveClaim, EmrInterest, User, Author, ApprovalStage } from '@/types';
 import { parseISO } from 'date-fns';
 
 // --- Helper Functions ---
@@ -173,22 +173,16 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: D
 
 export async function calculateArpsForUser(userId: string, year: number) {
   try {
-    // New: Define assessment year from June of previous year to May of selected year
     const startDate = new Date(year - 1, 5, 1); // June 1st of the previous year
     const endDate = new Date(year, 4, 31, 23, 59, 59, 999); // May 31st of the selected year
 
-    // Fetch all necessary data
     const claimsRef = adminDb.collection('incentiveClaims');
-    // Fetch all claims where the user is an author
     const claimsQuery = claimsRef.where('authorUids', 'array-contains', userId);
     
     const emrRef = adminDb.collection('emrInterests');
     const sanctionedStatuses = ['Sanctioned', 'SANCTIONED'];
 
-    // Query for projects where the user is the PI
     const emrPiQuery = emrRef.where('userId', '==', userId).where('status', 'in', sanctionedStatuses);
-
-    // Query for projects where the user is a Co-PI
     const emrCoPiQuery = emrRef.where('coPiUids', 'array-contains', userId).where('status', 'in', sanctionedStatuses);
 
     const [claimsSnapshot, emrPiSnapshot, emrCoPiSnapshot] = await Promise.all([
@@ -199,51 +193,47 @@ export async function calculateArpsForUser(userId: string, year: number) {
     
     const approvedClaimStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
     
-    // Filter claims by acceptance date within the June-May period
     const claimsInPeriod = claimsSnapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim))
       .filter(claim => {
         if (!approvedClaimStatuses.includes(claim.status)) return false;
 
-        // Find the timestamp of the final approval in the workflow for this claim type
         const workflow = claim.approvals || [];
-        const lastApproval = workflow.filter(a => a?.status === 'Approved').sort((a, b) => b!.stage - a!.stage)[0];
-        
-        if (!lastApproval) return false;
+        if (workflow.length === 0) return false;
 
-        const acceptanceDate = parseISO(lastApproval.timestamp);
+        const finalApprovalEntry = [...workflow]
+            .filter((a): a is ApprovalStage => a !== null)
+            .sort((a, b) => b.stage - a.stage)[0];
+        
+        if (!finalApprovalEntry || finalApprovalEntry.status === 'Rejected') return false;
+
+        const acceptanceDate = parseISO(finalApprovalEntry.timestamp);
         return acceptanceDate >= startDate && acceptanceDate <= endDate;
       });
     
     const piProjects = emrPiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
     const coPiProjects = emrCoPiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
 
-    // Combine and deduplicate EMR projects
     const allEmrProjects = new Map<string, EmrInterest>();
     piProjects.forEach(p => allEmrProjects.set(p.id, p));
     coPiProjects.forEach(p => allEmrProjects.set(p.id, p));
     const uniqueEmrProjects = Array.from(allEmrProjects.values());
 
 
-    // Calculate Raw Scores, passing pre-filtered claims
     const { score: rawPubScore, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId);
     const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId);
     const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, startDate, endDate);
 
-    // Apply Weighting
     const weightedPub = rawPubScore * 0.50;
     const weightedPatent = rawPatentScore * 0.15;
     const weightedEmr = rawEmrScore * 0.15;
 
-    // Apply Capping based on the "Revised" final formula from the policy
     const finalPubScore = Math.min(weightedPub, 50);
     const finalPatentScore = Math.min(weightedPatent, 10);
     const finalEmrScore = Math.min(weightedEmr, 20);
     
-    // Total ARPS (out of 80 since consultancy and research activities are not included)
     const totalArps = finalPubScore + finalPatentScore + finalEmrScore;
 
-    // Determine Grade
     let grade = 'DME';
     if (totalArps >= 80) grade = 'SEE';
     else if (totalArps >= 50) grade = 'EE';
