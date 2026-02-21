@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -41,10 +42,20 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
     let multiplier = 0;
 
     switch (publicationType) {
-        case 'Original Research Article': points = 8; break;
-        case 'Short Communication': points = 6; break;
-        case 'Review Article': points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6; break;
-        case 'Case Report / Case Study': points = 7; break;
+        case 'Research Articles/Short Communications': // This was the incorrect value
+        case 'Original Research Article': 
+            points = 8; 
+            break;
+        case 'Short Communication': 
+            points = 6; 
+            break;
+        case 'Review Article': 
+            points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6; 
+            break;
+        case 'Case Reports/Short Surveys': // This was the incorrect value
+        case 'Case Report / Case Study': 
+            points = 7; 
+            break;
     }
 
     switch (journalClassification) {
@@ -255,3 +266,4 @@ export async function calculateArpsForUser(userId: string, year: number) {
     return { success: false, error: "Failed to calculate ARPS score." };
   }
 }
+
