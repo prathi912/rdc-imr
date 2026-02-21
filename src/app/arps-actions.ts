@@ -273,12 +273,14 @@ export async function calculateArpsForUser(userId: string, year: number) {
       .map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim))
       .filter(claim => {
         if (!approvedClaimStatuses.includes(claim.status)) return false;
-
-        const submissionDate = parseISO(claim.submissionDate);
         
-        if (!submissionDate) return false;
+        // Use the approval timestamp if available, otherwise fall back to submission date
+        const approvalTimestamp = claim.approvals?.find(a => a?.status === 'Approved' && a.stage === 4)?.timestamp;
+        const dateToCheck = approvalTimestamp ? parseISO(approvalTimestamp) : parseISO(claim.submissionDate);
 
-        return submissionDate >= startDate && submissionDate <= endDate;
+        if (!dateToCheck) return false;
+
+        return dateToCheck >= startDate && dateToCheck <= endDate;
       });
     
     const piProjects = emrPiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
@@ -340,3 +342,12 @@ export async function calculateArpsForUser(userId: string, year: number) {
   }
 }
 
+
+type CalculationDetails = {
+    base: number;
+    multiplier?: number;
+    quartileMultiplier?: number;
+    authorMultiplier?: number;
+    applicantMultiplier?: number;
+    rolePoints?: number;
+};
