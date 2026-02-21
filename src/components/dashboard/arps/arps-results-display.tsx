@@ -209,40 +209,10 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     result={{ label: 'Final Score P(EMR) = min(Weighted Score, Cap)', value: emr.final.toFixed(2) }}
                 />
             </div>
-
-            {/* Grade Assignment */}
-            <div className="space-y-6">
-                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><GraduationCap className="h-6 w-6"/> IV. Grade Assignment</h2>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Final ARPS Score & Grade</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex items-center justify-center gap-8">
-                            <div className="text-center">
-                                <p className="text-6xl font-bold">{totalArps.toFixed(2)}</p>
-                                <p className="text-muted-foreground">Total ARPS</p>
-                            </div>
-                            <div className="text-center">
-                                <Badge variant={gradeInfo.variant} className={cn("text-4xl font-bold px-6 py-2", gradeInfo.className)}>{gradeInfo.label}</Badge>
-                                {gradeMessage && <p className="text-sm text-muted-foreground mt-2">{gradeMessage}</p>}
-                            </div>
-                        </div>
-                        <Separator className="my-6" />
-                        <p className="text-sm text-muted-foreground">The final ARPS score is used to determine the performance grade based on the following thresholds:</p>
-                        <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
-                            <li><strong>&gt;= 80:</strong> SEE (Significantly Exceeds Expectations)</li>
-                            <li><strong>50 - 79.99:</strong> EE (Exceeds Expectations)</li>
-                            <li><strong>30 - 49.99:</strong> ME (Meets Expectations)</li>
-                            <li><strong>&lt; 30:</strong> DME (Does Not Meet Expectations)</li>
-                        </ul>
-                    </CardContent>
-                </Card>
-            </div>
             
-            {/* How ARPS is Formed - Moved to the end */}
+            {/* Final ARPS Calculation Summary */}
             <div className="space-y-6">
-                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Sigma className="h-6 w-6"/> V. Final ARPS Calculation Summary</h2>
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Sigma className="h-6 w-6"/> IV. Final ARPS Calculation Summary</h2>
                 <FormulaCard
                     title="Final ARPS Calculation"
                     icon={Sigma}
@@ -256,7 +226,6 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     result={{ label: '= Final ARPS', value: totalArps.toFixed(2) }}
                 />
             </div>
-
         </div>
     );
 }
