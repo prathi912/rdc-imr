@@ -130,6 +130,44 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "incentiveClaims",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "authorUids",
+          "arrayConfig": "CONTAINS"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "emrInterests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "userId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "emrInterests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "coPiUids",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []
