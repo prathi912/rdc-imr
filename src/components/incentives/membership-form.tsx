@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -226,17 +227,18 @@ export function MembershipForm() {
 
         if (membershipProofUrl) claimData.membershipProofUrl = membershipProofUrl;
 
-        const result = await submitIncentiveClaim(claimData);
+        const claimId = searchParams.get('claimId');
+        const result = await submitIncentiveClaim(claimData, claimId || undefined);
         if (!result.success || !result.claimId) {
             throw new Error(result.error);
         }
 
-        const claimId = searchParams.get('claimId') || result.claimId;
+        const newClaimId = claimId || result.claimId;
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
           if (!searchParams.get('claimId')) {
-            router.push(`/dashboard/incentive-claim/membership?claimId=${claimId}`);
+            router.push(`/dashboard/incentive-claim/membership?claimId=${newClaimId}`);
           }
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for membership has been submitted.' });

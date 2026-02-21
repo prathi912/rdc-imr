@@ -1,4 +1,5 @@
 
+
 'use client';
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -572,17 +573,18 @@ useEffect(() => {
         if (apcPublicationProofUrl) claimData.apcPublicationProofUrl = apcPublicationProofUrl;
         if (apcInvoiceProofUrl) claimData.apcInvoiceProofUrl = apcInvoiceProofUrl;
         
-        const result = await submitIncentiveClaim(claimData);
+        const claimId = searchParams.get('claimId');
+        const result = await submitIncentiveClaim(claimData, claimId || undefined);
 
         if (!result.success) {
             throw new Error(result.error);
         }
         
-        const claimId = searchParams.get('claimId') || result.claimId;
+        const newClaimId = claimId || result.claimId;
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
-          router.push(`/dashboard/incentive-claim/apc?claimId=${claimId}`);
+          router.push(`/dashboard/incentive-claim/apc?claimId=${newClaimId}`);
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for APC has been submitted.' });
           router.push('/dashboard/incentive-claim');

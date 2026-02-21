@@ -57,22 +57,66 @@ const getClaimTitle = (claimData: Partial<IncentiveClaim>): string => {
         || 'your recent incentive claim';
 };
 
-export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' | 'claimId'>): Promise<{ success: boolean; error?: string, claimId?: string }> {
+export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' | 'claimId'>, claimIdToUpdate?: string): Promise<{ success: boolean; error?: string, claimId?: string }> {
     try {
-        const newClaimRef = adminDb.collection('incentiveClaims').doc();
+        const claimsRef = adminDb.collection('incentiveClaims');
+
+        // --- Uniqueness Check on Final Submission ---
+        if (claimData.status !== 'Draft') {
+            let uniquenessQuery;
+            const uid = claimData.uid;
+            let fieldToCheck: keyof IncentiveClaim | null = null;
+            let valueToCheck: string | undefined = undefined;
+            let claimTypeName = claimData.claimType;
+
+            switch (claimData.claimType) {
+                case 'Research Papers':
+                    if (claimData.doi) {
+                        fieldToCheck = 'doi';
+                        valueToCheck = claimData.doi;
+                    }
+                    break;
+                case 'Books':
+                    fieldToCheck = 'publicationTitle';
+                    valueToCheck = claimData.publicationTitle;
+                    break;
+                case 'Patents':
+                    fieldToCheck = 'patentTitle';
+                    valueToCheck = claimData.patentTitle;
+                    break;
+                case 'Membership of Professional Bodies':
+                    fieldToCheck = 'membershipNumber';
+                    valueToCheck = claimData.membershipNumber;
+                    break;
+            }
+            
+            if (fieldToCheck && valueToCheck) {
+                uniquenessQuery = claimsRef.where(fieldToCheck, '==', valueToCheck).where('uid', '==', uid);
+                const existingClaimsSnap = await uniquenessQuery.get();
+                // Filter out the current draft being updated
+                const duplicateClaim = existingClaimsSnap.docs.find(doc => doc.id !== claimIdToUpdate && doc.data().status !== 'Draft');
+                if (duplicateClaim) {
+                    return { success: false, error: `You have already submitted an incentive claim for this ${claimTypeName}.` };
+                }
+            }
+        }
+
+        const newClaimRef = claimIdToUpdate ? claimsRef.doc(claimIdToUpdate) : claimsRef.doc();
         const claimId = newClaimRef.id;
 
-        const acronym = getClaimTypeAcronym(claimData.claimType);
-        const counterRef = adminDb.collection('counters').doc(`incentiveClaim_${acronym}`);
-        
-        const { current } = await adminDb.runTransaction(async (transaction) => {
-            const counterDoc = await transaction.get(counterRef);
-            const newCount = (counterDoc.data()?.current || 0) + 1;
-            transaction.set(counterRef, { current: newCount }, { merge: true });
-            return { current: newCount };
-        });
-
-        const standardizedClaimId = `RDC/IC/${acronym}/${String(current).padStart(4, '0')}`;
+        let standardizedClaimId = claimData.claimId;
+        if (!standardizedClaimId && !claimIdToUpdate) {
+            const acronym = getClaimTypeAcronym(claimData.claimType);
+            const counterRef = adminDb.collection('counters').doc(`incentiveClaim_${acronym}`);
+            
+            const { current } = await adminDb.runTransaction(async (transaction) => {
+                const counterDoc = await transaction.get(counterRef);
+                const newCount = (counterDoc.data()?.current || 0) + 1;
+                transaction.set(counterRef, { current: newCount }, { merge: true });
+                return { current: newCount };
+            });
+            standardizedClaimId = `RDC/IC/${acronym}/${String(current).padStart(4, '0')}`;
+        }
         
         const settings = await getSystemSettings();
         const workflow = settings.incentiveApprovalWorkflows?.[claimData.claimType];
@@ -85,7 +129,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
         const finalClaimData: Omit<IncentiveClaim, 'id'> = {
             ...claimData,
-            claimId: standardizedClaimId,
+            claimId: standardizedClaimId || claimData.claimId,
             status: claimData.status === 'Draft' ? 'Draft' : initialStatus,
             authors: claimData.authors || [],
             authorUids: (claimData.authors || []).map(a => a.uid).filter(Boolean) as string[],
@@ -100,7 +144,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
             }
         }
 
-        await newClaimRef.set(finalClaimData);
+        await newClaimRef.set(finalClaimData, { merge: true });
 
         if (finalClaimData.status !== 'Draft' && finalClaimData.authors) {
             const coAuthorsToNotify = finalClaimData.authors.filter(a => a.uid && a.uid !== claimData.uid);

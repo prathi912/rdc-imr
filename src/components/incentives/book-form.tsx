@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -340,7 +341,7 @@ export function BookForm() {
         toast({
             variant: 'destructive',
             title: 'Bank Details Missing',
-            description: 'You must add your bank details in Settings to submit a claim.',
+            description: 'You must add your salary bank account details in your profile before you can submit a claim.',
         });
         return;
     }
@@ -394,17 +395,18 @@ export function BookForm() {
             }
         });
         
-        const result = await submitIncentiveClaim(claimData as Omit<IncentiveClaim, 'id' | 'claimId'>);
+        const claimId = searchParams.get('claimId');
+        const result = await submitIncentiveClaim(claimData as Omit<IncentiveClaim, 'id' | 'claimId'>, claimId || undefined);
         if (!result.success || !result.claimId) {
             throw new Error(result.error);
         }
 
-        const claimId = searchParams.get('claimId') || result.claimId;
+        const newClaimId = claimId || result.claimId;
         
         if (status === 'Draft') {
             toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
             if (!searchParams.get('claimId')) {
-                router.push(`/dashboard/incentive-claim/book?claimId=${claimId}`);
+                router.push(`/dashboard/incentive-claim/book?claimId=${newClaimId}`);
             }
         } else {
             toast({ title: 'Success', description: 'Your incentive claim for books/chapters has been submitted.' });
@@ -520,19 +522,19 @@ export function BookForm() {
 
   if (currentStep === 2) {
     return (
-        <Card>
-            <form onSubmit={form.handleSubmit(onFinalSubmit)}>
-                <CardContent className="pt-6">
-                    <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
-                </CardContent>
-                <CardFooter>
-                    <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isSubmitting ? 'Submitting...' : 'Submit Claim'}
-                    </Button>
-                </CardFooter>
-            </form>
-        </Card>
+      <Card>
+        <form onSubmit={form.handleSubmit(onFinalSubmit)}>
+          <CardContent className="pt-6">
+            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={isSubmitting || bankDetailsMissing}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
     );
   }
 
@@ -678,7 +680,9 @@ export function BookForm() {
         <DialogContent>
             <DialogHeader>
                 <DialogTitle>Multiple Users Found</DialogTitle>
-                <DialogDescription>Please select the correct user to add.</DialogDescription>
+                <DialogDescription>
+                    Please select the correct user to add.
+                </DialogDescription>
             </DialogHeader>
             <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))} className="py-4 space-y-2">
                 {foundCoPis.map((u, i) => (
@@ -697,5 +701,3 @@ export function BookForm() {
     </>
   );
 }
-
-    

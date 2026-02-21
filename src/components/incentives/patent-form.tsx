@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -402,18 +403,19 @@ export function PatentForm() {
         if (patentApprovalProofUrl) claimData.patentApprovalProofUrl = patentApprovalProofUrl;
         if (patentGovtReceiptUrl) claimData.patentGovtReceiptUrl = patentGovtReceiptUrl;
         
-        const result = await submitIncentiveClaim(claimData as Omit<IncentiveClaim, 'id' | 'claimId'>);
+        const claimId = searchParams.get('claimId');
+        const result = await submitIncentiveClaim(claimData as Omit<IncentiveClaim, 'id' | 'claimId'>, claimId || undefined);
 
         if (!result.success || !result.claimId) {
             throw new Error(result.error);
         }
 
-        const claimId = searchParams.get('claimId') || result.claimId;
+        const newClaimId = claimId || result.claimId;
 
         if (status === 'Draft') {
           toast({ title: 'Draft Saved!', description: "You can continue editing from the 'Incentive Claim' page." });
           if(!searchParams.get('claimId')) {
-            router.push(`/dashboard/incentive-claim/patent?claimId=${claimId}`);
+            router.push(`/dashboard/incentive-claim/patent?claimId=${newClaimId}`);
           }
         } else {
           toast({ title: 'Success', description: 'Your incentive claim for patent has been submitted.' });
