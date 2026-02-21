@@ -1,3 +1,4 @@
+
 // src/components/emr/schedule-meeting-dialog.tsx
 'use client';
 
@@ -168,7 +169,7 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, currentUser, 
         }
     };
     
-    const usersWithInterest = interests.filter(i => i.callId === call.id && !i.meetingSlot);
+    const usersWithInterest = interests.filter(i => i.callId === call.id && !i.meetingSlot && !i.wasAbsent);
     const availableEvaluators = allUsers.filter(u => {
         const isAdminRole = ['Super-admin', 'admin', 'CRO'].includes(u.role);
         const isNotAnApplicant = !usersWithInterest.some(interest => interest.userId === u.uid);

@@ -867,7 +867,7 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
 }
 
 export async function scheduleMeeting(
-  projectsToSchedule: { id: string; pi_uid: string; title: string; pi_email?: string }[],
+  projectsToSchedule: { id: string; pi_uid: string; pi: string; title: string; pi_email?: string }[],
   meetingDetails: { date: string; time: string; venue: string; evaluatorUids: string[]; mode: 'Online' | 'Offline' },
   isMidTermReview: boolean = false,
 ) {
@@ -908,19 +908,21 @@ export async function scheduleMeeting(
       batch.update(projectRef, updateData);
 
       // Collect users to notify
-      const piSnap = await adminDb.collection("users").doc(projectData.pi_uid).get();
-      if(piSnap.exists) allUsersToNotify.set(projectData.pi_uid, piSnap.data() as User);
+      if (projectData.pi_uid) {
+        const piSnap = await adminDb.collection("users").doc(projectData.pi_uid).get();
+        if(piSnap.exists) allUsersToNotify.set(projectData.pi_uid, piSnap.data() as User);
+      }
 
       if (isReschedule && existingProject?.meetingDetails?.assignedEvaluators) {
           for(const uid of existingProject.meetingDetails.assignedEvaluators) {
-              if(!allUsersToNotify.has(uid)) {
+              if(!allUsersToNotify.has(uid) && uid) {
                   const userSnap = await adminDb.collection("users").doc(uid).get();
                   if(userSnap.exists) allUsersToNotify.set(uid, userSnap.data() as User);
               }
           }
       }
       for(const uid of meetingDetails.evaluatorUids) {
-          if(!allUsersToNotify.has(uid)) {
+          if(!allUsersToNotify.has(uid) && uid) {
               const userSnap = await adminDb.collection("users").doc(uid).get();
               if(userSnap.exists) allUsersToNotify.set(uid, userSnap.data() as User);
           }
@@ -929,7 +931,7 @@ export async function scheduleMeeting(
     
     await batch.commit(); // Commit all project updates first
 
-    // Send notifications
+    // Send notifications to registered users
     for (const [uid, user] of allUsersToNotify.entries()) {
         const isPI = projectsToSchedule.some(p => p.pi_uid === uid);
         
@@ -961,7 +963,7 @@ export async function scheduleMeeting(
                   <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
                   <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
                   <p><strong style="color: #ffffff;">${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
-                    ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
+                    ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : venue}
                   </p>
                   <p style="color: #cccccc; margin-top: 15px;">
                     You can view more details on the 
@@ -986,7 +988,7 @@ export async function scheduleMeeting(
                       <p><strong style="color: #ffffff;">
                         ${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}
                       </strong> 
-                        ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : meetingDetails.venue}
+                        ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : venue}
                       </p>
                       <p style="color: #e0e0e0;">The following projects are scheduled for your review:</p>
                       <ul style="list-style-type: none; padding-left: 0;">
@@ -1030,6 +1032,49 @@ export async function scheduleMeeting(
         }
     }
     
+    // Handle unregistered PIs
+    const unregisteredPis = projectsToSchedule.filter(p => !p.pi_uid && p.pi_email);
+    for (const projectData of unregisteredPis) {
+        const isReschedule = rescheduleMap.get(projectData.id) || false;
+        const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting";
+        const subjectPrefix = isReschedule ? `RESCHEDULED: ${meetingType}` : meetingType;
+        const subject = `${subjectPrefix} for Your Project: ${projectData.title}`;
+
+        const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy");
+        const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)");
+        
+        const htmlContent = `
+            <div ${EMAIL_STYLES.background}>
+              ${EMAIL_STYLES.logo}
+              <p style="color: #ffffff;">Dear ${projectData.pi},</p>
+              <p style="color: #e0e0e0;">
+                An <strong style="color: #ffffff;">${meetingType}</strong> has been ${isReschedule ? 'rescheduled' : 'scheduled'} for your project, 
+                "<strong style="color: #ffffff;">${projectData.title}</strong>".
+              </p>
+               ${isReschedule ? `<p style="color: #ffcdd2;">Please note the updated time/date.</p>` : ''}
+              <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
+              <p><strong style="color: #ffffff;">Time:</strong> ${formattedTime}</p>
+              <p><strong style="color: #ffffff;">${meetingDetails.mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
+                ${meetingDetails.mode === 'Online' ? `<a href="${meetingDetails.venue}" style="color: #64b5f6; text-decoration: underline;">${meetingDetails.venue}</a>` : venue}
+              </p>
+              <p style="color: #cccccc; margin-top: 15px;">
+                You can view more details on the 
+                <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectData.id}" style="color: #64b5f6; text-decoration: underline;">
+                  PU Research Projects Portal
+                </a> once you sign up.
+              </p>
+              ${EMAIL_STYLES.footer}
+            </div>
+          `;
+            
+        await sendEmailUtility({
+            to: projectData.pi_email!,
+            subject,
+            html: htmlContent,
+            from: "default"
+        });
+    }
+
     await logActivity("INFO", `IMR ${isMidTermReview ? 'mid-term review' : ''} meeting scheduled/rescheduled`, {
       projectIds: projectsToSchedule.map((p) => p.id),
       meetingDate: meetingDetails.date,

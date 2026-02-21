@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -156,7 +155,7 @@ function HistoryTable({
                                     .map(uid => usersMap.get(uid)?.name)
                                     .filter(Boolean);
                                 
-                                const isUpcoming = project.meetingDetails?.date && isAfter(parseISO(project.meetingDetails.date), subDays(new Date(),1));
+                                const isUpcoming = project.meetingDetails?.date && isFuture(parseISO(project.meetingDetails.date));
 
                                 return (
                                     <TableRow key={project.id}>
@@ -495,7 +494,7 @@ export default function ScheduleMeetingPage() {
   }, [activeTab]);
 
   const onSubmit = async (data: z.infer<typeof scheduleSchema>) => {
-    let projectsToSchedule: {id: string, pi_uid: string, title: string, pi_email?: string}[] = [];
+    let projectsToSchedule: {id: string, pi_uid: string, pi: string, title: string, pi_email?: string}[] = [];
     let isMidTerm = activeTab === 'mid-term-review';
 
     if (meetingToEdit) {
@@ -505,7 +504,7 @@ export default function ScheduleMeetingPage() {
         // Find all projects that share the same meeting details
         projectsToSchedule = allProjects
             .filter(p => p.meetingDetails?.date === oldMeeting.date && p.meetingDetails?.time === oldMeeting.time && p.meetingDetails?.venue === oldMeeting.venue)
-            .map(p => ({ id: p.id, pi_uid: p.pi_uid, title: p.title, pi_email: p.pi_email }));
+            .map(p => ({ id: p.id, pi_uid: p.pi_uid, pi: p.pi, title: p.title, pi_email: p.pi_email }));
         isMidTerm = !!meetingToEdit.hasHadMidTermReview;
     } else {
         // New scheduling logic
@@ -515,7 +514,7 @@ export default function ScheduleMeetingPage() {
         }
         projectsToSchedule = allProjects
             .filter(p => selectedProjects.includes(p.id))
-            .map(p => ({ id: p.id, pi_uid: p.pi_uid, title: p.title, pi_email: p.pi_email }));
+            .map(p => ({ id: p.id, pi_uid: p.pi_uid, pi: p.pi, title: p.title, pi_email: p.pi_email }));
     }
 
     const meetingDetails = {
@@ -666,7 +665,7 @@ export default function ScheduleMeetingPage() {
     </div>
     <Dialog open={!!meetingToEdit} onOpenChange={() => setMeetingToEdit(null)}>
         <DialogContent className="sm:max-w-md">
-            <DialogHeader>
+             <DialogHeader>
                 <DialogTitle>Reschedule Meeting</DialogTitle>
                 <DialogDescription>
                     Update the details for this meeting. All participants will be re-notified.
@@ -678,3 +677,4 @@ export default function ScheduleMeetingPage() {
     </>
   );
 }
+
