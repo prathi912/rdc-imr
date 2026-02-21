@@ -7,6 +7,7 @@ import type { IncentiveClaim, EmrInterest, Author } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { CircleHelp, Sigma, Percent, Waypoints, Target, Trophy, GraduationCap, FileText, Star } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 type CalculationDetails = {
     base: number;
