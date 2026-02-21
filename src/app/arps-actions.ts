@@ -61,17 +61,16 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 
     switch (publicationType) {
         case 'Original Research Article':
-        case 'Research Articles/Short Communications': // Handling both singular and plural forms
+        case 'Research Articles/Short Communications':
             points = 8; 
             break;
         case 'Short Communication': 
             points = 6;
             break;
-        case 'Review Article':
         case 'Review Articles':
-             // The base points are already adjusted, so the multiplier is always 1 here to avoid double-penalty.
+        case 'Review Article':
              points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6;
-             multiplier = 1.0; // Multiplier is applied later based on quartile, so set to 1 to not interfere
+             multiplier = 1.0;
              break;
         case 'Case Report / Case Study': 
         case 'Case Reports/Short Surveys':
@@ -79,7 +78,6 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
             break;
     }
 
-    // This multiplier should apply to all types except Review Articles where points are already adjusted.
     if (publicationType !== 'Review Articles' && publicationType !== 'Review Article') {
         switch (journalClassification) {
             case 'Q1': multiplier = 1.0; break;
@@ -87,11 +85,11 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
             case 'Q3': multiplier = 0.4; break;
             case 'Q4': multiplier = 0.3; break;
         }
-    } else if (!multiplier) { // For Review Articles, if multiplier is not set above, set it based on quartile
+    } else if (!multiplier) { 
          switch (journalClassification) {
             case 'Q1': multiplier = 1.0; break;
-            case 'Q2': multiplier = 1.0; break; // Q1/Q2 for reviews get full points (8), so multiplier is 1.
-            case 'Q3': multiplier = 1.0; break; // Q3/Q4 get 6 points, multiplier is 1. The base point already reflects the reduction.
+            case 'Q2': multiplier = 1.0; break;
+            case 'Q3': multiplier = 1.0; break;
             case 'Q4': multiplier = 1.0; break;
         }
     }
@@ -100,17 +98,14 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 }
 
 function getClaimDate(claim: IncentiveClaim): Date | null {
-    // The date for ARPS calculation is the date of the FINAL approval.
     const finalApproval = (claim.approvals || [])
         .filter((a): a is ApprovalStage => a !== null && a.status === 'Approved')
         .sort((a, b) => b.stage - a.stage)[0];
         
-    // If a final approval stage exists, use its timestamp.
-    if (finalApproval) {
+    if (finalApproval && finalApproval.timestamp) {
         return parseISO(finalApproval.timestamp);
     }
     
-    // As a fallback for older data or different workflows, use the original submission date.
     return parseISO(claim.submissionDate);
 }
 
@@ -135,7 +130,7 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): {
         if (claim.claimType !== 'Research Papers') continue;
         
         // Indexing Validation
-        if (!claim.indexType || !['scopus', 'wos', 'both', 'sci'].includes(claim.indexType)) {
+        if (!claim.indexType || !['scopus', 'wos', 'both', 'sci'].includes(claim.indexType.toLowerCase())) {
             continue;
         }
         
@@ -225,7 +220,6 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: D
         const sanctionDate = parseISO(project.sanctionDate);
         if (sanctionDate < startDate || sanctionDate > endDate) continue;
 
-        // Use structured data if available, otherwise parse the string
         let amount = 0;
         if (project.sanctionAmount) {
             amount = project.sanctionAmount;
@@ -365,5 +359,3 @@ type CalculationDetails = {
     applicantMultiplier?: number;
     rolePoints?: number;
 };
-
-
