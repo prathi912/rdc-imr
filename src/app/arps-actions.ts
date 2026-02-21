@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -67,8 +66,8 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
         case 'Short Communication': 
             points = 6;
             break;
-        case 'Review Articles':
         case 'Review Article':
+        case 'Review Articles':
              points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6;
              multiplier = 1.0;
              break;
@@ -103,10 +102,19 @@ function getClaimDate(claim: IncentiveClaim): Date | null {
         .sort((a, b) => b.stage - a.stage)[0];
         
     if (finalApproval && finalApproval.timestamp) {
-        return parseISO(finalApproval.timestamp);
+        try {
+            return parseISO(finalApproval.timestamp);
+        } catch (e) {
+            // Fallback if timestamp is invalid for some reason
+        }
     }
     
-    return parseISO(claim.submissionDate);
+    // Fallback to submission date if no valid approval timestamp is found
+    try {
+        return parseISO(claim.submissionDate);
+    } catch(e) {
+        return null;
+    }
 }
 
 
@@ -129,8 +137,9 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): {
     for (const claim of claims) {
         if (claim.claimType !== 'Research Papers') continue;
         
-        // Indexing Validation
-        if (!claim.indexType || !['scopus', 'wos', 'both', 'sci'].includes(claim.indexType.toLowerCase())) {
+        // Indexing Validation (Case-insensitive)
+        const indexType = claim.indexType?.toLowerCase();
+        if (!indexType || !['scopus', 'wos', 'both', 'sci'].includes(indexType)) {
             continue;
         }
         
@@ -263,7 +272,7 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const endDate = new Date(year, 4, 31, 23, 59, 59, 999); // May 31st of the selected year
 
     const claimsRef = adminDb.collection('incentiveClaims');
-    const claimsQuery = claimsRef.where('authorUids', 'array-contains', userId);
+    const claimsQuery = claimsRef.where('uid', '==', userId);
     
     const emrRef = adminDb.collection('emrInterests');
     const sanctionedStatuses = ['Sanctioned', 'SANCTIONED'];
@@ -301,19 +310,6 @@ export async function calculateArpsForUser(userId: string, year: number) {
 
 
     const { score: rawPubScore, count: pubCount, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId);
-
-    if (pubCount < POLICY.MIN_PUBLICATIONS_REQUIRED) {
-        return {
-            success: true,
-            data: {
-                publications: { raw: 0, weighted: 0, final: 0, contributingClaims: [] },
-                patents: { raw: 0, weighted: 0, final: 0, contributingClaims: [] },
-                emr: { raw: 0, weighted: 0, final: 0, contributingProjects: [] },
-                totalArps: 0,
-                grade: 'DME (Minimum 10 publications required)',
-            }
-        };
-    }
     
     const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId);
     const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, startDate, endDate);
@@ -333,6 +329,10 @@ export async function calculateArpsForUser(userId: string, year: number) {
     else if (totalArps >= 50) grade = 'EE';
     else if (totalArps >= 30) grade = 'ME';
     
+    if (pubCount < POLICY.MIN_PUBLICATIONS_REQUIRED) {
+        grade += ' (Minimum 10 publications required)';
+    }
+
     return {
         success: true,
         data: {
