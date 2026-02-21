@@ -100,30 +100,6 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
     
     return (
         <div className="mt-8 space-y-12">
-            
-            {/* Final Score and Grade */}
-            <Card className="shadow-lg border-primary/20">
-                <CardHeader className="text-center">
-                    <CardTitle className="text-3xl">Final ARPS Score & Grade</CardTitle>
-                    <CardDescription>Based on approved activities from June 1 to May 31.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col md:flex-row items-center justify-center gap-8 text-center">
-                    <div className="flex flex-col">
-                        <span className="text-7xl font-bold tracking-tighter text-primary">{totalArps.toFixed(2)}</span>
-                        <span className="text-2xl font-medium text-muted-foreground">/ 80.00</span>
-                    </div>
-                    <div className="flex flex-col">
-                        <Badge className={`text-3xl px-6 py-2 ${gradeInfo.className}`} variant={gradeInfo.variant}>{grade}</Badge>
-                        <span className="mt-2 text-lg font-semibold">{gradeInfo.label}</span>
-                    </div>
-                </CardContent>
-                 <CardFooter className="p-4 text-center justify-center">
-                    <p className="text-xs text-muted-foreground">
-                        This is an intermediate score as Research Activities and Consultancy are not considered.
-                    </p>
-                </CardFooter>
-            </Card>
-
             {/* How ARPS is Formed */}
             <FormulaCard 
                 title="How Your ARPS is Calculated"
