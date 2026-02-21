@@ -4,7 +4,7 @@
 
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, EmrInterest, User, Author } from '@/types';
-import { startOfYear, endOfYear, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 
 // --- Helper Functions ---
 
@@ -62,12 +62,9 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
     let score = 0;
     const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
-    const approvedStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
-
 
     for (const claim of claims) {
-        if (!approvedStatuses.includes(claim.status)) continue;
-
+        // Find the claimant in the author list for this specific claim
         const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
         if (!claimantAuthorInfo) continue;
 
@@ -103,10 +100,9 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { 
 function calculatePatentScore(claims: IncentiveClaim[], userId: string): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
     let score = 0;
     const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
-    const approvedStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
 
     for (const claim of claims) {
-        if (!approvedStatuses.includes(claim.status) || claim.claimType !== 'Patents') continue;
+        if (claim.claimType !== 'Patents') continue;
         
         // Ensure this user is actually an inventor on this patent claim
         if (!claim.patentInventors?.some(inv => inv.uid === userId)) continue;
@@ -132,11 +128,9 @@ function calculatePatentScore(claims: IncentiveClaim[], userId: string): { score
 }
 
 
-function calculateEmrScore(projects: EmrInterest[], userId: string, year: number): { score: number; contributingProjects: { project: EmrInterest, score: number }[] } {
+function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: Date, endDate: Date): { score: number; contributingProjects: { project: EmrInterest, score: number }[] } {
     let score = 0;
     const contributingProjects: { project: EmrInterest, score: number }[] = [];
-    const startDate = startOfYear(new Date(year, 0, 1));
-    const endDate = endOfYear(new Date(year, 11, 31));
     
     for (const project of projects) {
         // Status is pre-filtered, but double-checking is safe.
@@ -179,14 +173,14 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, year: number
 
 export async function calculateArpsForUser(userId: string, year: number) {
   try {
-    const startDate = startOfYear(new Date(year, 0, 1));
-    const endDate = endOfYear(new Date(year, 11, 31));
+    // New: Define assessment year from June to May
+    const startDate = new Date(year, 5, 1); // June 1st of the selected year
+    const endDate = new Date(year + 1, 4, 31, 23, 59, 59, 999); // May 31st of the next year
 
     // Fetch all necessary data
     const claimsRef = adminDb.collection('incentiveClaims');
-    const claimsQuery = claimsRef.where('authorUids', 'array-contains', userId)
-                                 .where('submissionDate', '>=', startDate.toISOString())
-                                 .where('submissionDate', '<=', endDate.toISOString());
+    // Fetch all claims for the user first, then filter by date in the functions.
+    const claimsQuery = claimsRef.where('authorUids', 'array-contains', userId);
     
     const emrRef = adminDb.collection('emrInterests');
     const sanctionedStatuses = ['Sanctioned', 'SANCTIONED'];
@@ -202,8 +196,21 @@ export async function calculateArpsForUser(userId: string, year: number) {
       emrPiQuery.get(),
       emrCoPiQuery.get(),
     ]);
+    
+    const approvedClaimStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
+    
+    // New: Filter claims by acceptance date within the June-May period
+    const claimsInPeriod = claimsSnapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim))
+      .filter(claim => {
+        if (!approvedClaimStatuses.includes(claim.status)) return false;
 
-    const allClaims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
+        const lastApproval = (claim.approvals || []).filter(a => a?.status === 'Approved').pop();
+        if (!lastApproval) return false;
+
+        const acceptanceDate = parseISO(lastApproval.timestamp);
+        return acceptanceDate >= startDate && acceptanceDate <= endDate;
+      });
     
     const piProjects = emrPiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
     const coPiProjects = emrCoPiSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
@@ -215,17 +222,17 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const uniqueEmrProjects = Array.from(allEmrProjects.values());
 
 
-    // Calculate Raw Scores
-    const { score: rawPubScore, contributingClaims: pubClaims } = calculatePublicationScore(allClaims, userId);
-    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(allClaims, userId);
-    const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, year);
+    // Calculate Raw Scores, passing pre-filtered claims
+    const { score: rawPubScore, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId);
+    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId);
+    const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, startDate, endDate);
 
     // Apply Weighting
     const weightedPub = rawPubScore * 0.50;
     const weightedPatent = rawPatentScore * 0.15;
     const weightedEmr = rawEmrScore * 0.15;
 
-    // Apply Capping
+    // Apply Capping based on the "Revised" final formula from the policy
     const finalPubScore = Math.min(weightedPub, 50);
     const finalPatentScore = Math.min(weightedPatent, 10);
     const finalEmrScore = Math.min(weightedEmr, 20);

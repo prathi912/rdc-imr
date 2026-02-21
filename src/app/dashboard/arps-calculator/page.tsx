@@ -69,6 +69,11 @@ export default function ArpsCalculatorPage() {
             setResults(result.data!);
         } else {
             console.error(result.error);
+            toast({
+                variant: 'destructive',
+                title: 'Error Calculating Score',
+                description: result.error || 'An unexpected error occurred.',
+            });
         }
         setIsCalculating(false);
     };
@@ -94,12 +99,12 @@ export default function ArpsCalculatorPage() {
         <div className="container mx-auto py-10">
             <PageHeader
                 title="ARPS Calculator"
-                description={isSuperAdmin ? "Calculate the Annual Research Performance Score for any faculty member." : "Calculate your Annual Research Performance Score."}
+                description={isSuperAdmin ? "Calculate the Annual Research Performance Score for any faculty member for an evaluation year (June to May)." : "Calculate your Annual Research Performance Score for an evaluation year (June to May)."}
             />
             <Card className="mt-8">
                 <CardHeader>
                     <CardTitle>Calculate Score</CardTitle>
-                    <CardDescription>Select a user and year to calculate the ARPS based on approved claims and projects.</CardDescription>
+                    <CardDescription>Select a user and evaluation year (June to May) to calculate the ARPS based on approved claims and projects.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {isSuperAdmin && (
@@ -122,7 +127,7 @@ export default function ArpsCalculatorPage() {
                     </Select>
                     <Button onClick={handleCalculate} disabled={!selectedUserId || !selectedYear || isCalculating} className={isSuperAdmin ? '' : 'md:col-start-2'}>
                         {isCalculating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Calculate ARPS
+                        {isSuperAdmin ? 'Calculate ARPS' : 'Calculate My ARPS'}
                     </Button>
                 </CardContent>
             </Card>
