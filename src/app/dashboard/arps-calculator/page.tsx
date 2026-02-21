@@ -10,41 +10,71 @@ import { type User } from '@/types';
 import { calculateArpsForUser } from '@/app/arps-actions';
 import { ArpsResultsDisplay, type ArpsData } from '@/components/dashboard/arps/arps-results-display';
 import { useRouter } from 'next/navigation';
+import { getAllUsers } from '@/app/actions';
+import { Combobox } from '@/components/ui/combobox';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ArpsCalculatorPage() {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
     const [loading, setLoading] = useState(true);
     const [isCalculating, setIsCalculating] = useState(false);
     const [results, setResults] = useState<ArpsData | null>(null);
     const router = useRouter();
+    const { toast } = useToast();
+
+    const isSuperAdmin = currentUser?.role === 'Super-admin';
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             const parsedUser = JSON.parse(storedUser);
             setCurrentUser(parsedUser);
+            if (parsedUser.role !== 'Super-admin') {
+                setSelectedUserId(parsedUser.uid);
+            }
         } else {
             router.push('/login');
         }
-        setLoading(false);
     }, [router]);
 
+    useEffect(() => {
+        async function loadData() {
+            if (currentUser) {
+                if (currentUser.role === 'Super-admin') {
+                    const users = await getAllUsers();
+                    setAllUsers(users);
+                }
+                setLoading(false);
+            }
+        }
+        loadData();
+    }, [currentUser]);
+
     const handleCalculate = async () => {
-        if (!currentUser || !selectedYear) return;
+        if (!selectedUserId || !selectedYear) {
+            toast({
+                variant: 'destructive',
+                title: 'Selection Required',
+                description: 'Please select a user and a year.',
+            });
+            return;
+        }
         setIsCalculating(true);
         setResults(null);
-        const result = await calculateArpsForUser(currentUser.uid, parseInt(selectedYear, 10));
+        const result = await calculateArpsForUser(selectedUserId, parseInt(selectedYear, 10));
         if (result.success) {
             setResults(result.data!);
         } else {
-            // Handle error, maybe show a toast
             console.error(result.error);
         }
         setIsCalculating(false);
     };
 
     const yearOptions = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - i).toString());
+    const userOptions = allUsers.map(u => ({ label: u.name, value: u.uid }));
 
     if (loading || !currentUser) {
         return (
@@ -64,14 +94,24 @@ export default function ArpsCalculatorPage() {
         <div className="container mx-auto py-10">
             <PageHeader
                 title="ARPS Calculator"
-                description="Calculate your Annual Research Performance Score."
+                description={isSuperAdmin ? "Calculate the Annual Research Performance Score for any faculty member." : "Calculate your Annual Research Performance Score."}
             />
             <Card className="mt-8">
                 <CardHeader>
-                    <CardTitle>Calculate Your Score</CardTitle>
-                    <CardDescription>Select a year to calculate your ARPS based on your approved claims and projects for that year.</CardDescription>
+                    <CardTitle>Calculate Score</CardTitle>
+                    <CardDescription>Select a user and year to calculate the ARPS based on approved claims and projects.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {isSuperAdmin && (
+                        <Combobox
+                            options={userOptions}
+                            value={selectedUserId}
+                            onChange={setSelectedUserId}
+                            placeholder="Select a faculty member..."
+                            searchPlaceholder="Search faculty..."
+                            emptyPlaceholder="No user found."
+                        />
+                    )}
                     <Select value={selectedYear} onValueChange={setSelectedYear}>
                         <SelectTrigger><SelectValue placeholder="Select year..." /></SelectTrigger>
                         <SelectContent>
@@ -80,16 +120,17 @@ export default function ArpsCalculatorPage() {
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button onClick={handleCalculate} disabled={!selectedYear || isCalculating}>
+                    <Button onClick={handleCalculate} disabled={!selectedUserId || !selectedYear || isCalculating} className={isSuperAdmin ? '' : 'md:col-start-2'}>
                         {isCalculating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Calculate My ARPS
+                        Calculate ARPS
                     </Button>
                 </CardContent>
             </Card>
 
             {isCalculating && (
-                <div className="flex justify-center items-center p-8">
+                <div className="flex justify-center items-center p-8 mt-8">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="ml-4 text-muted-foreground">Calculating score...</p>
                 </div>
             )}
             

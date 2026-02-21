@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -42,8 +43,9 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 
 // --- Main Calculation Functions ---
 
-function calculatePublicationScore(claims: IncentiveClaim[], userId: string): number {
-    let totalScore = 0;
+function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
+    let score = 0;
+    const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
 
     for (const claim of claims) {
         if (claim.status !== 'Payment Completed') continue;
@@ -62,8 +64,7 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): nu
                 }
                 break;
             case 'Conference Presentations':
-                // Assuming "Scopus Indexed Conference Proceeding" maps to this claim type
-                 if (claim.publicationType === 'Scopus Indexed Conference Proceedings') {
+                if (claim.publicationType === 'Scopus Indexed Conference Proceedings') {
                     claimScore = 2 * authorPositionMultiplier;
                 }
                 break;
@@ -72,13 +73,18 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): nu
                 claimScore = (points * multiplier) * authorPositionMultiplier;
                 break;
         }
-        totalScore += claimScore;
+        if (claimScore > 0) {
+            score += claimScore;
+            contributingClaims.push({ claim, score: claimScore });
+        }
     }
-    return totalScore;
+    return { score, contributingClaims };
 }
 
-function calculatePatentScore(claims: IncentiveClaim[]): number {
-    let totalScore = 0;
+function calculatePatentScore(claims: IncentiveClaim[]): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
+    let score = 0;
+    const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
+
     for (const claim of claims) {
         if (claim.status !== 'Payment Completed' || claim.claimType !== 'Patents') continue;
 
@@ -93,13 +99,19 @@ function calculatePatentScore(claims: IncentiveClaim[]): number {
             multiplier = claim.isPuSoleApplicant ? 1.0 : 0.8;
         }
 
-        totalScore += basePoints * multiplier;
+        const claimScore = basePoints * multiplier;
+        if (claimScore > 0) {
+            score += claimScore;
+            contributingClaims.push({ claim, score: claimScore });
+        }
     }
-    return totalScore;
+    return { score, contributingClaims };
 }
 
-function calculateEmrScore(projects: EmrInterest[], userId: string): number {
-    let totalScore = 0;
+function calculateEmrScore(projects: EmrInterest[], userId: string): { score: number; contributingProjects: { project: EmrInterest, score: number }[] } {
+    let score = 0;
+    const contributingProjects: { project: EmrInterest, score: number }[] = [];
+    
     for (const project of projects) {
         if (project.status !== 'Sanctioned' && project.status !== 'SANCTIONED') continue;
 
@@ -109,15 +121,21 @@ function calculateEmrScore(projects: EmrInterest[], userId: string): number {
         const amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
         const isPI = project.userId === userId;
 
+        let projectScore = 0;
         if (amount >= 2000000 && amount <= 5000000) {
-            totalScore += isPI ? 50 : 15;
+            projectScore = isPI ? 50 : 15;
         } else if (amount > 5000000 && amount <= 10000000) {
-            totalScore += isPI ? 70 : 20;
+            projectScore = isPI ? 70 : 20;
         } else if (amount > 10000000) {
-            totalScore += isPI ? 100 : 25;
+            projectScore = isPI ? 100 : 25;
+        }
+
+        if (projectScore > 0) {
+            score += projectScore;
+            contributingProjects.push({ project, score: projectScore });
         }
     }
-    return totalScore;
+    return { score, contributingProjects };
 }
 
 
@@ -141,13 +159,13 @@ export async function calculateArpsForUser(userId: string, year: number) {
 
     const [claimsSnapshot, emrSnapshot] = await Promise.all([claimsQuery.get(), emrQuery.get()]);
 
-    const allClaims = claimsSnapshot.docs.map(doc => doc.data() as IncentiveClaim);
-    const allEmrProjects = emrSnapshot.docs.map(doc => doc.data() as EmrInterest);
+    const allClaims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
+    const allEmrProjects = emrSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
 
     // Calculate Raw Scores
-    const rawPubScore = calculatePublicationScore(allClaims, userId);
-    const rawPatentScore = calculatePatentScore(allClaims);
-    const rawEmrScore = calculateEmrScore(allEmrProjects, userId);
+    const { score: rawPubScore, contributingClaims: pubClaims } = calculatePublicationScore(allClaims, userId);
+    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(allClaims);
+    const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(allEmrProjects, userId);
 
     // Apply Weighting
     const weightedPub = rawPubScore * 0.50;
@@ -159,21 +177,21 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const finalPatentScore = Math.min(weightedPatent, 15);
     const finalEmrScore = Math.min(weightedEmr, 15);
     
-    // Total ARPS
+    // Total ARPS (out of 80 since consultancy and research activities are not included)
     const totalArps = finalPubScore + finalPatentScore + finalEmrScore;
 
     // Determine Grade
     let grade = 'DME';
-    if (totalArps >= 80) grade = 'SEE';
+    if (totalArps >= 80) grade = 'SEE'; // This grade is unreachable with the current criteria (max 80)
     else if (totalArps >= 50) grade = 'EE';
     else if (totalArps >= 30) grade = 'ME';
     
     return {
         success: true,
         data: {
-            publications: { raw: rawPubScore, weighted: weightedPub, final: finalPubScore },
-            patents: { raw: rawPatentScore, weighted: weightedPatent, final: finalPatentScore },
-            emr: { raw: rawEmrScore, weighted: weightedEmr, final: finalEmrScore },
+            publications: { raw: rawPubScore, weighted: weightedPub, final: finalPubScore, contributingClaims: pubClaims },
+            patents: { raw: rawPatentScore, weighted: weightedPatent, final: finalPatentScore, contributingClaims: patentClaims },
+            emr: { raw: rawEmrScore, weighted: weightedEmr, final: finalEmrScore, contributingProjects: emrProjects },
             totalArps: totalArps,
             grade: grade,
         }
