@@ -235,15 +235,26 @@ export async function calculateArpsForUser(userId: string, year: number) {
         if (!approvedClaimStatuses.includes(claim.status)) return false;
 
         const workflow = claim.approvals || [];
-        if (workflow.length === 0) return false;
+        let acceptanceDate: Date | null = null;
+        
+        if (workflow.length > 0) {
+            const finalApprovalEntry = [...workflow]
+                .filter((a): a is ApprovalStage => a !== null && !!a.timestamp)
+                .sort((a, b) => b.stage - a.stage)[0];
+            
+            if (finalApprovalEntry) {
+                acceptanceDate = parseISO(finalApprovalEntry.timestamp);
+            }
+        }
+        
+        // Fallback ONLY for claims with a final status but an empty approval array (legacy data)
+        if (!acceptanceDate && workflow.length === 0) {
+            // Use submissionDate as a last resort. This is not ideal but better than ignoring the claim.
+            acceptanceDate = parseISO(claim.submissionDate);
+        }
 
-        const finalApprovalEntry = [...workflow]
-            .filter((a): a is ApprovalStage => a !== null)
-            .sort((a, b) => b.stage - a.stage)[0];
-        
-        if (!finalApprovalEntry) return false;
-        
-        const acceptanceDate = parseISO(finalApprovalEntry.timestamp);
+        if (!acceptanceDate) return false;
+
         return acceptanceDate >= startDate && acceptanceDate <= endDate;
       });
     
