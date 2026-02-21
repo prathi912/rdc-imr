@@ -100,13 +100,16 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { 
     return { score, contributingClaims };
 }
 
-function calculatePatentScore(claims: IncentiveClaim[]): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
+function calculatePatentScore(claims: IncentiveClaim[], userId: string): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
     let score = 0;
     const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
     const approvedStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
 
     for (const claim of claims) {
         if (!approvedStatuses.includes(claim.status) || claim.claimType !== 'Patents') continue;
+        
+        // Ensure this user is actually an inventor on this patent claim
+        if (!claim.patentInventors?.some(inv => inv.uid === userId)) continue;
 
         let basePoints = 0;
         if (claim.currentStatus === 'Published') basePoints = 10;
@@ -127,6 +130,7 @@ function calculatePatentScore(claims: IncentiveClaim[]): { score: number; contri
     }
     return { score, contributingClaims };
 }
+
 
 function calculateEmrScore(projects: EmrInterest[], userId: string, year: number): { score: number; contributingProjects: { project: EmrInterest, score: number }[] } {
     let score = 0;
@@ -180,7 +184,7 @@ export async function calculateArpsForUser(userId: string, year: number) {
 
     // Fetch all necessary data
     const claimsRef = adminDb.collection('incentiveClaims');
-    const claimsQuery = claimsRef.where('uid', '==', userId)
+    const claimsQuery = claimsRef.where('authorUids', 'array-contains', userId)
                                  .where('submissionDate', '>=', startDate.toISOString())
                                  .where('submissionDate', '<=', endDate.toISOString());
     
@@ -213,7 +217,7 @@ export async function calculateArpsForUser(userId: string, year: number) {
 
     // Calculate Raw Scores
     const { score: rawPubScore, contributingClaims: pubClaims } = calculatePublicationScore(allClaims, userId);
-    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(allClaims);
+    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(allClaims, userId);
     const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, year);
 
     // Apply Weighting
