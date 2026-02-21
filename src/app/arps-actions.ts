@@ -17,8 +17,10 @@ function getJournalAuthorPositionMultiplier(claimantRole: Author['role'], author
     if (claimantRole === 'Co-Author') {
         if (position > 0 && position <= 5) return 0.3;
         if (position > 5) return 0.1;
+        // Default for co-authors if position is not specified but role is correct
+        return 0.3;
     }
-    return 0.3; // Default for co-authors if position is not specified
+    return 0; // Return 0 for any other role
 }
 
 // Multiplier for Books, Chapters, and Conference Proceedings (Policy 5.1.2)
@@ -28,10 +30,12 @@ function getBookConfAuthorPositionMultiplier(claimantRole: Author['role'], autho
         return 0.7;
     }
     if (claimantRole === 'Co-Author') {
-        // The policy states "up to 5", so we'll assume it applies to positions 1-5.
         if (position > 0 && position <= 5) return 0.3;
+        // To ensure all co-authors are "considered", we'll mirror the journal policy's 0.1 multiplier for positions > 5 as a reasonable default.
+        if (position > 5) return 0.1;
+        // Default for co-authors if position is not specified but role is correct
+        return 0.3;
     }
-    // If the role or position doesn't match, the multiplier is 0 for this category.
     return 0;
 }
 
@@ -47,6 +51,7 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
             points = 8; 
             break;
         case 'Review Articles':
+        case 'Review Article':
             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6; 
             break;
         case 'Case Report / Case Study': 
@@ -232,13 +237,11 @@ export async function calculateArpsForUser(userId: string, year: number) {
       .filter(claim => {
         if (!approvedClaimStatuses.includes(claim.status)) return false;
 
-        const workflow = claim.approvals || [];
         let acceptanceDate: Date | null = null;
         
-        if (workflow && workflow.length > 0) {
-            // Find the approval entry with the highest stage number.
-            const finalApprovalEntry = [...workflow]
-                .filter((a): a is ApprovalStage => a !== null && !!a.timestamp)
+        if (claim.approvals && claim.approvals.length > 0) {
+            const finalApprovalEntry = [...claim.approvals]
+                .filter((a): a is ApprovalStage => a !== null && !!a.timestamp && a.status === 'Approved')
                 .sort((a, b) => b.stage - a.stage)[0];
             
             if (finalApprovalEntry) {
@@ -248,7 +251,6 @@ export async function calculateArpsForUser(userId: string, year: number) {
         
         // Fallback ONLY for claims with a final status but an empty or incomplete approval array (legacy data)
         if (!acceptanceDate && approvedClaimStatuses.includes(claim.status)) {
-            // Use submissionDate as a last resort. This is not ideal but better than ignoring the claim.
             acceptanceDate = parseISO(claim.submissionDate);
         }
 
