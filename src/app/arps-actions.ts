@@ -173,13 +173,13 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: D
 
 export async function calculateArpsForUser(userId: string, year: number) {
   try {
-    // New: Define assessment year from June to May
-    const startDate = new Date(year, 5, 1); // June 1st of the selected year
-    const endDate = new Date(year + 1, 4, 31, 23, 59, 59, 999); // May 31st of the next year
+    // New: Define assessment year from June of previous year to May of selected year
+    const startDate = new Date(year - 1, 5, 1); // June 1st of the previous year
+    const endDate = new Date(year, 4, 31, 23, 59, 59, 999); // May 31st of the selected year
 
     // Fetch all necessary data
     const claimsRef = adminDb.collection('incentiveClaims');
-    // Fetch all claims for the user first, then filter by date in the functions.
+    // Fetch all claims where the user is an author
     const claimsQuery = claimsRef.where('authorUids', 'array-contains', userId);
     
     const emrRef = adminDb.collection('emrInterests');
@@ -199,13 +199,16 @@ export async function calculateArpsForUser(userId: string, year: number) {
     
     const approvedClaimStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
     
-    // New: Filter claims by acceptance date within the June-May period
+    // Filter claims by acceptance date within the June-May period
     const claimsInPeriod = claimsSnapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim))
       .filter(claim => {
         if (!approvedClaimStatuses.includes(claim.status)) return false;
 
-        const lastApproval = (claim.approvals || []).filter(a => a?.status === 'Approved').pop();
+        // Find the timestamp of the final approval in the workflow for this claim type
+        const workflow = claim.approvals || [];
+        const lastApproval = workflow.filter(a => a?.status === 'Approved').sort((a, b) => b!.stage - a!.stage)[0];
+        
         if (!lastApproval) return false;
 
         const acceptanceDate = parseISO(lastApproval.timestamp);
