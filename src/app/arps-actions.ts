@@ -100,28 +100,17 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 }
 
 function getClaimDate(claim: IncentiveClaim): Date | null {
-    // For Research Papers, the publication date is the most relevant date.
-    if (claim.claimType === 'Research Papers' && claim.publicationYear && claim.publicationMonth) {
-        const monthMap: { [key: string]: number } = {
-            'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
-            'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11
-        };
-        const monthIndex = monthMap[claim.publicationMonth.toLowerCase()];
-        if (monthIndex !== undefined) {
-            return new Date(claim.publicationYear, monthIndex, 15);
-        }
-    }
-    
-    // For other claim types, or as a fallback, use the final approval date if available.
+    // The date for ARPS calculation is the date of the FINAL approval.
     const finalApproval = (claim.approvals || [])
         .filter((a): a is ApprovalStage => a !== null && a.status === 'Approved')
         .sort((a, b) => b.stage - a.stage)[0];
         
+    // If a final approval stage exists, use its timestamp.
     if (finalApproval) {
         return parseISO(finalApproval.timestamp);
     }
     
-    // Final fallback to the original submission date of the claim.
+    // As a fallback for older data or different workflows, use the original submission date.
     return parseISO(claim.submissionDate);
 }
 
@@ -376,4 +365,5 @@ type CalculationDetails = {
     applicantMultiplier?: number;
     rolePoints?: number;
 };
+
 
