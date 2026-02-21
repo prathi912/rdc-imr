@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -45,7 +46,7 @@ export default function ArpsCalculatorPage() {
             if (currentUser) {
                 if (currentUser.role === 'Super-admin') {
                     const users = await getAllUsers();
-                    setAllUsers(users);
+                    setAllUsers(users.filter(u => u.role === 'faculty' || u.role === 'CRO' || u.role === 'Super-admin'));
                 }
                 setLoading(false);
             }
@@ -86,7 +87,7 @@ export default function ArpsCalculatorPage() {
             <div className="container mx-auto py-10">
                 <PageHeader
                     title="ARPS Calculator"
-                    description="Calculate your Annual Research Performance Score."
+                    description="Calculate the Annual Research Performance Score."
                 />
                  <div className="flex justify-center items-center p-8">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -99,15 +100,15 @@ export default function ArpsCalculatorPage() {
         <div className="container mx-auto py-10">
             <PageHeader
                 title="ARPS Calculator"
-                description={isSuperAdmin ? "Calculate the Annual Research Performance Score for any faculty member for an evaluation year (June to May)." : "Calculate your Annual Research Performance Score for an evaluation year (June to May)."}
+                description="Calculate the Annual Research Performance Score for an evaluation year (June 1st to May 31st)."
             />
             <Card className="mt-8">
                 <CardHeader>
                     <CardTitle>Calculate Score</CardTitle>
-                    <CardDescription>Select a user and evaluation year (June to May) to calculate the ARPS based on approved claims and projects.</CardDescription>
+                    <CardDescription>Select a user and evaluation year to calculate the ARPS based on approved claims and projects.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {isSuperAdmin && (
+                    {isSuperAdmin ? (
                         <Combobox
                             options={userOptions}
                             value={selectedUserId}
@@ -116,6 +117,8 @@ export default function ArpsCalculatorPage() {
                             searchPlaceholder="Search faculty..."
                             emptyPlaceholder="No user found."
                         />
+                    ) : (
+                        <Input value={currentUser.name} disabled />
                     )}
                     <Select value={selectedYear} onValueChange={setSelectedYear}>
                         <SelectTrigger><SelectValue placeholder="Select year..." /></SelectTrigger>
@@ -125,7 +128,7 @@ export default function ArpsCalculatorPage() {
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button onClick={handleCalculate} disabled={!selectedUserId || !selectedYear || isCalculating} className={isSuperAdmin ? '' : 'md:col-start-2'}>
+                    <Button onClick={handleCalculate} disabled={!selectedUserId || !selectedYear || isCalculating}>
                         {isCalculating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {isSuperAdmin ? 'Calculate ARPS' : 'Calculate My ARPS'}
                     </Button>

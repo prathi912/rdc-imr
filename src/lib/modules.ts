@@ -36,7 +36,7 @@ const coreModules = ["dashboard", "notifications", "settings", "emr-calendar", "
 const facultyCoreModules = ["new-submission", "my-projects"]
 const hierarchyCoreModules = ["analytics"]
 
-const facultyDefaults = [...coreModules, ...facultyCoreModules]
+const facultyDefaults = [...coreModules, ...facultyCoreModules, "arps-calculator"]
 const croDefaults = [...coreModules, ...facultyCoreModules, "all-projects", "analytics"]
 const iqacDefaults = [...coreModules, "all-projects", "analytics"]
 const adminDefaults = [...croDefaults, "schedule-meeting", "pending-reviews", "completed-reviews", "emr-management", "manage-incentive-claims"]

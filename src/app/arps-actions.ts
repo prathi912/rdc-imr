@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { adminDb } from '@/lib/admin';
@@ -205,8 +204,9 @@ export async function calculateArpsForUser(userId: string, year: number) {
             .filter((a): a is ApprovalStage => a !== null)
             .sort((a, b) => b.stage - a.stage)[0];
         
-        if (!finalApprovalEntry || finalApprovalEntry.status === 'Rejected') return false;
-
+        if (!finalApprovalEntry) return false;
+        
+        // Use final approval timestamp, regardless of its status, as long as the claim's final status is approved.
         const acceptanceDate = parseISO(finalApprovalEntry.timestamp);
         return acceptanceDate >= startDate && acceptanceDate <= endDate;
       });
@@ -229,8 +229,8 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const weightedEmr = rawEmrScore * 0.15;
 
     const finalPubScore = Math.min(weightedPub, 50);
-    const finalPatentScore = Math.min(weightedPatent, 10);
-    const finalEmrScore = Math.min(weightedEmr, 20);
+    const finalPatentScore = Math.min(weightedPatent, 15);
+    const finalEmrScore = Math.min(weightedEmr, 15);
     
     const totalArps = finalPubScore + finalPatentScore + finalEmrScore;
 
