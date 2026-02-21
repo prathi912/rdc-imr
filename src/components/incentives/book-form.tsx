@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -27,6 +28,8 @@ import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
 import { calculateBookIncentive } from '@/app/incentive-calculation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Badge } from '../ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 
 const bookSchema = z
   .object({
@@ -38,7 +41,7 @@ const bookSchema = z
         uid: z.string().optional().nullable(),
         role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', "Presenting Author", "First & Presenting Author"]),
         isExternal: z.boolean(),
-        status: z.enum(['approved', 'pending', 'Applied']),
+        status: z.enum(['approved', 'pending', 'Applied'])
     })).min(1, 'At least one author is required.')
     .refine(data => {
         const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
@@ -549,7 +552,7 @@ export function BookForm() {
                     </AlertDescription>
                 </Alert>
             )}
-
+            
             <div className="rounded-lg border p-4 space-y-6 animate-in fade-in-0">
                 <h3 className="font-semibold text-sm -mb-2">BOOK/BOOK CHAPTER DETAILS</h3>
                 <Separator />
@@ -640,7 +643,7 @@ export function BookForm() {
                   <FormField name="publicationMode" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Mode of Publication</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Print Only" /></FormControl><FormLabel className="font-normal">Print Only</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Electronic Only" /></FormControl><FormLabel className="font-normal">Electronic Only</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Print & Electronic" /></FormControl><FormLabel className="font-normal">Print & Electronic</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
                 )}
                 {(publicationMode === 'Print Only' || publicationMode === 'Print & Electronic') && <FormField name="isbnPrint" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number (Print)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
-                {(publicationMode === 'Electronic Only' || publicationMode === 'Print & Electronic') && <FormField name="isbnElectronic" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number (Electronic)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />}
+                {(publicationMode === 'Electronic Only' || publicationMode === 'Print & Electronic') && <FormField name="isbnElectronic" control={form.control} render={({ field }) => ( <FormItem><FormLabel>ISBN Number (Electronic)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 
                 <FormField name="publisherWebsite" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Publisher Website</FormLabel><FormControl><Input type="url" placeholder="https://example.com" {...field} /></FormControl><FormMessage /></FormItem> )} />
                 <FormField name="publicationOrderInYear" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Is this your First/Second/Third Chapter/Book in the calendar year?</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select publication order" /></SelectTrigger></FormControl><SelectContent><SelectItem value="First">First</SelectItem><SelectItem value="Second">Second</SelectItem><SelectItem value="Third">Third</SelectItem></SelectContent></Select><FormMessage /></FormItem> )} />
@@ -678,20 +681,18 @@ export function BookForm() {
                 <DialogTitle>Multiple Users Found</DialogTitle>
                 <DialogDescription>Please select the correct user to add.</DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-                <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))}>
-                    {foundCoPis.map((u, i) => (
-                        <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
-                            <RadioGroupItem value={JSON.stringify(u)} id={`user-${i}`} />
-                            <Label htmlFor={`user-${i}`} className="flex flex-col">
-                                <span className="font-semibold">{u.name}</span>
-                                <span className="text-muted-foreground text-xs">{u.email}</span>
-                                <span className="text-muted-foreground text-xs">{u.campus}</span>
-                            </Label>
-                        </div>
-                    ))}
-                </RadioGroup>
-            </div>
+            <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))} className="py-4 space-y-2">
+                {foundCoPis.map((u, i) => (
+                    <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
+                        <RadioGroupItem value={JSON.stringify(u)} id={`user-${i}`} />
+                        <Label htmlFor={`user-${i}`} className="flex flex-col">
+                            <span className="font-semibold">{u.name}</span>
+                            <span className="text-muted-foreground text-xs">{u.email}</span>
+                            <span className="text-muted-foreground text-xs">{u.campus}</span>
+                        </Label>
+                    </div>
+                ))}
+            </RadioGroup>
         </DialogContent>
     </Dialog>
     </>
