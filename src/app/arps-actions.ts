@@ -4,7 +4,7 @@
 
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, EmrInterest, User, Author, ApprovalStage } from '@/types';
-import { parseISO } from 'date-fns';
+import { parseISO, getYear } from 'date-fns';
 
 // --- Helper Functions ---
 
@@ -43,12 +43,10 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 
     switch (publicationType) {
         case 'Research Articles/Short Communications':
+        case 'Short Communication': 
             points = 8; 
             break;
-        case 'Short Communication': 
-            points = 6; 
-            break;
-        case 'Review Article': 
+        case 'Review Articles':
             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6; 
             break;
         case 'Case Report / Case Study': 
@@ -237,7 +235,8 @@ export async function calculateArpsForUser(userId: string, year: number) {
         const workflow = claim.approvals || [];
         let acceptanceDate: Date | null = null;
         
-        if (workflow.length > 0) {
+        if (workflow && workflow.length > 0) {
+            // Find the approval entry with the highest stage number.
             const finalApprovalEntry = [...workflow]
                 .filter((a): a is ApprovalStage => a !== null && !!a.timestamp)
                 .sort((a, b) => b.stage - a.stage)[0];
@@ -247,8 +246,8 @@ export async function calculateArpsForUser(userId: string, year: number) {
             }
         }
         
-        // Fallback ONLY for claims with a final status but an empty approval array (legacy data)
-        if (!acceptanceDate && workflow.length === 0) {
+        // Fallback ONLY for claims with a final status but an empty or incomplete approval array (legacy data)
+        if (!acceptanceDate && approvedClaimStatuses.includes(claim.status)) {
             // Use submissionDate as a last resort. This is not ideal but better than ignoring the claim.
             acceptanceDate = parseISO(claim.submissionDate);
         }
