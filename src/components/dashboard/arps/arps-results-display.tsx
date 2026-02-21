@@ -88,30 +88,20 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
     const { publications, patents, emr, totalArps, grade } = results;
 
     const getGradeInfo = (g: string) => {
-        switch (g) {
-            case 'SEE': return { label: 'Significantly Exceeds Expectations', variant: 'default' as const, className: 'bg-green-600 hover:bg-green-700' };
-            case 'EE': return { label: 'Exceeds Expectations', variant: 'default' as const, className: 'bg-blue-600 hover:bg-blue-700' };
-            case 'ME': return { label: 'Meets Expectations', variant: 'secondary' as const };
-            case 'DME': return { label: 'Does Not Meet Expectations', variant: 'destructive' as const };
-            default: return { label: 'N/A', variant: 'outline' as const };
-        }
+        if (g.startsWith('SEE')) return { label: 'Significantly Exceeds Expectations', variant: 'default' as const, className: 'bg-green-600 hover:bg-green-700' };
+        if (g.startsWith('EE')) return { label: 'Exceeds Expectations', variant: 'default' as const, className: 'bg-blue-600 hover:bg-blue-700' };
+        if (g.startsWith('ME')) return { label: 'Meets Expectations', variant: 'secondary' as const };
+        if (g.startsWith('DME')) return { label: 'Does Not Meet Expectations', variant: 'destructive' as const };
+        return { label: 'N/A', variant: 'outline' as const };
     };
     const gradeInfo = getGradeInfo(grade);
+    const gradeMessage = grade.includes('(') ? grade.substring(grade.indexOf('(')) : '';
     
+    const totalRawScore = publications.raw + patents.raw + emr.raw;
+    const totalWeightedScore = publications.weighted + patents.weighted + emr.weighted;
+
     return (
         <div className="mt-8 space-y-12">
-            {/* How ARPS is Formed */}
-            <FormulaCard 
-                title="How Your ARPS is Calculated"
-                icon={Sigma}
-                steps={[
-                    { label: 'Capped Publication Score: P(pub)', value: publications.final.toFixed(2) },
-                    { label: '+ Capped Patent Score: P(patent)', value: `+ ${patents.final.toFixed(2)}` },
-                    { label: '+ Capped EMR Project Score: P(EMR)', value: `+ ${emr.final.toFixed(2)}` },
-                ]}
-                result={{ label: '= Final ARPS', value: totalArps.toFixed(2) }}
-            />
-
             {/* --- Publications Section --- */}
             <div className="space-y-6">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><FileText className="h-6 w-6"/> I. Publications Scoring Breakdown</h2>
@@ -138,8 +128,8 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                         )) : <p className="text-muted-foreground text-center py-4">No contributing publications found in this period.</p>}
                     </CardContent>
                 </Card>
-                
-                <FormulaCard 
+
+                <FormulaCard
                     title="Step 2: Final Publication Score P(pub)"
                     icon={Target}
                     steps={[
@@ -155,7 +145,7 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
             {/* --- Patents Section --- */}
             <div className="space-y-6">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Trophy className="h-6 w-6"/> II. Patent Scoring Breakdown</h2>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>Step 1: Individual Patent Raw Scores</CardTitle>
                         <CardDescription>Each patent is scored based on its status and the University's applicant role. The formula is: <br/> <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Base Points × Applicant Multiplier</code></CardDescription>
@@ -173,7 +163,7 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                         )) : <p className="text-muted-foreground text-center py-4">No contributing patents found in this period.</p>}
                     </CardContent>
                 </Card>
-                <FormulaCard 
+                <FormulaCard
                     title="Step 2: Final Patent Score P(patent)"
                     icon={Target}
                     steps={[
@@ -185,11 +175,11 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     result={{ label: 'Final Score P(patent) = min(Weighted Score, Cap)', value: patents.final.toFixed(2) }}
                 />
             </div>
-            
+
             {/* --- EMR Section --- */}
-             <div className="space-y-6">
+            <div className="space-y-6">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Star className="h-6 w-6"/> III. EMR Project Scoring Breakdown</h2>
-                 <Card>
+                <Card>
                     <CardHeader>
                         <CardTitle>Step 1: Individual EMR Project Raw Scores</CardTitle>
                         <CardDescription>Each sanctioned project is awarded points based on the funding amount and your role. The formula is: <br/> <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Role Points</code></CardDescription>
@@ -206,7 +196,7 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                         )) : <p className="text-muted-foreground text-center py-4">No contributing EMR projects found in this period.</p>}
                     </CardContent>
                 </Card>
-                <FormulaCard 
+                <FormulaCard
                     title="Step 2: Final EMR Score P(EMR)"
                     icon={Target}
                     steps={[
@@ -218,23 +208,54 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     result={{ label: 'Final Score P(EMR) = min(Weighted Score, Cap)', value: emr.final.toFixed(2) }}
                 />
             </div>
-            
+
             {/* Grade Assignment */}
             <div className="space-y-6">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><GraduationCap className="h-6 w-6"/> IV. Grade Assignment</h2>
                 <Card>
-                    <CardContent className="pt-6">
-                        <p>The final ARPS score is used to determine the performance grade based on the following thresholds:</p>
-                        <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
+                    <CardHeader>
+                        <CardTitle>Final ARPS Score & Grade</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center justify-center gap-8">
+                            <div className="text-center">
+                                <p className="text-6xl font-bold">{totalArps.toFixed(2)}</p>
+                                <p className="text-muted-foreground">Total ARPS</p>
+                            </div>
+                            <div className="text-center">
+                                <Badge variant={gradeInfo.variant} className={cn("text-4xl font-bold px-6 py-2", gradeInfo.className)}>{gradeInfo.label}</Badge>
+                                {gradeMessage && <p className="text-sm text-muted-foreground mt-2">{gradeMessage}</p>}
+                            </div>
+                        </div>
+                        <Separator className="my-6" />
+                        <p className="text-sm text-muted-foreground">The final ARPS score is used to determine the performance grade based on the following thresholds:</p>
+                        <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
                             <li><strong>&gt;= 80:</strong> SEE (Significantly Exceeds Expectations)</li>
                             <li><strong>50 - 79.99:</strong> EE (Exceeds Expectations)</li>
                             <li><strong>30 - 49.99:</strong> ME (Meets Expectations)</li>
                             <li><strong>&lt; 30:</strong> DME (Does Not Meet Expectations)</li>
                         </ul>
-                        <p className="mt-4">Your score of <strong>{totalArps.toFixed(2)}</strong> results in a grade of <strong>{grade}</strong>.</p>
                     </CardContent>
                 </Card>
             </div>
+            
+            {/* How ARPS is Formed - Moved to the end */}
+            <div className="space-y-6">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Sigma className="h-6 w-6"/> V. Final ARPS Calculation Summary</h2>
+                <FormulaCard
+                    title="Final ARPS Calculation"
+                    icon={Sigma}
+                    steps={[
+                        { label: 'Total Raw Score (Publications + Patents + EMR)', value: totalRawScore.toFixed(2) },
+                        { label: 'Total Weighted Score (Before Capping)', value: totalWeightedScore.toFixed(2) },
+                        { label: 'Capped Publication Score: P(pub)', value: publications.final.toFixed(2) },
+                        { label: '+ Capped Patent Score: P(patent)', value: `+ ${patents.final.toFixed(2)}` },
+                        { label: '+ Capped EMR Project Score: P(EMR)', value: `+ ${emr.final.toFixed(2)}` },
+                    ]}
+                    result={{ label: '= Final ARPS', value: totalArps.toFixed(2) }}
+                />
+            </div>
+
         </div>
     );
 }
