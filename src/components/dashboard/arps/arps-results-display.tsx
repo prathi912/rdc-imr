@@ -1,11 +1,12 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import type { IncentiveClaim, EmrInterest } from '@/types';
+import type { IncentiveClaim, EmrInterest, Author } from '@/types';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { CircleHelp, Sigma, Percent, Waypoints, Target, Trophy, GraduationCap, FileText, Star } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 type CalculationDetails = {
     base: number;
@@ -55,191 +56,207 @@ interface ArpsResultsDisplayProps {
     results: ArpsData;
 }
 
-export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
+const FormulaCard = ({ title, steps, result, icon: Icon }: { title: string, steps: { label: string, value: string }[], result: { label: string, value: string }, icon: React.ElementType }) => (
+    <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Icon className="h-5 w-5"/> {title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <Table>
+                <TableBody>
+                    {steps.map((step, i) => (
+                        <TableRow key={i}>
+                            <TableCell>{step.label}</TableCell>
+                            <TableCell className="text-right font-mono">{step.value}</TableCell>
+                        </TableRow>
+                    ))}
+                    <TableRow className="text-base font-bold bg-muted/50">
+                        <TableCell>{result.label}</TableCell>
+                        <TableCell className="text-right font-mono">{result.value}</TableCell>
+                    </TableRow>
+                </TableBody>
+            </Table>
+        </CardContent>
+    </Card>
+);
 
-    const getGradeVariant = (grade: string) => {
-        switch (grade) {
-            case 'SEE': return 'default';
-            case 'EE': return 'default';
-            case 'ME': return 'secondary';
-            case 'DME': return 'destructive';
-            default: return 'outline';
+const getClaimant = (claim: IncentiveClaim): Author | undefined => {
+    return claim.authors?.find(a => a.uid === claim.uid);
+};
+
+export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
+    const { publications, patents, emr, totalArps, grade } = results;
+
+    const getGradeInfo = (g: string) => {
+        switch (g) {
+            case 'SEE': return { label: 'Significantly Exceeds Expectations', variant: 'default' as const, className: 'bg-green-600 hover:bg-green-700' };
+            case 'EE': return { label: 'Exceeds Expectations', variant: 'default' as const, className: 'bg-blue-600 hover:bg-blue-700' };
+            case 'ME': return { label: 'Meets Expectations', variant: 'secondary' as const };
+            case 'DME': return { label: 'Does Not Meet Expectations', variant: 'destructive' as const };
+            default: return { label: 'N/A', variant: 'outline' as const };
         }
     };
+    const gradeInfo = getGradeInfo(grade);
     
-    const getClaimTitle = (claim: IncentiveClaim): string => {
-        return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || 'N/A';
-    };
-
-    const totalRaw = results.publications.raw + results.patents.raw + results.emr.raw;
-    const totalWeighted = results.publications.weighted + results.patents.weighted + results.emr.weighted;
-
     return (
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            <div className="lg:col-span-2 space-y-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>ARPS Calculation Summary</CardTitle>
-                        <CardDescription>Overall scores based on the policy.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Criterion</TableHead>
-                                    <TableHead className="text-right">Raw Score</TableHead>
-                                    <TableHead className="text-right">Weighted Score</TableHead>
-                                    <TableHead className="text-right">Final Score (Capped)</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                <TableRow>
-                                    <TableCell className="font-medium">Publications</TableCell>
-                                    <TableCell className="text-right">{results.publications.raw.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{results.publications.weighted.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-bold">{results.publications.final.toFixed(2)}</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell className="font-medium">Patents</TableCell>
-                                    <TableCell className="text-right">{results.patents.raw.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{results.patents.weighted.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-bold">{results.patents.final.toFixed(2)}</TableCell>
-                                </TableRow>
-                                <TableRow>
-                                    <TableCell className="font-medium">EMR Projects</TableCell>
-                                    <TableCell className="text-right">{results.emr.raw.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right">{results.emr.weighted.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-bold">{results.emr.final.toFixed(2)}</TableCell>
-                                </TableRow>
-                            </TableBody>
-                             <TableFooter>
-                                <TableRow>
-                                    <TableCell className="font-bold">Total</TableCell>
-                                    <TableCell className="text-right font-bold">{totalRaw.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-bold">{totalWeighted.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-bold">{results.totalArps.toFixed(2)}</TableCell>
-                                </TableRow>
-                            </TableFooter>
-                        </Table>
-                    </CardContent>
-                </Card>
+        <div className="mt-8 space-y-12">
+            
+            {/* Final Score and Grade */}
+            <Card className="shadow-lg border-primary/20">
+                <CardHeader className="text-center">
+                    <CardTitle className="text-3xl">Final ARPS Score & Grade</CardTitle>
+                    <CardDescription>Based on approved activities from June 1 to May 31.</CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col md:flex-row items-center justify-center gap-8 text-center">
+                    <div className="flex flex-col">
+                        <span className="text-7xl font-bold tracking-tighter text-primary">{totalArps.toFixed(2)}</span>
+                        <span className="text-2xl font-medium text-muted-foreground">/ 80.00</span>
+                    </div>
+                    <div className="flex flex-col">
+                        <Badge className={`text-3xl px-6 py-2 ${gradeInfo.className}`} variant={gradeInfo.variant}>{grade}</Badge>
+                        <span className="mt-2 text-lg font-semibold">{gradeInfo.label}</span>
+                    </div>
+                </CardContent>
+                 <CardFooter className="p-4 text-center justify-center">
+                    <p className="text-xs text-muted-foreground">
+                        This is an intermediate score as Research Activities and Consultancy are not considered.
+                    </p>
+                </CardFooter>
+            </Card>
 
+            {/* How ARPS is Formed */}
+            <FormulaCard 
+                title="How Your ARPS is Calculated"
+                icon={Sigma}
+                steps={[
+                    { label: 'Capped Publication Score: P(pub)', value: publications.final.toFixed(2) },
+                    { label: '+ Capped Patent Score: P(patent)', value: `+ ${patents.final.toFixed(2)}` },
+                    { label: '+ Capped EMR Project Score: P(EMR)', value: `+ ${emr.final.toFixed(2)}` },
+                ]}
+                result={{ label: '= Final ARPS', value: totalArps.toFixed(2) }}
+            />
+
+            {/* --- Publications Section --- */}
+            <div className="space-y-6">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><FileText className="h-6 w-6"/> I. Publications Scoring Breakdown</h2>
                 <Card>
                     <CardHeader>
-                        <CardTitle>Detailed Report: Publications</CardTitle>
+                        <CardTitle>Step 1: Individual Publication Raw Scores</CardTitle>
+                        <CardDescription>Each approved publication is scored based on its type, journal quality, and your role as an author. The formula is: <br/> <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Base Points × Quartile Multiplier × Author Multiplier</code></CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <Table>
-                             <TableHeader>
-                                <TableRow>
-                                    <TableHead>Title</TableHead>
-                                    <TableHead className="text-right">Calculation</TableHead>
-                                    <TableHead className="text-right">Raw Score</TableHead>
-                                </TableRow>
-                             </TableHeader>
-                             <TableBody>
-                                {results.publications.contributingClaims.map(({ claim, score, calculation }) => (
-                                    <TableRow key={claim.id}>
-                                        <TableCell className="font-medium">{getClaimTitle(claim)}</TableCell>
-                                        <TableCell className="text-right text-xs text-muted-foreground">
-                                            <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <span>{calculation.base.toFixed(2)} &times; {(calculation.multiplier ?? calculation.quartileMultiplier ?? 1).toFixed(2)} &times; {calculation.authorMultiplier?.toFixed(2)}</span>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Base &times; Quartile/Type &times; Author</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        </TableCell>
-                                        <TableCell className="text-right font-semibold">{score.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {results.publications.contributingClaims.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No contributing publications found.</TableCell></TableRow>}
-                             </TableBody>
-                        </Table>
+                    <CardContent className="space-y-4">
+                        {publications.contributingClaims.length > 0 ? publications.contributingClaims.map(({ claim, score, calculation }) => (
+                            <div key={claim.id} className="p-4 border rounded-lg bg-background/50">
+                                <h4 className="font-semibold">{claim.paperTitle || claim.publicationTitle}</h4>
+                                <div className="overflow-x-auto">
+                                    <Table className="mt-2 text-sm whitespace-nowrap">
+                                        <TableBody>
+                                            <TableRow><TableCell className="w-[70%]">Base Points for article type '{claim.publicationType}'</TableCell><TableCell className="text-right font-mono">{calculation.base.toFixed(2)}</TableCell></TableRow>
+                                            <TableRow><TableCell>× Quartile Multiplier for <strong>{claim.journalClassification}</strong></TableCell><TableCell className="text-right font-mono">{(calculation.multiplier ?? calculation.quartileMultiplier ?? 1).toFixed(2)}</TableCell></TableRow>
+                                            <TableRow><TableCell>× Your Role Multiplier as <strong>{getClaimant(claim)?.role}</strong> (Position: {claim.authorPosition})</TableCell><TableCell className="text-right font-mono">{calculation.authorMultiplier?.toFixed(2)}</TableCell></TableRow>
+                                            <TableRow className="font-bold border-t-2 border-primary/20"><TableCell>= Raw Score for this Publication</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )) : <p className="text-muted-foreground text-center py-4">No contributing publications found in this period.</p>}
                     </CardContent>
                 </Card>
                 
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Detailed Report: Patents</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                             <TableHeader>
-                                <TableRow>
-                                    <TableHead>Title</TableHead>
-                                    <TableHead className="text-right">Calculation</TableHead>
-                                    <TableHead className="text-right">Raw Score</TableHead>
-                                </TableRow>
-                             </TableHeader>
-                             <TableBody>
-                                {results.patents.contributingClaims.map(({ claim, score, calculation }) => (
-                                    <TableRow key={claim.id}>
-                                        <TableCell className="font-medium">{getClaimTitle(claim)}</TableCell>
-                                        <TableCell className="text-right text-xs text-muted-foreground">
-                                             <TooltipProvider>
-                                                <Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <span>{calculation.base.toFixed(2)} &times; {calculation.applicantMultiplier?.toFixed(2)}</span>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent>
-                                                        <p>Base Points &times; Applicant Multiplier</p>
-                                                    </TooltipContent>
-                                                </Tooltip>
-                                            </TooltipProvider>
-                                        </TableCell>
-                                        <TableCell className="text-right font-semibold">{score.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {results.patents.contributingClaims.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No contributing patents found.</TableCell></TableRow>}
-                             </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
-                
-                 <Card>
-                    <CardHeader>
-                        <CardTitle>Detailed Report: EMR Projects</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                             <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Raw Score (Role Points)</TableHead></TableRow></TableHeader>
-                             <TableBody>
-                                {results.emr.contributingProjects.map(({ project, score }) => (
-                                    <TableRow key={project.id}>
-                                        <TableCell className="font-medium">{project.callTitle}</TableCell>
-                                        <TableCell>{project.userId === project.userId ? 'PI' : 'Co-PI'}</TableCell>
-                                        <TableCell className="text-right font-semibold">{score.toFixed(2)}</TableCell>
-                                    </TableRow>
-                                ))}
-                                {results.emr.contributingProjects.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No contributing EMR projects found.</TableCell></TableRow>}
-                             </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                <FormulaCard 
+                    title="Step 2: Final Publication Score P(pub)"
+                    icon={Target}
+                    steps={[
+                        { label: 'Sum of all Publication Raw Scores', value: publications.raw.toFixed(2) },
+                        { label: '× Weightage (as per policy)', value: '× 0.50' },
+                        { label: '= Weighted Score', value: `= ${publications.weighted.toFixed(2)}` },
+                        { label: 'Maximum Score (Cap)', value: '50.00' },
+                    ]}
+                    result={{ label: 'Final Score P(pub) = min(Weighted Score, Cap)', value: publications.final.toFixed(2) }}
+                />
             </div>
 
-            <div className="lg:col-span-1">
-                <Card className="sticky top-24">
-                    <CardHeader className="text-center">
-                        <CardDescription>Final Annual Research Performance Score (ARPS)</CardDescription>
-                        <CardTitle className="text-6xl flex items-baseline justify-center">
-                            {results.totalArps.toFixed(2)}
-                            <span className="text-2xl text-muted-foreground">/70</span>
-                        </CardTitle>
+            {/* --- Patents Section --- */}
+            <div className="space-y-6">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Trophy className="h-6 w-6"/> II. Patent Scoring Breakdown</h2>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Step 1: Individual Patent Raw Scores</CardTitle>
+                        <CardDescription>Each patent is scored based on its status and the University's applicant role. The formula is: <br/> <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Base Points × Applicant Multiplier</code></CardDescription>
                     </CardHeader>
-                    <CardContent className="text-center">
-                        <p className="text-muted-foreground">Performance Grade</p>
-                        <Badge variant={getGradeVariant(results.grade)} className="text-2xl px-4 py-1 mt-2">{results.grade}</Badge>
+                    <CardContent className="space-y-4">
+                        {patents.contributingClaims.length > 0 ? patents.contributingClaims.map(({ claim, score, calculation }) => (
+                            <div key={claim.id} className="p-4 border rounded-lg bg-background/50">
+                                <h4 className="font-semibold">{claim.patentTitle}</h4>
+                                <Table className="mt-2 text-sm"><TableBody>
+                                    <TableRow><TableCell className="w-[70%]">Base Points for status '<strong>{claim.currentStatus} ({claim.patentLocale})</strong>'</TableCell><TableCell className="text-right font-mono">{calculation.base.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell>× PU Applicant Multiplier (<strong>{claim.isPuSoleApplicant ? 'Sole' : 'Joint'} Applicant</strong>)</TableCell><TableCell className="text-right font-mono">{calculation.applicantMultiplier?.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow className="font-bold border-t-2 border-primary/20"><TableCell>= Raw Score for this Patent</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
+                                </TableBody></Table>
+                            </div>
+                        )) : <p className="text-muted-foreground text-center py-4">No contributing patents found in this period.</p>}
                     </CardContent>
-                    <CardFooter className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground">
-                            This is an intermediate score as Research Activities and Consultancy are not considered.
-                        </p>
-                    </CardFooter>
+                </Card>
+                <FormulaCard 
+                    title="Step 2: Final Patent Score P(patent)"
+                    icon={Target}
+                    steps={[
+                        { label: 'Sum of all Patent Raw Scores', value: patents.raw.toFixed(2) },
+                        { label: '× Weightage (as per policy)', value: '× 0.15' },
+                        { label: '= Weighted Score', value: `= ${patents.weighted.toFixed(2)}` },
+                        { label: 'Maximum Score (Cap)', value: '15.00' },
+                    ]}
+                    result={{ label: 'Final Score P(patent) = min(Weighted Score, Cap)', value: patents.final.toFixed(2) }}
+                />
+            </div>
+            
+            {/* --- EMR Section --- */}
+             <div className="space-y-6">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Star className="h-6 w-6"/> III. EMR Project Scoring Breakdown</h2>
+                 <Card>
+                    <CardHeader>
+                        <CardTitle>Step 1: Individual EMR Project Raw Scores</CardTitle>
+                        <CardDescription>Each sanctioned project is awarded points based on the funding amount and your role. The formula is: <br/> <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Role Points</code></CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {emr.contributingProjects.length > 0 ? emr.contributingProjects.map(({ project, score }) => (
+                            <div key={project.id} className="p-4 border rounded-lg bg-background/50">
+                                <h4 className="font-semibold">{project.callTitle}</h4>
+                                <Table className="mt-2 text-sm"><TableBody>
+                                    <TableRow><TableCell className="w-[70%]">Points for role as <strong>{project.userId === project.userId ? 'PI' : 'Co-PI'}</strong> with sanctioned {project.durationAmount}</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow className="font-bold border-t-2 border-primary/20"><TableCell>= Raw Score for this Project</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
+                                </TableBody></Table>
+                            </div>
+                        )) : <p className="text-muted-foreground text-center py-4">No contributing EMR projects found in this period.</p>}
+                    </CardContent>
+                </Card>
+                <FormulaCard 
+                    title="Step 2: Final EMR Score P(EMR)"
+                    icon={Target}
+                    steps={[
+                        { label: 'Sum of all EMR Raw Scores', value: emr.raw.toFixed(2) },
+                        { label: '× Weightage (as per policy)', value: '× 0.15' },
+                        { label: '= Weighted Score', value: `= ${emr.weighted.toFixed(2)}` },
+                        { label: 'Maximum Score (Cap)', value: '15.00' },
+                    ]}
+                    result={{ label: 'Final Score P(EMR) = min(Weighted Score, Cap)', value: emr.final.toFixed(2) }}
+                />
+            </div>
+            
+            {/* Grade Assignment */}
+            <div className="space-y-6">
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><GraduationCap className="h-6 w-6"/> IV. Grade Assignment</h2>
+                <Card>
+                    <CardContent className="pt-6">
+                        <p>The final ARPS score is used to determine the performance grade based on the following thresholds:</p>
+                        <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
+                            <li><strong>&gt;= 80:</strong> SEE (Significantly Exceeds Expectations)</li>
+                            <li><strong>50 - 79.99:</strong> EE (Exceeds Expectations)</li>
+                            <li><strong>30 - 49.99:</strong> ME (Meets Expectations)</li>
+                            <li><strong>&lt; 30:</strong> DME (Does Not Meet Expectations)</li>
+                        </ul>
+                        <p className="mt-4">Your score of <strong>{totalArps.toFixed(2)}</strong> results in a grade of <strong>{grade}</strong>.</p>
+                    </CardContent>
                 </Card>
             </div>
         </div>
