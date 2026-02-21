@@ -99,6 +99,44 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
     return { points, multiplier };
 }
 
+function getClaimDate(claim: IncentiveClaim): Date | null {
+    switch (claim.claimType) {
+        case 'Research Papers':
+            if (claim.publicationYear && claim.publicationMonth) {
+                const monthMap: { [key: string]: number } = {'january':0, 'february':1, 'march':2, 'april':3, 'may':4, 'june':5, 'july':6, 'august':7, 'september':8, 'october':9, 'november':10, 'december':11};
+                const monthIndex = monthMap[claim.publicationMonth.toLowerCase()];
+                if (monthIndex !== undefined) {
+                    return new Date(claim.publicationYear, monthIndex, 15); // Use mid-month to be safe
+                }
+            }
+            break;
+        case 'Patents':
+            // Use the most relevant date based on status
+            if (claim.currentStatus === 'Granted' && claim.grantDate) return parseISO(claim.grantDate);
+            if (claim.currentStatus === 'Published' && claim.publicationDate) return parseISO(claim.publicationDate);
+            if (claim.currentStatus === 'Filed' && claim.filingDate) return parseISO(claim.filingDate);
+            break;
+        case 'Conference Presentations':
+            if (claim.presentationDate) return parseISO(claim.presentationDate);
+            if (claim.conferenceDate) return parseISO(claim.conferenceDate);
+            break;
+        case 'Books':
+             if (claim.publicationYear) {
+                return new Date(claim.publicationYear, 5, 1); // Mid-year
+             }
+             break;
+        case 'Membership of Professional Bodies':
+            if (claim.membershipPaymentDate) return parseISO(claim.membershipPaymentDate);
+            break;
+        case 'Seed Money for APC':
+            // This one is tricky. Let's fall back to submission date.
+            break;
+    }
+    // Fallback for all cases where a specific date isn't found
+    return parseISO(claim.submissionDate);
+}
+
+
 // --- Main Calculation Functions ---
 
 function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { 
@@ -274,11 +312,9 @@ export async function calculateArpsForUser(userId: string, year: number) {
       .filter(claim => {
         if (!approvedClaimStatuses.includes(claim.status)) return false;
         
-        // Use the approval timestamp if available, otherwise fall back to submission date
-        const approvalTimestamp = claim.approvals?.find(a => a?.status === 'Approved' && a.stage === 4)?.timestamp;
-        const dateToCheck = approvalTimestamp ? parseISO(approvalTimestamp) : parseISO(claim.submissionDate);
+        const dateToCheck = getClaimDate(claim);
 
-        if (!dateToCheck) return false;
+        if (!dateToCheck || isNaN(dateToCheck.getTime())) return false;
 
         return dateToCheck >= startDate && dateToCheck <= endDate;
       });
