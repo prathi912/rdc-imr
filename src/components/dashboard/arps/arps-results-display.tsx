@@ -5,11 +5,48 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import type { IncentiveClaim, EmrInterest } from '@/types';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+type CalculationDetails = {
+    base: number;
+    multiplier?: number;
+    quartileMultiplier?: number;
+    authorMultiplier?: number;
+    applicantMultiplier?: number;
+    rolePoints?: number;
+};
 
 export interface ArpsData {
-    publications: { raw: number; weighted: number; final: number; contributingClaims: { claim: IncentiveClaim, score: number }[] };
-    patents: { raw: number; weighted: number; final: number; contributingClaims: { claim: IncentiveClaim, score: number }[] };
-    emr: { raw: number; weighted: number; final: number; contributingProjects: { project: EmrInterest, score: number }[] };
+    publications: { 
+        raw: number; 
+        weighted: number; 
+        final: number; 
+        contributingClaims: { 
+            claim: IncentiveClaim, 
+            score: number,
+            calculation: CalculationDetails
+        }[] 
+    };
+    patents: { 
+        raw: number; 
+        weighted: number; 
+        final: number; 
+        contributingClaims: { 
+            claim: IncentiveClaim, 
+            score: number,
+            calculation: CalculationDetails
+        }[] 
+    };
+    emr: { 
+        raw: number; 
+        weighted: number; 
+        final: number; 
+        contributingProjects: { 
+            project: EmrInterest, 
+            score: number,
+            calculation: CalculationDetails
+        }[] 
+    };
     totalArps: number;
     grade: string;
 }
@@ -82,15 +119,33 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     </CardHeader>
                     <CardContent>
                         <Table>
-                             <TableHeader><TableRow><TableHead>Title</TableHead><TableHead className="text-right">Raw Score</TableHead></TableRow></TableHeader>
+                             <TableHeader>
+                                <TableRow>
+                                    <TableHead>Title</TableHead>
+                                    <TableHead className="text-right">Calculation</TableHead>
+                                    <TableHead className="text-right">Raw Score</TableHead>
+                                </TableRow>
+                             </TableHeader>
                              <TableBody>
-                                {results.publications.contributingClaims.map(({ claim, score }) => (
+                                {results.publications.contributingClaims.map(({ claim, score, calculation }) => (
                                     <TableRow key={claim.id}>
                                         <TableCell className="font-medium">{getClaimTitle(claim)}</TableCell>
-                                        <TableCell className="text-right">{score.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right text-xs text-muted-foreground">
+                                            <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span>{calculation.base.toFixed(2)} &times; {(calculation.multiplier ?? calculation.quartileMultiplier ?? 1).toFixed(2)} &times; {calculation.authorMultiplier?.toFixed(2)}</span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Base &times; Quartile/Type &times; Author</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </TableCell>
+                                        <TableCell className="text-right font-semibold">{score.toFixed(2)}</TableCell>
                                     </TableRow>
                                 ))}
-                                {results.publications.contributingClaims.length === 0 && <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground">No contributing publications found.</TableCell></TableRow>}
+                                {results.publications.contributingClaims.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No contributing publications found.</TableCell></TableRow>}
                              </TableBody>
                         </Table>
                     </CardContent>
@@ -102,15 +157,33 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     </CardHeader>
                     <CardContent>
                         <Table>
-                             <TableHeader><TableRow><TableHead>Title</TableHead><TableHead className="text-right">Raw Score</TableHead></TableRow></TableHeader>
+                             <TableHeader>
+                                <TableRow>
+                                    <TableHead>Title</TableHead>
+                                    <TableHead className="text-right">Calculation</TableHead>
+                                    <TableHead className="text-right">Raw Score</TableHead>
+                                </TableRow>
+                             </TableHeader>
                              <TableBody>
-                                {results.patents.contributingClaims.map(({ claim, score }) => (
+                                {results.patents.contributingClaims.map(({ claim, score, calculation }) => (
                                     <TableRow key={claim.id}>
                                         <TableCell className="font-medium">{getClaimTitle(claim)}</TableCell>
-                                        <TableCell className="text-right">{score.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right text-xs text-muted-foreground">
+                                             <TooltipProvider>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span>{calculation.base.toFixed(2)} &times; {calculation.applicantMultiplier?.toFixed(2)}</span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>Base Points &times; Applicant Multiplier</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        </TableCell>
+                                        <TableCell className="text-right font-semibold">{score.toFixed(2)}</TableCell>
                                     </TableRow>
                                 ))}
-                                {results.patents.contributingClaims.length === 0 && <TableRow><TableCell colSpan={2} className="text-center text-muted-foreground">No contributing patents found.</TableCell></TableRow>}
+                                {results.patents.contributingClaims.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No contributing patents found.</TableCell></TableRow>}
                              </TableBody>
                         </Table>
                     </CardContent>
@@ -122,13 +195,13 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     </CardHeader>
                     <CardContent>
                         <Table>
-                             <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Raw Score</TableHead></TableRow></TableHeader>
+                             <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>Role</TableHead><TableHead className="text-right">Raw Score (Role Points)</TableHead></TableRow></TableHeader>
                              <TableBody>
                                 {results.emr.contributingProjects.map(({ project, score }) => (
                                     <TableRow key={project.id}>
                                         <TableCell className="font-medium">{project.callTitle}</TableCell>
                                         <TableCell>{project.userId === project.userId ? 'PI' : 'Co-PI'}</TableCell>
-                                        <TableCell className="text-right">{score.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-semibold">{score.toFixed(2)}</TableCell>
                                     </TableRow>
                                 ))}
                                 {results.emr.contributingProjects.length === 0 && <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">No contributing EMR projects found.</TableCell></TableRow>}

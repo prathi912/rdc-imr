@@ -42,8 +42,8 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
     let multiplier = 0;
 
     switch (publicationType) {
-        case 'Research Articles/Short Communications': // This was the incorrect value
         case 'Original Research Article': 
+        case 'Research Articles/Short Communications':
             points = 8; 
             break;
         case 'Short Communication': 
@@ -52,8 +52,8 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
         case 'Review Article': 
             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6; 
             break;
-        case 'Case Reports/Short Surveys': // This was the incorrect value
         case 'Case Report / Case Study': 
+        case 'Case Reports/Short Surveys':
             points = 7; 
             break;
     }
@@ -69,9 +69,16 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
 
 // --- Main Calculation Functions ---
 
-function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
+function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { 
+    score: number; 
+    contributingClaims: { 
+        claim: IncentiveClaim, 
+        score: number,
+        calculation: { base: number, multiplier: number, authorMultiplier: number } 
+    }[] 
+} {
     let score = 0;
-    const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
+    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: { base: number, multiplier: number, authorMultiplier: number } }[] = [];
 
     for (const claim of claims) {
         // Find the claimant in the author list for this specific claim
@@ -79,37 +86,50 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { 
         if (!claimantAuthorInfo) continue;
 
         let claimScore = 0;
+        let calculation = { base: 0, multiplier: 1, authorMultiplier: 0 };
 
         switch (claim.claimType) {
             case 'Books':
                 if (claim.isScopusIndexed) {
-                    const multiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
-                    claimScore = (claim.bookApplicationType === 'Book' ? 10 : 5) * multiplier;
+                    const authorMultiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
+                    const basePoints = claim.bookApplicationType === 'Book' ? 10 : 5;
+                    claimScore = basePoints * authorMultiplier;
+                    calculation = { base: basePoints, multiplier: 1, authorMultiplier };
                 }
                 break;
             case 'Conference Presentations':
                 if (claim.publicationType === 'Scopus Indexed Conference Proceedings') {
-                    const multiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
-                    claimScore = 2 * multiplier;
+                    const authorMultiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
+                    const basePoints = 2;
+                    claimScore = basePoints * authorMultiplier;
+                    calculation = { base: basePoints, multiplier: 1, authorMultiplier };
                 }
                 break;
             case 'Research Papers':
-                const authorPositionMultiplier = getJournalAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
-                const { points, multiplier } = getJournalPoints(claim);
-                claimScore = (points * multiplier) * authorPositionMultiplier;
+                const authorMultiplier = getJournalAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
+                const { points, multiplier: quartileMultiplier } = getJournalPoints(claim);
+                claimScore = (points * quartileMultiplier) * authorMultiplier;
+                calculation = { base: points, multiplier: quartileMultiplier, authorMultiplier };
                 break;
         }
         if (claimScore > 0) {
             score += claimScore;
-            contributingClaims.push({ claim, score: claimScore });
+            contributingClaims.push({ claim, score: claimScore, calculation });
         }
     }
     return { score, contributingClaims };
 }
 
-function calculatePatentScore(claims: IncentiveClaim[], userId: string): { score: number; contributingClaims: { claim: IncentiveClaim, score: number }[] } {
+function calculatePatentScore(claims: IncentiveClaim[], userId: string): { 
+    score: number; 
+    contributingClaims: { 
+        claim: IncentiveClaim, 
+        score: number,
+        calculation: { base: number, applicantMultiplier: number } 
+    }[] 
+} {
     let score = 0;
-    const contributingClaims: { claim: IncentiveClaim, score: number }[] = [];
+    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: { base: number, applicantMultiplier: number } }[] = [];
 
     for (const claim of claims) {
         if (claim.claimType !== 'Patents') continue;
@@ -123,24 +143,31 @@ function calculatePatentScore(claims: IncentiveClaim[], userId: string): { score
             basePoints = claim.patentLocale === 'International' ? 75 : 50;
         }
 
-        let multiplier = 0;
+        let applicantMultiplier = 0;
         if (claim.patentFiledInPuName) {
-            multiplier = claim.isPuSoleApplicant ? 1.0 : 0.8;
+            applicantMultiplier = claim.isPuSoleApplicant ? 1.0 : 0.8;
         }
 
-        const claimScore = basePoints * multiplier;
+        const claimScore = basePoints * applicantMultiplier;
         if (claimScore > 0) {
             score += claimScore;
-            contributingClaims.push({ claim, score: claimScore });
+            contributingClaims.push({ claim, score: claimScore, calculation: { base: basePoints, applicantMultiplier } });
         }
     }
     return { score, contributingClaims };
 }
 
 
-function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: Date, endDate: Date): { score: number; contributingProjects: { project: EmrInterest, score: number }[] } {
+function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: Date, endDate: Date): { 
+    score: number; 
+    contributingProjects: { 
+        project: EmrInterest, 
+        score: number,
+        calculation: { rolePoints: number } 
+    }[] 
+} {
     let score = 0;
-    const contributingProjects: { project: EmrInterest, score: number }[] = [];
+    const contributingProjects: { project: EmrInterest, score: number, calculation: { rolePoints: number } }[] = [];
     
     for (const project of projects) {
         // Status is pre-filtered, but double-checking is safe.
@@ -172,7 +199,7 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: D
 
         if (projectScore > 0) {
             score += projectScore;
-            contributingProjects.push({ project, score: projectScore });
+            contributingProjects.push({ project, score: projectScore, calculation: { rolePoints: projectScore } });
         }
     }
     return { score, contributingProjects };
@@ -217,7 +244,6 @@ export async function calculateArpsForUser(userId: string, year: number) {
         
         if (!finalApprovalEntry) return false;
         
-        // Use final approval timestamp, regardless of its status, as long as the claim's final status is approved.
         const acceptanceDate = parseISO(finalApprovalEntry.timestamp);
         return acceptanceDate >= startDate && acceptanceDate <= endDate;
       });
@@ -266,4 +292,3 @@ export async function calculateArpsForUser(userId: string, year: number) {
     return { success: false, error: "Failed to calculate ARPS score." };
   }
 }
-
