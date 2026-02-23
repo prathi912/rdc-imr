@@ -245,6 +245,7 @@ export type IncentiveClaim = {
   sdgGoals?: string[];
   authors?: Author[];
   authorUids?: string[];
+  authorEmails?: string[];
 
   // Research Paper Fields
   publicationType?: string;

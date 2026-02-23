@@ -133,6 +133,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
             status: claimData.status === 'Draft' ? 'Draft' : initialStatus,
             authors: claimData.authors || [],
             authorUids: (claimData.authors || []).map(a => a.uid).filter(Boolean) as string[],
+            authorEmails: (claimData.authors || []).map(a => a.email.toLowerCase()),
         };
 
         if (claimData.claimType === 'Research Papers' && claimData.paperTitle && claimData.relevantLink) {

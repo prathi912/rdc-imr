@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import type { User, IncentiveClaim, Author, SystemSettings } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/lib/config';
-import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, addDoc, updateDoc, doc, arrayUnion, or } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, Book, Award, Presentation, FileText, UserPlus, Banknote, Users, CheckSquare, Loader2, Edit, Eye, Info, Trash2 } from 'lucide-react';
@@ -288,14 +288,19 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
         }
     };
     
+    const getMyCoAuthorDetails = (claim: IncentiveClaim) => {
+        if (!currentUser) return undefined;
+        return claim.authors?.find(a => 
+            (a.uid && a.uid === currentUser.uid) || 
+            (a.email && a.email.toLowerCase() === currentUser.email.toLowerCase())
+        );
+    };
+
     const claimsToShow = claims.filter(claim => {
-        const myDetails = claim.authors?.find(a => a.uid === currentUser?.uid);
+        if (!currentUser) return false;
+        const myDetails = getMyCoAuthorDetails(claim);
         return !!myDetails;
     });
-    
-    const getMyCoAuthorDetails = (claim: IncentiveClaim) => {
-        return claim.authors?.find(a => a.uid === currentUser?.uid);
-    }
     
     const getClaimTitle = (claim: IncentiveClaim): string => {
         return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
@@ -452,7 +457,7 @@ export default function IncentiveClaimPage() {
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'apply');
   const isMobile = useIsMobile();
 
-  const fetchAllData = useCallback(async (uid: string) => {
+  const fetchAllData = useCallback(async (uid: string, email: string) => {
       setLoading(true);
       try {
           const claimsCollection = collection(db, 'incentiveClaims');
@@ -477,12 +482,29 @@ export default function IncentiveClaimPage() {
                 });
             }
           }
+          
+          const coAuthorByUidQuery = query(claimsCollection, where('authorUids', 'array-contains', uid));
+          const coAuthorByEmailQuery = query(claimsCollection, where('authorEmails', 'array-contains', email.toLowerCase()));
 
-          const coAuthorClaimsQuery = query(claimsCollection, where('authorUids', 'array-contains', uid));
-          const coAuthorSnapshot = await getDocs(coAuthorClaimsQuery);
-          const coAuthorClaimList = coAuthorSnapshot.docs
-              .map(doc => ({...doc.data(), id: doc.id} as IncentiveClaim))
+          const [coAuthorByUidSnap, coAuthorByEmailSnap] = await Promise.all([
+              getDocs(coAuthorByUidQuery),
+              getDocs(coAuthorByEmailQuery),
+          ]);
+          
+          const allCoAuthorClaims = new Map<string, IncentiveClaim>();
+          
+          coAuthorByUidSnap.forEach(doc => {
+              allCoAuthorClaims.set(doc.id, { ...doc.data(), id: doc.id } as IncentiveClaim);
+          });
+          coAuthorByEmailSnap.forEach(doc => {
+              if (!allCoAuthorClaims.has(doc.id)) {
+                  allCoAuthorClaims.set(doc.id, { ...doc.data(), id: doc.id } as IncentiveClaim);
+              }
+          });
+
+          const coAuthorClaimList = Array.from(allCoAuthorClaims.values())
               .filter(claim => claim.uid !== uid);
+          
           setCoAuthorClaims(coAuthorClaimList);
 
           const settings = await getSystemSettings();
@@ -507,7 +529,7 @@ export default function IncentiveClaimPage() {
 
   useEffect(() => {
     if (user) {
-        fetchAllData(user.uid);
+        fetchAllData(user.uid, user.email);
     }
   }, [user, fetchAllData]);
 
@@ -539,7 +561,7 @@ export default function IncentiveClaimPage() {
         const result = await deleteIncentiveClaim(claimToDelete.id, user.uid);
         if (result.success) {
             toast({ title: "Draft Deleted" });
-            fetchAllData(user.uid);
+            fetchAllData(user.uid, user.email);
         } else {
             toast({ variant: 'destructive', title: 'Error', description: result.error });
         }
@@ -613,7 +635,7 @@ export default function IncentiveClaimPage() {
   const tabs = [
     { value: 'apply', label: 'Apply' },
     { value: 'my-claims', label: `My Claims (${otherClaims.length})` },
-    { value: 'co-author', label: `Co-Author Claims (${coAuthorClaims.filter(c => c.authors?.find(a => a.uid === user?.uid)?.status === 'pending').length})` },
+    { value: 'co-author', label: `Co-Author Claims (${coAuthorClaims.filter(c => c.authors?.find(a => a.email.toLowerCase() === user?.email.toLowerCase())?.status === 'pending').length})` },
     { value: 'draft', label: `Drafts (${draftClaims.length})` },
   ];
 
@@ -687,7 +709,7 @@ export default function IncentiveClaimPage() {
              {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={otherClaims} claimType="other" onViewDetails={handleViewDetails} onDeleteClaim={() => {}}/>}
           </TabsContent>
            <TabsContent value="co-author" className="mt-4">
-            {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} onClaimApplied={() => fetchAllData(user!.uid)} />}
+            {loading ? <Skeleton className="h-40 w-full" /> : <CoAuthorClaimsList claims={coAuthorClaims} currentUser={user} onClaimApplied={() => fetchAllData(user!.uid, user!.email)} />}
           </TabsContent>
           <TabsContent value="draft" className="mt-4">
              {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" onViewDetails={handleViewDetails} onDeleteClaim={(id) => setClaimToDelete(userClaims.find(c => c.id === id) || null)}/>}
