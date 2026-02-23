@@ -63,7 +63,7 @@ export default function IncentiveApprovalsPage() {
             const [pendingSnapshot, historySnapshot, usersSnapshot] = await Promise.all([
                 getDocs(pendingClaimsQuery),
                 getDocs(historyQuery),
-                getDocs(usersSnapshot)
+                getDocs(usersQuery)
             ]);
 
             setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
