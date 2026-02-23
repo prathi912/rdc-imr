@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -15,6 +14,7 @@ import { getAllUsers } from '@/app/actions';
 import { Combobox } from '@/components/ui/combobox';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { getDefaultModulesForRole } from '@/lib/modules';
 
 export default function ArpsCalculatorPage() {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -47,10 +47,12 @@ export default function ArpsCalculatorPage() {
             if (currentUser) {
                 if (currentUser.role === 'Super-admin') {
                     const users = await getAllUsers();
-                    setAllUsers(users.filter(u =>
-                        (u.role === 'faculty' || u.role === 'CRO' || u.role === 'Super-admin') &&
-                        u.allowedModules?.includes('incentive-claim')
-                    ));
+                    setAllUsers(users.filter(u => {
+                        const userModules = u.allowedModules || getDefaultModulesForRole(u.role, u.designation);
+                        const hasClaimModule = userModules.includes('incentive-claim');
+                        const isEligibleRole = (u.role === 'faculty' || u.role === 'CRO' || u.role === 'Super-admin');
+                        return isEligibleRole && hasClaimModule;
+                    }));
                 }
                 setLoading(false);
             }
