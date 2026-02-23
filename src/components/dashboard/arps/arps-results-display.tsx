@@ -88,16 +88,6 @@ const getClaimant = (claim: IncentiveClaim): Author | undefined => {
 export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
     const { publications, patents, emr, totalArps, grade } = results;
 
-    const getGradeInfo = (g: string) => {
-        if (g.startsWith('SEE')) return { label: 'Significantly Exceeds Expectations', variant: 'default' as const, className: 'bg-green-600 hover:bg-green-700' };
-        if (g.startsWith('EE')) return { label: 'Exceeds Expectations', variant: 'default' as const, className: 'bg-blue-600 hover:bg-blue-700' };
-        if (g.startsWith('ME')) return { label: 'Meets Expectations', variant: 'secondary' as const };
-        if (g.startsWith('DME')) return { label: 'Does Not Meet Expectations', variant: 'destructive' as const };
-        return { label: 'N/A', variant: 'outline' as const };
-    };
-    const gradeInfo = getGradeInfo(grade);
-    const gradeMessage = grade.includes('(') ? grade.substring(grade.indexOf('(')) : '';
-    
     const totalRawScore = publications.raw + patents.raw + emr.raw;
     const totalWeightedScore = publications.weighted + patents.weighted + emr.weighted;
 
@@ -114,7 +104,10 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     <CardContent className="space-y-4">
                         {publications.contributingClaims.length > 0 ? publications.contributingClaims.map(({ claim, score, calculation }) => (
                             <div key={claim.id} className="p-4 border rounded-lg bg-background/50">
-                                <h4 className="font-semibold">{claim.paperTitle || claim.publicationTitle}</h4>
+                                <div className="flex justify-between items-start gap-4">
+                                    <h4 className="font-semibold flex-1">{claim.paperTitle || claim.publicationTitle}</h4>
+                                    {claim.claimId && <Badge variant="outline">{claim.claimId}</Badge>}
+                                </div>
                                 <div className="overflow-x-auto">
                                     <Table className="mt-2 text-sm whitespace-nowrap">
                                         <TableBody>
@@ -154,7 +147,10 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     <CardContent className="space-y-4">
                         {patents.contributingClaims.length > 0 ? patents.contributingClaims.map(({ claim, score, calculation }) => (
                             <div key={claim.id} className="p-4 border rounded-lg bg-background/50">
-                                <h4 className="font-semibold">{claim.patentTitle}</h4>
+                                <div className="flex justify-between items-start gap-4">
+                                    <h4 className="font-semibold flex-1">{claim.patentTitle}</h4>
+                                    {claim.claimId && <Badge variant="outline">{claim.claimId}</Badge>}
+                                </div>
                                 <Table className="mt-2 text-sm"><TableBody>
                                     <TableRow><TableCell className="w-[70%]">Base Points for status '<strong>{claim.currentStatus} ({claim.patentLocale})</strong>'</TableCell><TableCell className="text-right font-mono">{calculation.base.toFixed(2)}</TableCell></TableRow>
                                     <TableRow><TableCell>× PU Applicant Multiplier (<strong>{claim.isPuSoleApplicant ? 'Sole' : 'Joint'} Applicant</strong>)</TableCell><TableCell className="text-right font-mono">{calculation.applicantMultiplier?.toFixed(2)}</TableCell></TableRow>
@@ -188,7 +184,10 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
                     <CardContent className="space-y-4">
                         {emr.contributingProjects.length > 0 ? emr.contributingProjects.map(({ project, score }) => (
                             <div key={project.id} className="p-4 border rounded-lg bg-background/50">
-                                <h4 className="font-semibold">{project.callTitle}</h4>
+                                <div className="flex justify-between items-start gap-4">
+                                    <h4 className="font-semibold flex-1">{project.callTitle}</h4>
+                                    {project.interestId && <Badge variant="outline">{project.interestId}</Badge>}
+                                </div>
                                 <Table className="mt-2 text-sm"><TableBody>
                                     <TableRow><TableCell className="w-[70%]">Points for role as <strong>{project.userId === project.userId ? 'PI' : 'Co-PI'}</strong> with sanctioned {project.durationAmount}</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
                                     <TableRow className="font-bold border-t-2 border-primary/20"><TableCell>= Raw Score for this Project</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
