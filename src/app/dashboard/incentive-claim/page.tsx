@@ -309,16 +309,27 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
     const myDetailsInDialog = claimToApply ? getMyCoAuthorDetails(claimToApply) : null;
     const myRole = myDetailsInDialog?.role;
 
+    const getDisabledReason = (myDetails: Author | undefined, currentUser: User | null, isScopusConference: boolean, isPresentingAuthor: boolean): string => {
+        if (myDetails?.status !== 'pending') {
+            return `You have already applied for this claim.`;
+        }
+        if (!currentUser?.bankDetails) {
+            return 'Please add your bank details in Settings to apply.';
+        }
+        if (isScopusConference && !isPresentingAuthor) {
+            return 'Only Presenting Authors can apply for this type of conference proceeding.';
+        }
+        return 'This action is currently unavailable.';
+    };
+
     return (
       <>
         <div className="space-y-4">
             {claimsToShow.map(claim => {
                  const myDetails = getMyCoAuthorDetails(claim);
-                 // Special rule for Scopus Conference Proceedings
                  const isScopusConference = claim.publicationType === 'Scopus Indexed Conference Proceedings';
                  const isPresentingAuthor = myDetails?.role === 'Presenting Author' || myDetails?.role === 'First & Presenting Author';
                  const canApplyForConference = isScopusConference ? isPresentingAuthor : true;
-                 
                  const canApply = myDetails?.status === 'pending' && !!currentUser?.bankDetails && canApplyForConference;
 
                 return (
@@ -345,9 +356,22 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                                 )}
                              </div>
                         </div>
-                        <Button onClick={() => handleOpenDialog(claim)} disabled={!canApply}>
-                            {myDetails?.status === 'Applied' ? 'Applied' : 'View & Apply'}
-                        </Button>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span tabIndex={canApply ? -1 : 0}>
+                                        <Button onClick={() => handleOpenDialog(claim)} disabled={!canApply}>
+                                            {myDetails?.status === 'Applied' ? 'Applied' : 'View & Apply'}
+                                        </Button>
+                                    </span>
+                                </TooltipTrigger>
+                                {!canApply && (
+                                    <TooltipContent>
+                                        <p>{getDisabledReason(myDetails, currentUser, isScopusConference, isPresentingAuthor)}</p>
+                                    </TooltipContent>
+                                )}
+                            </Tooltip>
+                        </TooltipProvider>
                     </CardContent>
                 </Card>
             )})}
@@ -743,3 +767,4 @@ export default function IncentiveClaimPage() {
     </>
   );
 }
+
