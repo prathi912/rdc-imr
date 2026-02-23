@@ -21,7 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
-type SortableKeys = 'userName' | 'claimType' | 'submissionDate' | 'status';
+type SortableKeys = 'userName' | 'claimType' | 'submissionDate' | 'status' | 'paperTitle';
 
 export default function IncentiveApprovalsPage() {
     const [user, setUser] = useState<User | null>(null);
@@ -63,7 +63,7 @@ export default function IncentiveApprovalsPage() {
             const [pendingSnapshot, historySnapshot, usersSnapshot] = await Promise.all([
                 getDocs(pendingClaimsQuery),
                 getDocs(historyQuery),
-                getDocs(usersQuery)
+                getDocs(usersSnapshot)
             ]);
 
             setPendingClaims(pendingSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as IncentiveClaim)));
@@ -130,8 +130,17 @@ export default function IncentiveApprovalsPage() {
         });
 
         filteredClaims.sort((a, b) => {
-            const aValue = a[sortConfig.key] || '';
-            const bValue = b[sortConfig.key] || '';
+            const key = sortConfig.key;
+            let aValue, bValue;
+
+            if (key === 'paperTitle') {
+                aValue = getClaimTitle(a) || '';
+                bValue = getClaimTitle(b) || '';
+            } else {
+                aValue = a[key as keyof IncentiveClaim] || '';
+                bValue = b[key as keyof IncentiveClaim] || '';
+            }
+            
             if (aValue < bValue) {
                 return sortConfig.direction === 'ascending' ? -1 : 1;
             }
@@ -177,6 +186,7 @@ export default function IncentiveApprovalsPage() {
         <Table>
             <TableHeader><TableRow>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('userName')}>Claimant <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
+                <TableHead><Button variant="ghost" onClick={() => requestSort('paperTitle')}>Title <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('claimType')}>Claim Type <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('submissionDate')}>Submitted On <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 {isHistory && <TableHead>Approved Amount</TableHead>}
@@ -200,6 +210,7 @@ export default function IncentiveApprovalsPage() {
                                     claim.userName
                                 )}
                             </TableCell>
+                            <TableCell className="font-medium max-w-xs whitespace-normal break-words">{getClaimTitle(claim)}</TableCell>
                             <TableCell><Badge variant="outline">{claim.claimType}</Badge></TableCell>
                             <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
                             {isHistory && <TableCell>₹{myApproval?.approvedAmount.toLocaleString('en-IN') || 'N/A'}</TableCell>}
@@ -235,15 +246,22 @@ export default function IncentiveApprovalsPage() {
                   <Card key={claim.id}>
                       <CardHeader>
                           <CardTitle className="text-base break-words">
-                              {hasProfileLink ? (
-                                  <Link href={profileLink} target="_blank" className="text-primary hover:underline">{claim.userName}</Link>
-                              ) : (
-                                  claim.userName
-                              )}
+                            {getClaimTitle(claim)}
                           </CardTitle>
-                          <CardDescription>{new Date(claim.submissionDate).toLocaleDateString()}</CardDescription>
+                          <CardDescription>
+                            Claimant: {' '}
+                            {hasProfileLink ? (
+                                <Link href={profileLink} target="_blank" className="text-primary hover:underline">{claim.userName}</Link>
+                            ) : (
+                                claim.userName
+                            )}
+                          </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
+                           <div>
+                              <p className="text-xs font-semibold text-muted-foreground">Submitted On</p>
+                              <p className="text-sm">{new Date(claim.submissionDate).toLocaleDateString()}</p>
+                          </div>
                           <div>
                               <p className="text-xs font-semibold text-muted-foreground">Claim Type</p>
                               <Badge variant="outline">{claim.claimType}</Badge>
