@@ -7,6 +7,7 @@ import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper
 import { getSystemSettings } from './actions';
 import { sendEmail } from '@/lib/email';
 import { FieldValue } from 'firebase-admin/firestore';
+import { getDefaultModulesForRole } from '@/lib/modules';
 
 const EMAIL_STYLES = {
   background: 'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
@@ -148,53 +149,79 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
         await newClaimRef.set(finalClaimData, { merge: true });
 
         if (finalClaimData.status !== 'Draft' && finalClaimData.authors) {
-            const coAuthorsToNotify = finalClaimData.authors.filter(a => a.uid && a.uid !== claimData.uid);
-            for (const coAuthor of coAuthorsToNotify) {
-                const isConferenceProceeding = finalClaimData.publicationType === 'Scopus Indexed Conference Proceedings';
-                const canApply = !isConferenceProceeding || (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author');
+            const coAuthorUidsToNotify = finalClaimData.authors
+                .map(a => a.uid)
+                .filter((uid): uid is string => !!uid && uid !== claimData.uid);
 
-                const notification = {
-                    uid: coAuthor.uid,
-                    title: `${claimData.userName} has listed you as a co-author on an incentive claim.`,
-                    createdAt: new Date().toISOString(),
-                    isRead: false,
-                    type: 'default',
-                    projectId: '/dashboard/incentive-claim?tab=co-author'
-                };
-                await adminDb.collection('notifications').add(notification);
+            if (coAuthorUidsToNotify.length > 0) {
+                const usersRef = adminDb.collection('users');
+                const userChunks: string[][] = [];
+                for (let i = 0; i < coAuthorUidsToNotify.length; i += 30) {
+                    userChunks.push(coAuthorUidsToNotify.slice(i, i + 30));
+                }
 
-                if (coAuthor.email) {
-                    const claimTitle = getClaimTitle(finalClaimData);
-                     const emailHtml = `
-                        <div ${EMAIL_STYLES.background}>
-                            ${EMAIL_STYLES.logo}
-                            <p style="color:#ffffff;">Dear ${coAuthor.name},</p>
-                            <p style="color:#e0e0e0;">
-                                This is to inform you that ${claimData.userName} has submitted an incentive claim for the publication/work titled "<strong style="color:#ffffff;">${claimTitle}</strong>" and has listed you as a co-author.
-                            </p>
-                            ${canApply
-                                ? `<p style="color:#e0e0e0;">
-                                    If you wish to claim your share of the incentive, please log in to the portal and visit the "Co-Author Claims" tab on the Incentive Claim page to submit your application.
-                                </p>
-                                <p style="text-align:center; margin-top:25px;">
-                                    <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim?tab=co-author" style="background-color: #64B5F6; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                                        Apply for Claim
-                                    </a>
-                                </p>`
-                                : `<p style="color:#e0e0e0;">
-                                    As per university policy, only presenting authors are eligible for an incentive for this type of publication. This notification is for your records.
-                                </p>`
-                            }
-                            ${EMAIL_STYLES.footer}
-                        </div>
-                    `;
+                for (const chunk of userChunks) {
+                    if (chunk.length === 0) continue;
+                    const coAuthorUsersSnapshot = await usersRef.where(adminDb.firestore.FieldPath.documentId(), 'in', chunk).get();
+                    
+                    for (const userDoc of coAuthorUsersSnapshot.docs) {
+                        const coAuthorUser = { uid: userDoc.id, ...userDoc.data() } as User;
+                        
+                        const userModules = coAuthorUser.allowedModules || getDefaultModulesForRole(coAuthorUser.role, coAuthorUser.designation);
+                        if (!userModules.includes('incentive-claim')) {
+                            continue; // Skip users who don't have access to the incentive claim module
+                        }
 
-                    await sendEmail({
-                        to: coAuthor.email,
-                        subject: `You've been added as a co-author on an incentive claim`,
-                        from: 'default',
-                        html: emailHtml
-                    });
+                        const coAuthor = finalClaimData.authors.find(a => a.uid === coAuthorUser.uid);
+                        if (!coAuthor) continue;
+
+                        const isConferenceProceeding = finalClaimData.publicationType === 'Scopus Indexed Conference Proceedings';
+                        const canApply = !isConferenceProceeding || (coAuthor.role === 'Presenting Author' || coAuthor.role === 'First & Presenting Author');
+
+                        const notification = {
+                            uid: coAuthor.uid,
+                            title: `${claimData.userName} has listed you as a co-author on an incentive claim.`,
+                            createdAt: new Date().toISOString(),
+                            isRead: false,
+                            type: 'default' as const,
+                            projectId: '/dashboard/incentive-claim?tab=co-author'
+                        };
+                        await adminDb.collection('notifications').add(notification);
+
+                        if (coAuthor.email) {
+                            const claimTitle = getClaimTitle(finalClaimData);
+                            const emailHtml = `
+                                <div ${EMAIL_STYLES.background}>
+                                    ${EMAIL_STYLES.logo}
+                                    <p style="color:#ffffff;">Dear ${coAuthor.name},</p>
+                                    <p style="color:#e0e0e0;">
+                                        This is to inform you that ${claimData.userName} has submitted an incentive claim for the publication/work titled "<strong style="color:#ffffff;">${claimTitle}</strong>" and has listed you as a co-author.
+                                    </p>
+                                    ${canApply
+                                        ? `<p style="color:#e0e0e0;">
+                                            If you wish to claim your share of the incentive, please log in to the portal and visit the "Co-Author Claims" tab on the Incentive Claim page to submit your application.
+                                        </p>
+                                        <p style="text-align:center; margin-top:25px;">
+                                            <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/incentive-claim?tab=co-author" style="background-color: #64B5F6; color: white; padding: 12px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                                                Apply for Claim
+                                            </a>
+                                        </p>`
+                                        : `<p style="color:#e0e0e0;">
+                                            As per university policy, only presenting authors are eligible for an incentive for this type of publication. This notification is for your records.
+                                        </p>`
+                                    }
+                                    ${EMAIL_STYLES.footer}
+                                </div>
+                            `;
+
+                            await sendEmail({
+                                to: coAuthor.email,
+                                subject: `You've been added as a co-author on an incentive claim`,
+                                from: 'default',
+                                html: emailHtml
+                            });
+                        }
+                    }
                 }
             }
         }
