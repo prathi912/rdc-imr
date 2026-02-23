@@ -22,10 +22,10 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, BookCoAuthor, Author } from '@/types';
-import { uploadFileToServer } from '@/app/actions';
+import { uploadFileToApi } from '@/lib/upload-client';
 import { findUserByMisId } from '@/app/userfinding';
 import { Loader2, AlertCircle, Plus, Trash2, Search, Edit } from 'lucide-react';
-import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { calculateBookIncentive } from '@/app/incentive-calculation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Badge } from '../ui/badge';
@@ -86,15 +86,6 @@ const bookSchema = z
 type BookFormValues = z.infer<typeof bookSchema>;
 
 const coAuthorRoles: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
-
-const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-    });
-};
 
 function ReviewDetails({ data, onEdit }: { data: BookFormValues; onEdit: () => void }) {
     const renderDetail = (label: string, value?: string | number | boolean | string[] | Author[]) => {
@@ -352,9 +343,8 @@ export function BookForm() {
 
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
             if (!file || !user) return undefined;
-            const dataUrl = await fileToDataUrl(file);
             const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
-            const result = await uploadFileToServer(dataUrl, path);
+            const result = await uploadFileToApi(file, { path });
             if (!result.success || !result.url) {
                 throw new Error(result.error || `File upload failed for ${folderName}`);
             }
@@ -396,7 +386,7 @@ export function BookForm() {
         });
         
         const claimId = searchParams.get('claimId');
-        const result = await submitIncentiveClaim(claimData as Omit<IncentiveClaim, 'id' | 'claimId'>, claimId || undefined);
+        const result = await submitIncentiveClaimViaApi(claimData as Omit<IncentiveClaim, 'id' | 'claimId'>, claimId || undefined);
         if (!result.success || !result.claimId) {
             throw new Error(result.error);
         }

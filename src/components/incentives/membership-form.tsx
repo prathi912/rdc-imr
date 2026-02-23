@@ -19,10 +19,10 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { uploadFileToServer } from '@/app/actions';
+import { uploadFileToApi } from '@/lib/upload-client';
 import { Loader2, AlertCircle, Edit } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 
 const membershipSchema = z.object({
     professionalBodyName: z.string().min(3, 'Name of the professional body is required.'),
@@ -36,15 +36,6 @@ const membershipSchema = z.object({
 });
 
 type MembershipFormValues = z.infer<typeof membershipSchema>;
-
-const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-    });
-};
 
 function ReviewDetails({ data, onEdit }: { data: MembershipFormValues; onEdit: () => void }) {
     const renderDetail = (label: string, value?: string | number | boolean) => {
@@ -194,14 +185,13 @@ export function MembershipForm() {
         const data = form.getValues();
         
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
-            if (!file || !user) return undefined;
-            const dataUrl = await fileToDataUrl(file);
-            const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
-            const result = await uploadFileToServer(dataUrl, path);
-            if (!result.success || !result.url) {
-                throw new Error(result.error || `File upload failed for ${folderName}`);
-            }
-            return result.url;
+          if (!file || !user) return undefined;
+          const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
+          const result = await uploadFileToApi(file, { path });
+          if (!result.success || !result.url) {
+            throw new Error(result.error || `File upload failed for ${folderName}`);
+          }
+          return result.url;
         };
 
         const membershipProofUrl = await uploadFileHelper(data.membershipProof?.[0], 'membership-proof');
@@ -228,7 +218,7 @@ export function MembershipForm() {
         if (membershipProofUrl) claimData.membershipProofUrl = membershipProofUrl;
 
         const claimId = searchParams.get('claimId');
-        const result = await submitIncentiveClaim(claimData, claimId || undefined);
+        const result = await submitIncentiveClaimViaApi(claimData, claimId || undefined);
         if (!result.success || !result.claimId) {
             throw new Error(result.error);
         }

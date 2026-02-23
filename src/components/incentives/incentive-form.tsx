@@ -41,7 +41,8 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { fetchScopusDataByUrl, getJournalWebsite, uploadFileToServer, fetchWosDataByUrl } from '@/app/actions';
+import { fetchScopusDataByUrl, getJournalWebsite, fetchWosDataByUrl } from '@/app/actions';
+import { uploadFileToApi } from '@/lib/upload-client';
 import { Loader2, AlertCircle, Bot } from 'lucide-react';
 
 const SPECIAL_POLICY_FACULTIES = [
@@ -294,16 +295,6 @@ const journalClassificationOptions = [
     { value: 'Q3', label: 'Q3' },
     { value: 'Q4', label: 'Q4' },
 ];
-
-
-const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-    });
-};
 
 
 export function IncentiveForm() {
@@ -610,9 +601,8 @@ export function IncentiveForm() {
     try {
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
             if (!file || !user) return undefined;
-            const dataUrl = await fileToDataUrl(file);
             const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
-            const result = await uploadFileToServer(dataUrl, path);
+            const result = await uploadFileToApi(file, { path });
             if (!result.success || !result.url) {
                 throw new Error(result.error || `File upload failed for ${folderName}`);
             }

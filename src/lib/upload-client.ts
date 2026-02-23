@@ -9,6 +9,7 @@ export async function uploadFileToApi(
   options?: {
     onProgress?: (progress: number) => void;
     signal?: AbortSignal;
+    path?: string;
   }
 ): Promise<{ success: boolean; url?: string; error?: string; fileData?: any }> {
   try {
@@ -23,6 +24,9 @@ export async function uploadFileToApi(
     // Create FormData with file
     const formData = new FormData();
     formData.append("file", file);
+    if (options?.path) {
+      formData.append("path", options.path);
+    }
 
     // Upload to the new API route with timeout
     const controller = new AbortController();

@@ -34,7 +34,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { getSystemSettings } from '@/app/actions';
-import { submitIncentiveClaim, deleteIncentiveClaim } from '@/app/incentive-approval-actions';
+import { deleteIncentiveClaim } from '@/app/incentive-approval-actions';
+import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { calculateBookIncentive,calculateApcIncentive, calculateResearchPaperIncentive, calculateConferenceIncentive } from '@/app/incentive-calculation';
@@ -268,7 +269,7 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                 calculatedIncentive: calculatedAmount, // Store the calculated amount
             };
             
-            await submitIncentiveClaim(newClaim);
+            await submitIncentiveClaimViaApi(newClaim as Omit<IncentiveClaim, 'id' | 'claimId'>);
 
             // Update the status on the original claim for this co-author
             const originalClaimRef = doc(db, 'incentiveClaims', claimToApply.id);

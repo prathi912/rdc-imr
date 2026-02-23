@@ -20,10 +20,11 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, Author } from '@/types';
-import { uploadFileToServer, checkPatentUniqueness } from '@/app/actions';
+import { checkPatentUniqueness } from '@/app/actions';
+import { uploadFileToApi } from '@/lib/upload-client';
 import { findUserByMisId } from '@/app/userfinding';
 import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Bot, Edit } from 'lucide-react';
-import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { calculateApcIncentive } from '@/app/incentive-calculation';
 import { fetchAdvancedScopusData } from '@/app/scopus-actions';
@@ -82,15 +83,6 @@ type ApcFormValues = z.infer<typeof apcSchema>;
 
 const articleTypes = ['Research Paper Publication', 'Review Article', 'Letter to Editor', 'Other'];
 const coAuthorRoles: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author'];
-
-const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-    });
-};
 
 const SPECIAL_POLICY_FACULTIES = [
     "Faculty of Applied Sciences",
@@ -535,14 +527,13 @@ useEffect(() => {
         const data = form.getValues();
         
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
-            if (!file || !user) return undefined;
-            const dataUrl = await fileToDataUrl(file);
-            const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
-            const result = await uploadFileToServer(dataUrl, path);
-            if (!result.success || !result.url) {
-            throw new Error(result.error || `File upload failed for ${folderName}`);
-            }
-            return result.url;
+          if (!file || !user) return undefined;
+          const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
+          const result = await uploadFileToApi(file, { path });
+          if (!result.success || !result.url) {
+          throw new Error(result.error || `File upload failed for ${folderName}`);
+          }
+          return result.url;
         };
 
         const [apcApcWaiverProofUrl, apcPublicationProofUrl, apcInvoiceProofUrl] = await Promise.all([
@@ -574,7 +565,7 @@ useEffect(() => {
         if (apcInvoiceProofUrl) claimData.apcInvoiceProofUrl = apcInvoiceProofUrl;
         
         const claimId = searchParams.get('claimId');
-        const result = await submitIncentiveClaim(claimData, claimId || undefined);
+        const result = await submitIncentiveClaimViaApi(claimData, claimId || undefined);
 
         if (!result.success) {
             throw new Error(result.error);

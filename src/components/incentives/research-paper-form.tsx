@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast'
 import { db } from '@/lib/config'
 import { collection, doc, getDoc, setDoc } from 'firebase/firestore'
 import type { User, IncentiveClaim, Author } from '@/types'
-import { uploadFileToServer } from '@/app/actions'
+import { uploadFileToApi } from '@/lib/upload-client'
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { fetchScienceDirectData } from "@/app/sciencedirect-actions";
@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "../ui/checkbox"
 import { calculateResearchPaperIncentive } from "@/app/incentive-calculation"
-import { submitIncentiveClaim } from "@/app/incentive-approval-actions"
+import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
 import { Badge } from "../ui/badge"
 import { findUserByMisId } from "@/app/userfinding"
@@ -69,7 +69,7 @@ const researchPaperSchema = z
     publicationProof: z.any().optional(),
     isPuNameInPublication: z
       .boolean()
-      .refine((val) => val === true, { message: "PU name must be present in the publication for an incentive." }),
+      .default(true),
     wasApcPaidByUniversity: z.boolean().default(false),
     authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
     authors: z
@@ -237,15 +237,6 @@ const months = [
   "December",
 ]
 const years = Array.from({ length: 10 }, (_, i) => (new Date().getFullYear() - i).toString())
-
-const fileToDataUrl = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = (error) => reject(error)
-    reader.readAsDataURL(file)
-  })
-}
 
 const SPECIAL_POLICY_FACULTIES = [
     "Faculty of Applied Sciences",
@@ -747,17 +738,16 @@ export function ResearchPaperForm() {
         return;
       }
       
-      const publicationProofUrls = await Promise.all(
+        const publicationProofUrls = await Promise.all(
           publicationProofFiles.map(async (file, index) => {
-              const dataUrl = await fileToDataUrl(file);
-              const path = `incentive-proofs/${user.uid}/publication-proof/${new Date().toISOString()}-${index}-${file.name}`;
-              const result = await uploadFileToServer(dataUrl, path);
-              if (!result.success || !result.url) {
-                  throw new Error(result.error || `Failed to upload file ${file.name}`);
-              }
-              return result.url;
+            const path = `incentive-proofs/${user.uid}/publication-proof/${new Date().toISOString()}-${index}-${file.name}`;
+            const result = await uploadFileToApi(file, { path });
+            if (!result.success || !result.url) {
+              throw new Error(result.error || `Failed to upload file ${file.name}`);
+            }
+            return result.url;
           })
-      );
+        );
 
       const { publicationProof, ...restOfData } = data;
 
@@ -779,7 +769,7 @@ export function ResearchPaperForm() {
           authorType: data.authors.find(a => a.email.toLowerCase() === user.email.toLowerCase())?.role || 'Co-Author',
       };
 
-      const result = await submitIncentiveClaim(claimData);
+      const result = await submitIncentiveClaimViaApi(claimData);
 
       if (!result.success) {
         throw new Error(result.error)

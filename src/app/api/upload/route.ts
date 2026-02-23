@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import { uploadFileToServer } from "@/app/actions";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 
-// Initialize Firebase Admin SDK
-const firebaseApps = getApps();
-if (!firebaseApps.length) {
+function ensureFirebaseAdminInitialized() {
+  if (getApps().length) return;
+
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\n/g, "\n");
+  const storageBucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+
+  if (!projectId || !clientEmail || !privateKey || !storageBucket) {
+    throw new Error("Firebase Admin credentials are not configured");
+  }
+
   initializeApp({
     credential: cert({
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      projectId,
+      clientEmail,
+      privateKey,
     }),
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    storageBucket,
   });
 }
 
@@ -26,8 +36,12 @@ const ALLOWED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
+export const runtime = "nodejs";
+
 export async function POST(req: NextRequest) {
   try {
+    ensureFirebaseAdminInitialized();
+
     // 1. Authenticate user
     const authHeader = req.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -76,6 +90,7 @@ export async function POST(req: NextRequest) {
     // 4. Stream the file to your blob storage
     const formData = await req.formData();
     const file = formData.get("file") as File;
+    const requestedPath = formData.get("path");
 
     if (!file) {
       return NextResponse.json(
@@ -102,7 +117,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Upload to blob storage with Firebase Storage fallback
+    // 5. Upload using provided path (uses server-side storage logic)
+    if (requestedPath && typeof requestedPath === "string") {
+      if (requestedPath.includes("..") || requestedPath.startsWith("/")) {
+        return NextResponse.json(
+          { error: "Invalid upload path" },
+          { status: 400 }
+        );
+      }
+
+      const blob = await file.arrayBuffer();
+      const buffer = Buffer.from(blob);
+      const base64 = buffer.toString("base64");
+      const dataUrl = `data:${file.type};base64,${base64}`;
+
+      const uploadResult = await uploadFileToServer(dataUrl, requestedPath);
+      if (!uploadResult.success || !uploadResult.url) {
+        return NextResponse.json(
+          { error: uploadResult.error || "Upload failed" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          ok: true,
+          message: "File uploaded successfully",
+          file: {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            uploadedAt: new Date().toISOString(),
+            userId,
+            uploadedUrl: uploadResult.url,
+            uploadedVia: "server-storage",
+            path: requestedPath,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    // 6. Upload to blob storage with Firebase Storage fallback
     const blob = await file.arrayBuffer();
     const buffer = Buffer.from(blob);
     

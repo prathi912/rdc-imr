@@ -21,9 +21,9 @@ import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, addDoc, doc, setDoc, getDocs, query, where, orderBy, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
-import { uploadFileToServer } from '@/app/actions';
+import { uploadFileToApi } from '@/lib/upload-client';
 import { Loader2, AlertCircle, Info, Calculator, Search, Edit } from 'lucide-react';
-import { submitIncentiveClaim } from '@/app/incentive-approval-actions';
+import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { differenceInDays, parseISO, addYears, format } from 'date-fns';
 import { calculateConferenceIncentive } from '@/app/incentive-calculation';
 import { findUserByMisId } from '@/app/userfinding';
@@ -96,15 +96,6 @@ const authorTypeOptions = [
   'Corresponding Author',
   'Co-Author',
 ];
-
-const fileToDataUrl = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = error => reject(error);
-        reader.readAsDataURL(file);
-    });
-};
 
 function ReviewDetails({ data, onEdit }: { data: ConferenceFormValues; onEdit: () => void }) {
     const renderDetail = (label: string, value?: string | number | boolean | React.ReactNode) => {
@@ -350,12 +341,11 @@ export function ConferenceForm() {
         const data = form.getValues();
         
         const uploadFileHelper = async (file: File | undefined, folderName: string): Promise<string | undefined> => {
-            if (!file || !user) return undefined;
-            const dataUrl = await fileToDataUrl(file);
-            const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
-            const result = await uploadFileToServer(dataUrl, path);
-            if (!result.success || !result.url) { throw new Error(result.error || `File upload failed for ${folderName}`); }
-            return result.url;
+          if (!file || !user) return undefined;
+          const path = `incentive-proofs/${user.uid}/${folderName}/${new Date().toISOString()}-${file.name}`;
+          const result = await uploadFileToApi(file, { path });
+          if (!result.success || !result.url) { throw new Error(result.error || `File upload failed for ${folderName}`); }
+          return result.url;
         };
         
         const {
@@ -409,7 +399,7 @@ export function ConferenceForm() {
             totalAuthors: data.totalAuthors,
         };
         
-        const result = await submitIncentiveClaim(claimData);
+        const result = await submitIncentiveClaimViaApi(claimData);
 
         if (!result.success) {
             throw new Error(result.error);
