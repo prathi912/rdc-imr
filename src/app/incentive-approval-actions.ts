@@ -216,7 +216,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
                             await sendEmail({
                                 to: coAuthor.email,
-                                subject: `You've been added as a co-author on an incentive claim`,
+                                subject: `[${standardizedClaimId}] You've been added as a co-author on an incentive claim`,
                                 from: 'default',
                                 html: emailHtml
                             });
