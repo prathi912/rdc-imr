@@ -47,7 +47,10 @@ export default function ArpsCalculatorPage() {
             if (currentUser) {
                 if (currentUser.role === 'Super-admin') {
                     const users = await getAllUsers();
-                    setAllUsers(users.filter(u => u.role === 'faculty' || u.role === 'CRO' || u.role === 'Super-admin'));
+                    setAllUsers(users.filter(u =>
+                        (u.role === 'faculty' || u.role === 'CRO' || u.role === 'Super-admin') &&
+                        u.allowedModules?.includes('incentive-claim')
+                    ));
                 }
                 setLoading(false);
             }
