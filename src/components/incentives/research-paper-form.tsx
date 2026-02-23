@@ -1445,7 +1445,7 @@ export function ResearchPaperForm() {
                   render={({ field: { value, onChange, ...fieldProps } }) => (
                     <FormItem>
                       <FormLabel>
-                        Attach Proof: Publication: Copy of paper, title of the paper details with PU Name.*
+                        Attach Proof of Publication: Copy of paper, title of the paper details with PU Name. [Max 10 MB]*
                       </FormLabel>
                       <FormControl>
                         <Input
