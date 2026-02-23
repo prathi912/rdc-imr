@@ -1005,7 +1005,7 @@ export function ResearchPaperForm() {
                   />
                 )}
 
-                {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both') && (
+                {(indexType === 'scopus' || indexType === 'wos' || indexType === 'both' || indexType === 'sci') && (
                     <FormField
                         control={form.control}
                         name="journalClassification"

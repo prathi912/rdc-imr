@@ -137,11 +137,6 @@ service cloud.firestore {
       }
     }
 
-    // System settings collection - accessible by admin SDK and super admins
-    match /system/{docId} {
-      allow read, write: if isSuperAdmin() || request.auth == null;
-    }
-
     // Health check collection is open for testing purposes.
     match /_health_check/{docId} {
       allow read, write: if true;
