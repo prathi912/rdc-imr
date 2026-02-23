@@ -57,6 +57,8 @@ const SPECIAL_POLICY_FACULTIES = [
     "Faculty of Engineering & Technology"
 ];
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 const incentiveSchema = z
   .object({
     claimType: z.string().min(1, 'Please select a claim type.'),
@@ -87,9 +89,9 @@ const incentiveSchema = z
     patentFiledInPuName: z.boolean().optional(),
     patentFiledFromIprCell: z.boolean().optional(),
     patentPermissionTaken: z.boolean().optional(),
-    patentApprovalProof: z.any().optional(),
-    patentForm1: z.any().optional(),
-    patentGovtReceipt: z.any().optional(),
+    patentApprovalProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    patentForm1: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    patentGovtReceipt: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     patentSelfDeclaration: z.boolean().optional(),
     // Conference fields
     conferenceName: z.string().optional(),
@@ -97,28 +99,28 @@ const incentiveSchema = z
     conferenceType: z.enum(['International', 'National', 'Regional/State']).optional(),
     conferenceVenue: z.enum(['India', 'Indian Subcontinent', 'South Korea, Japan, Australia and Middle East', 'Europe', 'African/South American/North American']).optional(),
     presentationType: z.enum(['Oral', 'Poster', 'Other']).optional(),
-    govtFundingRequestProof: z.any().optional(),
+    govtFundingRequestProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     registrationFee: z.coerce.number().optional(),
     travelFare: z.coerce.number().optional(),
     conferenceMode: z.enum(['Online', 'Offline']).optional(),
     onlinePresentationOrder: z.enum(['First', 'Second', 'Third', 'Additional']).optional(),
     wasPresentingAuthor: z.boolean().optional(),
     isPuNamePresent: z.boolean().optional(),
-    abstractUpload: z.any().optional(),
+    abstractUpload: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     organizerName: z.string().optional(),
     eventWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     conferenceDate: z.string().optional(),
     presentationDate: z.string().optional(),
-    registrationFeeProof: z.any().optional(),
-    participationCertificate: z.any().optional(),
+    registrationFeeProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    participationCertificate: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     wonPrize: z.boolean().optional(),
     prizeDetails: z.string().optional(),
-    prizeProof: z.any().optional(),
+    prizeProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     attendedOtherConference: z.boolean().optional(),
     travelPlaceVisited: z.string().optional(),
     travelMode: z.enum(['Bus', 'Train', 'Air', 'Other']).optional(),
-    travelReceipts: z.any().optional(),
-    flightTickets: z.any().optional(),
+    travelReceipts: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    flightTickets: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     conferenceSelfDeclaration: z.boolean().optional(),
     orcidId: z.string().optional(),
 
@@ -141,15 +143,15 @@ const incentiveSchema = z
     isbn: z.string().optional(),
     bookType: z.enum(['Textbook', 'Reference Book']).optional(),
     publisherWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-    bookProof: z.any().optional(),
-    scopusProof: z.any().optional(),
+    bookProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    scopusProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
     bookSelfDeclaration: z.boolean().optional(),
     
     // Professional Body Membership fields
     professionalBodyName: z.string().optional(),
     membershipFee: z.coerce.number().optional(),
-    membershipProof: z.any().optional(),
+    membershipProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     membershipSelfDeclaration: z.boolean().optional(),
   })
   .refine((data) => {

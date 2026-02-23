@@ -32,18 +32,29 @@ import { Badge } from '../ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 const bookSchema = z
   .object({
     bookApplicationType: z.enum(['Book Chapter', 'Book'], { required_error: 'Please select an application type.' }),
     publicationTitle: z.string().min(3, 'Title is required.'),
-    authors: z.array(z.object({
-        name: z.string().min(2, 'Author name is required.'),
-        email: z.string().email('Invalid email format.'),
-        uid: z.string().optional().nullable(),
-        role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', "Presenting Author", "First & Presenting Author"]),
-        isExternal: z.boolean(),
-        status: z.enum(['approved', 'pending', 'Applied'])
-    })).min(1, 'At least one author is required.')
+        authors: z
+            .array(
+                z
+                    .object({
+                        name: z.string().min(2, 'Author name is required.'),
+                        email: z.string().email('Invalid email format.').or(z.literal('')),
+                        uid: z.string().optional().nullable(),
+                        role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', "Presenting Author", "First & Presenting Author"]),
+                        isExternal: z.boolean(),
+                        status: z.enum(['approved', 'pending', 'Applied'])
+                    })
+                    .refine((data) => data.isExternal || !!data.email, {
+                        message: 'Email is required for internal authors.',
+                        path: ['email'],
+                    })
+            )
+            .min(1, 'At least one author is required.')
     .refine(data => {
         const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
         return firstAuthors.length <= 1;
@@ -67,8 +78,8 @@ const bookSchema = z
     isbnPrint: z.string().optional(),
     isbnElectronic: z.string().optional(),
     publisherWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-    bookProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.'),
-    scopusProof: z.any().optional(),
+    bookProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.').refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    scopusProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     publicationOrderInYear: z.enum(['First', 'Second', 'Third']).optional(),
     bookType: z.enum(['Textbook', 'Reference Book'], { required_error: 'Please select the book type.' }),
     bookSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
@@ -465,18 +476,18 @@ export function BookForm() {
     setIsSelectionOpen(false);
   };
   
-   const addExternalAuthor = () => {
+    const addExternalAuthor = () => {
         const name = externalAuthorName.trim();
         const email = externalAuthorEmail.trim().toLowerCase();
-        if (!name || !email) {
-            toast({ title: 'Name and email are required for external authors', variant: 'destructive' });
-            return;
+        if (!name) {
+                toast({ title: 'Name is required for external authors', variant: 'destructive' });
+                return;
         }
-         if (fields.some(a => a.email.toLowerCase() === email)) {
-            toast({ title: 'Author already added', variant: 'destructive' });
-            return;
+        if (email && fields.some(a => a.email?.toLowerCase() === email)) {
+                toast({ title: 'Author already added', variant: 'destructive' });
+                return;
         }
-        append({ name, email, role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
+        append({ name, email: email || '', role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
         setExternalAuthorName('');
         setExternalAuthorEmail('');
         setExternalAuthorRole('Co-Author'); // Reset role selector
@@ -597,12 +608,12 @@ export function BookForm() {
                         <FormLabel className="text-sm">Add External Co-Author</FormLabel>
                         <div className="flex flex-col md:flex-row gap-2 mt-1">
                             <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
-                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email (optional)"/>
                             <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
-                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><Plus className="h-4 w-4"/></Button>
+                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim()}><Plus className="h-4 w-4"/></Button>
                         </div>
                     </div>
                      <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>

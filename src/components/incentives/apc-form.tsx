@@ -35,14 +35,21 @@ import { Label } from '@/components/ui/label';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../ui/table';
 import { Badge } from '../ui/badge';
 
-const authorSchema = z.object({
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+const authorSchema = z
+  .object({
     name: z.string().min(2, 'Author name is required.'),
-    email: z.string().email('Invalid email format.'),
+    email: z.string().email('Invalid email format.').or(z.literal('')),
     uid: z.string().optional().nullable(),
     role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', "Presenting Author", "First & Presenting Author"]),
     isExternal: z.boolean(),
     status: z.enum(['approved', 'pending', 'Applied'])
-});
+  })
+  .refine((data) => data.isExternal || !!data.email, {
+    message: 'Email is required for internal authors.',
+    path: ['email'],
+  });
 
 const apcSchema = z.object({
   apcTypeOfArticle: z.string({ required_error: 'Please select an article type.' }),
@@ -64,12 +71,12 @@ const apcSchema = z.object({
   }),
   apcApcWaiverProof: z.any().refine(files => files?.length > 0, {
     message: 'Proof of APC waiver request is required.',
-  }),
+  }).refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
   apcJournalWebsite: z.string().url('Please enter a valid URL.'),
   apcIssnNo: z.string().min(5, 'ISSN is required.'),
   apcSciImpactFactor: z.coerce.number().optional(),
-  apcPublicationProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.'),
-  apcInvoiceProof: z.any().refine((files) => files?.length > 0, 'Proof of payment/invoice is required.'),
+  apcPublicationProof: z.any().refine((files) => files?.length > 0, 'Proof of publication is required.').refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+  apcInvoiceProof: z.any().refine((files) => files?.length > 0, 'Proof of payment/invoice is required.').refine(files => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
   apcPuNameInPublication: z.boolean().optional(),
   apcAmountClaimed: z.coerce.number().positive('Claimed amount must be positive.'),
   apcTotalAmount: z.coerce.number().positive('Total amount must be a positive number greater than 0.'),
@@ -466,22 +473,22 @@ useEffect(() => {
     setIsSelectionOpen(false);
   };
   
-   const addExternalAuthor = () => {
-        const name = externalAuthorName.trim();
-        const email = externalAuthorEmail.trim().toLowerCase();
-        if (!name || !email) {
-            toast({ title: 'Name and email are required for external authors', variant: 'destructive' });
-            return;
-        }
-         if (fields.some(a => a.email.toLowerCase() === email)) {
-            toast({ title: 'Author already added', variant: 'destructive' });
-            return;
-        }
-        append({ name, email, role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
-        setExternalAuthorName('');
-        setExternalAuthorEmail('');
-        setExternalAuthorRole('Co-Author'); // Reset role selector
-    };
+  const addExternalAuthor = () => {
+    const name = externalAuthorName.trim();
+    const email = externalAuthorEmail.trim().toLowerCase();
+    if (!name) {
+        toast({ title: 'Name is required for external authors', variant: 'destructive' });
+        return;
+    }
+    if (email && fields.some(a => a.email?.toLowerCase() === email)) {
+        toast({ title: 'Author already added', variant: 'destructive' });
+        return;
+    }
+    append({ name, email: email || '', role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
+    setExternalAuthorName('');
+    setExternalAuthorEmail('');
+    setExternalAuthorRole('Co-Author'); // Reset role selector
+  };
 
 
   const removeAuthor = (index: number) => {
@@ -709,12 +716,12 @@ useEffect(() => {
                         <FormLabel className="text-sm">Add External Co-Author</FormLabel>
                         <div className="flex flex-col md:flex-row gap-2 mt-1">
                             <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
-                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email (optional)"/>
                             <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
-                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><Plus className="h-4 w-4"/></Button>
+                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim()}><Plus className="h-4 w-4"/></Button>
                         </div>
                         <FormDescription className="!mt-2 text-destructive text-xs">
                            Important: If an internal/external co-author is found at the approval stage that was not declared here, the claim will be rejected.

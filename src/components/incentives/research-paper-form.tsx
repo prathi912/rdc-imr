@@ -43,7 +43,7 @@ import { findUserByMisId } from "@/app/userfinding"
 
 
 const MAX_FILES = 10
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 const ACCEPTED_FILE_TYPES = ["application/pdf"]
 
 const researchPaperSchema = z
@@ -66,7 +66,13 @@ const researchPaperSchema = z
     publicationMonth: z.string({ required_error: "Publication month is required." }),
     publicationYear: z.string({ required_error: "Publication year is required." }),
     sdgGoals: z.array(z.string()).refine((value) => value.length > 0, { message: "Please select at least one SDG." }),
-    publicationProof: z.any().optional(),
+    publicationProof: z
+      .any()
+      .optional()
+      .refine(
+        (files) => !files || Array.from(files as FileList).every((file) => file.size <= MAX_FILE_SIZE),
+        'File must be less than 10 MB.'
+      ),
     isPuNameInPublication: z
       .boolean()
       .default(true),
@@ -74,14 +80,19 @@ const researchPaperSchema = z
     authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
     authors: z
       .array(
-        z.object({
-          name: z.string(),
-          email: z.string().email(),
-          uid: z.string().optional().nullable(),
-          role: z.enum(["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author", "Presenting Author", "First & Presenting Author"]),
-          isExternal: z.boolean(),
-          status: z.enum(['approved', 'pending', 'Applied'])
-        }),
+        z
+          .object({
+            name: z.string(),
+            email: z.string().email('Invalid email format.').or(z.literal('')),
+            uid: z.string().optional().nullable(),
+            role: z.enum(["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author", "Presenting Author", "First & Presenting Author"]),
+            isExternal: z.boolean(),
+            status: z.enum(['approved', 'pending', 'Applied'])
+          })
+          .refine((data) => data.isExternal || !!data.email, {
+            message: 'Email is required for internal authors.',
+            path: ['email'],
+          }),
       )
       .min(1, "At least one author is required.").refine(data => {
       const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
@@ -144,15 +155,6 @@ const researchPaperSchema = z
       return true;
     },
     { message: 'Web of Science URL is required when WoS or Both is selected.', path: ['wosLink'] }
-  )
-  .refine(
-    (data) => {
-      const correspondingAuthors = data.authors.filter(
-        (author) => author.role === "Corresponding Author" || author.role === "First & Corresponding Author",
-      )
-      return correspondingAuthors.length <= 1
-    },
-    { message: "Only one author can be designated as the Corresponding Author.", path: ["authors"] },
   )
   .refine(
     (data) => {
@@ -648,15 +650,15 @@ export function ResearchPaperForm() {
   const addExternalAuthor = () => {
     const name = externalAuthorName.trim();
     const email = externalAuthorEmail.trim().toLowerCase();
-    if (!name || !email) {
-        toast({ title: 'Name and email are required for external authors', variant: 'destructive' });
+    if (!name) {
+        toast({ title: 'Name is required for external authors', variant: 'destructive' });
         return;
     }
-     if (fields.some(a => a.email.toLowerCase() === email)) {
+    if (email && fields.some(a => a.email?.toLowerCase() === email)) {
         toast({ title: 'Author already added', variant: 'destructive' });
         return;
     }
-    append({ name, email, role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
+    append({ name, email: email || '', role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
     setExternalAuthorName('');
     setExternalAuthorEmail('');
     setExternalAuthorRole('Co-Author'); // Reset role selector
@@ -1289,12 +1291,12 @@ export function ResearchPaperForm() {
                         <FormLabel className="text-sm">Add External Co-Author</FormLabel>
                          <div className="flex flex-col md:flex-row gap-2 mt-1">
                             <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name"/>
-                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email"/>
+                            <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email (optional)"/>
                             <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
                                 <SelectTrigger><SelectValue/></SelectTrigger>
                                 <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
                             </Select>
-                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim() || !externalAuthorEmail.trim()}><UserPlus className="h-4 w-4"/></Button>
+                            <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim()}><UserPlus className="h-4 w-4"/></Button>
                         </div>
                     </div>
                   </div>

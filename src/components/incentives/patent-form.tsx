@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -42,6 +40,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { calculatePatentIncentive } from '@/app/incentive-calculation';
 import { Table, TableBody, TableCell, TableHeader, TableHead, TableRow } from '../ui/table';
 
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
 const sdgGoalsList = [
   "Goal 1: No Poverty", "Goal 2: Zero Hunger", "Goal 3: Good Health and Well-being", "Goal 4: Quality Education",
   "Goal 5: Gender Equality", "Goal 6: Clean Water and Sanitation", "Goal 7: Affordable and Clean Energy",
@@ -71,11 +71,20 @@ const patentSchema = z
     publicationDate: z.date().optional(),
     grantDate: z.date().optional(),
     currentStatus: z.enum(['Filed', 'Published', 'Granted'], { required_error: 'Please select the current status.' }),
-    patentForm1: z.any().refine((files) => files?.length > 0, 'Proof (Form 1) is required.'),
+    patentForm1: z
+      .any()
+      .refine((files) => files?.length > 0, 'Proof (Form 1) is required.')
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     patentFiledFromIprCell: z.boolean({ required_error: 'This field is required.' }),
     patentPermissionTaken: z.boolean().optional(),
-    patentApprovalProof: z.any().optional(),
-    patentGovtReceipt: z.any().refine((files) => files?.length > 0, 'Proof (Govt. Receipt) is required.'),
+    patentApprovalProof: z
+      .any()
+      .optional()
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    patentGovtReceipt: z
+      .any()
+      .refine((files) => files?.length > 0, 'Proof (Govt. Receipt) is required.')
+      .refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     patentSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
     patentFiledInPuName: z.boolean({ required_error: 'This field is required.' }),
     isPuSoleApplicant: z.boolean().optional(),
