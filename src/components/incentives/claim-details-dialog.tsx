@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import type { User, IncentiveClaim, Author, ApprovalStage } from '@/types';
-import { Loader2, Printer, Check, X, Download, Bot } from 'lucide-react';
+import { Loader2, Printer, Check, X, Download, Bot, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { generateOfficeNotingForClaim } from '@/app/document-actions';
@@ -174,6 +174,11 @@ a.href = url;
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Incentive Claim Details</DialogTitle>
+                    {claim.claimId && (
+                        <DialogDescription className="font-mono text-sm text-primary pt-1">
+                            {claim.claimId}
+                        </DialogDescription>
+                    )}
                     <DialogDescription>Full submission details for claimant: {claim.userName}.</DialogDescription>
                 </DialogHeader>
                 <div className="max-h-[70vh] overflow-y-auto pr-4 space-y-2 text-sm">
