@@ -423,23 +423,33 @@ export function BookForm() {
   
   const onFinalSubmit = () => handleSave('Pending');
   
-  const handleSearchCoPi = async () => {
-    if (!coPiSearchTerm) return;
+  const handleSearchCoPi = async (searchTerm: string) => {
+    if (!searchTerm || searchTerm.length < 2) {
+      setFoundCoPis([]);
+      return;
+    }
     setIsSearching(true);
     try {
-        const result = await findUserByMisId(coPiSearchTerm);
-        if (result.success && result.users && result.users.length > 0) {
-            if (result.users.length === 1) {
-                handleAddCoPi(result.users[0]);
-            } else {
-                setFoundCoPis(result.users);
-                setIsSelectionOpen(true);
-            }
+        // Check if search term looks like a MIS ID (numeric or alphanumeric, max 10 chars)
+        const isMisIdSearch = /^[a-zA-Z0-9]+$/.test(searchTerm) && searchTerm.length <= 10;
+        
+        let url = '';
+        if (isMisIdSearch) {
+            url = `/api/find-users-by-name?misId=${encodeURIComponent(searchTerm)}`;
         } else {
-            toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
+            url = `/api/find-users-by-name?name=${encodeURIComponent(searchTerm)}`;
         }
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Search Failed', description: error.message || 'An error occurred while searching.' });
+        
+        const res = await fetch(url);
+        const result = await res.json();
+        if (result.success && result.users) {
+            setFoundCoPis(result.users);
+            setIsSelectionOpen(true);
+        } else {
+            setFoundCoPis([]);
+        }
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
     } finally {
         setIsSearching(false);
     }
@@ -599,9 +609,25 @@ export function BookForm() {
 
                     <div className="space-y-2 p-3 border rounded-md">
                         <FormLabel>Add Internal Co-Author</FormLabel>
-                        <div className="flex items-center gap-2">
-                            <Input placeholder="Search by Co-Author's Name or MIS ID" value={coPiSearchTerm} onChange={(e) => setCoPiSearchTerm(e.target.value)} />
-                            <Button type="button" onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                        <div className="relative">
+                            <Input placeholder="Search by Co-Author's Name or MIS ID" value={coPiSearchTerm} onChange={(e) => {
+                                setCoPiSearchTerm(e.target.value);
+                                handleSearchCoPi(e.target.value);
+                            }} />
+                            {isSearching && <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin" />}
+                            {isSelectionOpen && foundCoPis.length > 0 && (
+                                <div className="absolute z-10 w-full border rounded-md bg-white shadow-md mt-1 max-h-48 overflow-y-auto">
+                                    {foundCoPis.map((user: any) => (
+                                        <div key={user.id || user.misId} onClick={() => {
+                                            handleAddCoPi(user);
+                                            setCoPiSearchTerm('');
+                                            setIsSelectionOpen(false);
+                                        }} className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm">
+                                            {user.name} {user.misId ? `(${user.misId})` : ''}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                     <div className="space-y-2 p-3 border rounded-md">

@@ -507,6 +507,7 @@ export default function IncentiveClaimPage() {
             }
           }
           
+          // Query by authorUids and authorEmails arrays (for newer claims)
           const coAuthorByUidQuery = query(claimsCollection, where('authorUids', 'array-contains', uid));
           const coAuthorByEmailQuery = query(claimsCollection, where('authorEmails', 'array-contains', email.toLowerCase()));
 
@@ -526,6 +527,21 @@ export default function IncentiveClaimPage() {
               }
           });
 
+          // Fallback: Also check the authors array directly for older claims that might not have authorUids/authorEmails
+          const allClaimsSnapshot = await getDocs(claimsCollection);
+          allClaimsSnapshot.forEach(doc => {
+              const claim = { ...doc.data(), id: doc.id } as IncentiveClaim;
+              // Check if user is in the authors array
+              if (claim.authors && claim.authors.some(author => 
+                  (author.uid === uid || author.email.toLowerCase() === email.toLowerCase())
+              )) {
+                  if (!allCoAuthorClaims.has(doc.id)) {
+                      allCoAuthorClaims.set(doc.id, claim);
+                  }
+              }
+          });
+
+          // Filter out claims where the current user is the primary author (uid)
           const coAuthorClaimList = Array.from(allCoAuthorClaims.values())
               .filter(claim => claim.uid !== uid);
           

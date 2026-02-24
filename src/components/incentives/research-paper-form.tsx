@@ -607,14 +607,24 @@ export function ResearchPaperForm() {
   };
 
 
-  const handleSearchCoPi = async (name: string) => {
-    if (name.length < 3) {
+  const handleSearchCoPi = async (searchTerm: string) => {
+    if (searchTerm.length < 2) {
       setFoundCoPis([]);
       return;
     }
     setIsSearching(true);
     try {
-        const res = await fetch(`/api/find-users-by-name?name=${encodeURIComponent(name)}`);
+        // Check if search term looks like a MIS ID (numeric or alphanumeric)
+        const isMisIdSearch = /^[a-zA-Z0-9]+$/.test(searchTerm) && searchTerm.length <= 10;
+        
+        let url = '';
+        if (isMisIdSearch) {
+            url = `/api/find-users-by-name?misId=${encodeURIComponent(searchTerm)}`;
+        } else {
+            url = `/api/find-users-by-name?name=${encodeURIComponent(searchTerm)}`;
+        }
+        
+        const res = await fetch(url);
         const result = await res.json();
         if (result.success && result.users) {
             setFoundCoPis(result.users);
