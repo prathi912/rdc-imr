@@ -313,8 +313,11 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
         if (myDetails?.status !== 'pending') {
             return `You have already applied for this claim.`;
         }
-        if (!currentUser?.bankDetails) {
-            return 'Please add your bank details in Settings to apply.';
+        if (!currentUser?.bankDetails || !currentUser?.orcidId) {
+            const missing = [];
+            if (!currentUser?.bankDetails) missing.push('bank details');
+            if (!currentUser?.orcidId) missing.push('ORCID ID');
+            return `Please add your ${missing.join(' and ')} in Settings to apply.`;
         }
         if (isScopusConference && !isPresentingAuthor) {
             return 'Only Presenting Authors can apply for this type of conference proceeding.';
@@ -330,50 +333,49 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                  const isScopusConference = claim.publicationType === 'Scopus Indexed Conference Proceedings';
                  const isPresentingAuthor = myDetails?.role === 'Presenting Author' || myDetails?.role === 'First & Presenting Author';
                  const canApplyForConference = isScopusConference ? isPresentingAuthor : true;
-                 const canApply = myDetails?.status === 'pending' && !!currentUser?.bankDetails && canApplyForConference;
+                 const canApply = myDetails?.status === 'pending' && !!currentUser?.bankDetails && !!currentUser?.orcidId && canApplyForConference;
 
                 return (
-                 <Card key={claim.id}>
-                    <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                         <div className="flex-1 space-y-2">
-                            <p className="font-semibold">
-                                {getClaimTitle(claim)}
-                            </p>
-                            <p className="text-sm text-muted-foreground">Primary Author: <span className="font-medium text-foreground">{claim.userName}</span></p>
-                             <div className="flex items-center gap-2">
-                                <Badge variant="outline">{claim.claimType}</Badge>
-                                {isScopusConference && !isPresentingAuthor && (
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <Badge variant="destructive">Not Eligible</Badge>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Only Presenting Authors can claim for this publication type.</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                )}
-                             </div>
+                 <div key={claim.id}>
+                    <Card>
+                        <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                             <div className="flex-1 space-y-2">
+                                <p className="font-semibold">
+                                    {getClaimTitle(claim)}
+                                </p>
+                                <p className="text-sm text-muted-foreground">Primary Author: <span className="font-medium text-foreground">{claim.userName}</span></p>
+                                 <div className="flex items-center gap-2">
+                                    <Badge variant="outline">{claim.claimType}</Badge>
+                                    {isScopusConference && !isPresentingAuthor && (
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger>
+                                                    <Badge variant="destructive">Not Eligible</Badge>
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Only Presenting Authors can claim for this publication type.</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    )}
+                                 </div>
+                            </div>
+                            <Button onClick={() => handleOpenDialog(claim)} disabled={!canApply}>
+                                {myDetails?.status === 'Applied' ? 'Applied' : 'View & Apply'}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                    {!canApply && (
+                        <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+                            <div className="flex items-start gap-2">
+                                <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                                <p className="text-sm text-amber-800 dark:text-amber-200">
+                                    {getDisabledReason(myDetails, currentUser, isScopusConference, isPresentingAuthor)}
+                                </p>
+                            </div>
                         </div>
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <span tabIndex={canApply ? -1 : 0}>
-                                        <Button onClick={() => handleOpenDialog(claim)} disabled={!canApply}>
-                                            {myDetails?.status === 'Applied' ? 'Applied' : 'View & Apply'}
-                                        </Button>
-                                    </span>
-                                </TooltipTrigger>
-                                {!canApply && (
-                                    <TooltipContent>
-                                        <p>{getDisabledReason(myDetails, currentUser, isScopusConference, isPresentingAuthor)}</p>
-                                    </TooltipContent>
-                                )}
-                            </Tooltip>
-                        </TooltipProvider>
-                    </CardContent>
-                </Card>
+                    )}
+                 </div>
             )})}
         </div>
         {claimToApply && (
