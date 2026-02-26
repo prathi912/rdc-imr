@@ -346,6 +346,13 @@ export type IncentiveClaim = {
   conferenceSelfDeclaration?: boolean
   totalAuthors?: string;
 
+  // Workshop/Training/FDP fields
+  workshopName?: string;
+  attendanceMode?: "Online" | "Offline";
+  eventTypeLevel?: "International" | "National" | "Regional/State" | "Other";
+  workshopCertificateUrl?: string;
+  workshopSelfDeclaration?: boolean;
+  travelDetails?: string;
 
   // Book/Book Chapter Fields
   bookApplicationType?: "Book Chapter" | "Book"
@@ -383,6 +390,18 @@ export type IncentiveClaim = {
   membershipPaymentDate?: string; // ISO string
   membershipProofUrl?: string;
   membershipSelfDeclaration?: boolean
+
+  // Award fields
+  awardTitle?: string;
+  awardingBody?: string;
+  awardStature?: 'National' | 'International';
+  awardBodyType?: 'Government' | 'NGO (Non-Governmental Organization)' | 'Any Other';
+  awardLocale?: string;
+  amountPaid?: number;
+  paymentDate?: string; // ISO string
+  awardDate?: string; // ISO string
+  awardProofUrls?: string[];
+  awardSelfDeclaration?: boolean;
 
   // Seed Money for APC Fields
   apcTypeOfArticle?: string

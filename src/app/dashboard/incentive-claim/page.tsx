@@ -65,7 +65,7 @@ function UserClaimsList({
     }
     
     const getClaimTitle = (claim: IncentiveClaim): string => {
-        return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || 'Untitled Claim';
+        return claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.awardTitle || 'Untitled Claim';
     };
 
     const getClaimEditHref = (claim: IncentiveClaim): string => {
@@ -76,6 +76,8 @@ function UserClaimsList({
             'Books': 'book',
             'Membership of Professional Bodies': 'membership',
             'Seed Money for APC': 'apc',
+            'Honoring the Award Winner': 'award',
+            'Award': 'award',
         };
         const slug = typeMap[claim.claimType] || '';
         return `/dashboard/incentive-claim/${slug}?claimId=${claim.id}`;
@@ -657,6 +659,12 @@ export default function IncentiveClaimPage() {
       description: 'Claim reimbursement for Article Processing Charges after publication.',
       href: '/dashboard/incentive-claim/apc',
       icon: Banknote,
+    },
+    {
+      title: 'Honoring the Award Winner',
+      description: 'Claim incentives for receiving awards and recognitions.',
+      href: '/dashboard/incentive-claim/award',
+      icon: Award,
     },
   ], [membershipClaimInfo]);
   
