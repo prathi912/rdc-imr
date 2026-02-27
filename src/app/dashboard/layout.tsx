@@ -343,11 +343,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         const isPrincipal = appUser.designation === "Principal"
         const isHod = appUser.designation === "HOD"
+        const isCro = appUser.role === "CRO"
 
-        if (isPrincipal || isHod) {
+        if (isPrincipal || isHod || isCro) {
           if (!appUser.allowedModules.includes("all-projects")) {
             appUser.allowedModules.push("all-projects")
           }
+        }
+
+        if (isCro && !appUser.allowedModules.includes("analytics")) {
+          appUser.allowedModules.push("analytics")
         }
 
         const postSetupInfo = sessionStorage.getItem("postSetupInfo")

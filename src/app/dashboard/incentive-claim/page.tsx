@@ -546,8 +546,9 @@ export default function IncentiveClaimPage() {
           });
 
           // Filter out claims where the current user is the primary author (uid)
+          // and exclude co-author-derived claims to avoid duplicate listings and re-application.
           const coAuthorClaimList = Array.from(allCoAuthorClaims.values())
-              .filter(claim => claim.uid !== uid);
+              .filter(claim => claim.uid !== uid && !claim.originalClaimId);
           
           setCoAuthorClaims(coAuthorClaimList);
 
