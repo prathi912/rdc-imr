@@ -347,7 +347,12 @@ export default function ManageIncentiveClaimsPage() {
                         }}
                     />
                 </TableCell>
-                <TableCell className="font-medium whitespace-nowrap">{claim.userName}</TableCell>
+                <TableCell className="font-medium">
+                    <div className="flex flex-col">
+                        <span>{claim.userName}</span>
+                        {claim.claimId && <span className="text-xs text-muted-foreground">{claim.claimId}</span>}
+                    </div>
+                </TableCell>
                 <TableCell className="max-w-xs whitespace-normal break-words">{getClaimTitle(claim)}</TableCell>
                 <TableCell className="hidden md:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
                 <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
@@ -474,6 +479,17 @@ function GeneratePaymentSheetDialog({ isOpen, onOpenChange, claims, allUsers }: 
     const [referenceNumber, setReferenceNumber] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
 
+    // Autofill remarks with Claim IDs when claims change
+    useEffect(() => {
+        if (claims.length > 0) {
+            const initialRemarks: Record<string, string> = {};
+            claims.forEach(claim => {
+                initialRemarks[claim.id] = claim.claimId || claim.id;
+            });
+            setRemarks(initialRemarks);
+        }
+    }, [claims]);
+
     const handleGenerate = async () => {
         if (!referenceNumber.trim()) {
             toast({ variant: 'destructive', title: 'Reference Number Required' });
@@ -522,10 +538,15 @@ function GeneratePaymentSheetDialog({ isOpen, onOpenChange, claims, allUsers }: 
                     <Separator />
                     <div className="space-y-2">
                         <h4 className="font-semibold">Add Remarks</h4>
-                        {claims.map(claim => (
+                        {claims.sort((a, b) => {
+                            const claimIdA = a.claimId || a.id;
+                            const claimIdB = b.claimId || b.id;
+                            return claimIdA.localeCompare(claimIdB);
+                        }).map(claim => (
                             <div key={claim.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-2 rounded-md">
                                 <div className="md:col-span-1">
                                     <p className="font-medium text-sm">{claim.userName}</p>
+                                    {claim.claimId && <p className="text-xs text-muted-foreground">Claim ID: {claim.claimId}</p>}
                                     <p className="text-xs text-muted-foreground">{claim.paperTitle || claim.publicationTitle || claim.claimType}</p>
                                     <p className="text-sm font-semibold">₹{claim.finalApprovedAmount?.toLocaleString('en-IN')}</p>
                                 </div>

@@ -253,7 +253,7 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
         }
         setIsApplying(true);
         try {
-            const { id, uid, userName, userEmail, status, submissionDate, publicationOrderInYear, ...originalClaimData } = claimToApply;
+            const { id, claimId, uid, userName, userEmail, status, submissionDate, publicationOrderInYear, ...originalClaimData } = claimToApply;
 
             const newClaim: Omit<IncentiveClaim, 'id' | 'claimId'> = {
                 ...originalClaimData,
