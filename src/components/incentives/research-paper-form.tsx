@@ -25,7 +25,7 @@ import { uploadFileToApi } from '@/lib/upload-client'
 import { fetchAdvancedScopusData } from "@/app/scopus-actions";
 import { fetchWosDataByUrl } from "@/app/wos-actions";
 import { fetchScienceDirectData } from "@/app/sciencedirect-actions";
-import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit } from 'lucide-react'
+import { Loader2, AlertCircle, Bot, ChevronDown, Trash2, Plus, Search, UserPlus, Edit, Info } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,

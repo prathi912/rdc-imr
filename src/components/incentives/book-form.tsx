@@ -29,8 +29,6 @@ import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { calculateBookIncentive } from '@/app/incentive-calculation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Badge } from '../ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -205,7 +203,6 @@ export function BookForm() {
   const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
-  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 
   const form = useForm<BookFormValues>({
     resolver: zodResolver(bookSchema),
@@ -442,9 +439,8 @@ export function BookForm() {
         
         const res = await fetch(url);
         const result = await res.json();
-        if (result.success && result.users) {
+        if (result.success && Array.isArray(result.users)) {
             setFoundCoPis(result.users);
-            setIsSelectionOpen(true);
         } else {
             setFoundCoPis([]);
         }
@@ -483,7 +479,6 @@ export function BookForm() {
     }
     setCoPiSearchTerm('');
     setFoundCoPis([]);
-    setIsSelectionOpen(false);
   };
   
     const addExternalAuthor = () => {
@@ -608,27 +603,29 @@ export function BookForm() {
                     <Separator className="my-4" />
 
                     <div className="space-y-2 p-3 border rounded-md">
-                        <FormLabel>Add Internal Co-Author</FormLabel>
+                        <FormLabel className="text-sm">Add Internal Co-Author</FormLabel>
                         <div className="relative">
-                            <Input placeholder="Search by Co-Author's Name or MIS ID" value={coPiSearchTerm} onChange={(e) => {
-                                setCoPiSearchTerm(e.target.value);
-                                handleSearchCoPi(e.target.value);
-                            }} />
-                            {isSearching && <Loader2 className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 animate-spin" />}
-                            {isSelectionOpen && foundCoPis.length > 0 && (
-                                <div className="absolute z-10 w-full border rounded-md bg-white shadow-md mt-1 max-h-48 overflow-y-auto">
-                                    {foundCoPis.map((user: any) => (
-                                        <div key={user.id || user.misId} onClick={() => {
-                                            handleAddCoPi(user);
-                                            setCoPiSearchTerm('');
-                                            setIsSelectionOpen(false);
-                                        }} className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm">
-                                            {user.name} {user.misId ? `(${user.misId})` : ''}
+                            <Input
+                                placeholder="Search by Co-Author's Name or MIS ID"
+                                value={coPiSearchTerm}
+                                onChange={(e) => {
+                                    setCoPiSearchTerm(e.target.value);
+                                    handleSearchCoPi(e.target.value);
+                                }}
+                            />
+                            {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />}
+                        </div>
+                        {foundCoPis.length > 0 && (
+                            <div className="relative">
+                                <div className="absolute w-full bg-background border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto">
+                                    {foundCoPis.map((coPi: any) => (
+                                        <div key={coPi.uid || coPi.email || coPi.misId} className="p-2 hover:bg-muted cursor-pointer" onClick={() => handleAddCoPi(coPi)}>
+                                            {coPi.name} ({coPi.misId})
                                         </div>
                                     ))}
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </div>
                     <div className="space-y-2 p-3 border rounded-md">
                         <FormLabel className="text-sm">Add External Co-Author</FormLabel>
@@ -703,28 +700,6 @@ export function BookForm() {
         </form>
       </Form>
     </Card>
-    <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Multiple Users Found</DialogTitle>
-                <DialogDescription>
-                    Please select the correct user to add.
-                </DialogDescription>
-            </DialogHeader>
-            <RadioGroup onValueChange={(value) => handleAddCoPi(JSON.parse(value))} className="py-4 space-y-2">
-                {foundCoPis.map((u, i) => (
-                    <div key={i} className="flex items-center space-x-2 border rounded-md p-3">
-                        <RadioGroupItem value={JSON.stringify(u)} id={`user-${i}`} />
-                        <Label htmlFor={`user-${i}`} className="flex flex-col">
-                            <span className="font-semibold">{u.name}</span>
-                            <span className="text-muted-foreground text-xs">{u.email}</span>
-                            <span className="text-muted-foreground text-xs">{u.campus}</span>
-                        </Label>
-                    </div>
-                ))}
-            </RadioGroup>
-        </DialogContent>
-    </Dialog>
     </>
   );
 }
