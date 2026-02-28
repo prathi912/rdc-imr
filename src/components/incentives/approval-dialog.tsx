@@ -39,7 +39,7 @@ interface ApprovalDialogProps {
 }
 
 const verifiedFieldsSchema = z.record(z.string(), z.boolean()).optional();
-const suggestionsSchema = z.record(z.string(), z.string().optional()).optional();
+const suggestionsSchema = z.record(z.string(), z.string()).optional();
 
 const createApprovalSchema = (stageIndex: number, claimType?: string) => {
     const isChecklistEnabled = (claimType === 'Research Papers' && (stageIndex === 0 || stageIndex === 1)) || (claimType === 'Conference Presentations' && stageIndex === 0);
@@ -94,6 +94,20 @@ const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'des
     { id: 'publicationProofUrls', label: 'PROOF OF PUBLICATION ATTACHED' },
     { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
     { id: 'publicationMonth', label: 'Published Month & Year' },
+];
+
+const additionalResearchPaperFieldsForFinalReview: { id: keyof IncentiveClaim | 'authorsSummary'; label: string }[] = [
+    { id: 'paperTitle', label: 'Title of Paper' },
+    { id: 'doi', label: 'DOI' },
+    { id: 'relevantLink', label: 'Relevant Link' },
+    { id: 'journalWebsite', label: 'Journal Website' },
+    { id: 'scopusLink', label: 'Scopus Link' },
+    { id: 'wosLink', label: 'WoS Link' },
+    { id: 'sdgGoals', label: 'SDG Goals' },
+    { id: 'totalPuStudentAuthors', label: 'Total PU Student Authors' },
+    { id: 'puStudentNames', label: 'PU Student Names' },
+    { id: 'wasApcPaidByUniversity', label: 'APC Paid by University' },
+    { id: 'authorsSummary', label: 'All Authors (Role)' },
 ];
 
 const conferenceChecklistFields: { id: keyof IncentiveClaim | 'name' | 'designation', label: string }[] = [
@@ -257,20 +271,48 @@ function ResearchPaperClaimDetails({
     const approval1 = previousApprovals[0];
     const approval2 = previousApprovals[1];
 
-    const renderDetail = (field: {id: string, label: string}, value?: string | number | null | boolean | string[]) => {
+    const getDisplayValue = (field: {id: string, label: string}, value?: string | number | null | boolean | string[] | Author[]) => {
         if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return null;
-        
         let displayValue: React.ReactNode = String(value);
 
         if (typeof value === 'boolean') {
             displayValue = value ? 'Yes' : 'No';
+        } else if (typeof value === 'string' && /^https?:\/\//i.test(value)) {
+            displayValue = (
+                <Button asChild variant="link" size="sm" className="p-0 h-auto justify-start">
+                    <a href={value} target="_blank" rel="noopener noreferrer">Open Link</a>
+                </Button>
+            );
+        } else if (field.id === 'authorsSummary' && Array.isArray(value)) {
+            const authors = value as Author[];
+            displayValue = (
+                <div className="rounded-md border overflow-hidden">
+                    <table className="w-full text-xs">
+                        <thead className="bg-muted/60">
+                            <tr>
+                                <th className="text-left font-medium p-2">Author Name</th>
+                                <th className="text-left font-medium p-2">Role</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {authors.map((author, index) => (
+                                <tr key={`${author.email || author.name}-${index}`} className="border-t">
+                                    <td className="p-2">{author.name}</td>
+                                    <td className="p-2">{author.role}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            );
         } else if (Array.isArray(value)) {
              if (value.every(item => typeof item === 'string' && item.startsWith('https://'))) {
+                const links = value as string[];
                 displayValue = (
                     <div className="flex flex-col gap-1">
-                        {value.map((url, i) => (
+                        {links.map((url, i) => (
                              <Button key={i} asChild variant="link" size="sm" className="p-0 h-auto justify-start">
-                                <a href={url} target="_blank" rel="noopener noreferrer">View Document {value.length > 1 ? i + 1 : ''}</a>
+                                <a href={url} target="_blank" rel="noopener noreferrer">View Document {links.length > 1 ? i + 1 : ''}</a>
                             </Button>
                         ))}
                     </div>
@@ -279,6 +321,13 @@ function ResearchPaperClaimDetails({
                 displayValue = value.join(', ');
             }
         }
+
+        return displayValue;
+    };
+
+    const renderDetail = (field: {id: string, label: string}, value?: string | number | null | boolean | string[] | Author[]) => {
+        const displayValue = getDisplayValue(field, value);
+        if (displayValue === null) return null;
         
         const suggestion1 = approval1?.suggestions?.[field.id];
         const suggestion2 = approval2?.suggestions?.[field.id];
@@ -352,6 +401,18 @@ function ResearchPaperClaimDetails({
             </div>
         );
     };
+
+    const renderAdditionalDetail = (field: {id: string, label: string}, value?: string | number | null | boolean | string[] | Author[]) => {
+        const displayValue = getDisplayValue(field, value);
+        if (displayValue === null) return null;
+
+        return (
+            <div key={field.id} className="grid grid-cols-12 gap-3 text-sm items-start py-1.5">
+                <span className="text-muted-foreground col-span-4">{field.label}</span>
+                <div className="col-span-8 break-words">{displayValue}</div>
+            </div>
+        );
+    };
     
     const claimWithUserData = {
         ...claim,
@@ -359,6 +420,7 @@ function ResearchPaperClaimDetails({
         designation: `${claimant?.designation || 'N/A'}, ${claimant?.department || 'N/A'}`,
         authorRoleAndPosition: `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`,
         totalInternalAuthors: (claim.authors || []).filter(a => !a.isExternal).length,
+        authorsSummary: claim.authors || [],
     };
 
 
@@ -375,6 +437,15 @@ function ResearchPaperClaimDetails({
             <div className="space-y-1">
                  {allPossibleResearchPaperFields.map(field => renderDetail(field, (claimWithUserData as any)[field.id]))}
             </div>
+            {!isChecklistEnabled && (
+                <>
+                    <Separator />
+                    <div className="space-y-1">
+                        <h5 className="text-sm font-semibold">Additional Research Paper Details</h5>
+                        {additionalResearchPaperFieldsForFinalReview.map(field => renderAdditionalDetail(field, (claimWithUserData as any)[field.id]))}
+                    </div>
+                </>
+            )}
             {isChecklistEnabled && <FormMessage>{form.formState.errors.verifiedFields?.message}</FormMessage>}
         </div>
     );
@@ -526,8 +597,10 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
     const previousApprovals = (claim.approvals || []).filter(a => a?.stage < stageIndex + 1);
     
-    const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
-    const hasProfileLink = claimant && claimant.misId;
+        const hasProfileLink = !!claimant?.misId;
+        const profileLink = hasProfileLink
+            ? (claimant?.campus === 'Goa' ? `/goa/${claimant?.misId}` : `/profile/${claimant?.misId}`)
+            : '#';
     const isViewerAdminOrApprover =
       approver?.role === 'Super-admin' ||
       approver?.role === 'admin' ||
