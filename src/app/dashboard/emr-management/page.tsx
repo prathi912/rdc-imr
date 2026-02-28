@@ -111,11 +111,11 @@ function EmrLogsTab({ user }: { user: User | null }) {
     }, [logs, searchTerm, users, calls]);
 
     const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
-    const paginatedLogs = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return filteredLogs.slice(startIndex, endIndex);
-    }, [filteredLogs, currentPage]);
+    
+    const paginatedLogs = filteredLogs.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
 
     useEffect(() => {
         setCurrentPage(1);
@@ -346,11 +346,11 @@ export default function EmrManagementOverviewPage() {
     }, [calls, interests, searchTerm]);
 
     const totalCallPages = Math.ceil(filteredCalls.length / itemsPerPage);
-    const paginatedCalls = useMemo(() => {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = startIndex + itemsPerPage;
-        return filteredCalls.slice(startIndex, endIndex);
-    }, [filteredCalls, currentPage]);
+    
+    const paginatedCalls = filteredCalls.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
 
     useEffect(() => {
         setCurrentPage(1);

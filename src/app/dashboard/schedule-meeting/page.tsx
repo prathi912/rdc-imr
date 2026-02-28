@@ -483,7 +483,7 @@ export default function ScheduleMeetingPage() {
     return Math.ceil(dataForTab.length / itemsPerPage);
   }, [projectsForCurrentTab, activeTab, filteredHistory]);
 
-  const paginatedProjects = useMemo(() => {
+  const paginatedProjects = (() => {
     let dataForTab = projectsForCurrentTab;
     if (activeTab === 'history') {
       dataForTab = filteredHistory;
@@ -491,7 +491,7 @@ export default function ScheduleMeetingPage() {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return dataForTab.slice(startIndex, endIndex);
-  }, [projectsForCurrentTab, activeTab, filteredHistory, currentPage]);
+  })();
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {

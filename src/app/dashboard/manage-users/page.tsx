@@ -326,6 +326,8 @@ export default function ManageUsersPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'name', direction: 'ascending' });
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -423,6 +425,13 @@ export default function ManageUsersPage() {
 
     return filtered;
   }, [usersWithClaims, searchTerm, roleFilter, sortConfig]);
+
+  const totalPages = Math.ceil(sortedAndFilteredUsers.length / itemsPerPage);
+
+  const paginatedUsers = sortedAndFilteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const requestSort = (key: SortableKeys) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -526,10 +535,10 @@ export default function ManageUsersPage() {
           <Input
               placeholder="Filter by name or email..."
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              onChange={(event) => {setSearchTerm(event.target.value); setCurrentPage(1);}}
               className="w-full sm:max-w-xs"
           />
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
+          <Select value={roleFilter} onValueChange={(value) => {setRoleFilter(value); setCurrentPage(1);}}>
               <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
@@ -554,7 +563,7 @@ export default function ManageUsersPage() {
                         checked={isAllSelected}
                         onCheckedChange={(checked) => {
                           if (checked) {
-                            setSelectedUsers(sortedAndFilteredUsers.map(u => u.uid));
+                            setSelectedUsers(paginatedUsers.map(u => u.uid));
                           } else {
                             setSelectedUsers([]);
                           }
@@ -587,7 +596,7 @@ export default function ManageUsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedAndFilteredUsers.map((user) => {
+                  {paginatedUsers.map((user) => {
                     const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
                     const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
                     const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
@@ -712,7 +721,7 @@ export default function ManageUsersPage() {
             </div>
             
             <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
-              {sortedAndFilteredUsers.map(user => {
+              {paginatedUsers.map(user => {
                 const isPrimarySuperAdmin = user.email === PRIMARY_SUPER_ADMIN_EMAIL;
                 const isCurrentUserLoggedIn = user.uid === currentUser?.uid;
                 const isActionsDisabled = isCurrentUserLoggedIn || (isPrimarySuperAdmin && currentUser?.email !== PRIMARY_SUPER_ADMIN_EMAIL);
@@ -804,6 +813,35 @@ export default function ManageUsersPage() {
                 );
               })}
             </div>
+            
+            {sortedAndFilteredUsers.length > itemsPerPage && (
+              <div className="flex items-center justify-between pt-6">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, sortedAndFilteredUsers.length)} of {sortedAndFilteredUsers.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <div className="text-sm">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
            {selectedUsers.length > 0 && isCurrentUserSuperAdmin && (
               <CardFooter className="p-4 border-t sticky bottom-0 bg-background/95">

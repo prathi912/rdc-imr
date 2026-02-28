@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Eye, ArrowUpDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { ApprovalDialog } from '@/components/incentives/approval-dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -40,6 +41,7 @@ export default function IncentiveApprovalsPage() {
     const [instituteFilter, setInstituteFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
     const [activeTab, setActiveTab] = useState('pending');
+    const [selectedClaimIds, setSelectedClaimIds] = useState<Set<string>>(new Set());
 
     const fetchClaimsAndUsers = useCallback(async (currentUser: User, stage: number) => {
         setLoading(true);
@@ -200,10 +202,26 @@ export default function IncentiveApprovalsPage() {
         )
     }
 
-    const renderTable = (claimsList: IncentiveClaim[], isHistory = false) => (
+    const renderTable = (claimsList: IncentiveClaim[], isHistory = false) => {
+        const allSelected = claimsList.length > 0 && claimsList.every(claim => selectedClaimIds.has(claim.id));
+        return (
       <div className="hidden md:block">
         <Table>
             <TableHeader><TableRow>
+                <TableHead className="w-12">
+                    <Checkbox 
+                        checked={allSelected}
+                        onCheckedChange={(checked) => {
+                            if (checked) {
+                                setSelectedClaimIds(new Set([...selectedClaimIds, ...claimsList.map(c => c.id)]));
+                            } else {
+                                const newSet = new Set(selectedClaimIds);
+                                claimsList.forEach(c => newSet.delete(c.id));
+                                setSelectedClaimIds(newSet);
+                            }
+                        }}
+                    />
+                </TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('userName')}>Claimant <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('paperTitle')}>Title <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
                 <TableHead><Button variant="ghost" onClick={() => requestSort('claimType')}>Claim Type <ArrowUpDown className="ml-2 h-4 w-4" /></Button></TableHead>
@@ -220,6 +238,20 @@ export default function IncentiveApprovalsPage() {
                     const myApproval = isHistory ? claim.approvals?.find(a => a?.approverUid === user?.uid) : null;
                     return (
                         <TableRow key={claim.id}>
+                            <TableCell className="w-12">
+                                <Checkbox 
+                                    checked={selectedClaimIds.has(claim.id)}
+                                    onCheckedChange={(checked) => {
+                                        const newSet = new Set(selectedClaimIds);
+                                        if (checked) {
+                                            newSet.add(claim.id);
+                                        } else {
+                                            newSet.delete(claim.id);
+                                        }
+                                        setSelectedClaimIds(newSet);
+                                    }}
+                                />
+                            </TableCell>
                             <TableCell>
                                 {hasProfileLink ? (
                                     <Link href={profileLink} target="_blank" className="text-primary hover:underline">
@@ -251,7 +283,8 @@ export default function IncentiveApprovalsPage() {
             </TableBody>
         </Table>
       </div>
-    );
+        )
+    };
 
     const renderCards = (claimsList: IncentiveClaim[], isHistory = false) => (
       <div className="grid md:hidden grid-cols-1 sm:grid-cols-2 gap-4">
@@ -329,39 +362,50 @@ export default function IncentiveApprovalsPage() {
                         onChange={(event) => setSearchTerm(event.target.value)}
                         className="w-full sm:max-w-sm"
                     />
-                    <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
-                        <SelectTrigger className="w-full sm:w-[240px]">
-                            <SelectValue placeholder="Filter by claim type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Claim Types</SelectItem>
-                            {CLAIM_TYPES.map(type => (
-                                <SelectItem key={type} value={type}>{type}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={facultyFilter} onValueChange={setFacultyFilter}>
-                        <SelectTrigger className="w-full sm:w-[200px]">
-                            <SelectValue placeholder="Filter by faculty" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Faculties</SelectItem>
-                            {uniqueFaculties.map(faculty => (
-                                <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={instituteFilter} onValueChange={setInstituteFilter}>
-                        <SelectTrigger className="w-full sm:w-[200px]">
-                            <SelectValue placeholder="Filter by institute" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All Institutes</SelectItem>
-                            {uniqueInstitutes.map(institute => (
-                                <SelectItem key={institute} value={institute}>{institute}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    {selectedClaimIds.size === 0 && (
+                        <>
+                            <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
+                                <SelectTrigger className="w-full sm:w-[200px]">
+                                    <SelectValue placeholder="Filter by claim type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Claim Types</SelectItem>
+                                    {CLAIM_TYPES.map(type => (
+                                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                                <SelectTrigger className="w-full sm:w-[200px]">
+                                    <SelectValue placeholder="Filter by faculty" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Faculties</SelectItem>
+                                    {uniqueFaculties.map(faculty => (
+                                        <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Select value={instituteFilter} onValueChange={setInstituteFilter}>
+                                <SelectTrigger className="w-full sm:w-[200px]">
+                                    <SelectValue placeholder="Filter by institute" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Institutes</SelectItem>
+                                    {uniqueInstitutes.map(institute => (
+                                        <SelectItem key={institute} value={institute}>{institute}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </>
+                    )}
+                    {selectedClaimIds.size > 0 && (
+                        <Button variant="outline" onClick={() => {
+                            setSelectedClaimIds(new Set());
+                        }}>
+                            Deselect All
+                        </Button>
+                    )}
                 </div>
                 <div className="mt-4">
                      <Tabs defaultValue="pending" value={activeTab} onValueChange={setActiveTab}>

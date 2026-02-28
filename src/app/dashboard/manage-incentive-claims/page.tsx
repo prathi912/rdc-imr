@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { generateOfficeNotingsZip } from '@/app/document-actions';
-import { markPaymentsCompleted, submitToAccounts, generateIncentivePaymentSheet } from '@/app/manage-claims-actions';
+import { markPaymentsCompleted, submitToAccounts, generateIncentivePaymentSheet, downloadPaymentSheetByRef } from '@/app/manage-claims-actions';
 import { ClaimDetailsDialog } from '@/components/incentives/claim-details-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -67,6 +68,7 @@ export default function ManageIncentiveClaimsPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDownloadingNotings, setIsDownloadingNotings] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedPaymentSheetRef, setSelectedPaymentSheetRef] = useState<string>('');
   const itemsPerPage = 30;
 
   useEffect(() => {
@@ -170,13 +172,15 @@ export default function ManageIncentiveClaimsPage() {
   
   const tabClaims = useMemo(() => {
     const pending = filteredClaims.filter(claim => ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval'].includes(claim.status));
-    const pendingBank = filteredClaims.filter(claim => ['Accepted', 'Submitted to Accounts'].includes(claim.status));
+    const pendingBank = filteredClaims.filter(claim => claim.status === 'Accepted');
+    const submittedBank = filteredClaims.filter(claim => claim.status === 'Submitted to Accounts' && claim.paymentSheetRef);
     const approved = filteredClaims.filter(claim => claim.status === 'Payment Completed');
     const rejected = filteredClaims.filter(claim => claim.status === 'Rejected');
     
     return {
         pending,
         'pending-bank': pendingBank,
+        'submitted-bank': submittedBank,
         approved,
         rejected
     };
@@ -184,6 +188,11 @@ export default function ManageIncentiveClaimsPage() {
 
   const sortedAndFilteredClaims = useMemo(() => {
     let claimsForTab = tabClaims[activeTab as keyof typeof tabClaims] || [];
+    
+    // Filter by payment sheet ref if in submitted-bank tab
+    if (activeTab === 'submitted-bank' && selectedPaymentSheetRef) {
+      claimsForTab = claimsForTab.filter(claim => claim.paymentSheetRef === selectedPaymentSheetRef);
+    }
     
     claimsForTab.sort((a, b) => {
         const key = sortConfig.key as keyof IncentiveClaim;
@@ -199,18 +208,25 @@ export default function ManageIncentiveClaimsPage() {
     });
 
     return claimsForTab;
-  }, [tabClaims, activeTab, sortConfig]);
+  }, [tabClaims, activeTab, sortConfig, selectedPaymentSheetRef]);
 
   const totalPages = Math.ceil(sortedAndFilteredClaims.length / itemsPerPage);
-  const paginatedClaims = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return sortedAndFilteredClaims.slice(startIndex, endIndex);
-  }, [sortedAndFilteredClaims, currentPage]);
+  
+  const uniquePaymentSheetRefs = useMemo(() => {
+    const submittedBankClaims = tabClaims['submitted-bank'] || [];
+    const refs = Array.from(new Set(submittedBankClaims.map(claim => claim.paymentSheetRef).filter(Boolean) as string[]));
+    return refs;
+  }, [tabClaims]);
+  
+  const paginatedClaims = sortedAndFilteredClaims.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
   
   useEffect(() => {
     setSelectedClaims([]);
     setCurrentPage(1);
+    setSelectedPaymentSheetRef('');
   }, [activeTab, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, sortConfig]);
 
   const requestSort = (key: SortableKeys) => {
@@ -295,6 +311,36 @@ export default function ManageIncentiveClaimsPage() {
     }
   };
 
+  const handleDownloadPaymentSheet = async (paymentSheetRef: string) => {
+    setIsUpdating(true);
+    try {
+      const result = await downloadPaymentSheetByRef(paymentSheetRef);
+      if (result.success && result.fileData) {
+        const binaryString = atob(result.fileData);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Payment_Sheet_${paymentSheetRef}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast({ title: 'Success', description: 'Payment sheet downloaded successfully.' });
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.error || 'Failed to download payment sheet.' });
+      }
+    } catch (error) {
+      console.error('Error downloading payment sheet:', error);
+      toast({ variant: 'destructive', title: 'Error', description: 'Failed to download payment sheet.' });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleExport = () => {
     if (sortedAndFilteredClaims.length === 0) {
@@ -404,14 +450,33 @@ export default function ManageIncentiveClaimsPage() {
                         }}
                     />
                 </TableCell>
-                <TableCell className="font-medium">
+                <TableCell className="font-medium max-w-xs">
                     <div className="flex flex-col">
-                        <span>{claim.userName}</span>
+                        {(() => {
+                            const claimUser = users.find(u => u.uid === claim.uid);
+                            const profileLink = claimUser?.campus === 'Goa' ? `/goa/${claimUser.misId}` : `/profile/${claimUser?.misId}`;
+                            const hasProfileLink = claimUser && claimUser.misId;
+                            
+                            return hasProfileLink ? (
+                                <Link href={profileLink} target="_blank" className="text-primary hover:underline break-words">
+                                    {claim.userName}
+                                </Link>
+                            ) : (
+                                <span className="break-words">{claim.userName}</span>
+                            );
+                        })()}
                         {claim.claimId && <span className="text-xs text-muted-foreground">{claim.claimId}</span>}
                     </div>
                 </TableCell>
                 <TableCell className="max-w-xs whitespace-normal break-words">{getClaimTitle(claim)}</TableCell>
-                <TableCell className="hidden md:table-cell"><Badge variant="outline">{claim.claimType}</Badge></TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <div className="flex flex-col gap-1">
+                    <Badge variant="outline">{claim.claimType}</Badge>
+                    {activeTab === 'submitted-bank' && claim.paymentSheetRef && (
+                      <span className="text-xs text-muted-foreground">{claim.paymentSheetRef}</span>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell>{new Date(claim.submissionDate).toLocaleDateString()}</TableCell>
                 <TableCell>
                   <Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' || claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
@@ -424,7 +489,7 @@ export default function ManageIncentiveClaimsPage() {
                   )}
                 </TableCell>
                 {activeTab === 'rejected' && <TableCell>{lastRejectedApproval ? `Stage ${lastRejectedApproval.stage}` : 'N/A'}</TableCell>}
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-2 flex justify-end">
                     <Button variant="outline" size="sm" onClick={() => setSelectedClaim(claim)}>View Details</Button>
                 </TableCell>
               </TableRow>
@@ -496,39 +561,48 @@ export default function ManageIncentiveClaimsPage() {
                   onChange={(event) => setSearchTerm(event.target.value)}
                   className="max-w-sm"
               />
-              <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
-                  <SelectTrigger className="w-[240px]">
-                      <SelectValue placeholder="Filter by claim type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="all">All Claim Types</SelectItem>
-                      {CLAIM_TYPES.map(type => (
-                          <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                  </SelectContent>
-              </Select>
-              <Select value={facultyFilter} onValueChange={setFacultyFilter}>
-                  <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filter by faculty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="all">All Faculties</SelectItem>
-                      {uniqueFaculties.map(faculty => (
-                          <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
-                      ))}
-                  </SelectContent>
-              </Select>
-              <Select value={instituteFilter} onValueChange={setInstituteFilter}>
-                  <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filter by institute" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="all">All Institutes</SelectItem>
-                      {uniqueInstitutes.map(institute => (
-                          <SelectItem key={institute} value={institute}>{institute}</SelectItem>
-                      ))}
-                  </SelectContent>
-              </Select>
+              {selectedClaims.length === 0 && (
+                <>
+                  <Select value={claimTypeFilter} onValueChange={setClaimTypeFilter}>
+                      <SelectTrigger className="w-[240px]">
+                          <SelectValue placeholder="Filter by claim type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">All Claim Types</SelectItem>
+                          {CLAIM_TYPES.map(type => (
+                              <SelectItem key={type} value={type}>{type}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                      <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Filter by faculty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">All Faculties</SelectItem>
+                          {uniqueFaculties.map(faculty => (
+                              <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                  <Select value={instituteFilter} onValueChange={setInstituteFilter}>
+                      <SelectTrigger className="w-[200px]">
+                          <SelectValue placeholder="Filter by institute" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="all">All Institutes</SelectItem>
+                          {uniqueInstitutes.map(institute => (
+                              <SelectItem key={institute} value={institute}>{institute}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+                </>
+              )}
+              {selectedClaims.length > 0 && (
+                <Button variant="outline" onClick={() => setSelectedClaims([])}>
+                  Deselect All ({selectedClaims.length})
+                </Button>
+              )}
             </div>
             {activeTab === 'pending-bank' && selectedClaims.length > 0 && (
                 <div className="flex items-center gap-2">
@@ -543,25 +617,61 @@ export default function ManageIncentiveClaimsPage() {
                         {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Submit to Accounts
                     </Button>
+                </div>
+            )}
+            {activeTab === 'submitted-bank' && selectedClaims.length > 0 && (
+                <div className="flex items-center gap-2">
                     <Button onClick={handleMarkPaymentCompleted} disabled={isUpdating || !eligibleForPaymentSheet.every(c => c.status === 'Submitted to Accounts') || eligibleForPaymentSheet.length === 0}>
                         {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Mark as Payment Completed
                     </Button>
                 </div>
             )}
+            {activeTab === 'submitted-bank' && selectedPaymentSheetRef && (
+                <div className="flex items-center gap-2">
+                    <Button onClick={() => handleDownloadPaymentSheet(selectedPaymentSheetRef)} disabled={isUpdating}>
+                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Download Payment Sheet
+                    </Button>
+                </div>
+            )}
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="pending">Pending ({tabClaims.pending.length})</TabsTrigger>
                 <TabsTrigger value="pending-bank">Pending for Bank ({tabClaims['pending-bank'].length})</TabsTrigger>
+                <TabsTrigger value="submitted-bank">Submitted to Bank ({tabClaims['submitted-bank'].length})</TabsTrigger>
                 <TabsTrigger value="approved">Approved ({tabClaims.approved.length})</TabsTrigger>
                 <TabsTrigger value="rejected">Rejected ({tabClaims.rejected.length})</TabsTrigger>
             </TabsList>
             <Card className="mt-4">
               <CardContent className="pt-6">
+                {activeTab === 'submitted-bank' && (
+                  <div className="mb-6">
+                    <Label htmlFor="payment-sheet-ref" className="mb-2 block">Select Payment Sheet Reference Number</Label>
+                    <Select value={selectedPaymentSheetRef} onValueChange={setSelectedPaymentSheetRef}>
+                      <SelectTrigger id="payment-sheet-ref" className="w-full md:w-[300px]">
+                        <SelectValue placeholder="Choose a payment sheet..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {uniquePaymentSheetRefs.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">No payment sheets available</div>
+                        ) : (
+                          uniquePaymentSheetRefs.map(ref => (
+                            <SelectItem key={ref} value={ref}>{ref}</SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                  {loading ? (
                     <div className="space-y-4">
                         {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                    </div>
+                 ) : activeTab === 'submitted-bank' && !selectedPaymentSheetRef && !searchTerm ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                        <p>Please select a payment sheet reference number to view claims.</p>
                     </div>
                  ) : sortedAndFilteredClaims.length > 0 ? (
                     renderTable()

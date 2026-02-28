@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from "@/components/ui/card";
 import { Bell, FileCheck2, GanttChartSquare, Loader2, Check, X, CalendarClock } from "lucide-react";
@@ -29,6 +29,8 @@ export default function NotificationsPage() {
   const { toast } = useToast();
   const [managingRequest, setManagingRequest] = useState<{ notification: NotificationType, paper: ResearchPaper } | null>(null);
   const [requestToReject, setRequestToReject] = useState<NotificationType | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
   
   // State for the acceptance dialog
   const [assignedRole, setAssignedRole] = useState<Author['role'] | ''>('');
@@ -150,6 +152,13 @@ export default function NotificationsPage() {
     }
   };
 
+  const paginatedNotifications = notifications.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(notifications.length / itemsPerPage);
+
   const getAvailableRolesForMainAuthor = (paper?: ResearchPaper, requesterAssignedRole?: Author['role']): Author['role'][] => {
     if (!paper || !requesterAssignedRole) return AUTHOR_ROLES;
     const myCurrentRole = paper.authors.find(a => a.uid === user?.uid)?.role;
@@ -215,7 +224,7 @@ export default function NotificationsPage() {
                   </div>
               ) : (
                  <div className="space-y-4">
-                  {notifications.map((notification) => {
+                  {paginatedNotifications.map((notification) => {
                     const Icon = getIcon(notification.title);
                     const link = getNotificationLink(notification);
                     
@@ -231,14 +240,14 @@ export default function NotificationsPage() {
                     const ActionButtons = () => (
                       <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
                         {!notification.isRead && notification.type !== 'coAuthorRequest' && (
-                          <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleMarkAsRead(notification.id); }}>
+                          <Button variant="ghost" size="sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleMarkAsRead(notification.id); }}>
                               Mark as read
                           </Button>
                         )}
                         {!notification.isRead && notification.type === 'coAuthorRequest' && (
                            <>
-                             <Button size="sm" onClick={(e) => { e.stopPropagation(); handleOpenAcceptDialog(notification); }}><Check className="h-4 w-4 mr-2"/>Accept</Button>
-                             <Button size="sm" variant="destructive" onClick={(e) => { e.stopPropagation(); setRequestToReject(notification); }}><X className="h-4 w-4 mr-2"/>Reject</Button>
+                             <Button size="sm" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpenAcceptDialog(notification); }}><Check className="h-4 w-4 mr-2"/>Accept</Button>
+                             <Button size="sm" variant="destructive" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRequestToReject(notification); }}><X className="h-4 w-4 mr-2"/>Reject</Button>
                            </>
                         )}
                       </div>
@@ -254,22 +263,48 @@ export default function NotificationsPage() {
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary mt-1 flex-shrink-0">
                           <Icon className="h-5 w-5" />
                         </div>
-                        {link && notification.type !== 'coAuthorRequest' ? (
-                            <Link href={link} className="flex-1 min-w-0" onClick={() => handleMarkAsRead(notification.id)}>
-                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                                  <NotificationContent />
-                                  <ActionButtons />
-                                </div>
-                            </Link>
-                        ) : (
-                           <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 flex-1 min-w-0">
+                          {link && notification.type !== 'coAuthorRequest' ? (
+                              <Link href={link} className="flex-1 min-w-0" onClick={() => handleMarkAsRead(notification.id)}>
+                                <NotificationContent />
+                              </Link>
+                          ) : (
                               <NotificationContent />
-                              <ActionButtons />
-                           </div>
-                        )}
+                          )}
+                          <ActionButtons />
+                        </div>
                       </div>
                     );
                   })}
+                </div>
+              )}
+              
+              {notifications.length > itemsPerPage && (
+                <div className="flex items-center justify-between pt-6">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, notifications.length)} of {notifications.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <div className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>

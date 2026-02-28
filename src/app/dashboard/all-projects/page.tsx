@@ -430,6 +430,9 @@ export default function AllProjectsPage() {
   const [campusFilter, setCampusFilter] = useState(searchParams.get('campus') || 'all');
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'imr');
   const [isAddEmrDialogOpen, setIsAddEmrDialogOpen] = useState(false);
+  const [currentPageImr, setCurrentPageImr] = useState(1);
+  const [currentPageEmr, setCurrentPageEmr] = useState(1);
+  const itemsPerPage = 30;
 
   const isMobile = useIsMobile();
 
@@ -531,6 +534,8 @@ export default function AllProjectsPage() {
   useEffect(() => {
       setSelectedExportColumns(activeTab === 'imr' ? IMR_EXPORT_COLUMNS.map(c => c.id) : EMR_EXPORT_COLUMNS.map(c => c.id));
       updateUrlParams({ tab: activeTab });
+      setCurrentPageImr(1);
+      setCurrentPageEmr(1);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -576,6 +581,13 @@ export default function AllProjectsPage() {
       );
     });
   }, [allImrProjects, searchTerm, statusFilter, facultyFilter, campusFilter]);
+
+  const totalPagesImr = Math.ceil(filteredImrProjects.length / itemsPerPage);
+  
+  const paginatedImrProjects = filteredImrProjects.slice(
+    (currentPageImr - 1) * itemsPerPage,
+    currentPageImr * itemsPerPage
+  );
   
   const filteredEmrProjects = useMemo(() => {
       return allEmrProjects.filter(project => {
@@ -587,6 +599,13 @@ export default function AllProjectsPage() {
           return title.toLowerCase().includes(lowerCaseSearch) || project.userName.toLowerCase().includes(lowerCaseSearch) || (project.agency || '').toLowerCase().includes(lowerCaseSearch);
       })
   }, [allEmrProjects, searchTerm, facultyFilter, campusFilter]);
+
+  const totalPagesEmr = Math.ceil(filteredEmrProjects.length / itemsPerPage);
+  
+  const paginatedEmrProjects = filteredEmrProjects.slice(
+    (currentPageEmr - 1) * itemsPerPage,
+    currentPageEmr * itemsPerPage
+  );
 
   let pageTitle = "All Projects";
   let pageDescription = "Browse and manage all projects in the system.";
@@ -773,72 +792,166 @@ export default function AllProjectsPage() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList><TabsTrigger value="imr">IMR Projects</TabsTrigger><TabsTrigger value="emr">EMR Projects</TabsTrigger></TabsList>
                 <TabsContent value="imr" className="mt-4">
-                    {loading ? <Skeleton className="h-64 w-full" /> : <ProjectList projects={filteredImrProjects} currentUser={user!} allUsers={users} />}
+                    {loading ? <Skeleton className="h-64 w-full" /> : (
+                        <>
+                            <ProjectList projects={paginatedImrProjects} currentUser={user!} allUsers={users} />
+                            {filteredImrProjects.length > itemsPerPage && (
+                                <div className="flex items-center justify-between pt-6">
+                                    <div className="text-sm text-muted-foreground">
+                                        Showing {((currentPageImr - 1) * itemsPerPage) + 1} to {Math.min(currentPageImr * itemsPerPage, filteredImrProjects.length)} of {filteredImrProjects.length}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPageImr(prev => Math.max(prev - 1, 1))}
+                                            disabled={currentPageImr === 1}
+                                        >
+                                            Previous
+                                        </Button>
+                                        <div className="text-sm">
+                                            Page {currentPageImr} of {totalPagesImr}
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPageImr(prev => Math.min(prev + 1, totalPagesImr))}
+                                            disabled={currentPageImr === totalPagesImr}
+                                        >
+                                            Next
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </TabsContent>
                 <TabsContent value="emr" className="mt-4">
                      {loading ? <Skeleton className="h-64 w-full" /> : (
-                         <Card>
-                            <CardContent className="pt-6">
-                                <Table>
-                                    <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Sanction Date</TableHead><TableHead>Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
-                                    <TableBody>{filteredEmrProjects.map(p => {
-                                        const pi = users.find(u => u.uid === p.userId);
-                                        const proofLink = p.finalProofUrl || p.proofUrl;
-                                        return (
-                                        <TableRow key={p.id}>
-                                            <TableCell className="font-medium">
-                                                {proofLink ? (
-                                                    <a href={proofLink} target="_blank" rel="noopener noreferrer" className="hover:underline text-primary">
-                                                        {p.callTitle || 'N/A'}
-                                                    </a>
-                                                ) : (
-                                                    p.callTitle || 'N/A'
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                {pi?.misId ? (
-                                                    <Link href={`/profile/${pi.misId}`} className="hover:underline text-primary" target="_blank" rel="noopener noreferrer">
-                                                        {p.userName}
-                                                    </Link>
-                                                ) : p.userName}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-col text-xs">
-                                                    {(p.coPiDetails || []).map(copi => {
-                                                        const coPiUser = users.find(u => u.uid === copi.uid);
-                                                        return (
-                                                            <div key={copi.email}>
-                                                                {coPiUser?.misId ? (
-                                                                    <Link href={`/profile/${coPiUser.misId}`} className="hover:underline text-primary" target="_blank" rel="noopener noreferrer">
-                                                                        {copi.name}
-                                                                    </Link>
-                                                                ) : copi.name}
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{p.agency || 'N/A'}</TableCell>
-                                            <TableCell>{p.sanctionDate ? format(parseISO(p.sanctionDate), 'PPP') : 'N/A'}</TableCell>
-                                            <TableCell>{p.durationAmount || 'N/A'}</TableCell>
-                                            <TableCell className="flex items-center gap-2">
-                                                {isSuperAdmin && p.isBulkUploaded && (
-                                                    <Button variant="outline" size="sm" onClick={() => setProjectToEdit(p)}>
-                                                        <Edit className="h-4 w-4 mr-2" /> Edit
-                                                    </Button>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    )})}</TableBody>
-                                </Table>
-                            </CardContent>
-                         </Card>
+                         <>
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <Table>
+                                        <TableHeader><TableRow><TableHead>Project Title</TableHead><TableHead>PI</TableHead><TableHead>Co-PIs</TableHead><TableHead>Agency</TableHead><TableHead>Sanction Date</TableHead><TableHead>Amount</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+                                        <TableBody>{paginatedEmrProjects.map(p => {
+                                            const pi = users.find(u => u.uid === p.userId);
+                                            const proofLink = p.finalProofUrl || p.proofUrl;
+                                            return (
+                                            <TableRow key={p.id}>
+                                                <TableCell className="font-medium">
+                                                    {proofLink ? (
+                                                        <a href={proofLink} target="_blank" rel="noopener noreferrer" className="hover:underline text-primary">
+                                                            {p.callTitle || 'N/A'}
+                                                        </a>
+                                                    ) : (
+                                                        p.callTitle || 'N/A'
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {pi?.misId ? (
+                                                        <Link href={`/profile/${pi.misId}`} className="hover:underline text-primary" target="_blank" rel="noopener noreferrer">
+                                                            {p.userName}
+                                                        </Link>
+                                                    ) : p.userName}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-col text-xs">
+                                                        {(p.coPiDetails || []).map(copi => {
+                                                            const coPiUser = users.find(u => u.uid === copi.uid);
+                                                            return (
+                                                                <div key={copi.email}>
+                                                                    {coPiUser?.misId ? (
+                                                                        <Link href={`/profile/${coPiUser.misId}`} className="hover:underline text-primary" target="_blank" rel="noopener noreferrer">
+                                                                            {copi.name}
+                                                                        </Link>
+                                                                    ) : copi.name}
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>{p.agency || 'N/A'}</TableCell>
+                                                <TableCell>{p.sanctionDate ? format(parseISO(p.sanctionDate), 'PPP') : 'N/A'}</TableCell>
+                                                <TableCell>{p.durationAmount || 'N/A'}</TableCell>
+                                                <TableCell className="flex items-center gap-2">
+                                                    {isSuperAdmin && p.isBulkUploaded && (
+                                                        <Button variant="outline" size="sm" onClick={() => setProjectToEdit(p)}>
+                                                            <Edit className="h-4 w-4 mr-2" /> Edit
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        )})}</TableBody>
+                                    </Table>
+                                </CardContent>
+                            </Card>
+                            {filteredEmrProjects.length > itemsPerPage && (
+                                <div className="flex items-center justify-between pt-6">
+                                    <div className="text-sm text-muted-foreground">
+                                        Showing {((currentPageEmr - 1) * itemsPerPage) + 1} to {Math.min(currentPageEmr * itemsPerPage, filteredEmrProjects.length)} of {filteredEmrProjects.length}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPageEmr(prev => Math.max(prev - 1, 1))}
+                                            disabled={currentPageEmr === 1}
+                                        >
+                                            Previous
+                                        </Button>
+                                        <div className="text-sm">
+                                            Page {currentPageEmr} of {totalPagesEmr}
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPageEmr(prev => Math.min(prev + 1, totalPagesEmr))}
+                                            disabled={currentPageEmr === totalPagesEmr}
+                                        >
+                                            Next
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                         </>
                      )}
                 </TabsContent>
             </Tabs>
         ) : (
             <div className="mt-4">
-                {loading ? <Skeleton className="h-64 w-full" /> : <ProjectList projects={filteredImrProjects} currentUser={user!} allUsers={users} />}
+                {loading ? <Skeleton className="h-64 w-full" /> : (
+                    <>
+                        <ProjectList projects={paginatedImrProjects} currentUser={user!} allUsers={users} />
+                        {filteredImrProjects.length > itemsPerPage && (
+                            <div className="flex items-center justify-between pt-6">
+                                <div className="text-sm text-muted-foreground">
+                                    Showing {((currentPageImr - 1) * itemsPerPage) + 1} to {Math.min(currentPageImr * itemsPerPage, filteredImrProjects.length)} of {filteredImrProjects.length}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPageImr(prev => Math.max(prev - 1, 1))}
+                                        disabled={currentPageImr === 1}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <div className="text-sm">
+                                        Page {currentPageImr} of {totalPagesImr}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setCurrentPageImr(prev => Math.min(prev + 1, totalPagesImr))}
+                                        disabled={currentPageImr === totalPagesImr}
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
         )}
     </div>

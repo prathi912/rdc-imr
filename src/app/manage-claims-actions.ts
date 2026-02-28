@@ -147,6 +147,11 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
         skippedCount++;
             continue;
         }
+        if (!claim.paymentSheetRef) {
+            console.warn(`Skipping claim ${doc.id} for submission to accounts as payment sheet has not been generated.`);
+            skippedCount++;
+            continue;
+        }
         batch.update(doc.ref, { status: 'Submitted to Accounts' });
       processedCount++;
     }
@@ -289,5 +294,99 @@ export async function generateIncentivePaymentSheet(
     console.error('Error generating payment sheet:', error);
     await logActivity('ERROR', 'Failed to generate payment sheet', { error: error.message });
     return { success: false, error: error.message || 'Failed to generate the sheet.' };
+  }
+}
+
+export async function downloadPaymentSheetByRef(
+  paymentSheetRef: string
+): Promise<{ success: boolean; fileData?: string; error?: string }> {
+  try {
+    const { toWords } = await import('number-to-words');
+    
+    // Find all claims with this payment sheet reference
+    const claimsRef = adminDb.collection('incentiveClaims');
+    const q = claimsRef.where('paymentSheetRef', '==', paymentSheetRef);
+    const claimsSnapshot = await q.get();
+    const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
+
+    if (claims.length === 0) {
+      return { success: false, error: 'No claims found for this payment sheet reference.' };
+    }
+
+    const userIds = [...new Set(claims.map(c => c.uid))];
+    const usersRef = adminDb.collection('users');
+    const usersQuery = usersRef.where(FieldPath.documentId(), 'in', userIds);
+    const usersSnapshot = await usersQuery.get();
+    const usersMap = new Map(usersSnapshot.docs.map(doc => [doc.id, doc.data()]));
+
+    const settings = await getSystemSettings();
+    const templateUrl = settings.templateUrls?.INCENTIVE_PAYMENT_SHEET;
+
+    if (!templateUrl) {
+      return { success: false, error: 'Incentive Payment Sheet template URL is not configured.' };
+    }
+    
+    const { getTemplateContentFromUrl } = await import('@/lib/template-manager');
+    const templateContent = await getTemplateContentFromUrl(templateUrl);
+    if (!templateContent) {
+      return { success: false, error: 'Payment sheet template not found or could not be loaded.' };
+    }
+    
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(templateContent);
+    const worksheet = workbook.worksheets[0];
+
+    if (!worksheet) {
+      return { success: false, error: 'Could not find a worksheet in the template file.' };
+    }
+    
+    let totalAmount = 0;
+
+    const paymentData = claims.map((claim, index) => {
+      const user = usersMap.get(claim.uid);
+      const amount = claim.finalApprovedAmount || 0;
+      totalAmount += amount;
+      
+      return {
+        [`beneficiary_${index + 1}`]: user?.bankDetails?.beneficiaryName || user?.name || '',
+        [`account_${index + 1}`]: user?.bankDetails?.accountNumber || '',
+        [`ifsc_${index + 1}`]: user?.bankDetails?.ifscCode || '',
+        [`branch_${index + 1}`]: user?.bankDetails?.branchName || '',
+        [`amount_${index + 1}`]: amount,
+        [`college_${index + 1}`]: getInstituteAcronym(user?.institute),
+        [`mis_${index + 1}`]: user?.misId || '',
+        [`remarks_${index + 1}`]: claim.paymentSheetRemarks || '',
+      };
+    });
+
+    const flatData: { [key: string]: any } = paymentData.reduce((acc, item) => ({ ...acc, ...item }), {});
+    
+    flatData.date = format(new Date(), 'dd/MM/yyyy');
+    flatData.reference_number = paymentSheetRef;
+    flatData.total_amount = totalAmount;
+    flatData.amount_in_words = toWords(totalAmount).replace(/\b\w/g, (l: string) => l.toUpperCase()) + ' Only';
+
+    worksheet.eachRow((row) => {
+        row.eachCell((cell) => {
+            if (cell.value && typeof cell.value === 'string') {
+                const templateVarMatch = cell.value.match(/\{(.*?)\}/);
+                if (templateVarMatch && templateVarMatch[1]) {
+                    const key = templateVarMatch[1];
+                    const newValue = flatData[key] !== undefined ? flatData[key] : '';
+                    cell.value = newValue;
+                }
+            }
+        });
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+    
+    await logActivity('INFO', 'Downloaded incentive payment sheet', { paymentSheetRef, claimCount: claims.length });
+    return { success: true, fileData: base64 };
+  } catch (error: any) {
+    console.error('Error downloading payment sheet:', error);
+    await logActivity('ERROR', 'Failed to download payment sheet', { error: error.message });
+    return { success: false, error: error.message || 'Failed to download the sheet.' };
   }
 }
