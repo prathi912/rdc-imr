@@ -36,6 +36,8 @@ export default function IncentiveApprovalsPage() {
     const [isApprovalOpen, setIsApprovalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [claimTypeFilter, setClaimTypeFilter] = useState('all');
+    const [facultyFilter, setFacultyFilter] = useState('all');
+    const [instituteFilter, setInstituteFilter] = useState('all');
     const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
     const [activeTab, setActiveTab] = useState('pending');
 
@@ -118,10 +120,27 @@ export default function IncentiveApprovalsPage() {
     const getClaimTitle = (claim: IncentiveClaim) => {
         return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
     };
+
+    const uniqueFaculties = useMemo(() => {
+        const faculties = new Set([...pendingClaims, ...historyClaims].map(claim => claim.faculty).filter(Boolean));
+        return Array.from(faculties).sort();
+    }, [pendingClaims, historyClaims]);
+
+    const uniqueInstitutes = useMemo(() => {
+        const institutes = new Set(
+            allUsers.map(u => u.institute).filter(Boolean)
+        );
+        return Array.from(institutes).sort();
+    }, [allUsers]);
     
     const applyFiltersAndSort = useCallback((claims: IncentiveClaim[]) => {
         let filteredClaims = claims.filter(claim => {
             if (claimTypeFilter !== 'all' && claim.claimType !== claimTypeFilter) return false;
+            if (facultyFilter !== 'all' && claim.faculty !== facultyFilter) return false;
+            if (instituteFilter !== 'all') {
+                const claimUser = allUsers.find(u => u.uid === claim.uid);
+                if (claimUser?.institute !== instituteFilter) return false;
+            }
             if (!searchTerm) return true;
             const lowerCaseSearch = searchTerm.toLowerCase();
             return claim.userName.toLowerCase().includes(lowerCaseSearch) || 
@@ -151,7 +170,7 @@ export default function IncentiveApprovalsPage() {
         });
 
         return filteredClaims;
-    }, [claimTypeFilter, searchTerm, sortConfig]);
+    }, [claimTypeFilter, facultyFilter, instituteFilter, searchTerm, sortConfig, allUsers]);
 
     const filteredPendingClaims = useMemo(() => applyFiltersAndSort(pendingClaims), [pendingClaims, applyFiltersAndSort]);
     const filteredHistoryClaims = useMemo(() => applyFiltersAndSort(historyClaims), [historyClaims, applyFiltersAndSort]);
@@ -318,6 +337,28 @@ export default function IncentiveApprovalsPage() {
                             <SelectItem value="all">All Claim Types</SelectItem>
                             {CLAIM_TYPES.map(type => (
                                 <SelectItem key={type} value={type}>{type}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue placeholder="Filter by faculty" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Faculties</SelectItem>
+                            {uniqueFaculties.map(faculty => (
+                                <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={instituteFilter} onValueChange={setInstituteFilter}>
+                        <SelectTrigger className="w-full sm:w-[200px]">
+                            <SelectValue placeholder="Filter by institute" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Institutes</SelectItem>
+                            {uniqueInstitutes.map(institute => (
+                                <SelectItem key={institute} value={institute}>{institute}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

@@ -4,6 +4,7 @@
 
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, User } from '@/types';
+import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 import { sendEmail as sendEmailUtility } from "@/lib/email";
 import ExcelJS from 'exceljs';
 import { getSystemSettings } from './actions';
@@ -40,7 +41,7 @@ const EMAIL_STYLES = {
 };
 
 
-export async function markPaymentsCompleted(claimIds: string[]): Promise<{ success: boolean; error?: string }> {
+export async function markPaymentsCompleted(claimIds: string[]): Promise<{ success: boolean; error?: string; processedCount?: number; skippedCount?: number }> {
   if (!claimIds || claimIds.length === 0) {
     return { success: false, error: 'No claim IDs provided.' };
   }
@@ -51,11 +52,20 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
     
     const claimsQuery = await claimsRef.where(FieldPath.documentId(), 'in', claimIds).get();
     
+    let processedCount = 0;
+    let skippedCount = 0;
+
     for (const doc of claimsQuery.docs) {
       const claim = { id: doc.id, ...doc.data() } as IncentiveClaim;
+
+      if (!isEligibleForFinancialDisbursement(claim)) {
+        skippedCount++;
+        continue;
+      }
       
       if(claim.status !== 'Submitted to Accounts') {
           console.warn(`Skipping claim ${claim.id} for payment completion as its status is not 'Submitted to Accounts'.`);
+          skippedCount++;
           continue;
       }
       
@@ -97,12 +107,14 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
             from: 'default'
         });
       }
+
+      processedCount++;
     }
 
     await batch.commit();
     await logActivity('INFO', 'Marked incentive payments as completed', { claimIds, count: claimIds.length });
 
-    return { success: true };
+    return { success: true, processedCount, skippedCount };
   } catch (error: any) {
     console.error('Error marking payments as completed:', error);
     await logActivity('ERROR', 'Failed to mark payments as completed', { claimIds, error: error.message });
@@ -110,7 +122,7 @@ export async function markPaymentsCompleted(claimIds: string[]): Promise<{ succe
   }
 }
 
-export async function submitToAccounts(claimIds: string[]): Promise<{ success: boolean; error?: string }> {
+export async function submitToAccounts(claimIds: string[]): Promise<{ success: boolean; error?: string; processedCount?: number; skippedCount?: number }> {
   if (!claimIds || claimIds.length === 0) {
     return { success: false, error: 'No claim IDs provided.' };
   }
@@ -121,19 +133,28 @@ export async function submitToAccounts(claimIds: string[]): Promise<{ success: b
     
     const claimsQuery = await claimsRef.where(FieldPath.documentId(), 'in', claimIds).get();
     
+    let processedCount = 0;
+    let skippedCount = 0;
+
     for (const doc of claimsQuery.docs) {
         const claim = doc.data() as IncentiveClaim;
+      if (!isEligibleForFinancialDisbursement(claim)) {
+        skippedCount++;
+        continue;
+      }
         if(claim.status !== 'Accepted') {
             console.warn(`Skipping claim ${doc.id} for submission to accounts as its status is not 'Accepted'.`);
+        skippedCount++;
             continue;
         }
         batch.update(doc.ref, { status: 'Submitted to Accounts' });
+      processedCount++;
     }
 
     await batch.commit();
     await logActivity('INFO', 'Submitted claims to accounts', { claimIds, count: claimIds.length });
 
-    return { success: true };
+    return { success: true, processedCount, skippedCount };
   } catch (error: any) {
     console.error('Error submitting claims to accounts:', error);
     await logActivity('ERROR', 'Failed to submit claims to accounts', { claimIds, error: error.message });
@@ -172,7 +193,7 @@ export async function generateIncentivePaymentSheet(
   claimIds: string[],
   remarks: Record<string, string>,
   referenceNumber: string
-): Promise<{ success: boolean; fileData?: string; error?: string }> {
+): Promise<{ success: boolean; fileData?: string; error?: string; includedCount?: number; skippedCount?: number }> {
   try {
     const { toWords } = await import('number-to-words');
     
@@ -180,12 +201,14 @@ export async function generateIncentivePaymentSheet(
     const q = claimsRef.where(FieldPath.documentId(), 'in', claimIds);
     const claimsSnapshot = await q.get();
     const claims = claimsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncentiveClaim));
+    const payableClaims = claims.filter(isEligibleForFinancialDisbursement);
+    const skippedCount = claims.length - payableClaims.length;
 
-    if (claims.length === 0) {
+    if (payableClaims.length === 0) {
         return { success: false, error: "No valid claims found for the provided IDs." };
     }
 
-    const userIds = [...new Set(claims.map(c => c.uid))];
+    const userIds = [...new Set(payableClaims.map(c => c.uid))];
     const usersRef = adminDb.collection('users');
     const usersQuery = usersRef.where(FieldPath.documentId(), 'in', userIds);
     const usersSnapshot = await usersQuery.get();
@@ -215,7 +238,7 @@ export async function generateIncentivePaymentSheet(
     const batch = adminDb.batch();
     let totalAmount = 0;
 
-    const paymentData = claims.map((claim, index) => {
+    const paymentData = payableClaims.map((claim, index) => {
       const user = usersMap.get(claim.uid);
       const amount = claim.finalApprovedAmount || 0;
       totalAmount += amount;
@@ -260,8 +283,8 @@ export async function generateIncentivePaymentSheet(
     const buffer = await workbook.xlsx.writeBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
     
-    await logActivity('INFO', 'Generated incentive payment sheet', { referenceNumber, claimCount: claims.length });
-    return { success: true, fileData: base64 };
+    await logActivity('INFO', 'Generated incentive payment sheet', { referenceNumber, claimCount: payableClaims.length, skippedCount });
+    return { success: true, fileData: base64, includedCount: payableClaims.length, skippedCount };
   } catch (error: any) {
     console.error('Error generating payment sheet:', error);
     await logActivity('ERROR', 'Failed to generate payment sheet', { error: error.message });

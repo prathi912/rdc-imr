@@ -18,6 +18,7 @@ import { generateMembershipIncentiveForm } from '@/app/membership-actions';
 import { generatePatentIncentiveForm } from '@/app/patent-actions';
 import { generateConferenceIncentiveForm } from '@/app/conference-actions';
 import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
+import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 
 
 async function logActivity(level: 'INFO' | 'WARNING' | 'ERROR', message: string, context: Record<string, any> = {}) {
@@ -63,6 +64,10 @@ function getInstituteAcronym(name?: string): string {
         .map(word => word.charAt(0))
         .join('')
         .toUpperCase();
+      if (!isEligibleForFinancialDisbursement(claim)) {
+        console.warn(`Skipping office noting for non-disbursement-eligible claim: ${claimId}`);
+        return null;
+      }
 }
 
 

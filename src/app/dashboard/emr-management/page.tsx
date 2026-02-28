@@ -32,6 +32,8 @@ function EmrLogsTab({ user }: { user: User | null }) {
     const [users, setUsers] = useState<Map<string, User>>(new Map());
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15;
     const { toast } = useToast();
 
     const fetchData = useCallback(async () => {
@@ -108,6 +110,17 @@ function EmrLogsTab({ user }: { user: User | null }) {
         });
     }, [logs, searchTerm, users, calls]);
 
+    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+    const paginatedLogs = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredLogs.slice(startIndex, endIndex);
+    }, [filteredLogs, currentPage]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
     const handleExport = () => {
         const dataToExport = filteredLogs.map(log => {
             const call = calls.get(log.callId);
@@ -149,7 +162,7 @@ function EmrLogsTab({ user }: { user: User | null }) {
                                     <TableHead>Logged On</TableHead>
                                     <TableHead>Acknowledgement</TableHead>
                                 </TableRow></TableHeader>
-                                <TableBody>{filteredLogs.map(log => (
+                                <TableBody>{paginatedLogs.map(log => (
                                     <TableRow key={log.id}>
                                         <TableCell className="whitespace-nowrap">{users.get(log.userId)?.name || log.userName}</TableCell>
                                         <TableCell className="hidden md:table-cell">{calls.get(log.callId)?.title || 'Loading...'}</TableCell>
@@ -169,6 +182,36 @@ function EmrLogsTab({ user }: { user: User | null }) {
                             </Table>
                         </div>
                     ) : ( <div className="text-center text-muted-foreground py-8">No submissions have been logged.</div> )}
+                    {filteredLogs.length > itemsPerPage && (
+                        <div className="flex items-center justify-between mt-4">
+                            <p className="text-sm text-muted-foreground">
+                                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredLogs.length)} of {filteredLogs.length} submissions
+                            </p>
+                            <div className="flex gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                    disabled={currentPage === 1}
+                                >
+                                    Previous
+                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm text-muted-foreground">
+                                        Page {currentPage} of {totalPages}
+                                    </span>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                    disabled={currentPage === totalPages}
+                                >
+                                    Next
+                                </Button>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         </div>
@@ -186,6 +229,8 @@ export default function EmrManagementOverviewPage() {
     const [isAnnounceDialogOpen, setIsAnnounceDialogOpen] = useState(false);
     const [isAnnouncing, setIsAnnouncing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 15;
     const router = useRouter();
 
     useEffect(() => {
@@ -300,6 +345,17 @@ export default function EmrManagementOverviewPage() {
         );
     }, [calls, interests, searchTerm]);
 
+    const totalCallPages = Math.ceil(filteredCalls.length / itemsPerPage);
+    const paginatedCalls = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredCalls.slice(startIndex, endIndex);
+    }, [filteredCalls, currentPage]);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
+
     const isSuperAdmin = user?.role === 'Super-admin';
 
     if (!user || loading) {
@@ -363,7 +419,7 @@ export default function EmrManagementOverviewPage() {
                                                     <TableHead>Announced</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow></TableHeader>
-                                                <TableBody>{filteredCalls.map(call => {
+                                                <TableBody>{paginatedCalls.map(call => {
                                                     const isClosed = isAfter(new Date(), parseISO(call.interestDeadline));
                                                     return (
                                                     <TableRow key={call.id}>
@@ -402,6 +458,36 @@ export default function EmrManagementOverviewPage() {
                                         </div>
                                     ) : (
                                         <div className="text-center text-muted-foreground py-8">No funding calls have been created or match your search.</div>
+                                    )}
+                                    {filteredCalls.length > itemsPerPage && (
+                                        <div className="flex items-center justify-between mt-4">
+                                            <p className="text-sm text-muted-foreground">
+                                                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredCalls.length)} of {filteredCalls.length} calls
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                                    disabled={currentPage === 1}
+                                                >
+                                                    Previous
+                                                </Button>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm text-muted-foreground">
+                                                        Page {currentPage} of {totalCallPages}
+                                                    </span>
+                                                </div>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setCurrentPage(prev => Math.min(totalCallPages, prev + 1))}
+                                                    disabled={currentPage === totalCallPages}
+                                                >
+                                                    Next
+                                                </Button>
+                                            </div>
+                                        </div>
                                     )}
                                 </CardContent>
                             </Card>

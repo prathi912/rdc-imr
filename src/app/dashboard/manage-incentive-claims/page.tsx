@@ -40,6 +40,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 
 const CLAIM_TYPES = ['Research Papers', 'Patents', 'Conference Presentations', 'Books', 'Membership of Professional Bodies', 'Seed Money for APC'];
 type SortableKeys = keyof Pick<IncentiveClaim, 'userName' | 'paperTitle' | 'submissionDate' | 'status' | 'claimType'>;
@@ -57,12 +58,16 @@ export default function ManageIncentiveClaimsPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [claimTypeFilter, setClaimTypeFilter] = useState('all');
+  const [facultyFilter, setFacultyFilter] = useState('all');
+  const [instituteFilter, setInstituteFilter] = useState('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortableKeys; direction: 'ascending' | 'descending' }>({ key: 'submissionDate', direction: 'descending' });
   
   const [selectedClaims, setSelectedClaims] = useState<string[]>([]);
   const [isGenerateSheetOpen, setIsGenerateSheetOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDownloadingNotings, setIsDownloadingNotings] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -121,12 +126,35 @@ export default function ManageIncentiveClaimsPage() {
   const getClaimTitle = (claim: IncentiveClaim): string => {
     return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
   };
+
+  const uniqueFaculties = useMemo(() => {
+    const faculties = new Set(allClaims.map(claim => claim.faculty).filter(Boolean));
+    return Array.from(faculties).sort();
+  }, [allClaims]);
+
+  const uniqueInstitutes = useMemo(() => {
+    const institutes = new Set(
+      users.map(u => u.institute).filter(Boolean)
+    );
+    return Array.from(institutes).sort();
+  }, [users]);
   
   const filteredClaims = useMemo(() => {
     let filtered = [...allClaims];
     
     if (claimTypeFilter !== 'all') {
       filtered = filtered.filter(claim => claim.claimType === claimTypeFilter);
+    }
+
+    if (facultyFilter !== 'all') {
+      filtered = filtered.filter(claim => claim.faculty === facultyFilter);
+    }
+
+    if (instituteFilter !== 'all') {
+      filtered = filtered.filter(claim => {
+        const claimUser = users.find(u => u.uid === claim.uid);
+        return claimUser?.institute === instituteFilter;
+      });
     }
 
     if (searchTerm) {
@@ -138,7 +166,7 @@ export default function ManageIncentiveClaimsPage() {
       );
     }
     return filtered;
-  }, [allClaims, searchTerm, claimTypeFilter]);
+  }, [allClaims, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, users]);
   
   const tabClaims = useMemo(() => {
     const pending = filteredClaims.filter(claim => ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval'].includes(claim.status));
@@ -172,10 +200,18 @@ export default function ManageIncentiveClaimsPage() {
 
     return claimsForTab;
   }, [tabClaims, activeTab, sortConfig]);
+
+  const totalPages = Math.ceil(sortedAndFilteredClaims.length / itemsPerPage);
+  const paginatedClaims = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return sortedAndFilteredClaims.slice(startIndex, endIndex);
+  }, [sortedAndFilteredClaims, currentPage]);
   
   useEffect(() => {
     setSelectedClaims([]);
-  }, [activeTab, searchTerm, claimTypeFilter, sortConfig]);
+    setCurrentPage(1);
+  }, [activeTab, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, sortConfig]);
 
   const requestSort = (key: SortableKeys) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -187,9 +223,13 @@ export default function ManageIncentiveClaimsPage() {
   
   const handleMarkPaymentCompleted = async () => {
     setIsUpdating(true);
-    const result = await markPaymentsCompleted(selectedClaims);
+    const payableClaimIds = allClaims
+      .filter(claim => selectedClaims.includes(claim.id) && isEligibleForFinancialDisbursement(claim))
+      .map(claim => claim.id);
+
+    const result = await markPaymentsCompleted(payableClaimIds);
     if (result.success) {
-      toast({ title: 'Success', description: `${selectedClaims.length} claim(s) marked as payment completed.` });
+      toast({ title: 'Success', description: `${result.processedCount || 0} claim(s) marked as payment completed.${(result.skippedCount || 0) > 0 ? ` ${result.skippedCount} claim(s) skipped.` : ''}` });
       setSelectedClaims([]);
       fetchClaimsAndUsers();
     } else {
@@ -200,9 +240,13 @@ export default function ManageIncentiveClaimsPage() {
 
   const handleSubmitToAccounts = async () => {
     setIsUpdating(true);
-    const result = await submitToAccounts(selectedClaims);
+    const payableClaimIds = allClaims
+      .filter(claim => selectedClaims.includes(claim.id) && isEligibleForFinancialDisbursement(claim))
+      .map(claim => claim.id);
+
+    const result = await submitToAccounts(payableClaimIds);
     if (result.success) {
-        toast({ title: 'Success', description: `${selectedClaims.length} claim(s) submitted to accounts.`});
+        toast({ title: 'Success', description: `${result.processedCount || 0} claim(s) submitted to accounts.${(result.skippedCount || 0) > 0 ? ` ${result.skippedCount} claim(s) skipped.` : ''}`});
         setSelectedClaims([]);
         fetchClaimsAndUsers();
     } else {
@@ -218,7 +262,15 @@ export default function ManageIncentiveClaimsPage() {
     }
     setIsDownloadingNotings(true);
     try {
-        const result = await generateOfficeNotingsZip(selectedClaims);
+        const eligibleClaimIds = allClaims
+          .filter(claim => selectedClaims.includes(claim.id) && isEligibleForFinancialDisbursement(claim))
+          .map(claim => claim.id);
+
+        if (eligibleClaimIds.length === 0) {
+            throw new Error('Selected claims are not eligible for office noting generation.');
+        }
+
+        const result = await generateOfficeNotingsZip(eligibleClaimIds);
         if (result.success && result.fileData) {
             const byteCharacters = atob(result.fileData);
             const byteNumbers = new Array(byteCharacters.length).fill(0).map((_, i) => byteCharacters.charCodeAt(i));
@@ -232,7 +284,7 @@ export default function ManageIncentiveClaimsPage() {
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
-            toast({ title: "Download Started", description: `Downloading ${selectedClaims.length} office notings.` });
+            toast({ title: "Download Started", description: `Downloading ${eligibleClaimIds.length} office notings.` });
         } else {
             throw new Error(result.error || "Failed to generate ZIP file.");
         }
@@ -275,43 +327,47 @@ export default function ManageIncentiveClaimsPage() {
     toast({ title: "Export Started", description: `Downloading ${sortedAndFilteredClaims.length} claims.` });
   };
   
-  const eligibleForPaymentSheet = useMemo(() => {
-      return allClaims.filter(claim => selectedClaims.includes(claim.id) && (claim.status === 'Accepted' || claim.status === 'Submitted to Accounts'));
-  }, [selectedClaims, allClaims]);
+    const eligibleForPaymentSheet = useMemo(() => {
+      return allClaims.filter(
+      claim =>
+        selectedClaims.includes(claim.id) &&
+        (claim.status === 'Accepted' || claim.status === 'Submitted to Accounts') &&
+        isEligibleForFinancialDisbursement(claim)
+      );
+    }, [selectedClaims, allClaims]);
+
+    const eligibleForOfficeNotings = useMemo(() => {
+      return allClaims.filter(claim => selectedClaims.includes(claim.id) && isEligibleForFinancialDisbursement(claim));
+    }, [selectedClaims, allClaims]);
 
   
   const renderTable = () => (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-12">
-                <Checkbox
-                    checked={sortedAndFilteredClaims.length > 0 && selectedClaims.length === sortedAndFilteredClaims.length && sortedAndFilteredClaims.length <= 30}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        if (sortedAndFilteredClaims.length > 30) {
-                          toast({ variant: 'destructive', title: 'Limit Exceeded', description: 'You can only select up to 30 claims at once.' });
-                          setSelectedClaims(sortedAndFilteredClaims.slice(0, 30).map(c => c.id));
+    <div className="space-y-4">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12">
+                  <Checkbox
+                      checked={paginatedClaims.length > 0 && selectedClaims.length === paginatedClaims.length}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedClaims([...new Set([...selectedClaims, ...paginatedClaims.map(c => c.id)])]);
                         } else {
-                          setSelectedClaims(sortedAndFilteredClaims.map(c => c.id));
+                          setSelectedClaims(selectedClaims.filter(id => !paginatedClaims.map(c => c.id).includes(id)));
                         }
-                      } else {
-                        setSelectedClaims([]);
-                      }
-                    }}
-                    disabled={sortedAndFilteredClaims.length > 30}
-                    // @ts-ignore
-                    indeterminate={selectedClaims.length > 0 && selectedClaims.length < sortedAndFilteredClaims.length ? "true" : undefined}
-                />
-            </TableHead>
-            <TableHead>
-               <Button variant="ghost" onClick={() => requestSort('userName')}>
-                  Claimant <ArrowUpDown className="ml-2 h-4 w-4" />
-              </Button>
-            </TableHead>
-            <TableHead>Title</TableHead>
-            <TableHead className="hidden md:table-cell">
+                      }}
+                      // @ts-ignore
+                      indeterminate={paginatedClaims.some(c => selectedClaims.includes(c.id)) && !paginatedClaims.every(c => selectedClaims.includes(c.id)) ? "true" : undefined}
+                  />
+              </TableHead>
+              <TableHead>
+                 <Button variant="ghost" onClick={() => requestSort('userName')}>
+                    Claimant <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+              </TableHead>
+              <TableHead>Title</TableHead>
+              <TableHead className="hidden md:table-cell">
                <Button variant="ghost" onClick={() => requestSort('claimType')}>
                   Claim Type <ArrowUpDown className="ml-2 h-4 w-4" />
               </Button>
@@ -322,12 +378,13 @@ export default function ManageIncentiveClaimsPage() {
               </Button>
             </TableHead>
             <TableHead>Status</TableHead>
+            <TableHead>Amount</TableHead>
             {activeTab === 'rejected' && <TableHead>Rejected At Stage</TableHead>}
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedAndFilteredClaims.map((claim) => {
+          {paginatedClaims.map((claim) => {
             const lastRejectedApproval = claim.approvals?.slice().reverse().find(a => a?.status === 'Rejected');
             return (
               <TableRow key={claim.id} data-state={selectedClaims.includes(claim.id) ? "selected" : ""}>
@@ -359,6 +416,13 @@ export default function ManageIncentiveClaimsPage() {
                 <TableCell>
                   <Badge variant={claim.status === 'Accepted' || claim.status === 'Submitted to Accounts' || claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                 </TableCell>
+                <TableCell className="text-right font-medium">
+                  {claim.finalApprovedAmount !== undefined && claim.finalApprovedAmount !== null ? (
+                    <span>₹{claim.finalApprovedAmount.toLocaleString('en-IN')}</span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
                 {activeTab === 'rejected' && <TableCell>{lastRejectedApproval ? `Stage ${lastRejectedApproval.stage}` : 'N/A'}</TableCell>}
                 <TableCell className="text-right">
                     <Button variant="outline" size="sm" onClick={() => setSelectedClaim(claim)}>View Details</Button>
@@ -368,6 +432,39 @@ export default function ManageIncentiveClaimsPage() {
           })}
         </TableBody>
       </Table>
+      </div>
+      
+      {/* Pagination Controls */}
+      {sortedAndFilteredClaims.length > 0 && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, sortedAndFilteredClaims.length)} of {sortedAndFilteredClaims.length} claims
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+            >
+              Previous
+            </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -410,21 +507,43 @@ export default function ManageIncentiveClaimsPage() {
                       ))}
                   </SelectContent>
               </Select>
+              <Select value={facultyFilter} onValueChange={setFacultyFilter}>
+                  <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filter by faculty" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Faculties</SelectItem>
+                      {uniqueFaculties.map(faculty => (
+                          <SelectItem key={faculty} value={faculty}>{faculty}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+              <Select value={instituteFilter} onValueChange={setInstituteFilter}>
+                  <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filter by institute" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="all">All Institutes</SelectItem>
+                      {uniqueInstitutes.map(institute => (
+                          <SelectItem key={institute} value={institute}>{institute}</SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
             </div>
             {activeTab === 'pending-bank' && selectedClaims.length > 0 && (
                 <div className="flex items-center gap-2">
                     <Button onClick={() => setIsGenerateSheetOpen(true)} disabled={eligibleForPaymentSheet.length === 0 || isUpdating}>
                         Generate Payment Sheet ({eligibleForPaymentSheet.length})
                     </Button>
-                    <Button onClick={handleDownloadNotings} disabled={isDownloadingNotings}>
+                    <Button onClick={handleDownloadNotings} disabled={isDownloadingNotings || eligibleForOfficeNotings.length === 0}>
                         {isDownloadingNotings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Download Notings ({selectedClaims.length})
+                      Download Notings ({eligibleForOfficeNotings.length})
                     </Button>
-                    <Button onClick={handleSubmitToAccounts} disabled={isUpdating || !selectedClaims.every(id => allClaims.find(c => c.id === id)?.status === 'Accepted')}>
+                    <Button onClick={handleSubmitToAccounts} disabled={isUpdating || !eligibleForPaymentSheet.every(c => c.status === 'Accepted') || eligibleForPaymentSheet.length === 0}>
                         {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Submit to Accounts
                     </Button>
-                    <Button onClick={handleMarkPaymentCompleted} disabled={isUpdating || !selectedClaims.every(id => allClaims.find(c => c.id === id)?.status === 'Submitted to Accounts')}>
+                    <Button onClick={handleMarkPaymentCompleted} disabled={isUpdating || !eligibleForPaymentSheet.every(c => c.status === 'Submitted to Accounts') || eligibleForPaymentSheet.length === 0}>
                         {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                         Mark as Payment Completed
                     </Button>
@@ -511,7 +630,7 @@ function GeneratePaymentSheetDialog({ isOpen, onOpenChange, claims, allUsers }: 
                 a.click();
                 a.remove();
                 window.URL.revokeObjectURL(url);
-                toast({ title: "Export Successful", description: "Payment sheet has been generated." });
+                toast({ title: "Export Successful", description: `Payment sheet has been generated.${(result.skippedCount || 0) > 0 ? ` ${result.skippedCount} claim(s) were skipped as non-disbursement eligible.` : ''}` });
                 onOpenChange(false);
             } else {
                 throw new Error(result.error || "Failed to generate sheet.");

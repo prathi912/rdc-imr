@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 
 interface ApprovalDialogProps {
   claim: IncentiveClaim;
@@ -227,6 +228,31 @@ function MembershipClaimDetails({ claim, claimant }: { claim: IncentiveClaim, cl
   );
 }
 
+function getCalculationLogic(claim: IncentiveClaim): string {
+  if (claim.claimType === 'Research Papers') {
+    const baseAmount = claim.calculatedIncentive || 0;
+    let logic = `Base Amount: ₹${baseAmount.toLocaleString('en-IN')}`;
+    
+    if (claim.isPuNameInPublication === false) {
+      logic += '\n• PU name not in publication: -50%';
+    }
+    if (claim.wasApcPaidByUniversity === true) {
+      logic += '\n• APC paid by University: -50%';
+    }
+    if (!isEligibleForFinancialDisbursement(claim)) {
+      logic += '\n• Co-Author beyond 5th position: ₹0 (ARPS only)';
+    }
+    
+    return logic;
+  }
+  
+  if (claim.claimType === 'Membership of Professional Bodies') {
+    return `Amount Paid: ₹${claim.membershipAmountPaid?.toLocaleString('en-IN') || 0}\n(50% reimbursement by university)`;
+  }
+  
+  return `Base Calculated Amount: ₹${claim.calculatedIncentive?.toLocaleString('en-IN') || 0}`;
+}
+
 export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, onOpenChange, onActionComplete }: ApprovalDialogProps) {
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -304,6 +330,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
 
 
     const action = form.watch('action');
+    const approvedAmount = form.watch('amount');
 
     const handleSubmit = async (values: ApprovalFormData) => {
         setIsSubmitting(true);
@@ -428,6 +455,14 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                                                 {isAutoCalculated && <span className="text-xs text-muted-foreground">(Tentative)</span>}
                                             </div>
                                             <FormControl><Input type="number" {...field} /></FormControl>
+                                            {isAutoCalculated && approvedAmount === defaultAmount && (
+                                                <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-900/50 rounded border border-slate-200 dark:border-slate-800">
+                                                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Calculation Logic:</p>
+                                                    <p className="text-xs text-slate-600 dark:text-slate-400 whitespace-pre-line">
+                                                        {getCalculationLogic(claim)}
+                                                    </p>
+                                                </div>
+                                            )}
                                             <FormMessage />
                                         </FormItem>
                                     )}

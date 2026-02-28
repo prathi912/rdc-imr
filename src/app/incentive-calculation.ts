@@ -2,6 +2,7 @@
 'use server';
 
 import type { IncentiveClaim, CoAuthor, Author } from '@/types';
+import { isResearchCoAuthorBeyondFifthPosition } from '@/lib/incentive-eligibility';
 
 // --- Research Paper Calculation ---
 
@@ -95,6 +96,12 @@ export async function calculateResearchPaperIncentive(
         const claimant = authors.find(a => a.email.toLowerCase() === userEmail?.toLowerCase());
         if (!claimant) {
             return { success: false, error: "Claimant not found in the author list." };
+        }
+
+        // Policy: Co-Authors beyond 5th author position are not eligible for monetary incentive.
+        // (These claims may still be used for ARPS and analytics.)
+        if (isResearchCoAuthorBeyondFifthPosition(claimData)) {
+            return { success: true, amount: 0 };
         }
         
         const baseIncentive = getBaseIncentiveForPaper(claimData, faculty, designation);

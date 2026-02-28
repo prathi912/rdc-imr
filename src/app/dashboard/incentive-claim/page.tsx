@@ -160,6 +160,22 @@ function CoAuthorClaimsList({ claims, currentUser, onClaimApplied }: { claims: I
     const form = useForm<CoAuthorApplyValues>({
         resolver: zodResolver(coAuthorApplySchema),
     });
+
+    const toAuthorPositionLabel = (position: number): IncentiveClaim['authorPosition'] | undefined => {
+        const labels: Record<number, IncentiveClaim['authorPosition']> = {
+            1: '1st',
+            2: '2nd',
+            3: '3rd',
+            4: '4th',
+            5: '5th',
+            6: '6th',
+            7: '7th',
+            8: '8th',
+            9: '9th',
+            10: '10th',
+        };
+        return labels[position];
+    };
     
 const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
     if (!currentUser) return;
@@ -206,6 +222,8 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                 return author;
             }),
             userEmail: currentUser.email,
+            authorType: myAuthorDetails.role,
+            authorPosition: toAuthorPositionLabel((claim.authors || []).findIndex(a => a.email.toLowerCase() === currentUser.email.toLowerCase()) + 1),
         };
 
         if (claim.claimType === 'Research Papers') {
@@ -269,6 +287,8 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                 orcidId: currentUser.orcidId,
                 faculty: currentUser.faculty || '',
                 calculatedIncentive: calculatedAmount, // Store the calculated amount
+                authorType: claimToApply.authors?.find(a => a.email.toLowerCase() === currentUser.email.toLowerCase())?.role || originalClaimData.authorType,
+                authorPosition: toAuthorPositionLabel((claimToApply.authors || []).findIndex(a => a.email.toLowerCase() === currentUser.email.toLowerCase()) + 1) || originalClaimData.authorPosition,
             };
             
             await submitIncentiveClaimViaApi(newClaim as Omit<IncentiveClaim, 'id' | 'claimId'>);

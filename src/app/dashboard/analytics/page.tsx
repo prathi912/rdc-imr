@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bar, BarChart, CartesianGrid, XAxis, Line, LineChart, ResponsiveContainer, YAxis, Tooltip, Pie, PieChart, Cell, Legend, LabelList } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import type { Project, User, EmrInterest, IncentiveClaim } from '@/types';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, onSnapshot, or, orderBy, Timestamp } from 'firebase/firestore';
@@ -70,6 +72,8 @@ export default function AnalyticsPage() {
   const incentiveAmountChartRef = useRef<HTMLDivElement>(null);
   const activeUsersChartRef = useRef<HTMLDivElement>(null);
   const fundingByAgencyChartRef = useRef<HTMLDivElement>(null);
+  const fieldOfStudyChartRef = useRef<HTMLDivElement>(null);
+  const fieldOfStudySubdomainChartRef = useRef<HTMLDivElement>(null);
 
   const handleExport = useCallback(async (ref: React.RefObject<HTMLDivElement>, fileName: string) => {
     if (!ref.current) {
@@ -423,6 +427,245 @@ export default function AnalyticsPage() {
     return config;
   }, [incentiveAmountData]);
 
+  const {
+    fieldOfStudyData,
+    fieldOfStudyConfig,
+    fieldOfStudySubdomainData,
+    fieldOfStudySubdomainConfig,
+    fieldOfStudyDrilldown,
+    fieldOfStudySummary,
+  } = useMemo(() => {
+    const getClaimTitle = (claim: IncentiveClaim): string => {
+      return (
+        claim.paperTitle ||
+        claim.patentTitle ||
+        claim.conferencePaperTitle ||
+        claim.publicationTitle ||
+        claim.professionalBodyName ||
+        claim.apcPaperTitle ||
+        claim.awardTitle ||
+        ''
+      );
+    };
+
+    const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    const taxonomy: Array<{
+      domain: string;
+      subdomains: Array<{ name: string; keywords: string[]; weight: number }>;
+    }> = [
+      {
+        domain: 'Computer Science & AI',
+        subdomains: [
+          { name: 'Artificial Intelligence', keywords: ['artificial intelligence', 'machine learning', 'deep learning', 'neural network', 'llm', 'gen ai', 'nlp', 'computer vision'], weight: 5 },
+          { name: 'Data Science & Analytics', keywords: ['data mining', 'predictive model', 'data analytics', 'big data', 'classification', 'regression'], weight: 4 },
+          { name: 'Software & Systems', keywords: ['software', 'algorithm', 'distributed system', 'cloud', 'microservice', 'devops', 'compiler'], weight: 3 },
+          { name: 'Cybersecurity & Blockchain', keywords: ['cybersecurity', 'network security', 'cryptography', 'intrusion', 'blockchain', 'smart contract'], weight: 4 },
+        ],
+      },
+      {
+        domain: 'Engineering & Technology',
+        subdomains: [
+          { name: 'Electrical & Electronics', keywords: ['electrical', 'power system', 'power electronics', 'vlsi', 'embedded', 'sensor', 'signal processing'], weight: 4 },
+          { name: 'Mechanical & Manufacturing', keywords: ['mechanical', 'manufacturing', 'thermal', 'fluid', 'cad', 'cam', 'tribology'], weight: 4 },
+          { name: 'Civil & Infrastructure', keywords: ['civil', 'concrete', 'structural', 'transportation', 'geotechnical', 'construction'], weight: 4 },
+          { name: 'Robotics & Automation', keywords: ['robotics', 'automation', 'control system', 'mechatronics', 'autonomous'], weight: 5 },
+        ],
+      },
+      {
+        domain: 'Health & Life Sciences',
+        subdomains: [
+          { name: 'Clinical & Medical', keywords: ['clinical', 'medical', 'disease', 'patient', 'diagnosis', 'therapy', 'hospital'], weight: 5 },
+          { name: 'Pharmacy & Drug Discovery', keywords: ['pharmacy', 'drug', 'formulation', 'pharmacology', 'toxicology', 'medicinal chemistry'], weight: 5 },
+          { name: 'Nursing & Allied Health', keywords: ['nursing', 'physiotherapy', 'rehabilitation', 'public health', 'healthcare'], weight: 4 },
+          { name: 'Biology & Biotechnology', keywords: ['biology', 'biotechnology', 'microbiology', 'genome', 'protein', 'cell', 'biomarker'], weight: 4 },
+        ],
+      },
+      {
+        domain: 'Management, Commerce & Economics',
+        subdomains: [
+          { name: 'Finance & Accounting', keywords: ['finance', 'accounting', 'fintech', 'investment', 'portfolio', 'banking'], weight: 4 },
+          { name: 'Marketing & Consumer Behavior', keywords: ['marketing', 'consumer', 'branding', 'digital marketing', 'retail', 'customer'], weight: 4 },
+          { name: 'Operations & Supply Chain', keywords: ['supply chain', 'operations', 'logistics', 'inventory', 'quality management'], weight: 4 },
+          { name: 'HR & Organization Studies', keywords: ['human resource', 'hrm', 'organizational', 'leadership', 'workforce'], weight: 3 },
+        ],
+      },
+      {
+        domain: 'Social Sciences & Humanities',
+        subdomains: [
+          { name: 'Education & Pedagogy', keywords: ['education', 'pedagogy', 'curriculum', 'learning outcomes', 'assessment'], weight: 4 },
+          { name: 'Psychology & Sociology', keywords: ['psychology', 'sociology', 'behavior', 'social', 'mental health'], weight: 4 },
+          { name: 'Law, Policy & Governance', keywords: ['law', 'policy', 'governance', 'public administration', 'constitutional'], weight: 4 },
+          { name: 'Language, Media & Culture', keywords: ['language', 'literature', 'media', 'communication', 'cultural'], weight: 3 },
+        ],
+      },
+      {
+        domain: 'Environmental & Sustainability',
+        subdomains: [
+          { name: 'Climate & Renewable Energy', keywords: ['climate', 'renewable', 'solar', 'wind', 'decarbonization', 'net zero'], weight: 5 },
+          { name: 'Water, Waste & Pollution', keywords: ['water treatment', 'waste', 'pollution', 'effluent', 'air quality', 'solid waste'], weight: 4 },
+          { name: 'Sustainable Development', keywords: ['sustainability', 'sdg', 'green', 'circular economy', 'eco friendly'], weight: 4 },
+        ],
+      },
+      {
+        domain: 'Basic Sciences',
+        subdomains: [
+          { name: 'Physics', keywords: ['physics', 'quantum', 'optics', 'photonics', 'nanophysics'], weight: 5 },
+          { name: 'Chemistry', keywords: ['chemistry', 'organic synthesis', 'catalysis', 'polymer', 'electrochemistry'], weight: 5 },
+          { name: 'Mathematics & Statistics', keywords: ['mathematics', 'statistics', 'probability', 'stochastic', 'optimization'], weight: 4 },
+          { name: 'Biological Sciences', keywords: ['botany', 'zoology', 'ecology', 'genetics', 'microbiology'], weight: 4 },
+        ],
+      },
+    ];
+
+    const scoreKeyword = (text: string, keyword: string) => {
+      if (keyword.includes(' ')) {
+        return text.includes(keyword) ? 1 : 0;
+      }
+      const regex = new RegExp(`\\b${keyword.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b`, 'i');
+      return regex.test(text) ? 1 : 0;
+    };
+
+    const analyzeTitle = (title: string) => {
+      const normalized = normalize(title);
+      const scored: Array<{
+        domain: string;
+        subdomain: string;
+        score: number;
+        matchedKeywords: string[];
+      }> = [];
+
+      for (const domain of taxonomy) {
+        for (const sub of domain.subdomains) {
+          const matchedKeywords = sub.keywords.filter((kw) => scoreKeyword(normalized, kw) > 0);
+          const score = matchedKeywords.length * sub.weight;
+          scored.push({
+            domain: domain.domain,
+            subdomain: sub.name,
+            score,
+            matchedKeywords,
+          });
+        }
+      }
+
+      scored.sort((a, b) => b.score - a.score);
+      const top = scored[0];
+      const second = scored[1];
+
+      if (!top || top.score === 0) {
+        return {
+          domain: 'Interdisciplinary / Other',
+          subdomain: 'Unclassified',
+          confidence: 35,
+          matchedKeywords: [] as string[],
+        };
+      }
+
+      const confidence = Math.max(
+        40,
+        Math.min(
+          97,
+          55 + top.score * 3 + (second?.score ? Math.max(0, 15 - second.score * 2) : 18)
+        )
+      );
+
+      return {
+        domain: top.domain,
+        subdomain: top.subdomain,
+        confidence,
+        matchedKeywords: top.matchedKeywords.slice(0, 4),
+      };
+    };
+
+    const analyzed = incentiveClaims
+      .map((claim) => {
+        const title = getClaimTitle(claim);
+        if (!title) return null;
+        const analysis = analyzeTitle(title);
+        return {
+          id: claim.id,
+          claimId: claim.claimId || 'N/A',
+          claimType: claim.claimType,
+          title,
+          submissionDate: claim.submissionDate,
+          ...analysis,
+        };
+      })
+      .filter(Boolean) as Array<{
+        id: string;
+        claimId: string;
+        claimType: string;
+        title: string;
+        submissionDate: string;
+        domain: string;
+        subdomain: string;
+        confidence: number;
+        matchedKeywords: string[];
+      }>;
+
+    const byDomain = analyzed.reduce((acc, item) => {
+      acc[item.domain] = (acc[item.domain] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const bySubdomain = analyzed.reduce((acc, item) => {
+      const key = `${item.domain} • ${item.subdomain}`;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const domainData = Object.entries(byDomain)
+      .map(([field, count]) => ({ field, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const subdomainData = Object.entries(bySubdomain)
+      .map(([subdomain, count]) => ({ subdomain, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12);
+
+    const domainConfig: ChartConfig = {};
+    domainData.forEach((item, index) => {
+      domainConfig[item.field] = {
+        label: item.field,
+        color: COLORS[index % COLORS.length],
+      };
+    });
+
+    const subdomainConfig: ChartConfig = {};
+    subdomainData.forEach((item, index) => {
+      subdomainConfig[item.subdomain] = {
+        label: item.subdomain,
+        color: COLORS[index % COLORS.length],
+      };
+    });
+
+    const sortedDrilldown = analyzed
+      .sort((a, b) => {
+        const byDate = new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime();
+        if (byDate !== 0) return byDate;
+        return b.confidence - a.confidence;
+      })
+      .slice(0, 40);
+
+    const avgConfidence = analyzed.length > 0
+      ? Math.round(analyzed.reduce((sum, row) => sum + row.confidence, 0) / analyzed.length)
+      : 0;
+
+    return {
+      fieldOfStudyData: domainData,
+      fieldOfStudyConfig: domainConfig,
+      fieldOfStudySubdomainData: subdomainData,
+      fieldOfStudySubdomainConfig: subdomainConfig,
+      fieldOfStudyDrilldown: sortedDrilldown,
+      fieldOfStudySummary: {
+        classifiedClaims: analyzed.length,
+        uniqueDomains: domainData.length,
+        uniqueSubdomains: Object.keys(bySubdomain).length,
+        avgConfidence,
+      },
+    };
+  }, [incentiveClaims]);
+
 
   const isCro = user?.role === 'CRO';
   const isGoaHead = user?.designation === 'Head of Goa Campus';
@@ -757,6 +1000,171 @@ export default function AnalyticsPage() {
             </CardContent>
         </Card>
       </div>
+      {user.role === 'Super-admin' && (
+        <div className="mt-8">
+          <div className="grid gap-6 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Classified Claims</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{fieldOfStudySummary.classifiedClaims}</div>
+                <p className="text-xs text-muted-foreground">Claims with identifiable title text</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Unique Domains</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{fieldOfStudySummary.uniqueDomains}</div>
+                <p className="text-xs text-muted-foreground">Primary field clusters</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Unique Subdomains</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{fieldOfStudySummary.uniqueSubdomains}</div>
+                <p className="text-xs text-muted-foreground">Granular research segments</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Avg Confidence</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{fieldOfStudySummary.avgConfidence}%</div>
+                <p className="text-xs text-muted-foreground">Title-based classification score</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Field of Studies by Domain</CardTitle>
+                    <CardDescription>Primary domain distribution inferred from claim titles.</CardDescription>
+                  </div>
+                  <Button variant="outline" size="icon" onClick={() => handleExport(fieldOfStudyChartRef, 'field_of_studies_domain_distribution')}>
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div ref={fieldOfStudyChartRef} className="p-4 bg-card">
+                  <ChartContainer config={fieldOfStudyConfig} className="h-[420px] w-full">
+                    <BarChart data={fieldOfStudyData} layout="vertical" margin={{ left: 140 }}>
+                      <CartesianGrid horizontal={false} />
+                      <YAxis
+                        dataKey="field"
+                        type="category"
+                        tickLine={false}
+                        tickMargin={10}
+                        axisLine={false}
+                        width={240}
+                        tick={{ fontSize: 12, whiteSpace: 'normal', textAnchor: 'end' }}
+                        interval={0}
+                      />
+                      <XAxis dataKey="count" type="number" allowDecimals={false} />
+                      <ChartTooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
+                      <Bar dataKey="count" fill="hsl(var(--primary))" radius={4}>
+                        <LabelList dataKey="count" position="right" offset={8} className="fill-foreground" fontSize={12} />
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Top Subdomains</CardTitle>
+                    <CardDescription>Most frequent granular research areas (top 12).</CardDescription>
+                  </div>
+                  <Button variant="outline" size="icon" onClick={() => handleExport(fieldOfStudySubdomainChartRef, 'field_of_studies_subdomain_distribution')}>
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div ref={fieldOfStudySubdomainChartRef} className="p-4 bg-card">
+                  <ChartContainer config={fieldOfStudySubdomainConfig} className="h-[420px] w-full">
+                    <BarChart data={fieldOfStudySubdomainData} layout="vertical" margin={{ left: 160 }}>
+                      <CartesianGrid horizontal={false} />
+                      <YAxis
+                        dataKey="subdomain"
+                        type="category"
+                        tickLine={false}
+                        tickMargin={10}
+                        axisLine={false}
+                        width={280}
+                        tick={{ fontSize: 12, whiteSpace: 'normal', textAnchor: 'end' }}
+                        interval={0}
+                      />
+                      <XAxis dataKey="count" type="number" allowDecimals={false} />
+                      <ChartTooltip cursor={{ fill: 'hsl(var(--muted))' }} content={<ChartTooltipContent />} />
+                      <Bar dataKey="count" fill="hsl(var(--accent))" radius={4}>
+                        <LabelList dataKey="count" position="right" offset={8} className="fill-foreground" fontSize={12} />
+                      </Bar>
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Claim-Level Domain Drilldown</CardTitle>
+              <CardDescription>
+                Recent claims with inferred domain, subdomain, confidence, and matched title signals.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Claim ID</TableHead>
+                      <TableHead>Claim Type</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Domain</TableHead>
+                      <TableHead>Subdomain</TableHead>
+                      <TableHead>Confidence</TableHead>
+                      <TableHead>Matched Signals</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fieldOfStudyDrilldown.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell className="font-medium">{row.claimId}</TableCell>
+                        <TableCell>{row.claimType}</TableCell>
+                        <TableCell className="max-w-[320px] truncate" title={row.title}>{row.title}</TableCell>
+                        <TableCell>{row.domain}</TableCell>
+                        <TableCell>{row.subdomain}</TableCell>
+                        <TableCell>
+                          <Badge variant={row.confidence >= 75 ? 'default' : row.confidence >= 55 ? 'secondary' : 'outline'}>
+                            {row.confidence}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="max-w-[240px] truncate" title={row.matchedKeywords.join(', ')}>
+                          {row.matchedKeywords.length > 0 ? row.matchedKeywords.join(', ') : 'No explicit signal'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

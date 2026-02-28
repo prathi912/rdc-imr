@@ -333,6 +333,8 @@ export default function ScheduleMeetingPage() {
   const [midTermSearchTerm, setMidTermSearchTerm] = useState('');
   const [meetingToEdit, setMeetingToEdit] = useState<Project | null>(null);
   const [isSendingGlobalReminders, setIsSendingGlobalReminders] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
 
   const form = useForm<z.infer<typeof scheduleSchema>>({
     resolver: zodResolver(scheduleSchema),
@@ -473,6 +475,24 @@ export default function ScheduleMeetingPage() {
 
   const projectsForCurrentTab = activeTab === 'new-submissions' ? newSubmissions : filteredMidTermProjects;
 
+  const totalPages = useMemo(() => {
+    let dataForTab = projectsForCurrentTab;
+    if (activeTab === 'history') {
+      dataForTab = filteredHistory;
+    }
+    return Math.ceil(dataForTab.length / itemsPerPage);
+  }, [projectsForCurrentTab, activeTab, filteredHistory]);
+
+  const paginatedProjects = useMemo(() => {
+    let dataForTab = projectsForCurrentTab;
+    if (activeTab === 'history') {
+      dataForTab = filteredHistory;
+    }
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return dataForTab.slice(startIndex, endIndex);
+  }, [projectsForCurrentTab, activeTab, filteredHistory, currentPage]);
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedProjects(projectsForCurrentTab.map(p => p.id));
@@ -491,6 +511,7 @@ export default function ScheduleMeetingPage() {
 
   useEffect(() => {
     setSelectedProjects([]);
+    setCurrentPage(1);
   }, [activeTab]);
 
   const onSubmit = async (data: z.infer<typeof scheduleSchema>) => {
@@ -624,25 +645,85 @@ export default function ScheduleMeetingPage() {
           
           <div className={cn("grid grid-cols-1 gap-8 mt-4", activeTab !== 'history' && "lg:grid-cols-3")}>
             <div className={cn("space-y-4", activeTab !== 'history' ? "lg:col-span-2" : "lg:col-span-3")}>
-              <TabsContent value="new-submissions" className="mt-0">
+              <TabsContent value="new-submissions" className="mt-0 space-y-4">
                 <ProjectListTable
-                  projects={newSubmissions} selectedProjects={selectedProjects} onSelectAll={handleSelectAll} onSelectOne={handleSelectOne}
+                  projects={paginatedProjects} selectedProjects={selectedProjects} onSelectAll={handleSelectAll} onSelectOne={handleSelectOne}
                   usersMap={usersMap} usersByEmailMap={usersByEmailMap} title="Projects Awaiting Meeting"
                   description="Select new submissions to schedule for their initial evaluation meeting." dateColumnHeader="Submission Date"
                 />
+                {newSubmissions.length > itemsPerPage && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, newSubmissions.length)} of {newSubmissions.length} projects
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Page {currentPage} of {Math.ceil(newSubmissions.length / itemsPerPage)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(newSubmissions.length / itemsPerPage), prev + 1))}
+                        disabled={currentPage === Math.ceil(newSubmissions.length / itemsPerPage)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
               <TabsContent value="mid-term-review" className="mt-0 space-y-4">
                 <Input placeholder="Search by title or PI..." value={midTermSearchTerm} onChange={e => setMidTermSearchTerm(e.target.value)} className="max-w-sm" />
                 <ProjectListTable
-                  projects={filteredMidTermProjects} selectedProjects={selectedProjects} onSelectAll={handleSelectAll} onSelectOne={handleSelectOne}
+                  projects={paginatedProjects} selectedProjects={selectedProjects} onSelectAll={handleSelectAll} onSelectOne={handleSelectOne}
                   usersMap={usersMap} usersByEmailMap={usersByEmailMap} title="Projects Due for Mid-term Review"
                   description={`These projects were funded at least ${systemSettings?.imrMidTermReviewMonths ?? 6} months ago and are due for a progress review.`}
                   dateColumnHeader="Last Disbursement Date"
                 />
+                {filteredMidTermProjects.length > itemsPerPage && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredMidTermProjects.length)} of {filteredMidTermProjects.length} projects
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Page {currentPage} of {Math.ceil(filteredMidTermProjects.length / itemsPerPage)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredMidTermProjects.length / itemsPerPage), prev + 1))}
+                        disabled={currentPage === Math.ceil(filteredMidTermProjects.length / itemsPerPage)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
-              <TabsContent value="history" className="mt-0">
+              <TabsContent value="history" className="mt-0 space-y-4">
                 <HistoryTable 
-                    projects={filteredHistory} 
+                    projects={paginatedProjects} 
                     usersMap={usersMap} 
                     filter={historyFilter} 
                     onFilterChange={setHistoryFilter} 
@@ -651,6 +732,36 @@ export default function ScheduleMeetingPage() {
                     isReminding={isSendingGlobalReminders}
                     onEdit={setMeetingToEdit}
                 />
+                {filteredHistory.length > itemsPerPage && (
+                  <div className="flex items-center justify-between mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredHistory.length)} of {filteredHistory.length} meetings
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Page {currentPage} of {Math.ceil(filteredHistory.length / itemsPerPage)}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredHistory.length / itemsPerPage), prev + 1))}
+                        disabled={currentPage === Math.ceil(filteredHistory.length / itemsPerPage)}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
             </div>
             

@@ -40,6 +40,7 @@ import { submitIncentiveClaimViaApi } from "@/lib/incentive-claim-client"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
 import { Badge } from "../ui/badge"
 import { findUserByMisId } from "@/app/userfinding"
+import { isEligibleForFinancialDisbursement } from "@/lib/incentive-eligibility"
 
 
 const MAX_FILES = 10
@@ -77,7 +78,7 @@ const researchPaperSchema = z
       .boolean()
       .default(true),
     wasApcPaidByUniversity: z.boolean().default(false),
-    authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th'], { required_error: 'Please select your author position.' }),
+    authorPosition: z.enum(['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'], { required_error: 'Please select your author position.' }),
     authors: z
       .array(
         z
@@ -200,7 +201,7 @@ const sdgGoalsList = [
 const coAuthorRoles: Author['role'][] = ["First Author", "Corresponding Author", "Co-Author", "First & Corresponding Author"];
 const conferenceAuthorRoles: Author['role'][] = ['Presenting Author', 'First & Presenting Author', 'Co-Author'];
 
-const authorPositions = ['1st', '2nd', '3rd', '4th', '5th', '6th'];
+const authorPositions = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
 
 const wosTypeOptions = [
   { value: "SCIE", label: "SCIE" },
@@ -403,7 +404,22 @@ export function ResearchPaperForm() {
     if (!user || !user.faculty) return;
     const result = await calculateResearchPaperIncentive({ ...formValues, userEmail: user.email }, user.faculty, user.designation);
     if (result.success) {
-        setCalculatedIncentive(result.amount ?? null);
+        // Apply eligibility policy check: if co-author beyond 5th position, set to 0
+        let finalAmount = result.amount ?? null;
+        
+        // Build claim object for eligibility check
+        const claimForEligibility: Partial<IncentiveClaim> = {
+          claimType: 'Research Papers',
+          userEmail: user.email,
+          authors: formValues.authors,
+          authorType: formValues.authors.find(a => a.email.toLowerCase() === user.email.toLowerCase())?.role as any,
+          authorPosition: formValues.authorPosition,
+        };
+        
+        if (!isEligibleForFinancialDisbursement(claimForEligibility as IncentiveClaim)) {
+          finalAmount = 0;
+        }
+        setCalculatedIncentive(finalAmount);
     } else {
         console.error("Incentive calculation failed:", result.error);
         setCalculatedIncentive(null);
@@ -1407,9 +1423,20 @@ export function ResearchPaperForm() {
                 />
 
                 {calculatedIncentive !== null && (
-                    <div className="p-4 bg-secondary rounded-md">
+                    <div className={`p-4 rounded-md ${calculatedIncentive === 0 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-secondary'}`}>
                         <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
-                        <p className="text-xs text-muted-foreground">This is your individual share based on the policy, publication type, and author roles.</p>
+                        {calculatedIncentive === 0 && formValues.authorPosition && ['6th', '7th', '8th', '9th', '10th'].includes(formValues.authorPosition) && (
+                            (() => {
+                              const userRole = formValues.authors.find(a => a.email.toLowerCase() === user?.email.toLowerCase())?.role;
+                              if (userRole === 'Co-Author') {
+                                return <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">As a co-author beyond the 5th position, this claim qualifies for ARPS score but not monetary incentive.</p>;
+                              }
+                              return null;
+                            })()
+                        )}
+                        {!(calculatedIncentive === 0 && formValues.authorPosition && ['6th', '7th', '8th', '9th', '10th'].includes(formValues.authorPosition) && formValues.authors.find(a => a.email.toLowerCase() === user?.email.toLowerCase())?.role === 'Co-Author') && (
+                            <p className="text-xs text-muted-foreground">This is your individual share based on the policy, publication type, and author roles.</p>
+                        )}
                     </div>
                 )}
                 

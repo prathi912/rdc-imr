@@ -5,6 +5,7 @@
 import { adminDb } from '@/lib/admin';
 import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper, Author } from '@/types';
 import { getSystemSettings } from './actions';
+import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 import { sendEmail } from '@/lib/email';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDefaultModulesForRole } from '@/lib/modules';
@@ -338,6 +339,8 @@ export async function processIncentiveClaimAction(
       return { success: false, error: 'Incentive claim not found.' };
     }
     const claim = { id: claimSnap.id, ...claimSnap.data() } as IncentiveClaim;
+    const isDisbursementEligible = isEligibleForFinancialDisbursement(claim);
+    const effectiveApprovedAmount = isDisbursementEligible ? (data.amount || 0) : 0;
     const settings = await getSystemSettings();
     
     if (!settings.incentiveApprovers || settings.incentiveApprovers.length <= stageIndex) {
@@ -353,7 +356,7 @@ export async function processIncentiveClaimAction(
       approverUid: approver.uid,
       approverName: approver.name,
       status: action === 'reject' ? 'Rejected' : 'Approved',
-      approvedAmount: data.amount || 0,
+      approvedAmount: effectiveApprovedAmount,
       comments: data.comments || '',
       timestamp: new Date().toISOString(),
       stage: stageIndex + 1,
@@ -392,7 +395,7 @@ export async function processIncentiveClaimAction(
     if (action === 'approve' || action === 'verify') {
         // For stages 2, 3, 4 (stageIndex 1, 2, 3), the approver finalizes the amount
         if (stageIndex >= 1) {
-            updateData.finalApprovedAmount = data.amount;
+            updateData.finalApprovedAmount = effectiveApprovedAmount;
         }
     }
 
@@ -436,7 +439,7 @@ export async function processIncentiveClaimAction(
                             We are pleased to inform you that your incentive claim for "<strong style="color:#ffffff;">${claimTitle}</strong>" has been successfully approved by all committees.
                         </p>
                         <p style="color:#e0e0e0;">
-                            The final approved incentive amount is <strong style="color:#ffffff;">₹${(data.amount || 0).toLocaleString('en-IN')}</strong>. The amount will be processed by the accounts department shortly.
+                            The final approved incentive amount is <strong style="color:#ffffff;">₹${effectiveApprovedAmount.toLocaleString('en-IN')}</strong>. The amount will be processed by the accounts department shortly.
                         </p>
                         <p style="color:#e0e0e0;">Congratulations on your achievement!</p>
                         ${EMAIL_STYLES.footer}

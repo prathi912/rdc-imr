@@ -8,6 +8,7 @@ import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import type { User, IncentiveClaim, ApprovalStage, Author } from '@/types';
 import { processIncentiveClaimAction } from '@/app/incentive-approval-actions';
+import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 import {
   Dialog,
   DialogContent,
@@ -413,6 +414,7 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
     
     const isConferenceClaim = claim.claimType === 'Conference Presentations';
     const isResearchPaperClaim = claim.claimType === 'Research Papers';
+    const isDisbursementEligible = isEligibleForFinancialDisbursement(claim);
     const isChecklistEnabled = (isResearchPaperClaim && (stageIndex === 0 || stageIndex === 1)) || (isConferenceClaim && stageIndex === 0);
     const showActionButtons = !isChecklistEnabled;
     
@@ -588,10 +590,15 @@ export function ApprovalDialog({ claim, approver, claimant, stageIndex, isOpen, 
                         </div>
                     )}
                     
-                     {stageIndex === 0 && claim.calculatedIncentive !== undefined && claim.calculatedIncentive !== null && (
-                        <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-md text-center">
-                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Tentatively Eligible Incentive Amount:</p>
-                            <p className="font-bold text-2xl text-blue-600 dark:text-blue-400 mt-1">₹{claim.calculatedIncentive.toLocaleString('en-IN')}</p>
+                    {stageIndex === 0 && claim.calculatedIncentive !== undefined && claim.calculatedIncentive !== null && (
+                        <div className={`p-4 rounded-md text-center ${isEligibleForFinancialDisbursement(claim) ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
+                            <p className={`text-sm font-medium ${isEligibleForFinancialDisbursement(claim) ? 'text-blue-800 dark:text-blue-200' : 'text-yellow-800 dark:text-yellow-200'}`}>
+                                {isEligibleForFinancialDisbursement(claim) ? 'Tentatively Eligible Incentive Amount:' : 'ARPS-Only Claim (No Financial Disbursement):'}
+                            </p>
+                            <p className={`font-bold text-2xl mt-1 ${isEligibleForFinancialDisbursement(claim) ? 'text-blue-600 dark:text-blue-400' : 'text-yellow-600 dark:text-yellow-400'}`}>₹{(isEligibleForFinancialDisbursement(claim) ? claim.calculatedIncentive : 0).toLocaleString('en-IN')}</p>
+                            {!isEligibleForFinancialDisbursement(claim) && (
+                                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">This co-author research paper claim is beyond the 5th position and qualifies for ARPS score but not monetary incentive.</p>
+                            )}
                         </div>
                     )}
 

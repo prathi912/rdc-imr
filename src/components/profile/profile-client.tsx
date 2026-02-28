@@ -565,8 +565,39 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
         return claim.paperTitle || claim.patentTitle || claim.conferencePaperTitle || claim.publicationTitle || claim.professionalBodyName || claim.apcPaperTitle || 'N/A';
     };
 
-    const paperClaims = claims.filter(c => c.claimType === 'Research Papers');
+    const getResearchPaperProofUrl = (claim: IncentiveClaim) => {
+        return claim.publicationProofUrls?.[0] || claim.relevantLink || undefined;
+    };
+
+    const normalizePublicationValue = (value?: string) => (value || '').trim().toLowerCase();
+
+    const researchPaperIdSet = new Set(researchPapers.map((paper) => paper.id));
+    const researchPaperTitleSet = new Set(researchPapers.map((paper) => normalizePublicationValue(paper.title)));
+    const researchPaperUrlSet = new Set(researchPapers.map((paper) => normalizePublicationValue(paper.url)));
+
+    const paperClaims = claims.filter(c => c.claimType === 'Research Papers').filter((claim) => {
+        // Do not list the same publication twice when a claim is already linked to
+        // a research paper entry for this profile.
+        if (claim.paperId && researchPaperIdSet.has(claim.paperId)) {
+            return false;
+        }
+
+        const normalizedTitle = normalizePublicationValue(claim.paperTitle);
+        if (normalizedTitle && researchPaperTitleSet.has(normalizedTitle)) {
+            return false;
+        }
+
+        const normalizedUrl = normalizePublicationValue(claim.relevantLink);
+        if (normalizedUrl && researchPaperUrlSet.has(normalizedUrl)) {
+            return false;
+        }
+
+        return true;
+    });
+
     const otherClaims = claims.filter(c => c.claimType !== 'Research Papers');
+    const totalPublicationAndClaimCount = researchPapers.length + paperClaims.length + otherClaims.length;
+    const totalApprovedAmount = claims.reduce((sum, claim) => sum + (claim.finalApprovedAmount || 0), 0);
 
     return (
         <div className="flex flex-col items-center">
@@ -593,7 +624,8 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                             <div className="flex justify-center md:justify-start gap-8 my-4">
                                 <StatItem value={projects.length} label="IMR Projects" />
                                 <StatItem value={emrInterests.length} label="EMR Interests" />
-                                <StatItem value={researchPapers.length + claims.length} label="Publications & Claims" />
+                                <StatItem value={totalPublicationAndClaimCount} label="Publications & Claims" />
+                                <StatItem value={`₹${totalApprovedAmount.toLocaleString('en-IN')}`} label="Total Approved" />
                             </div>
                         </div>
                     </div>
@@ -629,7 +661,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                     <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="projects">IMR Projects ({projects.length})</TabsTrigger>
                         <TabsTrigger value="emr">EMR Interests ({emrInterests.length})</TabsTrigger>
-                        <TabsTrigger value="publications">Publications & Incentives ({researchPapers.length + claims.length})</TabsTrigger>
+                        <TabsTrigger value="publications">Publications & Incentives ({totalPublicationAndClaimCount})</TabsTrigger>
                     </TabsList>
                     <TabsContent value="projects">
                         <div className="space-y-4 mt-4">
@@ -781,10 +813,24 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                             <Card key={claim.id}>
                                                 <CardContent className="p-4 space-y-2">
                                                     <div className="flex justify-between items-start">
-                                                        <p className="font-semibold flex-1">{getClaimTitle(claim)}</p>
+                                                        <div className="font-semibold flex-1">
+                                                            {getResearchPaperProofUrl(claim) ? (
+                                                                <a
+                                                                    href={getResearchPaperProofUrl(claim)}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="hover:underline text-primary"
+                                                                >
+                                                                    {getClaimTitle(claim)}
+                                                                </a>
+                                                            ) : (
+                                                                <span>{getClaimTitle(claim)}</span>
+                                                            )}
+                                                        </div>
                                                         <Badge variant={claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                                                     </div>
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm pt-2 border-t">
+                                                        <span><strong className="text-muted-foreground">Claim ID:</strong> {claim.claimId || 'N/A'}</span>
                                                         <span><strong className="text-muted-foreground">Index:</strong> {claim.indexType?.toUpperCase() || 'N/A'}</span>
                                                         {claim.finalApprovedAmount && <span><strong className="text-muted-foreground">Approved Amount:</strong> ₹{claim.finalApprovedAmount.toLocaleString('en-IN')}</span>}
                                                         <span><strong className="text-muted-foreground">Submitted:</strong> {format(parseISO(claim.submissionDate), 'PPP')}</span>
@@ -809,6 +855,7 @@ export function ProfileClient({ user, projects, emrInterests: initialEmrInterest
                                                         <Badge variant={claim.status === 'Payment Completed' ? 'default' : claim.status === 'Rejected' ? 'destructive' : 'secondary'}>{claim.status}</Badge>
                                                     </div>
                                                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm pt-2 border-t">
+                                                        <span><strong className="text-muted-foreground">Claim ID:</strong> {claim.claimId || 'N/A'}</span>
                                                         <span><strong className="text-muted-foreground">Claim Type:</strong> {claim.claimType}</span>
                                                         {claim.finalApprovedAmount && <span><strong className="text-muted-foreground">Approved Amount:</strong> ₹{claim.finalApprovedAmount.toLocaleString('en-IN')}</span>}
                                                         <span><strong className="text-muted-foreground">Submitted:</strong> {format(parseISO(claim.submissionDate), 'PPP')}</span>

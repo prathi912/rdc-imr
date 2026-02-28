@@ -11,11 +11,7 @@ import { Loader2, Printer, Check, X, Download, Bot, ExternalLink } from 'lucide-
 import Link from 'next/link';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '../ui/tooltip';
 import { generateOfficeNotingForClaim } from '@/app/document-actions';
-import { generateResearchPaperIncentiveForm } from '@/app/research-paper-actions';
-import { generateBookIncentiveForm } from '@/app/incentive-actions';
-import { generateMembershipIncentiveForm } from '@/app/membership-actions';
-import { generatePatentIncentiveForm } from '@/app/patent-actions';
-import { generateConferenceIncentiveForm } from '@/app/conference-actions';
+import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 
 
 function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId: string) {
@@ -33,36 +29,19 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     if (!claim) return null;
     
     const handleDownloadNoting = async () => {
+        if (!isEligibleForFinancialDisbursement(claim)) {
+            toast({
+                variant: 'destructive',
+                title: 'Not Eligible for Office Noting',
+                description: 'This claim is ARPS-only and excluded from office noting/payment processing.',
+            });
+            return;
+        }
+
         setIsPrinting(true);
         try {
-            let result;
-            let fileName = `Office_Noting_${claim.userName.replace(/\s/g, '_')}.docx`;
-
-            switch (claim.claimType) {
-                case 'Research Papers':
-                    result = await generateResearchPaperIncentiveForm(claim.id);
-                    fileName = `Research_Paper_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
-                    break;
-                case 'Books':
-                    result = await generateBookIncentiveForm(claim.id);
-                     fileName = `Book_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
-                    break;
-                case 'Membership of Professional Bodies':
-                    result = await generateMembershipIncentiveForm(claim.id);
-                    fileName = `Membership_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
-                    break;
-                case 'Patents':
-                    result = await generatePatentIncentiveForm(claim.id);
-                    fileName = `Patent_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
-                    break;
-                case 'Conference Presentations':
-                    result = await generateConferenceIncentiveForm(claim.id);
-                    fileName = `Conference_Incentive_${claim.userName.replace(/\s/g, '_')}.docx`;
-                    break;
-                default:
-                    result = await generateOfficeNotingForClaim(claim.id);
-                    fileName = result?.fileName || fileName;
-            }
+            const result = await generateOfficeNotingForClaim(claim.id);
+            let fileName = result?.fileName || `Office_Noting_${claim.userName.replace(/\s/g, '_')}.docx`;
 
             if (result.success && result.fileData) {
                  const byteCharacters = atob(result.fileData);
@@ -165,6 +144,7 @@ a.href = url;
     const isFullAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
     const isPendingForBank = ['Accepted', 'Submitted to Accounts'].includes(claim.status);
+    const canGenerateNoting = isEligibleForFinancialDisbursement(claim);
 
     const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
@@ -416,9 +396,9 @@ a.href = url;
                 </div>
                 <DialogFooter className="gap-2">
                     {isPendingForBank && isFullAdmin && (
-                         <Button onClick={handleDownloadNoting} disabled={isPrinting}>
+                         <Button onClick={handleDownloadNoting} disabled={isPrinting || !canGenerateNoting}>
                             {isPrinting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                            Download Notings
+                            {canGenerateNoting ? 'Download Notings' : 'Notings Not Applicable'}
                         </Button>
                     )}
                     {canTakeAction && (
