@@ -159,13 +159,19 @@ export default function ManageIncentiveClaimsPage() {
       });
     }
 
-    if (searchTerm) {
-      const lowerCaseSearch = searchTerm.toLowerCase();
-      filtered = filtered.filter(claim =>
-        claim.userName.toLowerCase().includes(lowerCaseSearch) ||
-        getClaimTitle(claim).toLowerCase().includes(lowerCaseSearch) ||
-        (claim.claimId && claim.claimId.toLowerCase().includes(lowerCaseSearch))
-      );
+    if (searchTerm.trim()) {
+      const lowerCaseSearch = searchTerm.trim().toLowerCase();
+      filtered = filtered.filter(claim => {
+        const claimUser = users.find(u => u.uid === claim.uid);
+        const title = getClaimTitle(claim) || '';
+        const claimIdMatch = claim.claimId ? claim.claimId.toLowerCase().includes(lowerCaseSearch) : false;
+        const userNameMatch = claim.userName ? claim.userName.toLowerCase().includes(lowerCaseSearch) : false;
+        const titleMatch = title.toLowerCase().includes(lowerCaseSearch);
+        const emailMatch = claim.userEmail ? claim.userEmail.toLowerCase().includes(lowerCaseSearch) : false;
+        const misIdMatch = claimUser?.misId ? claimUser.misId.toLowerCase().includes(lowerCaseSearch) : false;
+        
+        return claimIdMatch || userNameMatch || titleMatch || emailMatch || misIdMatch;
+      });
     }
     return filtered;
   }, [allClaims, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, users]);
@@ -558,8 +564,19 @@ export default function ManageIncentiveClaimsPage() {
               <Input
                   placeholder="Filter by claimant, title, or Claim ID..."
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setSearchTerm(value);
+                    setCurrentPage(1);
+                    setSelectedClaims([]);
+                  }}
+                  onInput={(event) => {
+                    const value = (event.target as HTMLInputElement).value;
+                    setSearchTerm(value);
+                  }}
                   className="max-w-sm"
+                  type="text"
+                  autoComplete="off"
               />
               {selectedClaims.length === 0 && (
                 <>
