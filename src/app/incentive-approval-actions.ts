@@ -7,7 +7,7 @@ import type { IncentiveClaim, SystemSettings, ApprovalStage, User, ResearchPaper
 import { getSystemSettings } from './actions';
 import { isEligibleForFinancialDisbursement } from '@/lib/incentive-eligibility';
 import { sendEmail } from '@/lib/email';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue } from 'firebase-admin/firestore';
 import { getDefaultModulesForRole } from '@/lib/modules';
 
 const EMAIL_STYLES = {
@@ -163,7 +163,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
                 for (const chunk of userChunks) {
                     if (chunk.length === 0) continue;
-                    const coAuthorUsersSnapshot = await usersRef.where(adminDb.firestore.FieldPath.documentId(), 'in', chunk).get();
+                    const coAuthorUsersSnapshot = await usersRef.where(FieldPath.documentId(), 'in', chunk).get();
                     
                     for (const userDoc of coAuthorUsersSnapshot.docs) {
                         const coAuthorUser = { uid: userDoc.id, ...userDoc.data() } as User;
