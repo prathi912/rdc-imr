@@ -130,13 +130,19 @@ export default function ManageIncentiveClaimsPage() {
   };
 
   const uniqueFaculties = useMemo(() => {
-    const faculties = new Set(allClaims.map(claim => claim.faculty).filter(Boolean));
+    const faculties = new Set(
+      allClaims
+        .map(claim => claim.faculty)
+        .filter((faculty): faculty is string => Boolean(faculty) && typeof faculty === 'string')
+    );
     return Array.from(faculties).sort();
   }, [allClaims]);
 
   const uniqueInstitutes = useMemo(() => {
     const institutes = new Set(
-      users.map(u => u.institute).filter(Boolean)
+      users
+        .map(u => u.institute)
+        .filter((institute): institute is string => Boolean(institute) && typeof institute === 'string')
     );
     return Array.from(institutes).sort();
   }, [users]);

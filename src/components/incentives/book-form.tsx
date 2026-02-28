@@ -406,7 +406,6 @@ export function BookForm() {
             bookSelfDeclaration: data.bookSelfDeclaration,
             calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
             misId: user.misId,
-            orcidId: user.orcidId,
             claimType: 'Books',
             benefitMode: 'incentives',
             uid: user.uid,
@@ -415,7 +414,6 @@ export function BookForm() {
             faculty: user.faculty,
             status,
             submissionDate: new Date().toISOString(),
-            bankDetails: user.bankDetails,
         };
         
         if (bookProofUrl) claimData.bookProofUrl = bookProofUrl;

@@ -55,6 +55,8 @@ export interface ArpsData {
 
 interface ArpsResultsDisplayProps {
     results: ArpsData;
+    evaluationYear?: string;
+    evaluationWindow?: string;
 }
 
 const FormulaCard = ({ title, steps, result, icon: Icon }: { title: string, steps: { label: string, value: string }[], result: { label: string, value: string }, icon: React.ElementType }) => (
@@ -85,7 +87,7 @@ const getClaimant = (claim: IncentiveClaim): Author | undefined => {
     return claim.authors?.find(a => a.uid === claim.uid);
 };
 
-export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
+export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }: ArpsResultsDisplayProps) {
     const { publications, patents, emr, totalArps, grade } = results;
 
     const totalRawScore = publications.raw + patents.raw + emr.raw;
@@ -93,6 +95,24 @@ export function ArpsResultsDisplay({ results }: ArpsResultsDisplayProps) {
 
     return (
         <div className="mt-8 space-y-12">
+            {/* Evaluation Period Info */}
+            {evaluationYear && evaluationWindow && (
+                <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+                    <CardContent className="pt-6">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <p className="text-muted-foreground font-medium">Evaluation Year</p>
+                                <p className="text-lg font-semibold">{evaluationYear}</p>
+                            </div>
+                            <div>
+                                <p className="text-muted-foreground font-medium">Evaluation Period</p>
+                                <p className="text-lg font-semibold">{evaluationWindow}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* --- Publications Section --- */}
             <div className="space-y-6">
                 <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2"><FileText className="h-6 w-6"/> I. Publications Scoring Breakdown</h2>

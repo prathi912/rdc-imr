@@ -108,7 +108,7 @@ export default function ArpsCalculatorPage() {
             };
             const instituteFullName = getFullInstituteName(selectedUser?.institute);
 
-            const evaluationWindow = `01-Jun-${selectedYear} to 31-May-${Number(selectedYear) + 1}`;
+            const evaluationWindow = `01-Jun-${Number(selectedYear) - 1} to 31-May-${selectedYear}`;
             const safeName = (selectedUser?.name || 'faculty').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '_');
 
             const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -355,7 +355,11 @@ export default function ArpsCalculatorPage() {
                             Download PDF Report
                         </Button>
                     </div>
-                    <ArpsResultsDisplay results={results} />
+                    <ArpsResultsDisplay 
+                        results={results} 
+                        evaluationYear={selectedYear}
+                        evaluationWindow={`01-Jun-${Number(selectedYear) - 1} to 31-May-${selectedYear}`}
+                    />
                 </div>
             )}
         </div>

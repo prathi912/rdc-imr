@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { submitIncentiveClaim } from "@/app/incentive-approval-actions";
-import { gunzip } from "zlib";
-import { promisify } from "util";
-
-const gunzipAsync = promisify(gunzip);
 
 function ensureFirebaseAdminInitialized() {
   if (getApps().length) return;
@@ -46,17 +42,8 @@ export async function POST(req: NextRequest) {
     }
 
     let body: any;
-    const encoding = req.headers.get("content-encoding");
-
-    if (encoding === "gzip") {
-      // Handle gzip-compressed requests
-      const buffer = await req.arrayBuffer();
-      const decompressed = await gunzipAsync(Buffer.from(buffer));
-      body = JSON.parse(decompressed.toString("utf-8"));
-    } else {
-      // Handle normal JSON requests
-      body = await req.json();
-    }
+    
+    body = await req.json();
 
     const claimData = body?.claimData;
     const claimIdToUpdate = body?.claimIdToUpdate as string | undefined;
