@@ -1,5 +1,9 @@
 import { auth } from "@/lib/config";
 import type { IncentiveClaim } from "@/types";
+import { gzip } from "zlib";
+import { promisify } from "util";
+
+const gzipAsync = promisify(gzip);
 
 export async function submitIncentiveClaimViaApi(
   claimData: Omit<IncentiveClaim, "id" | "claimId">,
@@ -12,14 +16,43 @@ export async function submitIncentiveClaimViaApi(
     }
 
     const token = await user.getIdToken();
+    
+    const payload = { claimData, claimIdToUpdate };
+    const jsonString = JSON.stringify(payload);
+    
+    // Check if payload is large enough to compress (typically >1KB)
+    let body: Uint8Array | string;
+    let contentEncoding: string | null = null;
+    
+    if (jsonString.length > 1024) {
+      // Compress large payloads
+      try {
+        const buffer = Buffer.from(jsonString, 'utf-8');
+        const compressed = await gzipAsync(buffer);
+        body = new Uint8Array(compressed);
+        contentEncoding = 'gzip';
+      } catch {
+        // Fall back to uncompressed if compression fails
+        body = jsonString;
+      }
+    } else {
+      // Small payloads don't need compression
+      body = jsonString;
+    }
+
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    };
+    
+    if (contentEncoding) {
+      headers["Content-Encoding"] = contentEncoding;
+    }
 
     const response = await fetch("/api/incentive-claims", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify({ claimData, claimIdToUpdate }),
+      headers,
+      body,
     });
 
     if (!response.ok) {

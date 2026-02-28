@@ -368,11 +368,45 @@ export function BookForm() {
         // Create a clean data object without the file objects
         const { bookProof, scopusProof, ...restOfData } = data;
 
+        // Optimize authors array - only send essential fields to reduce payload size
+        const optimizedAuthors = (data.authors || []).map(author => ({
+            name: author.name,
+            email: author.email,
+            uid: author.uid || null,
+            role: author.role,
+            isExternal: author.isExternal,
+            status: author.status,
+        }));
+
         const claimData: Partial<IncentiveClaim> = {
-            ...restOfData,
+            bookApplicationType: data.bookApplicationType,
+            publicationTitle: data.publicationTitle,
+            authors: optimizedAuthors,
+            bookTitleForChapter: data.bookTitleForChapter,
+            bookEditor: data.bookEditor,
+            totalPuStudents: data.totalPuStudents,
+            puStudentNames: data.puStudentNames,
+            bookChapterPages: data.bookChapterPages,
+            bookTotalPages: data.bookTotalPages,
+            bookTotalChapters: data.bookTotalChapters,
+            chaptersInSameBook: data.chaptersInSameBook,
+            publicationYear: data.publicationYear,
+            publisherName: data.publisherName,
+            publisherCity: data.publisherCity,
+            publisherCountry: data.publisherCountry,
+            publisherType: data.publisherType,
+            isScopusIndexed: data.isScopusIndexed,
+            authorRole: data.authorRole,
+            publicationMode: data.publicationMode,
+            isbnPrint: data.isbnPrint,
+            isbnElectronic: data.isbnElectronic,
+            publisherWebsite: data.publisherWebsite,
+            publicationOrderInYear: data.publicationOrderInYear,
+            bookType: data.bookType,
+            bookSelfDeclaration: data.bookSelfDeclaration,
             calculatedIncentive: calculationResult.success ? calculationResult.amount : 0,
-            misId: user.misId || null,
-            orcidId: user.orcidId || null,
+            misId: user.misId,
+            orcidId: user.orcidId,
             claimType: 'Books',
             benefitMode: 'incentives',
             uid: user.uid,
@@ -381,14 +415,16 @@ export function BookForm() {
             faculty: user.faculty,
             status,
             submissionDate: new Date().toISOString(),
-            bankDetails: user.bankDetails || null,
+            bankDetails: user.bankDetails,
         };
         
         if (bookProofUrl) claimData.bookProofUrl = bookProofUrl;
         if (scopusProofUrl) claimData.scopusProofUrl = scopusProofUrl;
         
+        // Remove undefined and null values to reduce payload size
         Object.keys(claimData).forEach(key => {
-            if ((claimData as any)[key] === undefined) {
+            const value = (claimData as any)[key];
+            if (value === undefined || value === null) {
                 delete (claimData as any)[key];
             }
         });
