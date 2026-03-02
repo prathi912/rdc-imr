@@ -8,14 +8,14 @@ import { parseISO, getYear } from 'date-fns';
 // --- Policy Constants ---
 const POLICY = {
     WEIGHTAGE: {
-        PUBLICATION: 0.50,
-        PATENT: 0.15,
-        EMR: 0.15,
+        PUBLICATION: 0.80,
+        PATENT: 0.05,
+        EMR: 0.05,
     },
     CAPS: {
-        PUBLICATION: 50,
-        PATENT: 15,
-        EMR: 15,
+        PUBLICATION: 80,
+        PATENT: 5,
+        EMR: 5,
     },
     MIN_PUBLICATIONS_REQUIRED: 10,
 };
