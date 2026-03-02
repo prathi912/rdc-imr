@@ -148,9 +148,9 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
                     icon={Target}
                     steps={[
                         { label: 'Sum of all Publication Raw Scores', value: publications.raw.toFixed(2) },
-                        { label: '× Weightage (as per policy)', value: '× 0.50' },
+                        { label: '× Weightage (as per policy)', value: '× 0.80' },
                         { label: '= Weighted Score', value: `= ${publications.weighted.toFixed(2)}` },
-                        { label: 'Maximum Score (Cap)', value: '50.00' },
+                        { label: 'Maximum Score (Cap)', value: '80.00' },
                     ]}
                     result={{ label: 'Final Score P(pub) = min(Weighted Score, Cap)', value: publications.final.toFixed(2) }}
                 />
