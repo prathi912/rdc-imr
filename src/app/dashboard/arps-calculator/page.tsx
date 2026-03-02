@@ -28,6 +28,35 @@ export default function ArpsCalculatorPage() {
     const router = useRouter();
     const { toast } = useToast();
 
+    const parseEmrAmountAndDuration = (durationAmount?: string) => {
+        const raw = durationAmount || '';
+        const amountMatch = raw.match(/Amount\s*:\s*[^\d]*([\d,]+(?:\.\d+)?)/i);
+        const durationMatch = raw.match(/Duration\s*:\s*([^|]+)/i);
+
+        const amount = amountMatch ? amountMatch[1].trim() : '';
+        const duration = durationMatch ? durationMatch[1].trim() : '';
+
+        return {
+            amount: amount ? `₹${amount}` : 'N/A',
+            duration: duration || 'N/A',
+        };
+    };
+
+    const formatEmrSanctionDate = (dateValue?: string) => {
+        if (!dateValue) return 'N/A';
+        const parsed = new Date(dateValue);
+        if (isNaN(parsed.getTime())) return 'N/A';
+        return parsed.toLocaleDateString('en-GB');
+    };
+
+    const getSanctionProofUrl = (project: { finalProofUrl?: string; proofUrl?: string; agencyAcknowledgementUrl?: string }) => {
+        return project.finalProofUrl || project.proofUrl || project.agencyAcknowledgementUrl || '';
+    };
+
+    const getPublicationProofUrl = (claim: { publicationProofUrls?: string[] }) => {
+        return claim.publicationProofUrls?.[0] || '';
+    };
+
     const isSuperAdmin = currentUser?.role === 'Super-admin';
 
     useEffect(() => {
@@ -198,7 +227,13 @@ export default function ArpsCalculatorPage() {
                 margin: { left: margin, right: margin },
             });
 
-            const addSection = (title: string, head: string[], body: (string | number)[][], footerRow?: (string | number)[]) => {
+            const addSection = (
+                title: string,
+                head: string[],
+                body: (string | number)[][],
+                footerRow?: (string | number)[],
+                linkByRowIndex?: Record<number, string>
+            ) => {
                 let y = ((doc as any).lastAutoTable?.finalY || 20) + 8;
                 if (y > pageHeight - 40) {
                     doc.addPage();
@@ -219,6 +254,22 @@ export default function ArpsCalculatorPage() {
                     footStyles: { fillColor: [226, 232, 240], textColor: 20, fontStyle: 'bold' },
                     styles: { fontSize: 8, cellPadding: 1.8, overflow: 'linebreak' },
                     margin: { left: margin, right: margin },
+                    didParseCell: (data: any) => {
+                        if (!linkByRowIndex) return;
+                        if (data.section !== 'body') return;
+                        if (data.column.index !== 1) return;
+                        const url = linkByRowIndex[data.row.index];
+                        if (!url) return;
+                        data.cell.styles.textColor = [37, 99, 235];
+                    },
+                    didDrawCell: (data: any) => {
+                        if (!linkByRowIndex) return;
+                        if (data.section !== 'body') return;
+                        if (data.column.index !== 1) return;
+                        const url = linkByRowIndex[data.row.index];
+                        if (!url) return;
+                        doc.link(data.cell.x, data.cell.y, data.cell.width, data.cell.height, { url });
+                    },
                 });
             };
 
@@ -236,7 +287,12 @@ export default function ArpsCalculatorPage() {
                     (calculation.authorMultiplier ?? 1).toFixed(2),
                     score.toFixed(2),
                 ]),
-                ['', '', '', '', 'Total', '', '', '', `Raw: ${results.publications.raw.toFixed(2)} | Score: ${results.publications.final.toFixed(2)}`]
+                ['', '', '', '', 'Total', '', '', '', `Raw: ${results.publications.raw.toFixed(2)} | Score: ${results.publications.final.toFixed(2)}`],
+                results.publications.contributingClaims.reduce((acc, { claim }, index) => {
+                    const url = getPublicationProofUrl(claim);
+                    if (url) acc[index] = url;
+                    return acc;
+                }, {} as Record<number, string>)
             );
 
             addSection(
@@ -257,14 +313,24 @@ export default function ArpsCalculatorPage() {
 
             addSection(
                 'EMR Projects Details',
-                ['Project ID', 'Project Title', 'Amount/Duration', 'Raw Score'],
-                results.emr.contributingProjects.map(({ project, score }) => [
-                    project.interestId || project.id,
-                    project.callTitle || '',
-                    project.durationAmount || '',
-                    score.toFixed(2),
-                ]),
-                ['', 'Total', '', `Raw: ${results.emr.raw.toFixed(2)} | Score: ${results.emr.final.toFixed(2)}`]
+                ['Project ID', 'Project Title', 'Sanction Date', 'Amount', 'Duration', 'Raw Score'],
+                results.emr.contributingProjects.map(({ project, score }) => {
+                    const { amount, duration } = parseEmrAmountAndDuration(project.durationAmount);
+                    return [
+                        project.interestId || project.id,
+                        project.callTitle || '',
+                        formatEmrSanctionDate(project.sanctionDate),
+                        amount,
+                        duration,
+                        score.toFixed(2),
+                    ];
+                }),
+                ['', 'Total', '', '', '', `Raw: ${results.emr.raw.toFixed(2)} | Score: ${results.emr.final.toFixed(2)}`],
+                results.emr.contributingProjects.reduce((acc, { project }, index) => {
+                    const url = getSanctionProofUrl(project);
+                    if (url) acc[index] = url;
+                    return acc;
+                }, {} as Record<number, string>)
             );
 
             const totalPages = doc.getNumberOfPages();

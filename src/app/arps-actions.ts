@@ -14,8 +14,8 @@ const POLICY = {
     },
     CAPS: {
         PUBLICATION: 80,
-        PATENT: 15,
-        EMR: 15,
+        PATENT: 5,
+        EMR: 5,
     },
     MIN_PUBLICATIONS_REQUIRED: 10,
 };
@@ -23,6 +23,60 @@ const POLICY = {
 // --- Helper Functions ---
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+function parseProjectDate(project: EmrInterest): Date | null {
+    const rawDate = (project as any).sanctionDate ?? project.registeredAt;
+    if (!rawDate) return null;
+
+    if (typeof rawDate === 'string') {
+        const isoParsed = parseISO(rawDate);
+        if (!isNaN(isoParsed.getTime())) return isoParsed;
+
+        const cleaned = rawDate.replace(/(\d+)(st|nd|rd|th)/gi, '$1').trim();
+        const fallbackParsed = new Date(cleaned);
+        if (!isNaN(fallbackParsed.getTime())) return fallbackParsed;
+        return null;
+    }
+
+    if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
+        return rawDate;
+    }
+
+    if (typeof rawDate === 'object' && typeof (rawDate as any).toDate === 'function') {
+        const dateValue = (rawDate as any).toDate();
+        if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+            return dateValue;
+        }
+    }
+
+    return null;
+}
+
+function parseProjectAmount(project: EmrInterest): number {
+    const directAmount = (project as any).sanctionAmount;
+    if (typeof directAmount === 'number' && directAmount > 0) {
+        return directAmount;
+    }
+    if (typeof directAmount === 'string') {
+        const numeric = parseFloat(directAmount.replace(/[^\d.]/g, ''));
+        if (!isNaN(numeric) && numeric > 0) return numeric;
+    }
+
+    const durationAmount = project.durationAmount || '';
+    const labelledMatch = durationAmount.match(/Amount\s*:\s*[^\d]*([\d,]+(?:\.\d+)?)/i);
+    if (labelledMatch) {
+        const value = parseFloat(labelledMatch[1].replace(/,/g, ''));
+        if (!isNaN(value) && value > 0) return value;
+    }
+
+    const anyNumberMatch = durationAmount.match(/([\d,]+(?:\.\d+)?)/);
+    if (anyNumberMatch) {
+        const value = parseFloat(anyNumberMatch[1].replace(/,/g, ''));
+        if (!isNaN(value) && value > 0) return value;
+    }
+
+    return 0;
+}
 
 // Multiplier for Journal Publications (Policy 5.2.3)
 function getJournalAuthorPositionMultiplier(claimantRole: Author['role'], authorPosition?: string): number {
@@ -224,40 +278,41 @@ function calculateEmrScore(projects: EmrInterest[], userId: string, startDate: D
     const contributingProjects: { project: EmrInterest, score: number, calculation: CalculationDetails }[] = [];
     
     for (const project of projects) {
-        if (project.status !== 'Sanctioned' && project.status !== 'SANCTIONED') continue;
-        if (!project.sanctionDate) continue;
-        const sanctionDate = parseISO(project.sanctionDate);
-        if (sanctionDate < startDate || sanctionDate > endDate) continue;
+        const normalizedStatus = String(project.status || '').trim().toUpperCase();
+        if (normalizedStatus !== 'SANCTIONED') continue;
 
-        let amount = 0;
-        if (project.sanctionAmount) {
-            amount = project.sanctionAmount;
-        } else if (project.durationAmount) {
-            const amountMatch = project.durationAmount.match(/Amount:\s*([\d,]+)/);
-            if (amountMatch) {
-                amount = parseInt(amountMatch[1].replace(/,/g, ''), 10);
-            }
-        }
+        const projectDate = parseProjectDate(project);
+        if (!projectDate) continue;
+        if (projectDate < startDate || projectDate > endDate) continue;
+
+        const amount = parseProjectAmount(project);
         if (amount === 0) continue;
 
         const isPI = project.userId === userId;
-        const isCoPi = !isPI && project.coPiUids?.includes(userId);
+        const isCoPi = !isPI && (
+            project.coPiUids?.includes(userId) ||
+            project.coPiDetails?.some((coPi) => coPi.uid === userId)
+        );
 
         let projectScore = 0;
         if (amount >= 2000000 && amount <= 5000000) {
-            if (isPI) projectScore = 50;
-            else if (isCoPi) projectScore = 15;
-        } else if (amount > 5000000 && amount <= 10000000) {
-            if (isPI) projectScore = 70;
-            else if (isCoPi) projectScore = 20;
-        } else if (amount > 10000000) {
             if (isPI) projectScore = 100;
-            else if (isCoPi) projectScore = 25;
+            else if (isCoPi) projectScore = 30;
+        } else if (amount > 5000000 && amount <= 10000000) {
+            if (isPI) projectScore = 120;
+            else if (isCoPi) projectScore = 40;
+        } else if (amount > 10000000) {
+            if (isPI) projectScore = 150;
+            else if (isCoPi) projectScore = 50;
         }
 
         if (projectScore > 0) {
             score += projectScore;
-            contributingProjects.push({ project, score: projectScore, calculation: { rolePoints: projectScore } });
+            contributingProjects.push({
+                project,
+                score: projectScore,
+                calculation: { rolePoints: projectScore, role: isPI ? 'PI' : 'Co-PI' }
+            });
         }
     }
     return { score: round(score), contributingProjects };
@@ -275,10 +330,9 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const claimsQuery = claimsRef.where('uid', '==', userId);
     
     const emrRef = adminDb.collection('emrInterests');
-    const sanctionedStatuses = ['Sanctioned', 'SANCTIONED'];
 
-    const emrPiQuery = emrRef.where('userId', '==', userId).where('status', 'in', sanctionedStatuses);
-    const emrCoPiQuery = emrRef.where('coPiUids', 'array-contains', userId).where('status', 'in', sanctionedStatuses);
+    const emrPiQuery = emrRef.where('userId', '==', userId);
+    const emrCoPiQuery = emrRef.where('coPiUids', 'array-contains', userId);
 
     const [claimsSnapshot, emrPiSnapshot, emrCoPiSnapshot] = await Promise.all([
       claimsQuery.get(),
@@ -352,10 +406,11 @@ export async function calculateArpsForUser(userId: string, year: number) {
 
 
 type CalculationDetails = {
-    base: number;
+    base?: number;
     multiplier?: number;
     quartileMultiplier?: number;
     authorMultiplier?: number;
     applicantMultiplier?: number;
     rolePoints?: number;
+    role?: 'PI' | 'Co-PI';
 };

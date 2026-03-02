@@ -10,12 +10,13 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 
 type CalculationDetails = {
-    base: number;
+    base?: number;
     multiplier?: number;
     quartileMultiplier?: number;
     authorMultiplier?: number;
     applicantMultiplier?: number;
     rolePoints?: number;
+    role?: 'PI' | 'Co-PI';
 };
 
 export interface ArpsData {
@@ -93,6 +94,35 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
     const totalRawScore = publications.raw + patents.raw + emr.raw;
     const totalWeightedScore = publications.weighted + patents.weighted + emr.weighted;
 
+    const parseEmrAmountAndDuration = (durationAmount?: string) => {
+        const raw = durationAmount || '';
+        const amountMatch = raw.match(/Amount\s*:\s*[^\d]*([\d,]+(?:\.\d+)?)/i);
+        const durationMatch = raw.match(/Duration\s*:\s*([^|]+)/i);
+
+        const amount = amountMatch ? amountMatch[1].trim() : '';
+        const duration = durationMatch ? durationMatch[1].trim() : '';
+
+        return {
+            amount: amount ? `₹${amount}` : 'N/A',
+            duration: duration || 'N/A',
+        };
+    };
+
+    const formatEmrSanctionDate = (dateValue?: string) => {
+        if (!dateValue) return 'N/A';
+        const parsed = new Date(dateValue);
+        if (isNaN(parsed.getTime())) return 'N/A';
+        return parsed.toLocaleDateString('en-GB');
+    };
+
+    const getSanctionProofUrl = (project: EmrInterest) => {
+        return project.finalProofUrl || project.proofUrl || project.agencyAcknowledgementUrl || '';
+    };
+
+    const getPublicationProofUrl = (claim: IncentiveClaim) => {
+        return claim.publicationProofUrls?.[0] || '';
+    };
+
     return (
         <div className="mt-8 space-y-12">
             {/* Evaluation Period Info */}
@@ -122,10 +152,17 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
                         <CardDescription>Each approved publication is scored based on its type, journal quality, and your role as an author. The formula is: <br/> <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Base Points × Quartile Multiplier × Author Multiplier</code></CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {publications.contributingClaims.length > 0 ? publications.contributingClaims.map(({ claim, score, calculation }) => (
-                            <div key={claim.id} className="p-4 border rounded-lg bg-background/50">
+                        {publications.contributingClaims.length > 0 ? publications.contributingClaims.map(({ claim, score, calculation }) => {
+                            const publicationProofUrl = getPublicationProofUrl(claim);
+                            return <div key={claim.id} className="p-4 border rounded-lg bg-background/50">
                                 <div className="flex justify-between items-start gap-4">
-                                    <h4 className="font-semibold flex-1">{claim.paperTitle || claim.publicationTitle}</h4>
+                                    {publicationProofUrl ? (
+                                        <a href={publicationProofUrl} target="_blank" rel="noopener noreferrer" className="font-semibold flex-1 underline underline-offset-4 hover:text-primary">
+                                            {claim.paperTitle || claim.publicationTitle}
+                                        </a>
+                                    ) : (
+                                        <h4 className="font-semibold flex-1">{claim.paperTitle || claim.publicationTitle}</h4>
+                                    )}
                                     {claim.claimId && <Badge variant="outline">{claim.claimId}</Badge>}
                                 </div>
                                 <div className="overflow-x-auto">
@@ -139,7 +176,7 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
                                     </Table>
                                 </div>
                             </div>
-                        )) : <p className="text-muted-foreground text-center py-4">No contributing publications found in this period.</p>}
+                        }) : <p className="text-muted-foreground text-center py-4">No contributing publications found in this period.</p>}
                     </CardContent>
                 </Card>
 
@@ -202,18 +239,31 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
                         <CardDescription>Each sanctioned project is awarded points based on the funding amount and your role. The formula is: <br/> <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Role Points</code></CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {emr.contributingProjects.length > 0 ? emr.contributingProjects.map(({ project, score }) => (
-                            <div key={project.id} className="p-4 border rounded-lg bg-background/50">
+                        {emr.contributingProjects.length > 0 ? emr.contributingProjects.map(({ project, score, calculation }) => {
+                            const proofUrl = getSanctionProofUrl(project);
+                            const { amount, duration } = parseEmrAmountAndDuration(project.durationAmount);
+
+                            return <div key={project.id} className="p-4 border rounded-lg bg-background/50">
                                 <div className="flex justify-between items-start gap-4">
-                                    <h4 className="font-semibold flex-1">{project.callTitle}</h4>
+                                    {proofUrl ? (
+                                        <a href={proofUrl} target="_blank" rel="noopener noreferrer" className="font-semibold flex-1 underline underline-offset-4 hover:text-primary">
+                                            {project.callTitle}
+                                        </a>
+                                    ) : (
+                                        <h4 className="font-semibold flex-1">{project.callTitle}</h4>
+                                    )}
                                     {project.interestId && <Badge variant="outline">{project.interestId}</Badge>}
                                 </div>
                                 <Table className="mt-2 text-sm"><TableBody>
-                                    <TableRow><TableCell className="w-[70%]">Points for role as <strong>{project.userId === project.userId ? 'PI' : 'Co-PI'}</strong> with sanctioned {project.durationAmount}</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell className="w-[70%]">Points for role as <strong>{calculation.role ?? 'Co-PI'}</strong></TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
+                                    <TableRow><TableCell>Sanction Date</TableCell><TableCell className="text-right font-mono">{formatEmrSanctionDate(project.sanctionDate)}</TableCell></TableRow>
+                                    <TableRow><TableCell>Amount</TableCell><TableCell className="text-right font-mono">{amount}</TableCell></TableRow>
+                                    <TableRow><TableCell>Duration</TableCell><TableCell className="text-right font-mono">{duration}</TableCell></TableRow>
+                                    {proofUrl && <TableRow><TableCell>Sanction Proof</TableCell><TableCell className="text-right font-mono break-all">Available</TableCell></TableRow>}
                                     <TableRow className="font-bold border-t-2 border-primary/20"><TableCell>= Raw Score for this Project</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
                                 </TableBody></Table>
                             </div>
-                        )) : <p className="text-muted-foreground text-center py-4">No contributing EMR projects found in this period.</p>}
+                        }) : <p className="text-muted-foreground text-center py-4">No contributing EMR projects found in this period.</p>}
                     </CardContent>
                 </Card>
                 <FormulaCard
