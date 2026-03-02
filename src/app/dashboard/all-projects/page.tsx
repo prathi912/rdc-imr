@@ -79,7 +79,8 @@ const addEmrSchema = z.object({
     title: z.string().min(5, 'Project title is required.'),
     agency: z.string().min(2, 'Funding agency is required.'),
     sanctionDate: z.date().optional(),
-    durationAmount: z.string().min(3, 'Please provide amount and/or duration details.'),
+    amount: z.coerce.number().min(0, 'Amount cannot be negative.').optional(),
+    duration: z.coerce.number().min(0, 'Duration cannot be negative.').optional(),
 });
 
 function AddSanctionedEmrDialog({ isOpen, onOpenChange, onActionComplete }: { isOpen: boolean; onOpenChange: (open: boolean) => void; onActionComplete: () => void; }) {
@@ -135,8 +136,24 @@ function AddSanctionedEmrDialog({ isOpen, onOpenChange, onActionComplete }: { is
         }
         setIsSubmitting(true);
         try {
+            // Construct durationAmount from separate fields
+            let durationAmount = '';
+            if (values.amount !== undefined && values.amount > 0) {
+                durationAmount += `Amount: ₹${values.amount.toLocaleString('en-IN')}`;
+            }
+            if (values.duration !== undefined && values.duration > 0) {
+                if (durationAmount) durationAmount += ' | ';
+                durationAmount += `Duration: ${values.duration} Years`;
+            }
+            if (!durationAmount) {
+                durationAmount = 'Not specified';
+            }
+
             const result = await addSanctionedEmrProject({
-                ...values,
+                title: values.title,
+                agency: values.agency,
+                sanctionDate: values.sanctionDate,
+                durationAmount,
                 pi: { uid: pi.uid, name: pi.name, email: pi.email },
                 coPis,
             });
@@ -192,7 +209,8 @@ function AddSanctionedEmrDialog({ isOpen, onOpenChange, onActionComplete }: { is
                         <FormField name="title" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Project Title *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="agency" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Funding Agency *</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                         <FormField name="sanctionDate" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Date of Sanction</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={2015} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
-                        <FormField name="durationAmount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Duration & Amount *</FormLabel><FormControl><Input placeholder="e.g., Amount: 50,00,000 | Duration: 3 Years" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="amount" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount (₹)</FormLabel><FormControl><Input type="number" min="0" placeholder="e.g., 5000000" {...field} /></FormControl><FormMessage /></FormItem> )} />
+                        <FormField name="duration" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Duration (Years)</FormLabel><FormControl><Input type="number" min="0" step="0.5" placeholder="e.g., 3" {...field} /></FormControl><FormMessage /></FormItem> )} />
                     </form>
                 </Form>
                  <DialogFooter>

@@ -23,14 +23,12 @@ function getVerificationMark(approval: ApprovalStage | null | undefined, fieldId
 }
 
 export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, claimant, onTakeAction }: { claim: IncentiveClaim | null, open: boolean, onOpenChange: (open: boolean) => void, currentUser: User | null, claimant: User | null, onTakeAction?: () => void }) {
-    if (!claim) return null;
-
     const { toast } = useToast();
     const [isPrinting, setIsPrinting] = useState(false);
 
     // Check if amount hasn't been changed by any approver
     const isAmountUnchanged = useMemo(() => {
-        if (claim.claimType === 'Research Papers' && claim.calculatedIncentive && claim.finalApprovedAmount) {
+        if (claim && claim.claimType === 'Research Papers' && claim.calculatedIncentive && claim.finalApprovedAmount) {
             // If the amounts match, it means no approver has changed the amount
             return claim.calculatedIncentive === claim.finalApprovedAmount;
         }
@@ -39,7 +37,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
 
     // Calculate incentive breakdown for research papers
     const calculateIncentiveBreakdown = () => {
-        if (claim.claimType !== 'Research Papers') return null;
+        if (!claim || claim.claimType !== 'Research Papers') return null;
         
         try {
             const { journalClassification, publicationType, wasApcPaidByUniversity, isPuNameInPublication, authors = [] } = claim;
@@ -239,6 +237,10 @@ a.href = url;
           </dd>
         </div>
       );
+    }
+
+    if (!claim) {
+        return null;
     }
 
     const isFullAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';

@@ -111,7 +111,7 @@ export default function ArpsCalculatorPage() {
             const evaluationWindow = `01-Jun-${Number(selectedYear) - 1} to 31-May-${selectedYear}`;
             const safeName = (selectedUser?.name || 'faculty').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '_');
 
-            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
             const margin = 12;
@@ -198,7 +198,7 @@ export default function ArpsCalculatorPage() {
                 margin: { left: margin, right: margin },
             });
 
-            const addSection = (title: string, head: string[], body: (string | number)[][]) => {
+            const addSection = (title: string, head: string[], body: (string | number)[][], footerRow?: (string | number)[]) => {
                 let y = ((doc as any).lastAutoTable?.finalY || 20) + 8;
                 if (y > pageHeight - 40) {
                     doc.addPage();
@@ -212,9 +212,11 @@ export default function ArpsCalculatorPage() {
                 autoTable(doc, {
                     startY: y + 2,
                     head: [head],
-                    body: body.length ? body : [['No records found', '', '', '', '', '', '', '']],
+                    body: body.length ? body : [Array(head.length).fill('No records found')],
+                    foot: footerRow ? [footerRow] : undefined,
                     theme: 'striped',
                     headStyles: { fillColor: [51, 65, 85], textColor: 255 },
+                    footStyles: { fillColor: [226, 232, 240], textColor: 20, fontStyle: 'bold' },
                     styles: { fontSize: 8, cellPadding: 1.8, overflow: 'linebreak' },
                     margin: { left: margin, right: margin },
                 });
@@ -222,7 +224,7 @@ export default function ArpsCalculatorPage() {
 
             addSection(
                 'Publications Details',
-                ['Claim ID', 'Title', 'Type', 'Quartile', 'Author Pos.', 'Base', 'Multiplier', 'Raw Score'],
+                ['Claim ID', 'Title', 'Type', 'Quartile', 'Author Pos.', 'Base', 'Q-Mult.', 'A-Mult.', 'Raw Score'],
                 results.publications.contributingClaims.map(({ claim, score, calculation }) => [
                     claim.claimId || claim.id,
                     claim.paperTitle || claim.publicationTitle || '',
@@ -230,14 +232,16 @@ export default function ArpsCalculatorPage() {
                     claim.journalClassification || '',
                     claim.authorPosition || '',
                     calculation.base.toFixed(2),
-                    String(calculation.multiplier ?? calculation.quartileMultiplier ?? 1),
+                    (calculation.multiplier ?? calculation.quartileMultiplier ?? 1).toFixed(2),
+                    (calculation.authorMultiplier ?? 1).toFixed(2),
                     score.toFixed(2),
-                ])
+                ]),
+                ['', '', '', '', 'Total', '', '', '', `Raw: ${results.publications.raw.toFixed(2)} | Score: ${results.publications.final.toFixed(2)}`]
             );
 
             addSection(
                 'Patents Details',
-                ['Claim ID', 'Title', 'Status', 'Locale', 'Sole Applicant', 'Base', 'Multiplier', 'Raw Score'],
+                ['Claim ID', 'Title', 'Status', 'Locale', 'Sole Applicant', 'Base', 'Appl-Mult.', 'Raw Score'],
                 results.patents.contributingClaims.map(({ claim, score, calculation }) => [
                     claim.claimId || claim.id,
                     claim.patentTitle || '',
@@ -245,24 +249,22 @@ export default function ArpsCalculatorPage() {
                     claim.patentLocale || '',
                     claim.isPuSoleApplicant ? 'Yes' : 'No',
                     calculation.base.toFixed(2),
-                    String(calculation.applicantMultiplier ?? ''),
+                    (calculation.applicantMultiplier ?? 1).toFixed(2),
                     score.toFixed(2),
-                ])
+                ]),
+                ['', '', '', 'Total', '', '', '', `Raw: ${results.patents.raw.toFixed(2)} | Score: ${results.patents.final.toFixed(2)}`]
             );
 
             addSection(
                 'EMR Projects Details',
-                ['Project ID', 'Project Title', 'Amount/Duration', 'Raw Score', '', '', '', ''],
+                ['Project ID', 'Project Title', 'Amount/Duration', 'Raw Score'],
                 results.emr.contributingProjects.map(({ project, score }) => [
                     project.interestId || project.id,
                     project.callTitle || '',
                     project.durationAmount || '',
                     score.toFixed(2),
-                    '',
-                    '',
-                    '',
-                    '',
-                ])
+                ]),
+                ['', 'Total', '', `Raw: ${results.emr.raw.toFixed(2)} | Score: ${results.emr.final.toFixed(2)}`]
             );
 
             const totalPages = doc.getNumberOfPages();
