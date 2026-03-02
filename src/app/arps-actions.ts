@@ -14,8 +14,8 @@ const POLICY = {
     },
     CAPS: {
         PUBLICATION: 80,
-        PATENT: 5,
-        EMR: 5,
+        PATENT: 15,
+        EMR: 15,
     },
     MIN_PUBLICATIONS_REQUIRED: 10,
 };
@@ -61,19 +61,19 @@ function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: 
     switch (publicationType) {
         case 'Original Research Article':
         case 'Research Articles/Short Communications':
-            points = 8; 
+            points = 10; 
             break;
         case 'Short Communication': 
-            points = 6;
+            points = 8;
             break;
         case 'Review Article':
         case 'Review Articles':
-             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 8 : 6;
+             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 10 : 8;
              multiplier = 1.0;
              break;
         case 'Case Report / Case Study': 
         case 'Case Reports/Short Surveys':
-            points = 7; 
+            points = 6; 
             break;
     }
 
