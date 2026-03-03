@@ -79,29 +79,50 @@ function parseProjectAmount(project: EmrInterest): number {
 }
 
 // Multiplier for Journal Publications (Policy 5.2.3)
-function getJournalAuthorPositionMultiplier(claimantRole: Author['role'], authorPosition?: string): number {
+function getJournalAuthorPositionMultiplier(
+    claimantRole: Author['role'], 
+    authorPosition?: string,
+    isSingleAuthorParulWithMultipleOtherInstitutions?: boolean
+): number {
     const position = parseInt(authorPosition || '0', 10);
+    
+    // Single Author case
+    if (claimantRole === 'Single Author') {
+        return 1.0;
+    }
+    
+    // Single Co-author from Parul University & Multiple Authors from Other Institutions
+    if (isSingleAuthorParulWithMultipleOtherInstitutions && claimantRole === 'Co-Author') {
+        return 0.8;
+    }
+    
+    // First or Corresponding Author
     if (claimantRole === 'First Author' || claimantRole === 'Corresponding Author' || claimantRole === 'First & Corresponding Author') {
         return 0.7;
     }
+    
+    // Co-Author with position
     if (claimantRole === 'Co-Author') {
         if (!authorPosition || position <= 0) return 0; // Position must be specified for co-authors
         if (position <= 5) return 0.3;
         if (position > 5) return 0.1;
     }
+    
     return 0; // Return 0 for any other role
 }
 
 // Multiplier for Books, Chapters, and Conference Proceedings (Policy 5.1.2)
 function getBookConfAuthorPositionMultiplier(claimantRole: Author['role'], authorPosition?: string): number {
-    const position = parseInt(authorPosition || '0', 10);
-     if (claimantRole === 'First Author' || claimantRole === 'Corresponding Author' || claimantRole === 'First & Corresponding Author') {
+    // 5.1.2: Author Position Multiplier
+    if (claimantRole === 'First Author' || claimantRole === 'Corresponding Author' || claimantRole === 'First & Corresponding Author') {
         return 0.7;
     }
     if (claimantRole === 'Co-Author') {
+        const position = parseInt(authorPosition || '0', 10);
         if (!authorPosition || position <= 0) return 0; // Position must be specified for co-authors
         if (position <= 5) return 0.3;
-        if (position > 5) return 0.1;
+        // For position > 5, no points according to policy
+        return 0;
     }
     return 0;
 }
@@ -109,45 +130,57 @@ function getBookConfAuthorPositionMultiplier(claimantRole: Author['role'], autho
 
 function getJournalPoints(claim: IncentiveClaim): { points: number, multiplier: number } {
     const { publicationType, journalClassification } = claim;
-    let points = 0;
-    let multiplier = 0;
+    let quartilePoints = 0;
+    let articleTypeMultiplier = 0;
 
+    // 5.2.1 Points by Journal Quartile
+    switch (journalClassification) {
+        case 'Q1': quartilePoints = 15; break;
+        case 'Q2': quartilePoints = 10; break;
+        case 'Q3': quartilePoints = 6; break;
+        case 'Q4': quartilePoints = 4; break;
+    }
+
+    // 5.2.2 Multiplier by Article Type
     switch (publicationType) {
         case 'Original Research Article':
         case 'Research Articles/Short Communications':
-            points = 10; 
-            break;
-        case 'Short Communication': 
-            points = 8;
+        case 'Short Communication':
+            articleTypeMultiplier = 1.0;
             break;
         case 'Review Article':
         case 'Review Articles':
-             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 10 : 8;
-             multiplier = 1.0;
-             break;
-        case 'Case Report / Case Study': 
+            // Review articles: Q1/Q2 = 1.0, Q3/Q4 = 0.8
+            if (journalClassification === 'Q1' || journalClassification === 'Q2') {
+                articleTypeMultiplier = 1.0;
+            } else {
+                articleTypeMultiplier = 0.8;
+            }
+            break;
+        case 'Case Report / Case Study':
         case 'Case Reports/Short Surveys':
-            points = 6; 
+            articleTypeMultiplier = 0.9;
             break;
     }
 
-    if (publicationType !== 'Review Articles' && publicationType !== 'Review Article') {
-        switch (journalClassification) {
-            case 'Q1': multiplier = 1.0; break;
-            case 'Q2': multiplier = 0.7; break;
-            case 'Q3': multiplier = 0.4; break;
-            case 'Q4': multiplier = 0.3; break;
-        }
-    } else if (!multiplier) { 
-         switch (journalClassification) {
-            case 'Q1': multiplier = 1.0; break;
-            case 'Q2': multiplier = 1.0; break;
-            case 'Q3': multiplier = 1.0; break;
-            case 'Q4': multiplier = 1.0; break;
-        }
-    }
+    return { points: quartilePoints, multiplier: articleTypeMultiplier };
+}
 
-    return { points, multiplier };
+// 5.1 Points for Book Chapter, Publication & Conference Proceedings
+function getBookChapterPoints(claim: IncentiveClaim): { points: number } {
+    // 5.1.1: Scopus Indexed Book Chapter = 6 points
+    return { points: 6 };
+}
+
+function getBookPoints(claim: IncentiveClaim): { points: number, divisor: number } {
+    // 5.1.1: Scopus Indexed Book (Edited a book) = 18 points divided among total number of editors
+    const totalEditors = claim.totalCorrespondingAuthors || claim.authors?.length || 1;
+    return { points: 18, divisor: totalEditors };
+}
+
+function getConferenceProceedingsPoints(claim: IncentiveClaim): { points: number } {
+    // 5.1.1: Scopus-Indexed Conference Proceedings = 3 points
+    return { points: 3 };
 }
 
 function getClaimDate(claim: IncentiveClaim): Date | null {
@@ -215,11 +248,17 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): {
 
         let claimScore = 0;
         
-        const authorMultiplier = getJournalAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
-        const { points, multiplier: quartileMultiplier } = getJournalPoints(claim);
-        claimScore = (points * quartileMultiplier) * authorMultiplier;
+        // Check if this is a single co-author from Parul with multiple authors from other institutions
+        const totalAuthors = claim.authors?.length || 0;
+        const parulAuthors = claim.authors?.filter(a => a.name?.includes('Parul') || a.email?.includes('parul'))?.length || 0;
+        const isSingleParulWithOthers = (claimantAuthorInfo.role === 'Co-Author' && parulAuthors === 1 && totalAuthors > 1);
         
-        const calculation = { base: points, multiplier: quartileMultiplier, authorMultiplier };
+        const authorMultiplier = getJournalAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition, isSingleParulWithOthers);
+        const { points: quartilePoints, multiplier: articleTypeMultiplier } = getJournalPoints(claim);
+        // Formula: P_pub = (Quartile Points) × (Article Type Multiplier) × (Author Position Multiplier)
+        claimScore = quartilePoints * articleTypeMultiplier * authorMultiplier;
+        
+        const calculation = { base: quartilePoints, multiplier: articleTypeMultiplier, authorMultiplier };
         
         if (claimScore > 0) {
             score += claimScore;
@@ -227,6 +266,126 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): {
         }
     }
     return { score: round(score), count: publicationCount, contributingClaims };
+}
+
+function calculateBookChapterScore(claims: IncentiveClaim[], userId: string): { 
+    score: number; 
+    contributingClaims: { 
+        claim: IncentiveClaim, 
+        score: number,
+        calculation: CalculationDetails 
+    }[] 
+} {
+    let score = 0;
+    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: CalculationDetails }[] = [];
+
+    for (const claim of claims) {
+        const claimType = claim.claimType?.toLowerCase() || '';
+        // For Book Chapter claims: claimType is 'Books' and applicationTypeOrPublicationType should indicate 'Book Chapter'
+        if (claimType !== 'books') continue;
+        
+        // Check if this is specifically a Book Chapter (not a full book)
+        const isBookChapter = (claim.publicationType?.toLowerCase() === 'book chapter' || 
+                              (claim as any).applicationType?.toLowerCase() === 'book chapter' ||
+                              claim.eventType?.toLowerCase() === 'book chapter');
+        
+        if (!isBookChapter) continue; // Skip if not a book chapter
+        
+        // Book chapters must be Scopus indexed (Policy 5.1.1: Scopus Indexed Book Chapter)
+        const isScopusIndexed = (claim as any).isScopusIndexed;
+        if (isScopusIndexed === false) {
+            continue; // Skip if explicitly marked as not Scopus indexed
+        }
+        
+        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
+        if (!claimantAuthorInfo) continue;
+
+        const { points } = getBookChapterPoints(claim);
+        const authorMultiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
+        const claimScore = points * authorMultiplier;
+        
+        const calculation = { base: points, multiplier: authorMultiplier };
+        
+        if (claimScore > 0) {
+            score += claimScore;
+            contributingClaims.push({ claim, score: claimScore, calculation });
+        }
+    }
+    return { score: round(score), contributingClaims };
+}
+
+function calculateBookScore(claims: IncentiveClaim[], userId: string): { 
+    score: number; 
+    contributingClaims: { 
+        claim: IncentiveClaim, 
+        score: number,
+        calculation: CalculationDetails 
+    }[] 
+} {
+    let score = 0;
+    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: CalculationDetails }[] = [];
+
+    for (const claim of claims) {
+        const claimType = claim.claimType?.toLowerCase() || '';
+        // For full Book claims: claimType is 'Books' and should NOT be 'Book Chapter'
+        if (claimType !== 'books') continue;
+        
+        // Check if this is specifically a full Book (not a chapter)
+        const isFullBook = !(claim.publicationType?.toLowerCase() === 'book chapter' || 
+                            (claim as any).applicationType?.toLowerCase() === 'book chapter' ||
+                            claim.eventType?.toLowerCase() === 'book chapter');
+        
+        if (!isFullBook) continue; // Skip if it's a book chapter
+        
+        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
+        if (!claimantAuthorInfo) continue;
+
+        const { points, divisor } = getBookPoints(claim);
+        // For edited books, points are divided among total number of editors
+        const pointsPerEditor = points / divisor;
+        const claimScore = pointsPerEditor;
+        
+        const calculation = { base: points, divisor: divisor, multiplier: 1 };
+        
+        if (claimScore > 0) {
+            score += claimScore;
+            contributingClaims.push({ claim, score: round(claimScore), calculation });
+        }
+    }
+    return { score: round(score), contributingClaims };
+}
+
+function calculateConferenceProceedingsScore(claims: IncentiveClaim[], userId: string): { 
+    score: number; 
+    contributingClaims: { 
+        claim: IncentiveClaim, 
+        score: number,
+        calculation: CalculationDetails 
+    }[] 
+} {
+    let score = 0;
+    const contributingClaims: { claim: IncentiveClaim, score: number, calculation: CalculationDetails }[] = [];
+
+    for (const claim of claims) {
+        const claimType = claim.claimType?.toLowerCase() || '';
+        // Match Conference Presentations or Conference Proceedings types
+        if (claimType !== 'conference presentations' && claimType !== 'conference proceedings' && !claimType.includes('conference')) continue;
+        
+        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
+        if (!claimantAuthorInfo) continue;
+
+        const { points } = getConferenceProceedingsPoints(claim);
+        const authorMultiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
+        const claimScore = points * authorMultiplier;
+        
+        const calculation = { base: points, multiplier: authorMultiplier };
+        
+        if (claimScore > 0) {
+            score += claimScore;
+            contributingClaims.push({ claim, score: claimScore, calculation });
+        }
+    }
+    return { score: round(score), contributingClaims };
 }
 
 function calculatePatentScore(claims: IncentiveClaim[], userId: string): { 
@@ -364,11 +523,16 @@ export async function calculateArpsForUser(userId: string, year: number) {
 
 
     const { score: rawPubScore, count: pubCount, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId);
+    const { score: rawBookChapterScore, contributingClaims: bookChapterClaims } = calculateBookChapterScore(claimsInPeriod, userId);
+    const { score: rawBookScore, contributingClaims: bookClaims } = calculateBookScore(claimsInPeriod, userId);
+    const { score: rawConferenceProceedingsScore, contributingClaims: conferenceProceedingsClaims } = calculateConferenceProceedingsScore(claimsInPeriod, userId);
+    
+    const rawPublicationRelatedScore = rawPubScore + rawBookChapterScore + rawBookScore + rawConferenceProceedingsScore;
     
     const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId);
     const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, startDate, endDate);
 
-    const weightedPub = rawPubScore * POLICY.WEIGHTAGE.PUBLICATION;
+    const weightedPub = rawPublicationRelatedScore * POLICY.WEIGHTAGE.PUBLICATION;
     const weightedPatent = rawPatentScore * POLICY.WEIGHTAGE.PATENT;
     const weightedEmr = rawEmrScore * POLICY.WEIGHTAGE.EMR;
 
@@ -391,6 +555,9 @@ export async function calculateArpsForUser(userId: string, year: number) {
         success: true,
         data: {
             publications: { raw: round(rawPubScore), weighted: round(weightedPub), final: round(finalPubScore), contributingClaims: pubClaims },
+            bookChapters: { raw: round(rawBookChapterScore), contributingClaims: bookChapterClaims },
+            books: { raw: round(rawBookScore), contributingClaims: bookClaims },
+            conferenceProceedings: { raw: round(rawConferenceProceedingsScore), contributingClaims: conferenceProceedingsClaims },
             patents: { raw: round(rawPatentScore), weighted: round(weightedPatent), final: round(finalPatentScore), contributingClaims: patentClaims },
             emr: { raw: round(rawEmrScore), weighted: round(weightedEmr), final: round(finalEmrScore), contributingProjects: emrProjects },
             totalArps: totalArps,
