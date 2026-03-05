@@ -185,29 +185,54 @@ function getConferenceProceedingsPoints(claim: IncentiveClaim): { points: number
 
 function getClaimDate(claim: IncentiveClaim): Date | null {
     const finalApproval = (claim.approvals || [])
-        .filter((a): a is ApprovalStage => a !== null && a.status === 'Approved')
+        .filter((a): a is ApprovalStage => a !== null && ['Approved', 'Accepted', 'Submitted to Accounts', 'Payment Completed'].includes(a.status))
         .sort((a, b) => b.stage - a.stage)[0];
         
     if (finalApproval && finalApproval.timestamp) {
         try {
             return parseISO(finalApproval.timestamp);
         } catch (e) {
-            // Fallback if timestamp is invalid for some reason
+            // Fallback parsing for DD/MM/YYYY, HH:mm:ss format
+            const parts = finalApproval.timestamp.split(', ');
+            if (parts.length === 2) {
+                const datePart = parts[0]; // DD/MM/YYYY
+                const timePart = parts[1]; // HH:mm:ss
+                const [day, month, year] = datePart.split('/');
+                if (day && month && year) {
+                    const dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart}`;
+                    const parsed = new Date(dateStr);
+                    if (!isNaN(parsed.getTime())) return parsed;
+                }
+            }
         }
     }
     
     // Fallback to submission date if no valid approval timestamp is found
-    try {
-        return parseISO(claim.submissionDate);
-    } catch(e) {
-        return null;
+    if (claim.submissionDate) {
+        try {
+            return parseISO(claim.submissionDate);
+        } catch(e) {
+            // Fallback parsing for submission date
+            const parts = claim.submissionDate.split(', ');
+            if (parts.length === 2) {
+                const datePart = parts[0]; // DD/MM/YYYY
+                const timePart = parts[1]; // HH:mm:ss
+                const [day, month, year] = datePart.split('/');
+                if (day && month && year) {
+                    const dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${timePart}`;
+                    const parsed = new Date(dateStr);
+                    if (!isNaN(parsed.getTime())) return parsed;
+                }
+            }
+        }
     }
+    return null;
 }
 
 
 // --- Main Calculation Functions ---
 
-function calculatePublicationScore(claims: IncentiveClaim[], userId: string): { 
+function calculatePublicationScore(claims: IncentiveClaim[], userId: string, userEmail: string): { 
     score: number; 
     count: number;
     contributingClaims: { 
@@ -241,7 +266,7 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): {
         
         publicationCount++;
 
-        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
+        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId || a.email?.toLowerCase() === userEmail);
         if (!claimantAuthorInfo) continue;
         
         if (!claim.journalClassification) continue; // Quartile undefined guard
@@ -268,7 +293,7 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string): {
     return { score: round(score), count: publicationCount, contributingClaims };
 }
 
-function calculateBookChapterScore(claims: IncentiveClaim[], userId: string): { 
+function calculateBookChapterScore(claims: IncentiveClaim[], userId: string, userEmail: string): { 
     score: number; 
     contributingClaims: { 
         claim: IncentiveClaim, 
@@ -280,41 +305,59 @@ function calculateBookChapterScore(claims: IncentiveClaim[], userId: string): {
     const contributingClaims: { claim: IncentiveClaim, score: number, calculation: CalculationDetails }[] = [];
 
     for (const claim of claims) {
+        console.log(`ARPS BookChapter: Processing claim ${claim.id}, type: ${claim.claimType}, status: ${claim.status}`);
         const claimType = claim.claimType?.toLowerCase() || '';
         // For Book Chapter claims: claimType is 'Books' and applicationTypeOrPublicationType should indicate 'Book Chapter'
-        if (claimType !== 'books') continue;
+        if (claimType !== 'books') {
+            console.log(`ARPS BookChapter: Skipping claim ${claim.id}, not 'books'`);
+            continue;
+        }
         
         // Check if this is specifically a Book Chapter (not a full book)
         const isBookChapter = (claim.publicationType?.toLowerCase() === 'book chapter' || 
-                              (claim as any).applicationType?.toLowerCase() === 'book chapter' ||
+                              (claim as any).bookApplicationType?.toLowerCase() === 'book chapter' ||
                               claim.eventType?.toLowerCase() === 'book chapter');
         
-        if (!isBookChapter) continue; // Skip if not a book chapter
+        console.log(`ARPS BookChapter: Claim ${claim.id}, isBookChapter: ${isBookChapter}, bookApplicationType: ${(claim as any).bookApplicationType}`);
+        if (!isBookChapter) {
+            console.log(`ARPS BookChapter: Skipping claim ${claim.id}, not a book chapter`);
+            continue;
+        } // Skip if not a book chapter
         
         // Book chapters must be Scopus indexed (Policy 5.1.1: Scopus Indexed Book Chapter)
         const isScopusIndexed = (claim as any).isScopusIndexed;
+        console.log(`ARPS BookChapter: Claim ${claim.id}, isScopusIndexed: ${isScopusIndexed}`);
         if (isScopusIndexed === false) {
+            console.log(`ARPS BookChapter: Skipping claim ${claim.id}, not Scopus indexed`);
             continue; // Skip if explicitly marked as not Scopus indexed
         }
         
-        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
-        if (!claimantAuthorInfo) continue;
+        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId || a.email?.toLowerCase() === userEmail);
+        console.log(`ARPS BookChapter: Claim ${claim.id}, claimant found: ${!!claimantAuthorInfo}, userId: ${userId}, userEmail: ${userEmail}, authors: ${claim.authors?.map(a => ({uid: a.uid, email: a.email}))}`);
+        if (!claimantAuthorInfo) {
+            console.log(`ARPS BookChapter: Skipping claim ${claim.id}, claimant not found`);
+            continue;
+        }
 
         const { points } = getBookChapterPoints(claim);
         const authorMultiplier = getBookConfAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
         const claimScore = points * authorMultiplier;
+        
+        console.log(`ARPS BookChapter: Claim ${claim.id}, points: ${points}, multiplier: ${authorMultiplier}, score: ${claimScore}`);
         
         const calculation = { base: points, multiplier: authorMultiplier };
         
         if (claimScore > 0) {
             score += claimScore;
             contributingClaims.push({ claim, score: claimScore, calculation });
+            console.log(`ARPS BookChapter: Added claim ${claim.id} to contributing, total score so far: ${score}`);
         }
     }
+    console.log(`ARPS BookChapter: Final score: ${score}, contributing claims: ${contributingClaims.length}`);
     return { score: round(score), contributingClaims };
 }
 
-function calculateBookScore(claims: IncentiveClaim[], userId: string): { 
+function calculateBookScore(claims: IncentiveClaim[], userId: string, userEmail: string): { 
     score: number; 
     contributingClaims: { 
         claim: IncentiveClaim, 
@@ -332,12 +375,18 @@ function calculateBookScore(claims: IncentiveClaim[], userId: string): {
         
         // Check if this is specifically a full Book (not a chapter)
         const isFullBook = !(claim.publicationType?.toLowerCase() === 'book chapter' || 
-                            (claim as any).applicationType?.toLowerCase() === 'book chapter' ||
+                            (claim as any).bookApplicationType?.toLowerCase() === 'book chapter' ||
                             claim.eventType?.toLowerCase() === 'book chapter');
         
         if (!isFullBook) continue; // Skip if it's a book chapter
         
-        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
+        // Books must be Scopus indexed (Policy 5.1.1: Scopus Indexed Book)
+        const isScopusIndexed = (claim as any).isScopusIndexed;
+        if (isScopusIndexed === false) {
+            continue; // Skip if explicitly marked as not Scopus indexed
+        }
+        
+        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId || a.email?.toLowerCase() === userEmail);
         if (!claimantAuthorInfo) continue;
 
         const { points, divisor } = getBookPoints(claim);
@@ -355,7 +404,7 @@ function calculateBookScore(claims: IncentiveClaim[], userId: string): {
     return { score: round(score), contributingClaims };
 }
 
-function calculateConferenceProceedingsScore(claims: IncentiveClaim[], userId: string): { 
+function calculateConferenceProceedingsScore(claims: IncentiveClaim[], userId: string, userEmail: string): { 
     score: number; 
     contributingClaims: { 
         claim: IncentiveClaim, 
@@ -371,7 +420,7 @@ function calculateConferenceProceedingsScore(claims: IncentiveClaim[], userId: s
         // Match Conference Presentations or Conference Proceedings types
         if (claimType !== 'conference presentations' && claimType !== 'conference proceedings' && !claimType.includes('conference')) continue;
         
-        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId);
+        const claimantAuthorInfo = claim.authors?.find(a => a.uid === userId || a.email?.toLowerCase() === userEmail);
         if (!claimantAuthorInfo) continue;
 
         const { points } = getConferenceProceedingsPoints(claim);
@@ -388,7 +437,7 @@ function calculateConferenceProceedingsScore(claims: IncentiveClaim[], userId: s
     return { score: round(score), contributingClaims };
 }
 
-function calculatePatentScore(claims: IncentiveClaim[], userId: string): { 
+function calculatePatentScore(claims: IncentiveClaim[], userId: string, userEmail: string): { 
     score: number; 
     contributingClaims: { 
         claim: IncentiveClaim, 
@@ -402,7 +451,7 @@ function calculatePatentScore(claims: IncentiveClaim[], userId: string): {
     for (const claim of claims) {
         if (claim.claimType !== 'Patents') continue;
         
-        if (!claim.patentInventors?.some(inv => inv.uid === userId)) continue;
+        if (!claim.patentInventors?.some(inv => inv.uid === userId || inv.email?.toLowerCase() === userEmail)) continue;
 
         let basePoints = 0;
         if (claim.currentStatus === 'Published') basePoints = 10;
@@ -499,6 +548,10 @@ export async function calculateArpsForUser(userId: string, year: number) {
       emrCoPiQuery.get(),
     ]);
     
+    const userSnap = await adminDb.collection('users').doc(userId).get();
+    const userData = userSnap.data();
+    const userEmail = userData?.email?.toLowerCase() || '';
+    
     const approvedClaimStatuses: IncentiveClaim['status'][] = ['Accepted', 'Submitted to Accounts', 'Payment Completed'];
     
     const claimsInPeriod = claimsSnapshot.docs
@@ -522,14 +575,15 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const uniqueEmrProjects = Array.from(allEmrProjects.values());
 
 
-    const { score: rawPubScore, count: pubCount, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId);
-    const { score: rawBookChapterScore, contributingClaims: bookChapterClaims } = calculateBookChapterScore(claimsInPeriod, userId);
-    const { score: rawBookScore, contributingClaims: bookClaims } = calculateBookScore(claimsInPeriod, userId);
-    const { score: rawConferenceProceedingsScore, contributingClaims: conferenceProceedingsClaims } = calculateConferenceProceedingsScore(claimsInPeriod, userId);
+    const { score: rawPubScore, count: pubCount, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId, userEmail);
+    const { score: rawBookChapterScore, contributingClaims: bookChapterClaims } = calculateBookChapterScore(claimsInPeriod, userId, userEmail);
+    console.log(`ARPS: User ${userId}, rawBookChapterScore: ${rawBookChapterScore}, bookChapterClaims: ${bookChapterClaims.length}`);
+    const { score: rawBookScore, contributingClaims: bookClaims } = calculateBookScore(claimsInPeriod, userId, userEmail);
+    const { score: rawConferenceProceedingsScore, contributingClaims: conferenceProceedingsClaims } = calculateConferenceProceedingsScore(claimsInPeriod, userId, userEmail);
     
     const rawPublicationRelatedScore = rawPubScore + rawBookChapterScore + rawBookScore + rawConferenceProceedingsScore;
     
-    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId);
+    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId, userEmail);
     const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, startDate, endDate);
 
     const weightedPub = rawPublicationRelatedScore * POLICY.WEIGHTAGE.PUBLICATION;
@@ -541,20 +595,23 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const finalEmrScore = Math.min(weightedEmr, POLICY.CAPS.EMR);
     
     const totalArps = round(finalPubScore + finalPatentScore + finalEmrScore);
+    
+    const publicationContributingClaims = [...pubClaims, ...bookChapterClaims, ...bookClaims, ...conferenceProceedingsClaims];
+    const totalPublicationCount = pubCount + bookChapterClaims.length + bookClaims.length + conferenceProceedingsClaims.length;
 
     let grade = 'DME';
     if (totalArps >= 80) grade = 'SEE';
     else if (totalArps >= 50) grade = 'EE';
     else if (totalArps >= 30) grade = 'ME';
     
-    if (pubCount < POLICY.MIN_PUBLICATIONS_REQUIRED) {
+    if (totalPublicationCount < POLICY.MIN_PUBLICATIONS_REQUIRED) {
         grade += ' (Minimum 10 publications required)';
     }
 
     return {
         success: true,
         data: {
-            publications: { raw: round(rawPubScore), weighted: round(weightedPub), final: round(finalPubScore), contributingClaims: pubClaims },
+            publications: { raw: round(rawPubScore), weighted: round(weightedPub), final: round(finalPubScore), contributingClaims: publicationContributingClaims },
             bookChapters: { raw: round(rawBookChapterScore), contributingClaims: bookChapterClaims },
             books: { raw: round(rawBookScore), contributingClaims: bookClaims },
             conferenceProceedings: { raw: round(rawConferenceProceedingsScore), contributingClaims: conferenceProceedingsClaims },

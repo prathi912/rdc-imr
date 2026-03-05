@@ -168,9 +168,21 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
                                 <div className="overflow-x-auto">
                                     <Table className="mt-2 text-sm whitespace-nowrap">
                                         <TableBody>
-                                            <TableRow><TableCell className="w-[70%]">Base Points for article type '{claim.publicationType}'</TableCell><TableCell className="text-right font-mono">{calculation.base.toFixed(2)}</TableCell></TableRow>
-                                            <TableRow><TableCell>× Quartile Multiplier for <strong>{claim.journalClassification}</strong></TableCell><TableCell className="text-right font-mono">{(calculation.multiplier ?? calculation.quartileMultiplier ?? 1).toFixed(2)}</TableCell></TableRow>
-                                            <TableRow><TableCell>× Your Role Multiplier as <strong>{getClaimant(claim)?.role}</strong> (Position: {claim.authorPosition})</TableCell><TableCell className="text-right font-mono">{calculation.authorMultiplier?.toFixed(2)}</TableCell></TableRow>
+                                            {claim.claimType === 'Research Papers' ? (
+                                                <>
+                                                    <TableRow><TableCell className="w-[70%]">Base Points for article type '{claim.publicationType}'</TableCell><TableCell className="text-right font-mono">{calculation.base.toFixed(2)}</TableCell></TableRow>
+                                                    <TableRow><TableCell>× Quartile Multiplier for <strong>{claim.journalClassification}</strong></TableCell><TableCell className="text-right font-mono">{(calculation.multiplier ?? calculation.quartileMultiplier ?? 1).toFixed(2)}</TableCell></TableRow>
+                                                    <TableRow><TableCell>× Your Role Multiplier as <strong>{getClaimant(claim)?.role}</strong> (Position: {claim.authorPosition})</TableCell><TableCell className="text-right font-mono">{calculation.authorMultiplier?.toFixed(2)}</TableCell></TableRow>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <TableRow><TableCell className="w-[70%]">Base Points for {claim.claimType === 'Books' ? (claim.publicationType === 'Book Chapter' ? 'Scopus-indexed Book Chapter' : 'Scopus-indexed Book') : 'Scopus-indexed Conference Proceedings'}</TableCell><TableCell className="text-right font-mono">{calculation.base.toFixed(2)}</TableCell></TableRow>
+                                                    {calculation.divisor && calculation.divisor > 1 && (
+                                                        <TableRow><TableCell>÷ Number of Editors ({calculation.divisor})</TableCell><TableCell className="text-right font-mono">÷ {calculation.divisor}</TableCell></TableRow>
+                                                    )}
+                                                    <TableRow><TableCell>× Your Role Multiplier as <strong>{getClaimant(claim)?.role}</strong> (Position: {claim.authorPosition})</TableCell><TableCell className="text-right font-mono">{(calculation.multiplier ?? calculation.authorMultiplier ?? 1).toFixed(2)}</TableCell></TableRow>
+                                                </>
+                                            )}
                                             <TableRow className="font-bold border-t-2 border-primary/20"><TableCell>= Raw Score for this Publication</TableCell><TableCell className="text-right font-mono">{score.toFixed(2)}</TableCell></TableRow>
                                         </TableBody>
                                     </Table>
