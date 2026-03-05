@@ -89,11 +89,6 @@ function getJournalAuthorPositionMultiplier(
 ): number {
     const position = parseInt(authorPosition || '0', 10);
     
-    // Single Author case
-    if (claimantRole === 'Single Author') {
-        return 1.0;
-    }
-    
     // Single Co-author from Parul University & Multiple Authors from Other Institutions
     if (isSingleAuthorParulWithMultipleOtherInstitutions && claimantRole === 'Co-Author') {
         return 0.8;
@@ -171,7 +166,23 @@ function getJournalPoints(claim: IncentiveClaim): { quartileBase: number, articl
         }
     }
 
-    return { points, multiplier };
+    return { quartileBase: points, articleTypeMultiplier: multiplier };
+}
+
+function getBookChapterPoints(claim: IncentiveClaim): { points: number } {
+    // Policy 5.1.1: Scopus Indexed Book Chapter - base points
+    return { points: 15 };
+}
+
+function getBookPoints(claim: IncentiveClaim): { points: number, divisor: number } {
+    // Policy 5.1.1: Scopus Indexed Book - base points divided by number of editors
+    const numEditors = claim.authors?.length || 1;
+    return { points: 20, divisor: numEditors };
+}
+
+function getConferenceProceedingsPoints(claim: IncentiveClaim): { points: number } {
+    // Policy 5.2.4: Conference Proceedings - base points
+    return { points: 8 };
 }
 
 function getClaimDate(claim: IncentiveClaim): Date | null {
@@ -265,7 +276,7 @@ function calculatePublicationScore(claims: IncentiveClaim[], userId: string, use
         let claimScore = 0;
         
         const authorMultiplier = getJournalAuthorPositionMultiplier(claimantAuthorInfo.role, claim.authorPosition);
-        const { points, multiplier: quartileMultiplier } = getJournalPoints(claim);
+        const { quartileBase: points, articleTypeMultiplier: quartileMultiplier } = getJournalPoints(claim);
         claimScore = (points * quartileMultiplier) * authorMultiplier;
         
         const calculation = { base: points, multiplier: quartileMultiplier, authorMultiplier };
@@ -436,7 +447,7 @@ function calculatePatentScore(claims: IncentiveClaim[], userId: string, userEmai
     for (const claim of claims) {
         if (claim.claimType !== 'Patents') continue;
         
-        if (!claim.patentInventors?.some(inv => inv.uid === userId || inv.email?.toLowerCase() === userEmail)) continue;
+        if (!claim.patentInventors?.some(inv => inv.uid === userId)) continue;
 
         let basePoints = 0;
         if (claim.patentStatus === 'Published') basePoints = 10;
@@ -565,12 +576,15 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const uniqueEmrProjects = Array.from(allEmrProjects.values());
 
 
-    const { score: rawPubScore, count: pubCount, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId);
+    const { score: rawPubScore, count: pubCount, contributingClaims: pubClaims } = calculatePublicationScore(claimsInPeriod, userId, userEmail);
+    const { score: rawBookChapterScore, contributingClaims: bookChapterClaims } = calculateBookChapterScore(claimsInPeriod, userId, userEmail);
+    const { score: rawBookScore, contributingClaims: bookClaims } = calculateBookScore(claimsInPeriod, userId, userEmail);
+    const { score: rawConferenceProceedingsScore, contributingClaims: conferenceProceedingsClaims } = calculateConferenceProceedingsScore(claimsInPeriod, userId, userEmail);
     
-    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId);
+    const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId, userEmail);
     const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, startDate, endDate);
 
-    const weightedPub = rawPublicationRelatedScore * POLICY.WEIGHTAGE.PUBLICATION;
+    const weightedPub = rawPubScore * POLICY.WEIGHTAGE.PUBLICATION;
     const weightedPatent = rawPatentScore * POLICY.WEIGHTAGE.PATENT;
     const weightedEmr = rawEmrScore * POLICY.WEIGHTAGE.EMR;
 
@@ -582,6 +596,18 @@ export async function calculateArpsForUser(userId: string, year: number) {
     
     const publicationContributingClaims = [...pubClaims, ...bookChapterClaims, ...bookClaims, ...conferenceProceedingsClaims];
     const totalPublicationCount = pubCount + bookChapterClaims.length + bookClaims.length + conferenceProceedingsClaims.length;
+
+    // Count author positions
+    let firstCorrespondingAuthorCount = 0;
+    let coAuthorCount = 0;
+    for (const claim of publicationContributingClaims) {
+        const role = claim.claim.authors?.find(a => a.uid === userId || a.email?.toLowerCase() === userEmail)?.role;
+        if (role === 'First Author' || role === 'Corresponding Author' || role === 'First & Corresponding Author') {
+            firstCorrespondingAuthorCount++;
+        } else if (role === 'Co-Author') {
+            coAuthorCount++;
+        }
+    }
 
     let grade = 'DME';
     if (totalArps >= 80) grade = 'SEE';
