@@ -181,6 +181,12 @@ export default function ManageIncentiveClaimsPage() {
     }
     return filtered;
   }, [allClaims, searchTerm, claimTypeFilter, facultyFilter, instituteFilter, users]);
+
+  // count unique paper titles in the current filtered set
+  const uniquePaperCount = useMemo(() => {
+    const titles = filteredClaims.map(getClaimTitle).filter(t => Boolean(t));
+    return new Set(titles).size;
+  }, [filteredClaims]);
   
   const tabClaims = useMemo(() => {
     const pending = filteredClaims.filter(claim => ['Pending', 'Pending Stage 1 Approval', 'Pending Stage 2 Approval', 'Pending Stage 3 Approval'].includes(claim.status));
@@ -384,6 +390,41 @@ export default function ManageIncentiveClaimsPage() {
     XLSX.writeFile(workbook, `incentive_claims_${activeTab}_${new Date().toISOString().split('T')[0]}.xlsx`);
     toast({ title: "Export Started", description: `Downloading ${sortedAndFilteredClaims.length} claims.` });
   };
+
+  const handleExportUniquePapers = () => {
+    if (uniquePaperCount === 0) {
+      toast({ variant: 'destructive', title: "No Data", description: "There are no papers to export in the current view." });
+      return;
+    }
+
+    // Create a map of unique papers with their details
+    const papersMap = new Map<string, { title: string; doi?: string; journalName?: string }>();
+    
+    filteredClaims.forEach(claim => {
+      const title = getClaimTitle(claim);
+      if (title && title !== 'N/A') {
+        papersMap.set(title, {
+          title,
+          doi: claim.doi || '',
+          journalName: claim.journalName || '',
+        });
+      }
+    });
+
+    // Convert map to array for export
+    const dataToExport = Array.from(papersMap.values()).map((paper, index) => ({
+      'S.No': index + 1,
+      'Paper Title': paper.title,
+      'DOI': paper.doi || 'N/A',
+      'Journal Name': paper.journalName || 'N/A',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Unique Papers");
+    XLSX.writeFile(workbook, `unique_papers_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast({ title: "Export Started", description: `Downloading ${dataToExport.length} unique papers.` });
+  };
   
     const eligibleForPaymentSheet = useMemo(() => {
       return allClaims.filter(
@@ -557,7 +598,14 @@ export default function ManageIncentiveClaimsPage() {
     <>
     <div className="container mx-auto py-10">
       <PageHeader title={pageTitle} description={pageDescription}>
-         <div className="flex items-center gap-2">
+         <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground">
+              Unique papers: {uniquePaperCount}
+            </span>
+            <Button onClick={handleExportUniquePapers} disabled={loading || uniquePaperCount === 0} variant="outline" title="Download unique papers with DOI and journal name">
+                <Download className="mr-2 h-4 w-4" />
+                Export Papers
+            </Button>
             <Button onClick={handleExport} disabled={loading}>
                 <Download className="mr-2 h-4 w-4" />
                 Export XLSX

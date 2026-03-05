@@ -52,6 +52,10 @@ export interface ArpsData {
     };
     totalArps: number;
     grade: string;
+    authorCounts?: {
+        firstCorrespondingAuthor: number;
+        coAuthor: number;
+    };
 }
 
 interface ArpsResultsDisplayProps {
@@ -236,7 +240,11 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
                 <Card>
                     <CardHeader>
                         <CardTitle>Step 1: Individual EMR Project Raw Scores</CardTitle>
-                        <CardDescription>Each sanctioned project is awarded points based on the funding amount and your role. The formula is: <br/> <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Role Points</code></CardDescription>
+                        <CardDescription>
+                            EMR projects are scored directly by funding tier and role (PI vs Co‑PI); no ARPS weightage is applied later.
+                            <br/>
+                            <code className="font-mono text-sm bg-muted p-1 rounded-sm">Raw Score = Role Points (10/15/20 for PI; half for Co‑PI)</code>
+                        </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {emr.contributingProjects.length > 0 ? emr.contributingProjects.map(({ project, score, calculation }) => {
@@ -271,11 +279,10 @@ export function ArpsResultsDisplay({ results, evaluationYear, evaluationWindow }
                     icon={Target}
                     steps={[
                         { label: 'Sum of all EMR Raw Scores', value: emr.raw.toFixed(2) },
-                        { label: '× Weightage (as per policy)', value: '× 0.15' },
-                        { label: '= Weighted Score', value: `= ${emr.weighted.toFixed(2)}` },
-                        { label: 'Maximum Score (Cap)', value: '15.00' },
+                        { label: 'No weightage applied (direct score)', value: '' },
+                        { label: 'Cap on EMR component', value: '20.00' },
                     ]}
-                    result={{ label: 'Final Score P(EMR) = min(Weighted Score, Cap)', value: emr.final.toFixed(2) }}
+                    result={{ label: 'Final Score P(EMR) = min(Raw Score, Cap)', value: emr.final.toFixed(2) }}
                 />
             </div>
             

@@ -479,3 +479,111 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
+
+// --- Journal Publication Points Calculation (Section 5.2) ---
+
+/**
+ * Calculate points for journal publications based on:
+ * - Journal Quartile (Q1: 15pts, Q2: 10pts, Q3: 6pts, Q4: 4pts)
+ * - Article Type multiplier
+ * - Author Position multiplier
+ */
+export async function calculateJournalPublicationPoints(
+    claimData: Partial<IncentiveClaim>
+): Promise<{ success: boolean; points?: number; breakdown?: { basePoints: number; articleTypeMultiplier: number; authorPositionMultiplier: number }; error?: string }> {
+    try {
+        const { journalClassification, publicationType, authorPosition, authors = [], userEmail } = claimData;
+
+        // Validate journal quartile
+        const validQuartiles = ['Q1', 'Q2', 'Q3', 'Q4'];
+        if (!journalClassification || !validQuartiles.includes(journalClassification)) {
+            return { success: false, error: "Valid journal quartile (Q1-Q4) is required." };
+        }
+
+        // Base points by journal quartile
+        const basePointsMap: { [key: string]: number } = {
+            'Q1': 30,
+            'Q2': 20,
+            'Q3': 12,
+            'Q4': 8
+        };
+        const basePoints = basePointsMap[journalClassification] || 0;
+
+        // Article type multiplier (Section 5.2.2)
+        let articleTypeMultiplier = 1;
+        switch (publicationType) {
+            case 'Research Articles/Short Communications':
+            case 'Original Research Article':
+            case 'Short Communication':
+                articleTypeMultiplier = 1;
+                break;
+            case 'Review Articles':
+            case 'Review Article':
+                // Q1/Q2 gets 1x, Q3/Q4 gets 0.8x
+                articleTypeMultiplier = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 1 : 0.8;
+                break;
+            case 'Case Reports/Short Surveys':
+            case 'Case Report':
+            case 'Case Study':
+                articleTypeMultiplier = 0.9;
+                break;
+            default:
+                articleTypeMultiplier = 1;
+        }
+
+        // Find claimant in author list and get author position
+        const claimant = authors?.find(a => a.email.toLowerCase() === userEmail?.toLowerCase());
+        if (!claimant) {
+            return { success: false, error: "Claimant not found in the author list." };
+        }
+
+        // Author position multiplier (Section 5.2.3)
+        let authorPositionMultiplier = 0.3; // Default: Co-Author
+        const internalAuthors = authors?.filter(a => !a.isExternal) || [];
+        const internalAuthorCount = internalAuthors.length;
+
+        if (internalAuthorCount === 1) {
+            // Single Author: 1x
+            authorPositionMultiplier = 1;
+        } else if (claimant.role === 'First Author' || claimant.role === 'Corresponding Author' || claimant.role === 'First & Corresponding Author') {
+            // First or Corresponding Author: 0.7x
+            authorPositionMultiplier = 0.7;
+        } else if (claimant.role === 'Co-Author') {
+            // Determine author order position
+            const authorOrder = authors?.findIndex(a => a.email.toLowerCase() === userEmail?.toLowerCase()) ?? -1;
+            
+            if (authorOrder === -1) {
+                return { success: false, error: "Could not determine author position." };
+            }
+
+            // Check if single co-author from PU & multiple authors from other institutions
+            if (internalAuthorCount === 1) {
+                // This is the single co-author from PU with multiple external authors: 0.8x
+                authorPositionMultiplier = 0.8;
+            } else if (authorOrder < 5) {
+                // Co-Author (Author Order up to 5): 0.3x
+                authorPositionMultiplier = 0.3;
+            } else {
+                // Co-Author (Author Order 6 Onwards): 0.1x
+                authorPositionMultiplier = 0.1;
+            }
+        }
+
+        // Calculate final points
+        const totalPoints = basePoints * articleTypeMultiplier * authorPositionMultiplier;
+
+        return {
+            success: true,
+            points: Number(totalPoints.toFixed(2)),
+            breakdown: {
+                basePoints,
+                articleTypeMultiplier,
+                authorPositionMultiplier
+            }
+        };
+
+    } catch (error: any) {
+        console.error("Error calculating journal publication points:", error);
+        return { success: false, error: error.message || "An unknown error occurred during calculation." };
+    }
+}
