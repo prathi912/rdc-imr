@@ -149,7 +149,11 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
 
         await newClaimRef.set(finalClaimData, { merge: true });
 
-        if (finalClaimData.status !== 'Draft' && finalClaimData.authors) {
+        // Only send notifications to co-authors if this is the original author's claim.
+        // If this is a co-author claim (has originalClaimId), skip notifications as the original author already added them.
+        const isCoAuthorClaim = !!claimData.originalClaimId;
+        
+        if (!isCoAuthorClaim && finalClaimData.status !== 'Draft' && finalClaimData.authors) {
             const coAuthorUidsToNotify = finalClaimData.authors
                 .map(a => a.uid)
                 .filter((uid): uid is string => !!uid && uid !== claimData.uid);
