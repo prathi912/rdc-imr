@@ -83,6 +83,183 @@ function UserClaimsList({
         return `/dashboard/incentive-claim/${slug}?claimId=${claim.id}`;
     }
 
+    const getCalculationDetailsContent = (claim: IncentiveClaim) => {
+        const steps: { label: string; value: string }[] = [];
+
+        switch (claim.claimType) {
+            case 'Research Papers': {
+                // Base amount based on journal classification
+                const baseAmounts: { [key: string]: number } = {
+                    'Nature/Science/Lancet': 50000,
+                    'Top 1% Journals': 25000,
+                    'Q1': 15000,
+                    'Q2': 10000,
+                    'Q3': 6000,
+                    'Q4': 4000,
+                };
+                const baseAmount = baseAmounts[claim.journalClassification || ''] || 0;
+                if (baseAmount > 0) {
+                    steps.push({ label: 'Base Amount', value: `₹${baseAmount.toLocaleString('en-IN')} (${claim.journalClassification} journal)` });
+                }
+
+                // Author calculation
+                if (claim.authors && claim.authors.length > 0) {
+                    const claimantAuthor = claim.authors.find(a => a.email?.toLowerCase() === claim.userEmail?.toLowerCase());
+                    const internalAuthors = claim.authors.filter(a => !a.isExternal);
+                    const mainAuthors = internalAuthors.filter(a => a.role === 'First Author' || a.role === 'Corresponding Author' || a.role === 'First & Corresponding Author');
+                    const coAuthors = internalAuthors.filter(a => a.role === 'Co-Author');
+
+                    steps.push({ label: 'Total Authors', value: claim.authors.length.toString() });
+                    steps.push({ label: 'Your Role', value: claimantAuthor?.role || 'Unknown' });
+
+                    // Show distribution logic
+                    if (mainAuthors.length > 0 && coAuthors.length > 0) {
+                        if (claimantAuthor?.role === 'Co-Author') {
+                            const sharePercentage = 30;
+                            const coAuthorCount = coAuthors.length;
+                            steps.push({ 
+                                label: 'Distribution', 
+                                value: `Co-authors get ${sharePercentage}% (₹${(baseAmount * sharePercentage / 100).toLocaleString('en-IN')})` 
+                            });
+                            steps.push({ 
+                                label: 'Per Co-Author', 
+                                value: `₹${(baseAmount * sharePercentage / 100 / coAuthorCount).toLocaleString('en-IN')} ÷ ${coAuthorCount} co-author(s)` 
+                            });
+                        } else {
+                            const sharePercentage = 70;
+                            const mainAuthorCount = mainAuthors.length;
+                            steps.push({ 
+                                label: 'Distribution', 
+                                value: `Main authors get ${sharePercentage}% (₹${(baseAmount * sharePercentage / 100).toLocaleString('en-IN')})` 
+                            });
+                            steps.push({ 
+                                label: 'Per Main Author', 
+                                value: `₹${(baseAmount * sharePercentage / 100 / mainAuthorCount).toLocaleString('en-IN')} ÷ ${mainAuthorCount} main author(s)` 
+                            });
+                        }
+                    } else if (coAuthors.length > 1) {
+                        const sharePercentage = 80;
+                        steps.push({ 
+                            label: 'Distribution', 
+                            value: `Co-authors get ${sharePercentage}% (₹${(baseAmount * sharePercentage / 100).toLocaleString('en-IN')})` 
+                        });
+                        steps.push({ 
+                            label: 'Per Co-Author', 
+                            value: `₹${(baseAmount * sharePercentage / 100 / coAuthors.length).toLocaleString('en-IN')} ÷ ${coAuthors.length} co-authors` 
+                        });
+                    } else if (mainAuthors.length > 0) {
+                        steps.push({ 
+                            label: 'Distribution', 
+                            value: `₹${baseAmount.toLocaleString('en-IN')} ÷ ${mainAuthors.length} main author(s)` 
+                        });
+                    }
+                }
+                break;
+            }
+
+            case 'Patents': {
+                const baseAmounts: { [key: string]: number } = {
+                    'Filed': 5000,
+                    'Published': 10000,
+                    'Granted': 25000,
+                };
+                const baseAmount = baseAmounts[claim.currentStatus || ''] || 0;
+                if (baseAmount > 0) {
+                    steps.push({ label: 'Base Amount', value: `₹${baseAmount.toLocaleString('en-IN')} (${claim.currentStatus} status)` });
+                }
+                if (claim.isPuSoleApplicant !== undefined) {
+                    const multiplier = claim.isPuSoleApplicant ? 1.0 : 0.5;
+                    steps.push({ label: 'PU Role Multiplier', value: `${multiplier === 1.0 ? 'Sole Applicant (×1.0)' : 'Joint Applicant (×0.5)'}` });
+                    steps.push({ label: 'Final Amount', value: `₹${(baseAmount * multiplier).toLocaleString('en-IN')}` });
+                }
+                break;
+            }
+
+            case 'Books': {
+                if (claim.bookApplicationType === 'Book Chapter') {
+                    const baseAmounts: { [key: string]: number } = {
+                        'Scopus': 6000,
+                        'International': 3000,
+                        'National': 2500,
+                    };
+                    const baseAmount = claim.isScopusIndexed ? 6000 : (claim.publisherType === 'International' ? 3000 : 2500);
+                    steps.push({ label: 'Base Amount', value: `₹${baseAmount.toLocaleString('en-IN')} (Book Chapter)` });
+                    if (claim.authorRole === 'Editor') {
+                        steps.push({ label: 'Editor Multiplier', value: '×0.5 (as Editor)' });
+                        steps.push({ label: 'After Adjustment', value: `₹${(baseAmount * 0.5).toLocaleString('en-IN')}` });
+                    }
+                } else {
+                    const baseAmounts: { [key: string]: number } = {
+                        'Scopus': 18000,
+                        'International': 6000,
+                        'National': 3000,
+                    };
+                    const baseAmount = claim.isScopusIndexed ? 18000 : (claim.publisherType === 'International' ? 6000 : 3000);
+                    steps.push({ label: 'Base Amount', value: `₹${baseAmount.toLocaleString('en-IN')} (Full Book)` });
+                }
+                if (claim.authors && claim.authors.length > 1) {
+                    steps.push({ label: 'Internal Authors', value: claim.authors.length.toString() });
+                    steps.push({ label: 'Divided By', value: `₹ / ${claim.authors.length} authors` });
+                }
+                break;
+            }
+
+            case 'Conference Presentations': {
+                steps.push({ label: 'Base Amount', value: '₹3,000 (Standard Conference Assistance)' });
+                if (claim.conferenceName) {
+                    steps.push({ label: 'Conference', value: claim.conferenceName });
+                }
+                break;
+            }
+
+            case 'Seed Money for APC': {
+                const maxLimits: { [key: string]: number } = {
+                    'Q1': 40000,
+                    'Q2': 30000,
+                    'Q3': 20000,
+                    'Q4': 15000,
+                };
+                const limit = maxLimits[claim.apcQRating || ''] || 0;
+                if (limit > 0) {
+                    steps.push({ label: 'Max Reimbursement Limit', value: `₹${limit.toLocaleString('en-IN')} (${claim.apcQRating} journal)` });
+                }
+                if (claim.apcTotalAmount) {
+                    const amountStr = String(claim.apcTotalAmount).replace(/[^0-9.]/g, '');
+                    steps.push({ label: 'Actual APC Paid', value: `₹${amountStr}` });
+                    steps.push({ label: 'Reimbursement', value: `Min(Actual, Limit) = ₹${Math.min(parseFloat(amountStr) || 0, limit).toLocaleString('en-IN')}` });
+                }
+                break;
+            }
+
+            case 'Membership of Professional Bodies': {
+                steps.push({ label: 'Reimbursement', value: '50% of membership fee' });
+                if (claim.professionalBodyName) {
+                    steps.push({ label: 'Organization', value: claim.professionalBodyName });
+                }
+                break;
+            }
+
+            case 'Honoring the Award Winner':
+            case 'Award': {
+                steps.push({ label: 'Base Amount', value: '₹5,000 (Award Recognition)' });
+                if (claim.awardTitle) {
+                    steps.push({ label: 'Award', value: claim.awardTitle });
+                }
+                break;
+            }
+        }
+
+        // Add calculated amount at the end
+        if (claim.calculatedIncentive !== undefined) {
+            steps.push({ 
+                label: 'Final Calculated Amount', 
+                value: `₹${claim.calculatedIncentive.toLocaleString('en-IN')}` 
+            });
+        }
+
+        return steps;
+    };
+
     const getSimplifiedStatus = (claim: IncentiveClaim) => {
         if (claim.status === 'Submitted to Accounts') {
             return (
@@ -102,44 +279,82 @@ function UserClaimsList({
 
     return (
         <div className="space-y-4">
-            {claims.map(claim => (
-                 <Card key={claim.id}>
-                    <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                         <div className="flex-1 space-y-1">
-                            <Badge variant="outline">{claim.claimType}</Badge>
-                            <p className="font-semibold">
-                              {getClaimTitle(claim)}
-                            </p>
-                            {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
-                            {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
-                            <p className="text-sm text-muted-foreground pt-1">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
-                        </div>
-                        <div className="flex items-center gap-2 self-end sm:self-center">
-                            {claimType === 'draft' ? (
-                                <>
-                                    <Button asChild variant="outline" size="sm">
-                                        <Link href={getClaimEditHref(claim)}>
-                                            <Edit className="mr-2 h-4 w-4"/>
-                                            Continue
-                                        </Link>
-                                    </Button>
-                                    <Button variant="destructive" size="icon" onClick={() => onDeleteClaim(claim.id)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </>
-                            ) : (
-                                <>
-                                    <Button variant="outline" size="sm" onClick={() => onViewDetails(claim)}>
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        View Details
-                                    </Button>
-                                    {getSimplifiedStatus(claim)}
-                                </>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            ))}
+            {claims.map(claim => {
+                const calculationDetails = getCalculationDetailsContent(claim);
+                const hasCalculatedAmount = claim.calculatedIncentive !== undefined && claim.calculatedIncentive !== null;
+                
+                return (
+                    <Card key={claim.id}>
+                        <CardContent className="p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                            <div className="flex-1 space-y-1">
+                                <Badge variant="outline">{claim.claimType}</Badge>
+                                <p className="font-semibold">
+                                  {getClaimTitle(claim)}
+                                </p>
+                                {claim.journalName && <p className="text-sm text-muted-foreground">Journal: {claim.journalName}</p>}
+                                {claim.conferenceName && <p className="text-sm text-muted-foreground">Conference: {claim.conferenceName}</p>}
+                                <p className="text-sm text-muted-foreground pt-1">Submitted: {new Date(claim.submissionDate).toLocaleDateString()}</p>
+                                
+                                {hasCalculatedAmount && (
+                                    <div className="pt-2">
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <div className="inline-flex items-center gap-2 cursor-help">
+                                                        <p className="text-sm font-semibold text-primary">
+                                                            Calculated Amount: ₹{claim.calculatedIncentive?.toLocaleString('en-IN')}
+                                                        </p>
+                                                        <Info className="h-4 w-4 text-muted-foreground" />
+                                                    </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top" className="w-80 p-4 backdrop-blur-md bg-black/70 border-white/20 shadow-2xl">
+                                                    <div className="space-y-3">
+                                                        {calculationDetails.length > 0 ? (
+                                                            <div className="space-y-2 text-xs">
+                                                                {calculationDetails.map((detail, idx) => (
+                                                                    <div key={idx} className="flex justify-between gap-3 py-1">
+                                                                        <span className="text-gray-300 font-medium">{detail.label}:</span>
+                                                                        <span className="text-white text-right flex-1">{detail.value}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-xs text-gray-300">Based on claim details and policy guidelines.</p>
+                                                        )}
+                                                        </div>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 self-end sm:self-center">
+                                {claimType === 'draft' ? (
+                                    <>
+                                        <Button asChild variant="outline" size="sm">
+                                            <Link href={getClaimEditHref(claim)}>
+                                                <Edit className="mr-2 h-4 w-4"/>
+                                                Continue
+                                            </Link>
+                                        </Button>
+                                        <Button variant="destructive" size="icon" onClick={() => onDeleteClaim(claim.id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Button variant="outline" size="sm" onClick={() => onViewDetails(claim)}>
+                                            <Eye className="mr-2 h-4 w-4" />
+                                            View Details
+                                        </Button>
+                                        {getSimplifiedStatus(claim)}
+                                    </>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                );
+            })}
         </div>
     );
 }
