@@ -204,7 +204,9 @@ export function AddEditCallDialog({
     try {
         const callDataForServer: any = { ...values };
 
-        if (values.attachments && values.attachments.length > 0) {
+        // Only process attachments if they are valid File objects
+        if (values.attachments && values.attachments.length > 0 && 
+            values.attachments[0] instanceof File) {
             const attachmentDataUrls = await Promise.all(
                 Array.from(values.attachments as FileList).map(async (file: File) => ({
                     name: file.name,
@@ -212,6 +214,9 @@ export function AddEditCallDialog({
                 }))
             );
             callDataForServer.attachments = attachmentDataUrls;
+        } else {
+            // Remove attachments if they're not valid files
+            delete callDataForServer.attachments;
         }
 
         if (existingCall) {
