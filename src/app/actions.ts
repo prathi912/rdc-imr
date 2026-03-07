@@ -899,6 +899,8 @@ export async function scheduleMeeting(
       rescheduleMap.set(projectData.id, isReschedule);
 
       const updateData: any = { meetingDetails: newMeetingDetails };
+      // If we are scheduling or rescheduling a meeting, clear any previous absence flag
+      updateData.wasAbsent = false;
       if (isMidTermReview) {
         updateData.hasHadMidTermReview = true;
       } else {

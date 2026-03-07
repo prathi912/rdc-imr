@@ -354,6 +354,8 @@ export async function scheduleEmrMeeting(
         meetingSlot: { date, time, pptDeadline },
         status: "Evaluation Pending",
         assignedEvaluators: evaluatorUids,
+        // clear absence flag if previously marked absent
+        wasAbsent: false,
       })
 
       const notificationRef = adminDb.collection("notifications").doc()

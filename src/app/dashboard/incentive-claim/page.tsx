@@ -589,8 +589,8 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                                                 <TooltipTrigger>
                                                     <Badge variant="destructive">Not Eligible</Badge>
                                                 </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Only Presenting Authors can claim for this publication type.</p>
+                                                <TooltipContent className="backdrop-blur-md bg-black/70 border-white/20 shadow-2xl">
+                                                    <p className="text-white font-medium">Only Presenting Authors can claim for this publication type.</p>
                                                 </TooltipContent>
                                             </Tooltip>
                                         </TooltipProvider>
@@ -603,10 +603,10 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                         </CardContent>
                     </Card>
                     {!canApply && (
-                        <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+                        <div className="mt-2 p-3 backdrop-blur-md bg-black/70 dark:bg-black/70 border border-white/20 dark:border-white/20 rounded-md shadow-lg">
                             <div className="flex items-start gap-2">
-                                <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-                                <p className="text-sm text-amber-800 dark:text-amber-200">
+                                <Info className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                                <p className="text-sm text-gray-100 dark:text-gray-100">
                                     {getDisabledReason(myDetails, currentUser, isScopusConference, isPresentingAuthor)}
                                 </p>
                             </div>
@@ -617,31 +617,167 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
         </div>
         {claimToApply && (
             <Dialog open={!!claimToApply} onOpenChange={() => setClaimToApply(null)}>
-                <DialogContent>
+                <DialogContent className="max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Apply for Co-Author Incentive</DialogTitle>
-                        <DialogDescription>
-                           You are applying for an incentive for the publication: "{getClaimTitle(claimToApply)}".
-                        </DialogDescription>
                     </DialogHeader>
 
-                     <div className="space-y-3 py-4">
+                     <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
                         {myRole && (
                              <p className="text-sm"><strong>Your Role:</strong> <Badge variant="secondary">{myRole}</Badge></p>
                         )}
+                        
+                        {/* Research Paper Details */}
                         {claimToApply.claimType === 'Research Papers' && (
                             <>
-                                <p className="text-sm"><strong>Journal:</strong> {claimToApply.journalName}</p>
-                                <p className="text-sm"><strong>Indexing:</strong> {claimToApply.indexType?.toUpperCase()}</p>
-                                <p className="text-sm"><strong>Q-Rating:</strong> {claimToApply.journalClassification}</p>
+                                <div className="border-l-2 border-primary pl-3 space-y-2">
+                                    <p className="text-sm"><strong>Paper Title:</strong> {claimToApply.paperTitle}</p>
+                                    <p className="text-sm"><strong>Journal:</strong> {claimToApply.journalName}</p>
+                                    <p className="text-sm"><strong>Indexing:</strong> {claimToApply.indexType?.toUpperCase()}</p>
+                                    <p className="text-sm"><strong>Q-Rating:</strong> {claimToApply.journalClassification}</p>
+                                    {claimToApply.publicationType && <p className="text-sm"><strong>Publication Type:</strong> {claimToApply.publicationType}</p>}
+                                    {claimToApply.publicationYear && <p className="text-sm"><strong>Year of Publication:</strong> {claimToApply.publicationYear}</p>}
+                                    {claimToApply.doi && <p className="text-sm"><strong>DOI:</strong> {claimToApply.doi}</p>}
+                                    {claimToApply.relevantLink && (
+                                        <p className="text-sm"><strong>Link:</strong> <a href={claimToApply.relevantLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View Publication</a></p>
+                                    )}
+                                    {claimToApply.authors && claimToApply.authors.length > 0 && (
+                                        <p className="text-sm"><strong>Total Authors:</strong> {claimToApply.authors.length}</p>
+                                    )}
+                                </div>
                             </>
                         )}
-                         {claimToApply.claimType === 'Books' && (
-                             <>
-                                <p className="text-sm"><strong>Publisher:</strong> {claimToApply.publisherName}</p>
-                                <p className="text-sm"><strong>Book Type:</strong> {claimToApply.bookType}</p>
+                        
+                        {/* Patent Details */}
+                        {claimToApply.claimType === 'Patents' && (
+                            <>
+                                <div className="border-l-2 border-primary pl-3 space-y-2">
+                                    <p className="text-sm"><strong>Patent Title:</strong> {claimToApply.patentTitle}</p>
+                                    <p className="text-sm"><strong>Status:</strong> {claimToApply.currentStatus}</p>
+                                    {claimToApply.patentLocale && <p className="text-sm"><strong>Locale:</strong> {claimToApply.patentLocale}</p>}
+                                    {claimToApply.patentApplicationNumber && <p className="text-sm"><strong>Application Number:</strong> {claimToApply.patentApplicationNumber}</p>}
+                                    {claimToApply.patentFilingDate && <p className="text-sm"><strong>Filing Date:</strong> {new Date(claimToApply.patentFilingDate).toLocaleDateString('en-IN')}</p>}
+                                </div>
                             </>
-                         )}
+                        )}
+                        
+                        {/* Book Details */}
+                        {claimToApply.claimType === 'Books' && (
+                            <>
+                                <div className="border-l-2 border-primary pl-3 space-y-2">
+                                    <p className="text-sm"><strong>Book Title:</strong> {claimToApply.publicationTitle || claimToApply.bookTitleForChapter}</p>
+                                    <p className="text-sm"><strong>Publisher:</strong> {claimToApply.publisherName}</p>
+                                    <p className="text-sm"><strong>Book Type:</strong> {claimToApply.bookApplicationType}</p>
+                                    {claimToApply.publisherType && <p className="text-sm"><strong>Publisher Type:</strong> {claimToApply.publisherType}</p>}
+                                    {claimToApply.publicationYear && <p className="text-sm"><strong>Year of Publication:</strong> {claimToApply.publicationYear}</p>}
+                                    {claimToApply.bookTotalPages && <p className="text-sm"><strong>Total Pages:</strong> {claimToApply.bookTotalPages}</p>}
+                                    {claimToApply.isScopusIndexed && <p className="text-sm"><strong>Scopus Indexed:</strong> {claimToApply.isScopusIndexed ? 'Yes' : 'No'}</p>}
+                                </div>
+                            </>
+                        )}
+                        
+                        {/* Conference Details */}
+                        {claimToApply.claimType === 'Conference Presentations' && (
+                            <>
+                                <div className="border-l-2 border-primary pl-3 space-y-2">
+                                    <p className="text-sm"><strong>Paper Title:</strong> {claimToApply.conferencePaperTitle}</p>
+                                    <p className="text-sm"><strong>Conference Name:</strong> {claimToApply.conferenceName}</p>
+                                    {claimToApply.conferenceCity && <p className="text-sm"><strong>Location:</strong> {claimToApply.conferenceCity}</p>}
+                                    {claimToApply.conferenceCountry && <p className="text-sm"><strong>Country:</strong> {claimToApply.conferenceCountry}</p>}
+                                    {claimToApply.conferenceStartDate && <p className="text-sm"><strong>Conference Dates:</strong> {new Date(claimToApply.conferenceStartDate).toLocaleDateString('en-IN')} - {claimToApply.conferenceEndDate ? new Date(claimToApply.conferenceEndDate).toLocaleDateString('en-IN') : 'TBD'}</p>}
+                                    {claimToApply.publicationType && <p className="text-sm"><strong>Publication Type:</strong> {claimToApply.publicationType}</p>}
+                                </div>
+                            </>
+                        )}
+                        
+                        <Separator />
+                        
+                        {/* Publication Proofs Section */}
+                        {claimToApply.claimType === 'Research Papers' && (
+                            <div className="space-y-2">
+                                <p className="text-sm font-semibold">Publication Proofs</p>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => {
+                                        const url = claimToApply.publicationProofUrls?.[0];
+                                        if (url) window.open(url, '_blank');
+                                    }}
+                                    disabled={!claimToApply.publicationProofUrls || claimToApply.publicationProofUrls.length === 0}
+                                >
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    View Document
+                                </Button>
+                            </div>
+                        )}
+                        
+                        {/* Incentive Calculation Breakdown */}
+                        <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-md">
+                            <p className="text-sm font-semibold">Incentive Calculation Breakdown</p>
+                            <div className="space-y-1 text-sm">
+                                <div className="flex justify-between">
+                                    <span><strong>1. Base Amount (Q-Rating):</strong></span>
+                                    <span>
+                                        {claimToApply.claimType === 'Research Papers' ? (
+                                            <>
+                                                {claimToApply.journalClassification === 'Nature/Science/Lancet' && '₹50,000'}
+                                                {claimToApply.journalClassification === 'Top 1% Journals' && '₹25,000'}
+                                                {claimToApply.journalClassification === 'Q1' && '₹15,000'}
+                                                {claimToApply.journalClassification === 'Q2' && '₹10,000'}
+                                                {claimToApply.journalClassification === 'Q3' && '₹6,000'}
+                                                {claimToApply.journalClassification === 'Q4' && '₹4,000'}
+                                            </>
+                                        ) : 'N/A'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span><strong>2. Publication Type Adjustment:</strong></span>
+                                    <span>×1.0×</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span><strong>3. After Adjustment:</strong></span>
+                                    <span>
+                                        {claimToApply.claimType === 'Research Papers' ? (
+                                            <>
+                                                {claimToApply.journalClassification === 'Nature/Science/Lancet' && '₹50,000'}
+                                                {claimToApply.journalClassification === 'Top 1% Journals' && '₹25,000'}
+                                                {claimToApply.journalClassification === 'Q1' && '₹15,000'}
+                                                {claimToApply.journalClassification === 'Q2' && '₹10,000'}
+                                                {claimToApply.journalClassification === 'Q3' && '₹6,000'}
+                                                {claimToApply.journalClassification === 'Q4' && '₹4,000'}
+                                            </>
+                                        ) : 'N/A'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Author Distribution */}
+                        {claimToApply.authors && claimToApply.authors.length > 0 && (
+                            <div className="space-y-2 p-3 bg-slate-50 dark:bg-slate-900 rounded-md">
+                                <p className="text-sm font-semibold">Author Distribution:</p>
+                                <div className="space-y-1 text-sm">
+                                    {(() => {
+                                        const mainAuthors = claimToApply.authors.filter(a => a.role === 'Main Author');
+                                        const coAuthors = claimToApply.authors.filter(a => a.role === 'Co-Author');
+                                        const internalCount = claimToApply.authors.length;
+                                        
+                                        return (
+                                            <>
+                                                <p><strong>Internal Authors:</strong> {internalCount}</p>
+                                                <p><strong>Main Authors:</strong> {mainAuthors.length}, <strong>Co-Authors:</strong> {coAuthors.length}</p>
+                                                {mainAuthors.length > 0 && coAuthors.length > 0 ? (
+                                                    <p><strong>Mixed:</strong> Main (70% ÷ {mainAuthors.length}), Co-Author (30% ÷ {coAuthors.length})</p>
+                                                ) : null}
+                                                <p className="font-semibold mt-2"><strong>Final Incentive per Author:</strong></p>
+                                                <p className="text-lg">₹{calculatedAmount?.toLocaleString('en-IN') ?? 'Calculating...'}</p>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+                        
                         <Separator />
                         <div className="p-4 bg-secondary rounded-md text-center">
                             {isCalculating ? (
@@ -656,6 +792,34 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                                 </>
                             )}
                         </div>
+                        
+                        {/* Scopus and WoS Links */}
+                        {claimToApply.claimType === 'Research Papers' && (
+                            <div className="flex gap-2">
+                                {claimToApply.scopusLink && (
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => window.open(claimToApply.scopusLink, '_blank')}
+                                        className="flex-1"
+                                    >
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        Scopus Link
+                                    </Button>
+                                )}
+                                {claimToApply.wosLink && (
+                                    <Button 
+                                        variant="outline" 
+                                        size="sm"
+                                        onClick={() => window.open(claimToApply.wosLink, '_blank')}
+                                        className="flex-1"
+                                    >
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        WoS Link
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                      </div>
 
                     <Form {...form}>
@@ -686,8 +850,10 @@ const handleOpenDialog = useCallback(async (claim: IncentiveClaim) => {
                              )}
                          </form>
                     </Form>
-                    <p className="text-xs text-muted-foreground">This action will create a new incentive claim under your name using the publication details from the original author's submission.</p>
-                    <DialogFooter>
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-md border border-blue-200 dark:border-blue-800">
+                        <p className="text-xs text-blue-900 dark:text-blue-100">This action will create a new incentive claim under your name using the publication details from the original author's submission.</p>
+                    </div>
+                    <DialogFooter className="flex gap-2">
                         <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                         <Button type="submit" form="co-author-apply-form" disabled={isApplying || isCalculating}>
                            {isApplying ? <><Loader2 className="h-4 w-4 animate-spin mr-2"/> Submitting...</> : 'Confirm & Apply'}
@@ -718,6 +884,7 @@ export default function IncentiveClaimPage() {
   const [membershipClaimInfo, setMembershipClaimInfo] = useState<{ canClaim: boolean; nextAvailableDate?: string }>({ canClaim: true });
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'apply');
+  const [searchQuery, setSearchQuery] = useState('');
   const isMobile = useIsMobile();
 
   const fetchAllData = useCallback(async (uid: string, email: string) => {
@@ -782,8 +949,17 @@ export default function IncentiveClaimPage() {
 
           // Filter out claims where the current user is the primary author (uid)
           // and exclude co-author-derived claims to avoid duplicate listings and re-application.
+          // Also filter out claims where the user has already applied (status is not 'pending')
           const coAuthorClaimList = Array.from(allCoAuthorClaims.values())
-              .filter(claim => claim.uid !== uid && !claim.originalClaimId);
+              .filter(claim => {
+                  if (claim.uid === uid || claim.originalClaimId) return false;
+                  // Check if user has already applied for this claim
+                  const userAuthor = claim.authors?.find(a => 
+                      (a.uid === uid || a.email.toLowerCase() === email.toLowerCase())
+                  );
+                  // Only show if user's status is still 'pending' (hasn't applied yet)
+                  return userAuthor?.status === 'pending';
+              });
           
           setCoAuthorClaims(coAuthorClaimList);
 
@@ -857,6 +1033,34 @@ export default function IncentiveClaimPage() {
   const draftClaims = userClaims.filter(c => c.status === 'Draft');
   const otherClaims = userClaims.filter(c => c.status !== 'Draft');
 
+  // Search function to filter across all claims
+  const searchClaims = (query: string): IncentiveClaim[] => {
+    if (!query.trim()) return [];
+    const lowerQuery = query.toLowerCase();
+    const allClaims = [...otherClaims, ...coAuthorClaims, ...draftClaims];
+    
+    return allClaims.filter(claim => {
+      const titleText = (claim.paperTitle || claim.publicationTitle || claim.patentTitle || claim.conferencePaperTitle || claim.professionalBodyName || claim.apcPaperTitle || claim.awardTitle || '').toLowerCase();
+      const claimTypeText = (claim.claimType || '').toLowerCase();
+      const journalText = (claim.journalName || '').toLowerCase();
+      const conferenceText = (claim.conferenceName || '').toLowerCase();
+      const claimIdText = (claim.claimId || '').toLowerCase();
+      const statusText = (claim.status || '').toLowerCase();
+      
+      return (
+        titleText.includes(lowerQuery) ||
+        claimTypeText.includes(lowerQuery) ||
+        journalText.includes(lowerQuery) ||
+        conferenceText.includes(lowerQuery) ||
+        claimIdText.includes(lowerQuery) ||
+        statusText.includes(lowerQuery)
+      );
+    });
+  };
+
+  const searchResults = searchClaims(searchQuery);
+  const hasSearchQuery = searchQuery.trim().length > 0;
+
   const claimTypes = useMemo(() => [
     {
       title: 'Research Papers',
@@ -922,8 +1126,7 @@ export default function IncentiveClaimPage() {
     { value: 'apply', label: 'Apply' },
     { value: 'my-claims', label: `My Claims (${otherClaims.length})` },
     { value: 'co-author', label: `Co-Author Claims (${coAuthorClaims.filter(c => c.authors?.find(a => a.email.toLowerCase() === user?.email.toLowerCase())?.status === 'pending').length})` },
-    { value: 'draft', label: `Drafts (${draftClaims.length})` },
-  ];
+    { value: 'draft', label: `Drafts (${draftClaims.length})` },];
 
   return (
     <>
@@ -933,6 +1136,30 @@ export default function IncentiveClaimPage() {
         description="Select a category to apply for an incentive, or view your existing claims below."
         showBackButton={false}
       />
+      
+      {/* Search Bar */}
+      <div className="mt-6 mb-6">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Search by title, claim type, journal name, claim ID, or status..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (e.target.value.trim().length > 0) {
+                setActiveTab('search');
+              } else {
+                setActiveTab('apply');
+              }
+            }}
+            className="w-full px-4 py-2.5 pl-10 rounded-lg border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+      </div>
+
       <div className="mt-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           {isMobile ? (
@@ -1000,6 +1227,24 @@ export default function IncentiveClaimPage() {
           <TabsContent value="draft" className="mt-4">
              {loading ? <Skeleton className="h-40 w-full" /> : <UserClaimsList claims={draftClaims} claimType="draft" onViewDetails={handleViewDetails} onDeleteClaim={(id) => setClaimToDelete(userClaims.find(c => c.id === id) || null)}/>}
           </TabsContent>
+          {hasSearchQuery && (
+            <TabsContent value="search" className="mt-4">
+              {searchResults.length > 0 ? (
+                <UserClaimsList 
+                  claims={searchResults} 
+                  claimType="other" 
+                  onViewDetails={handleViewDetails} 
+                  onDeleteClaim={(id) => setClaimToDelete(userClaims.find(c => c.id === id) || null)}
+                />
+              ) : (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-center text-muted-foreground">No claims found matching "{searchQuery}"</p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>

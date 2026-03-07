@@ -297,7 +297,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const [completionReportFile, setCompletionReportFile] = useState<File | null>(null)
   const [utilizationCertificateFile, setUtilizationCertificateFile] = useState<File | null>(null)
   const [isSubmittingCompletion, setIsSubmittingCompletion] = useState(false)
-  const [showApprovalAlert, setShowApprovalAlert] = useState(false)
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false)
   const [revisedProposalFile, setRevisedProposalFile] = useState<File | null>(null)
   const [isSubmittingRevision, setIsSubmittingRevision] = useState(false)
@@ -803,11 +802,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   }
 
   const handleApprovalClick = (status: "Recommended" | "Not Recommended" | "Revision Needed") => {
-    if (!allEvaluationsIn) {
-      setShowApprovalAlert(true);
-      return;
-    }
-    
     if (status === "Revision Needed" || status === "Not Recommended") {
         revisionCommentForm.setValue("statusToSet", status);
         setIsRevisionCommentDialogOpen(true);
@@ -1082,14 +1076,11 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" disabled={isUpdating || !allEvaluationsIn}>
+                          <Button variant="outline" disabled={isUpdating}>
                             Update Status <ChevronDown className="ml-2 h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                       </TooltipTrigger>
-                       {!allEvaluationsIn ? (
-                            <TooltipContent><p>All evaluations must be submitted first.</p></TooltipContent>
-                       ) : null}
                     </Tooltip>
                     <DropdownMenuContent align="end">
                        <DropdownMenuItem 
@@ -1225,7 +1216,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {project.wasAbsent && (
+          {project.wasAbsent && !project.meetingDetails && (
               <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>PI Was Absent</AlertTitle>
@@ -1566,21 +1557,6 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
         <GrantManagement project={project} user={user} onUpdate={handleProjectUpdate} />
       )}
 
-      <AlertDialog open={showApprovalAlert} onOpenChange={setShowApprovalAlert}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Evaluation Incomplete</AlertDialogTitle>
-            <AlertDialogDescription>
-              This project cannot be Recommended or Not Recommended until all assigned evaluations have been submitted.
-              There are currently {evaluations.length || 0} of {presentEvaluatorsCount || 0}{" "}
-              required evaluations complete.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>OK</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Dialog open={isRevisionCommentDialogOpen} onOpenChange={setIsRevisionCommentDialogOpen}>
         <DialogContent>

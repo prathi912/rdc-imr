@@ -71,8 +71,36 @@ export default function ProjectDetailsPage() {
   }, [projectId]);
 
   useEffect(() => {
+    if (!projectId) return;
+
+    // Set up real-time listener for project
+    const projectRef = doc(db, 'projects', projectId);
+    const unsubscribeProject = onSnapshot(projectRef, (snap) => {
+      if (snap.exists()) {
+        const projectData = { id: snap.id, ...snap.data() } as Project;
+        setProject(projectData);
+      }
+    });
+
+    // Initial fetch for users
+    const fetchUsers = async () => {
+      try {
+        const usersRef = collection(db, 'users');
+        const usersSnap = await getDocs(usersRef);
+        const userList = usersSnap.docs.map(doc => ({ uid: doc.id, ...doc.data() }) as User);
+        setAllUsers(userList);
+      } catch (err) {
+        console.error('Error fetching users:', err);
+      }
+    };
+
+    fetchUsers();
     fetchProjectAndUsers();
-  }, [fetchProjectAndUsers]);
+
+    return () => {
+      unsubscribeProject();
+    };
+  }, [projectId]);
   
   const handleProjectUpdate = (updatedProject: Project) => {
     setProject(updatedProject);
