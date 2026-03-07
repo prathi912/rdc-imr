@@ -427,6 +427,109 @@ export default function AnalyticsPage() {
     return config;
   }, [incentiveAmountData]);
 
+  // --- Publication Analytics by Quartile & Monthly Distribution ---
+  const { quarterlyDistributionData, monthlyDistributionData, quartileSummary } = useMemo(() => {
+    // Filter research paper claims with publication data
+    const researchPaperClaims = incentiveClaims.filter(
+      claim => claim.claimType === 'Research Papers' && 
+               claim.journalClassification && 
+               claim.publicationMonth && 
+               claim.publicationYear
+    );
+
+    // Calculate Q1-Q4 distribution
+    const quartileCount: Record<string, number> = {
+      'Q1': 0,
+      'Q2': 0,
+      'Q3': 0,
+      'Q4': 0,
+    };
+
+    researchPaperClaims.forEach(claim => {
+      if (claim.journalClassification && quartileCount.hasOwnProperty(claim.journalClassification)) {
+        quartileCount[claim.journalClassification]++;
+      }
+    });
+
+    // Create quartile data in proper Q1, Q2, Q3, Q4 order
+    const quartileData = ['Q1', 'Q2', 'Q3', 'Q4']
+      .map(q => ({ quartile: q, count: quartileCount[q] }));
+
+    const totalArticles = researchPaperClaims.length;
+
+    // Calculate monthly distribution
+    const monthlyCount: Record<string, number> = {};
+    
+    researchPaperClaims.forEach(claim => {
+      if (claim.publicationMonth && claim.publicationYear) {
+        // Parse month and year
+        const monthStr = claim.publicationMonth.toLowerCase();
+        const yearStr = claim.publicationYear;
+        
+        // Try to parse the month string (could be "January", "Jan", "1", etc.)
+        const monthMap: Record<string, number> = {
+          'january': 1, 'jan': 1, 'february': 2, 'feb': 2, 'march': 3, 'mar': 3,
+          'april': 4, 'apr': 4, 'may': 5, 'june': 6, 'jun': 6, 'july': 7, 'jul': 7,
+          'august': 8, 'aug': 8, 'september': 9, 'sep': 9, 'october': 10, 'oct': 10,
+          'november': 11, 'nov': 11, 'december': 12, 'dec': 12
+        };
+
+        let monthNum = monthMap[monthStr] || parseInt(monthStr);
+        if (monthNum < 1 || monthNum > 12) monthNum = 1;
+
+        const monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][monthNum - 1];
+        const key = `${monthName} ${yearStr}`;
+        
+        monthlyCount[key] = (monthlyCount[key] || 0) + 1;
+      }
+    });
+
+    // Sort monthly data chronologically
+    const monthlyData = Object.entries(monthlyCount)
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => {
+        const dateA = new Date(`${a.month.split(' ')[0]} 1, ${a.month.split(' ')[1]}`);
+        const dateB = new Date(`${b.month.split(' ')[0]} 1, ${b.month.split(' ')[1]}`);
+        return dateA.getTime() - dateB.getTime();
+      });
+
+    return {
+      quarterlyDistributionData: quartileData,
+      monthlyDistributionData: monthlyData,
+      quartileSummary: {
+        totalArticles,
+        q1Count: quartileCount['Q1'],
+        q2Count: quartileCount['Q2'],
+        q3Count: quartileCount['Q3'],
+        q4Count: quartileCount['Q4'],
+      },
+    };
+  }, [incentiveClaims]);
+
+  const quartileChartConfig = useMemo(() => {
+    const config: ChartConfig = {};
+    ['Q1', 'Q2', 'Q3', 'Q4'].forEach((quartile, index) => {
+      config[quartile] = {
+        label: quartile,
+        color: COLORS[index % COLORS.length],
+      };
+    });
+    return config;
+  }, []);
+
+  const monthlyChartConfig = useMemo(() => {
+    const config: ChartConfig = {
+      count: {
+        label: 'Publications',
+        color: 'hsl(var(--primary))',
+      },
+    };
+    return config;
+  }, []);
+
+  const publicationChartRef = useRef<HTMLDivElement>(null);
+  const monthlyPublicationChartRef = useRef<HTMLDivElement>(null);
+
   const {
     fieldOfStudyData,
     fieldOfStudyConfig,
@@ -867,6 +970,118 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Publication Analytics Section */}
+      <div className="mt-8 grid gap-6 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Publications</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{quartileSummary.totalArticles}</div>
+            <p className="text-xs text-muted-foreground">Indexed journal articles</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Q1 Journals</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{quartileSummary.q1Count}</div>
+            <p className="text-xs text-muted-foreground">{quartileSummary.totalArticles > 0 ? `${((quartileSummary.q1Count / quartileSummary.totalArticles) * 100).toFixed(1)}%` : '0%'} of total</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Q2 Journals</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{quartileSummary.q2Count}</div>
+            <p className="text-xs text-muted-foreground">{quartileSummary.totalArticles > 0 ? `${((quartileSummary.q2Count / quartileSummary.totalArticles) * 100).toFixed(1)}%` : '0%'} of total</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Q3 & Q4 Journals</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{quartileSummary.q3Count + quartileSummary.q4Count}</div>
+            <p className="text-xs text-muted-foreground">{quartileSummary.totalArticles > 0 ? `${(((quartileSummary.q3Count + quartileSummary.q4Count) / quartileSummary.totalArticles) * 100).toFixed(1)}%` : '0%'} of total</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Publications by Journal Quartile</CardTitle>
+              <CardDescription>Distribution of articles across Q1, Q2, Q3, Q4 journals.</CardDescription>
+            </div>
+            <Button variant="outline" size="icon" onClick={() => handleExport(publicationChartRef, 'publication_quartile_distribution')}>
+              <Download className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div ref={publicationChartRef} className="p-4 bg-card">
+              <ChartContainer config={quartileChartConfig} className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={quarterlyDistributionData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="quartile" />
+                    <YAxis allowDecimals={false} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={4}>
+                      <LabelList dataKey="count" position="top" offset={8} className="fill-foreground" fontSize={12} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Monthly Publication Distribution</CardTitle>
+              <CardDescription>Number of articles published by month and year.</CardDescription>
+            </div>
+            <Button variant="outline" size="icon" onClick={() => handleExport(monthlyPublicationChartRef, 'publication_monthly_distribution')}>
+              <Download className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div ref={monthlyPublicationChartRef} className="p-4 bg-card">
+              <ChartContainer config={monthlyChartConfig} className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyDistributionData} margin={{ bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="month" 
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis allowDecimals={false} />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line 
+                      type="monotone" 
+                      dataKey="count" 
+                      stroke="hsl(var(--primary))" 
+                      strokeWidth={2} 
+                      dot={{ fill: 'hsl(var(--primary))', r: 4 }}
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
+          </CardContent>
+        </Card>
+
       </div>
        <div className="mt-8 grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <Card>
