@@ -749,7 +749,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     `
 
     if (comments) {
-      const reasonTitle = newStatus === 'Revision Needed' ? "Evaluator's Comments for Revision:" : "Reason for Decision:";
+      const reasonTitle = newStatus === 'Revision Needed' ? "Comments for Revision:" : "Reason for Decision:";
       emailHtml += `
           <div style="margin-top:20px; padding:15px; border:1px solid #4f5b62; border-radius:6px; background-color:#2c3e50;">
             <h4 style="color:#ffffff; margin-top:0;">${reasonTitle}</h4>
@@ -774,6 +774,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
     if (project.pi_email) {
       await sendEmailUtility({
         to: project.pi_email,
+        bcc: "vishal.sandhwar8850@paruluniversity.ac.in",
         subject: `Project Status Update: ${project.title}`,
         html: emailHtml,
         from: "default",
