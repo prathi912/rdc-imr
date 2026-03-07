@@ -8,15 +8,19 @@ import { parseISO, getYear } from 'date-fns';
 // --- Policy Constants ---
 const POLICY = {
     WEIGHTAGE: {
-        PUBLICATION: 0.70,
-        PATENT: 0.05,
+        PUBLICATION: 0.65,
+        PATENT: 0.5,
+        RESEARCH_ACTIVITIES: 0.05,
+        CONSULTANCY: 0.05,
         // EMR projects are scored directly without applying the usual ARPS weightage.
         // We set this to 1 so that the raw score is used as the final EMR component.
         EMR: 1,
     },
     CAPS: {
-        PUBLICATION: 70,
+        PUBLICATION: 65,
         PATENT: 5,
+        RESEARCH_ACTIVITIES: 5,
+        CONSULTANCY: 5,
         // cap for EMR raw points (same as before, can be adjusted later if policy changes)
         EMR: 20,
     },
@@ -134,14 +138,14 @@ function getJournalPoints(claim: IncentiveClaim): { quartileBase: number, articl
     switch (publicationType) {
         case 'Original Research Article':
         case 'Research Articles/Short Communications':
-            points = 10; 
+            points = 15; 
             break;
         case 'Short Communication': 
             points = 8;
             break;
         case 'Review Article':
         case 'Review Articles':
-             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 10 : 8;
+             points = (journalClassification === 'Q1' || journalClassification === 'Q2') ? 15 : 10;
              multiplier = 1.0;
              break;
         case 'Case Report / Case Study': 
@@ -584,15 +588,23 @@ export async function calculateArpsForUser(userId: string, year: number) {
     const { score: rawPatentScore, contributingClaims: patentClaims } = calculatePatentScore(claimsInPeriod, userId, userEmail);
     const { score: rawEmrScore, contributingProjects: emrProjects } = calculateEmrScore(uniqueEmrProjects, userId, startDate, endDate);
 
+    // TODO: Add scoring functions for Research Activities and Consultancy
+    const rawResearchActivitiesScore = 0;
+    const rawConsultancyScore = 0;
+
     const weightedPub = rawPubScore * POLICY.WEIGHTAGE.PUBLICATION;
     const weightedPatent = rawPatentScore * POLICY.WEIGHTAGE.PATENT;
+    const weightedResearchActivities = rawResearchActivitiesScore * POLICY.WEIGHTAGE.RESEARCH_ACTIVITIES;
+    const weightedConsultancy = rawConsultancyScore * POLICY.WEIGHTAGE.CONSULTANCY;
     const weightedEmr = rawEmrScore * POLICY.WEIGHTAGE.EMR;
 
     const finalPubScore = Math.min(weightedPub, POLICY.CAPS.PUBLICATION);
     const finalPatentScore = Math.min(weightedPatent, POLICY.CAPS.PATENT);
+    const finalResearchActivitiesScore = Math.min(weightedResearchActivities, POLICY.CAPS.RESEARCH_ACTIVITIES);
+    const finalConsultancyScore = Math.min(weightedConsultancy, POLICY.CAPS.CONSULTANCY);
     const finalEmrScore = Math.min(weightedEmr, POLICY.CAPS.EMR);
     
-    const totalArps = round(finalPubScore + finalPatentScore + finalEmrScore);
+    const totalArps = round(finalPubScore + finalPatentScore + finalResearchActivitiesScore + finalConsultancyScore + finalEmrScore);
     
     const publicationContributingClaims = [...pubClaims, ...bookChapterClaims, ...bookClaims, ...conferenceProceedingsClaims];
     const totalPublicationCount = pubCount + bookChapterClaims.length + bookClaims.length + conferenceProceedingsClaims.length;
@@ -633,6 +645,8 @@ export async function calculateArpsForUser(userId: string, year: number) {
             books: { raw: round(rawBookScore), contributingClaims: bookClaims },
             conferenceProceedings: { raw: round(rawConferenceProceedingsScore), contributingClaims: conferenceProceedingsClaims },
             patents: { raw: round(rawPatentScore), weighted: round(weightedPatent), final: round(finalPatentScore), contributingClaims: patentClaims },
+            researchActivities: { raw: round(rawResearchActivitiesScore), weighted: round(weightedResearchActivities), final: round(finalResearchActivitiesScore), contributingClaims: [] },
+            consultancy: { raw: round(rawConsultancyScore), weighted: round(weightedConsultancy), final: round(finalConsultancyScore), contributingClaims: [] },
             emr: { raw: round(rawEmrScore), weighted: round(weightedEmr), final: round(finalEmrScore), contributingProjects: emrProjects },
             totalArps: totalArps,
             grade: grade,
@@ -652,7 +666,7 @@ export async function calculateArpsForUser(userId: string, year: number) {
 export async function generateArpsStatisticsReport(year: number) {
   try {
     const startDate = new Date(year - 1, 5, 1); // June 1st of previous year
-    const endDate = new Date(year, 4, 31); // May 31st of current year
+    const endDate = new Date(year, 4, 31, 23, 59, 59, 999); // May 31st of current year
 
     // Get all users with incentive-claim module access
     const usersSnapshot = await adminDb.collection('users').get();
@@ -673,9 +687,9 @@ export async function generateArpsStatisticsReport(year: number) {
     const statistics = await Promise.all(
       eligibleUsers.map(async (user) => {
         try {
-          // Get all incentive claims for this user
+          // Get all incentive claims for this user (no date filter initially to check all claims)
           const claimsSnapshot = await adminDb
-            .collection('incentive-claims')
+            .collection('incentiveClaims')
             .where('uid', '==', user.uid)
             .where('status', 'in', [
               'Accepted',
@@ -684,44 +698,57 @@ export async function generateArpsStatisticsReport(year: number) {
             ])
             .get();
 
-          const claims = claimsSnapshot.docs.map(doc => ({
+          const claimsData = claimsSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data() as any,
           }));
+
+          // Filter claims by date
+          const claims = claimsData.filter(claim => {
+            const dateToCheck = getClaimDate(claim);
+            if (!dateToCheck || isNaN(dateToCheck.getTime())) return false;
+            return dateToCheck >= startDate && dateToCheck <= endDate;
+          });
 
           // Get all EMR projects for this user
           const emrSnapshot = await adminDb
-            .collection('emr-interest')
+            .collection('emrInterests')
             .where('userId', '==', user.uid)
-            .where('status', 'in', ['Sanctioned', 'Process Complete'])
             .get();
 
-          const emrProjects = emrSnapshot.docs.map(doc => ({
+          const emrData = emrSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data() as any,
           }));
+
+          // Filter EMR by status and date
+          const emrProjects = emrData.filter(project => {
+            const normalizedStatus = String(project.status || '').trim().toUpperCase();
+            if (normalizedStatus !== 'SANCTIONED') return false;
+            
+            const projectDate = parseProjectDate(project);
+            if (!projectDate) return false;
+            if (projectDate < startDate || projectDate > endDate) return false;
+            
+            return true;
+          });
 
           // Count papers by author role
           let papersFirstCorresponding = 0;
           let papersCoAuthor = 0;
 
           claims.forEach(claim => {
-            if (claim.claimType === 'research-paper') {
-              const authorPosition = claim.authorPosition || '';
-              const authorType = claim.authorType || '';
+            if (claim.claimType === 'Research Papers') {
+              const claimantRole = claim.authors?.find(a => a.uid === user.uid)?.role;
               
               // Check if this is first/corresponding author
               if (
-                authorPosition === '1st' ||
-                authorType === 'First Author' ||
-                authorType === 'Corresponding Author' ||
-                authorType === 'First & Corresponding Author'
+                claimantRole === 'First Author' ||
+                claimantRole === 'Corresponding Author' ||
+                claimantRole === 'First & Corresponding Author'
               ) {
                 papersFirstCorresponding++;
-              } else if (
-                authorType === 'Co-Author' ||
-                authorPosition !== '1st'
-              ) {
+              } else if (claimantRole === 'Co-Author') {
                 papersCoAuthor++;
               }
             }
@@ -733,15 +760,9 @@ export async function generateArpsStatisticsReport(year: number) {
 
           emrProjects.forEach(project => {
             emrCount++;
-            // Parse the durationAmount field to extract the amount
-            const durationAmount = project.durationAmount || '';
-            const amountMatch = durationAmount.match(/Amount\s*:\s*[^\d]*([\d,]+(?:\.\d+)?)/i);
-            if (amountMatch) {
-              const amountStr = amountMatch[1].replace(/,/g, '');
-              const amount = parseFloat(amountStr);
-              if (!isNaN(amount)) {
-                emrTotalAmount += amount;
-              }
+            const amount = parseProjectAmount(project);
+            if (amount > 0) {
+              emrTotalAmount += amount;
             }
           });
 
@@ -750,7 +771,9 @@ export async function generateArpsStatisticsReport(year: number) {
           let patentsGranted = 0;
 
           claims.forEach(claim => {
-            if (claim.claimType === 'patent') {
+            if (claim.claimType === 'Patents') {
+              if (!claim.patentInventors?.some(inv => inv.uid === user.uid)) return;
+              
               const status = claim.patentStatus || '';
               if (status === 'Published') {
                 patentsPublished++;
