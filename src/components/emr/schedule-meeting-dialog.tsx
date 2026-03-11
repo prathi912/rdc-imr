@@ -16,7 +16,7 @@ import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Checkbox } from '@/components/ui/checkbox';
 import type { FundingCall, User, EmrInterest } from '@/types';
-import { format, parseISO, startOfToday, isToday, parse } from 'date-fns';
+import { format, parseISO, startOfToday, isToday, parse, setHours, setMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Calendar, ChevronDown, Loader2, Info } from 'lucide-react';
 import { scheduleEmrMeeting } from '@/app/emr-actions';
