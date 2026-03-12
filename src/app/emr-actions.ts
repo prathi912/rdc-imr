@@ -219,12 +219,32 @@ export async function registerEmrInterest(
             isRead: false,
           })
         })
-        await batch.commit()
-      }
+      await batch.commit()
     }
-    
-    // Notify the user who was registered, especially if done by an admin.
-    if (user.email) {
+  }
+
+  // Email Super-admin on FIRST EMR interest
+  if (isFirstInterest && callTitle) {
+    const firstInterestEmail = `
+      <div \${EMAIL_STYLES.background}>
+        \${EMAIL_STYLES.logo}
+        <h2 style="color:#ffffff;">First EMR Interest Registered!</h2>
+        <p style="color:#e0e0e0;"><strong>Call:</strong> "\${callTitle}"</p>
+        <p style="color:#e0e0e0;"><strong>By:</strong> \${user.name} (\${user.email})</p>
+        <p style="color:#cccccc;">Time to schedule evaluation meeting. <a href="\${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/emr-calendar" style="color:#64b5f6;">EMR Calendar</a></p>
+        \${EMAIL_STYLES.footer}
+      </div>`;
+    await sendEmailUtility({
+      to: 'vishal.sandhwar8850@paruluniversity.ac.in',
+      subject: \`FIRST EMR Interest: \${callTitle}\`,
+      html: firstInterestEmail,
+      from: 'default'
+    });
+    await logActivity("INFO", "First EMR interest email sent to super-admin", { callId, userId: user.uid });
+  }
+  
+  // Notify the user who was registered, especially if done by an admin.
+  if (user.email) {
       let emailHtml: string;
       if (registeredByAdmin) {
         emailHtml = `<div ${EMAIL_STYLES.background}>
@@ -236,11 +256,15 @@ export async function registerEmrInterest(
         </div>`;
       } else {
         emailHtml = `<div ${EMAIL_STYLES.background}>
-            ${EMAIL_STYLES.logo}
-            <p style="color:#ffffff;">Dear ${user.name},</p>
-            <p style="color:#e0e0e0;">Your interest for the EMR funding call "<strong style="color:#ffffff;">${callTitle}</strong>" has been successfully registered.</p>
-            ${EMAIL_STYLES.footer}
-        </div>`;
+    ${EMAIL_STYLES.logo}
+    <p style="color:#ffffff;">Dear ${user.name},</p>
+    <p style="color:#e0e0e0;">
+        Your interest for the EMR funding call 
+        "<strong style="color:#ffffff;">${callTitle}</strong>" has been successfully registered. 
+        You are requested to upload your presentation (PPT) on the portal so that your proposal can be considered for the presentation round.
+    </p>
+    ${EMAIL_STYLES.footer}
+</div>`;
       }
       await sendEmailUtility({
         to: user.email,
@@ -339,6 +363,17 @@ export async function scheduleEmrMeeting(
     const dtstamp = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
 
 
+    batch.update(callRef, {
+      meetingDetails: {
+        date,
+        time,
+        venue,
+        pptDeadline,
+        assignedEvaluators: evaluatorUids,
+        mode,
+      },
+    });
+
     for (const userId of applicantUids) {
       const interestsRef = adminDb.collection("emrInterests")
       const q = interestsRef.where("callId", "==", callId).where("userId", "==", userId)
@@ -425,6 +460,24 @@ export async function scheduleEmrMeeting(
     if (evaluatorUids && evaluatorUids.length > 0) {
       const evaluatorDocs = await Promise.all(evaluatorUids.map((uid) => adminDb.collection("users").doc(uid).get()))
 
+      const applicantUsers = await Promise.all(
+        applicantUids.map(async (uid) => {
+          const userDoc = await adminDb.collection("users").doc(uid).get();
+          if (userDoc.exists) {
+            const user = userDoc.data() as User;
+            return {
+              name: user.name,
+              institute: user.institute || 'N/A',
+            };
+          }
+          return null;
+        })
+      );
+  
+      const validApplicantUsers = applicantUsers.filter(user => user !== null) as { name: string; institute: string }[];
+  
+      const piListHtml = validApplicantUsers.map(pi => `<li>${pi.name} (${pi.institute})</li>`).join('');
+
       for (const evaluatorDoc of evaluatorDocs) {
         if (evaluatorDoc.exists) {
           const evaluator = evaluatorDoc.data() as User
@@ -441,8 +494,12 @@ export async function scheduleEmrMeeting(
             const emailHtml = `
               <div ${EMAIL_STYLES.background}>
                   ${EMAIL_STYLES.logo}
-                  <p style="color: #ffffff;">Dear Evaluator,</p>
+                  <p style="color: #ffffff;">Dear ${evaluator.name},</p>
                   <p style="color: #e0e0e0;">You have been assigned to an EMR evaluation committee.</p>
+                  <p style="color: #e0e0e0; margin-top: 15px;">Assigned PI(s):</p>
+                  <ul style="color: #e0e0e0; margin-top: 8px; padding-left: 20px;">
+                    ${piListHtml}
+                  </ul>
                   <p><strong style="color: #ffffff;">Date:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy")}</p>
                   <p><strong style="color: #ffffff;">Time:</strong> ${formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)")}</p>
                   <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 

@@ -648,70 +648,131 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     
     const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot && !i.wasAbsent);
     const meetingIsScheduled = !!call.meetingDetails?.date;
+    const assignedEvaluators = useMemo(() => {
+        if (!call.meetingDetails?.assignedEvaluators) return [];
+        return allUsers.filter(u => call.meetingDetails?.assignedEvaluators?.includes(u.uid));
+    }, [call.meetingDetails?.assignedEvaluators, allUsers]);
     
     const pendingPptUploads = useMemo(() => {
         return interests.filter(i => !i.pptUrl).length;
     }, [interests]);
 
 
-    return (
-        <>
-        {meetingIsScheduled && (
-            <Card className="mb-8 bg-primary/10 border-primary/20">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <CalendarClock className="h-5 w-5" />
-                        Meeting Scheduled
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                        <p><strong>Date:</strong> {format(parseISO(call.meetingDetails!.date), 'PPP')}</p>
-                        <p><strong>Time:</strong> {call.meetingDetails!.time}</p>
-                        <p><strong>Venue:</strong> {call.meetingDetails!.venue}</p>
-                    </div>
-                </CardContent>
-            </Card>
-        )}
-        <Card>
-            <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                        <CardTitle>Applicant Registrations ({interests.length})</CardTitle>
-                        <CardDescription>Review and manage all applicants for this call.</CardDescription>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                         {unscheduledApplicantsExist && currentUser.designation !== 'Head of Goa Campus' && (
-                            <Button onClick={() => setIsScheduleDialogOpen(true)}>
-                                <CalendarClock className="mr-2 h-4 w-4" /> Schedule Meeting
-                            </Button>
-                         )}
-                         <Button variant="secondary" onClick={() => setIsRegisterUserDialogOpen(true)}>
-                            <UserPlus className="mr-2 h-4 w-4" /> Register User
-                         </Button>
-                        <Button variant="outline" onClick={handleSendPptReminders} disabled={isSendingReminders}>
-                            {isSendingReminders ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
-                            Remind ({pendingPptUploads})
-                        </Button>
-                         {meetingIsScheduled && (
-                            <Button variant="outline" onClick={() => setIsAttendanceDialogOpen(true)}>
-                                <UserCheck className="mr-2 h-4 w-4" /> Attendance
-                            </Button>
-                         )}
-                        <Button variant="outline" onClick={handleExport} disabled={interests.length === 0}>
-                            <Download className="mr-2 h-4 w-4" /> Export XLSX
-                        </Button>
+return (
+<>
+{meetingIsScheduled && (
+    <Card className="mb-8 bg-primary/10 border-primary/20">
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+                <CalendarClock className="h-5 w-5" />
+                Meeting Scheduled
+            </CardTitle>
+        </CardHeader>
+
+        <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <p><strong>Date:</strong> {format(parseISO(call.meetingDetails!.date), 'PPP')}</p>
+                <p><strong>Time:</strong> {call.meetingDetails!.time}</p>
+                <p><strong>Venue:</strong> {call.meetingDetails!.venue}</p>
+            </div>
+
+            {assignedEvaluators.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-primary/20">
+                    <p className="text-sm font-semibold mb-2">Assigned Evaluators:</p>
+                    <div className="flex flex-wrap gap-2">
+                        {assignedEvaluators.map(evaluator => (
+                            <Badge key={evaluator.uid} variant="outline" className="bg-white/50">
+                                {evaluator.name}
+                            </Badge>
+                        ))}
                     </div>
                 </div>
-                 <div className="mt-4">
-                    <Input
-                        placeholder="Search by PI Name, Email, or MIS ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="max-w-md"
-                    />
-                </div>
-            </CardHeader>
+            )}
+
+            <div className="mt-4 flex justify-end">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsScheduleDialogOpen(true)}
+                >
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Meeting Details
+                </Button>
+            </div>
+        </CardContent>
+    </Card>
+)}
+
+<Card>
+    <CardHeader>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <CardTitle>
+                    Applicant Registrations ({interests.length})
+                </CardTitle>
+                <CardDescription>
+                    Review and manage all applicants for this call.
+                </CardDescription>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+                {unscheduledApplicantsExist && currentUser.designation !== 'Head of Goa Campus' && (
+                    <Button onClick={() => setIsScheduleDialogOpen(true)}>
+                        <CalendarClock className="mr-2 h-4 w-4" />
+                        Schedule Meeting
+                    </Button>
+                )}
+
+                <Button
+                    variant="secondary"
+                    onClick={() => setIsRegisterUserDialogOpen(true)}
+                >
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Register User
+                </Button>
+
+                <Button
+                    variant="outline"
+                    onClick={handleSendPptReminders}
+                    disabled={isSendingReminders}
+                >
+                    {isSendingReminders
+                        ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        : <Send className="mr-2 h-4 w-4" />
+                    }
+                    Remind ({pendingPptUploads})
+                </Button>
+
+                {meetingIsScheduled && (
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsAttendanceDialogOpen(true)}
+                    >
+                        <UserCheck className="mr-2 h-4 w-4" />
+                        Attendance
+                    </Button>
+                )}
+
+                <Button
+                    variant="outline"
+                    onClick={handleExport}
+                    disabled={interests.length === 0}
+                >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export XLSX
+                </Button>
+            </div>
+        </div>
+
+        <div className="mt-4">
+            <Input
+                placeholder="Search by PI Name, Email, or MIS ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="max-w-md"
+            />
+        </div>
+    </CardHeader>
             <CardContent className="overflow-x-auto">
                  {filteredInterests.length > 0 ? (
                     <Table>
@@ -925,13 +986,14 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 />
             )}
         </Card>
-        <RegisterUserDialog 
-            call={call} 
-            adminUser={currentUser} 
-            isOpen={isRegisterUserDialogOpen} 
-            onOpenChange={setIsRegisterUserDialogOpen} 
-            onRegisterSuccess={onActionComplete} 
-        />
-        </>
-    );
-}
+   
+<RegisterUserDialog 
+    call={call}
+    adminUser={currentUser}
+    isOpen={isRegisterUserDialogOpen}
+    onOpenChange={setIsRegisterUserDialogOpen}
+    onRegisterSuccess={onActionComplete}
+/>
+
+</>
+)};
