@@ -114,9 +114,7 @@ export default function SignupPage() {
     let notifyRole: string | null = null
     let campus: User['campus'] = 'Vadodara';
 
-    if (firebaseUser.email?.endsWith('@goa.paruluniversity.ac.in')) {
-        campus = 'Goa';
-    } else if (firebaseUser.email?.endsWith('@rajkot.paruluniversity.ac.in')) {
+    if (firebaseUser.email?.endsWith('@rajkot.paruluniversity.ac.in')) {
         campus = 'Rajkot';
     } else if (firebaseUser.email?.endsWith('@ahmedabad.paruluniversity.ac.in')) {
         campus = 'Ahmedabad';

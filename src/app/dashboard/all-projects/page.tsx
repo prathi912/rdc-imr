@@ -40,8 +40,8 @@ import { findUserByMisId } from '@/app/userfinding';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
-const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval', 'Sanctioned'];
-const CAMPUSES = ['Vadodara', 'Goa', 'Ahmedabad', 'Rajkot'];
+const STATUSES: Project['status'][] = ['Draft', 'Submitted', 'Under Review', 'Recommended', 'Revision Needed', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval', 'Sanctioned'];
+const CAMPUSES = ['Vadodara', 'Ahmedabad', 'Rajkot'];
 
 const IMR_EXPORT_COLUMNS = [
   { id: 'title', label: 'Project Title' },
@@ -489,7 +489,6 @@ export default function AllProjectsPage() {
         const isCro = user?.role === 'CRO';
         const isPrincipal = user?.designation === 'Principal';
         const isHod = user?.designation === 'HOD';
-        const isGoaHead = user?.designation === 'Head of Goa Campus';
 
         let imrConstraints: any[] = [orderBy('submissionDate', 'desc')];
         let emrConstraints: any[] = [where('isBulkUploaded', '==', true)];
@@ -497,9 +496,6 @@ export default function AllProjectsPage() {
         if (isCro && user.faculties && user.faculties.length > 0) {
             imrConstraints.unshift(where('faculty', 'in', user.faculties));
             emrConstraints.unshift(where('faculty', 'in', user.faculties));
-        } else if (isGoaHead) {
-            imrConstraints.unshift(where('campus', '==', 'Goa'));
-            emrConstraints.unshift(where('campus', '==', 'Goa'));
         } else if (isPrincipal && user.institute) {
             imrConstraints.unshift(where('institute', '==', user.institute));
             emrConstraints.unshift(where('faculty', '==', user.faculty));
@@ -563,7 +559,7 @@ export default function AllProjectsPage() {
     }
   }, [user, fetchAllData]);
   
-  const hasAdminView = ['Super-admin', 'admin', 'CRO', 'IQAC'].includes(user?.role || '') || user?.designation === 'Principal' || user?.designation === 'HOD' || user?.designation === 'Head of Goa Campus';
+  const hasAdminView = ['Super-admin', 'admin', 'CRO', 'IQAC'].includes(user?.role || '') || user?.designation === 'Principal' || user?.designation === 'HOD';
   const isSuperAdmin = user?.role === 'Super-admin';
 
   const allFaculties = useMemo(() => {
@@ -630,7 +626,6 @@ export default function AllProjectsPage() {
   
   if (user?.designation === 'Principal' && user?.institute) pageTitle = `Projects from ${user.institute}`;
   if (user?.designation === 'HOD' && user?.department) pageTitle = `Projects from ${user.department}`;
-  if (user?.designation === 'Head of Goa Campus') pageTitle = `Projects from Goa Campus`;
   if (user?.role === 'CRO' && facultyFilter.length === 1) pageTitle = `Projects from ${facultyFilter[0]}`;
   if (user?.role === 'CRO' && facultyFilter.length > 1) pageTitle = `Projects from multiple faculties`;
 

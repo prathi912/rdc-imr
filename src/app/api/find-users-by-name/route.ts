@@ -19,11 +19,10 @@ interface StaffData {
   ORCID_ID?: string | number;
   Vidwan_ID?: string | number;
   Type?: 'CRO' | 'Institutional' | 'faculty';
-  Campus?: 'Vadodara' | 'Ahmedabad' | 'Rajkot' | 'Goa';
+  Campus?: 'Vadodara' | 'Ahmedabad' | 'Rajkot';
   Orcid?: string | number;
 }
 
-const GOA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/goastaffdata.xlsx';
 const VADODARA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/staffdata.xlsx';
 
 const readStaffDataFromUrl = async (url: string): Promise<StaffData[]> => {
@@ -84,12 +83,9 @@ export async function GET(request: NextRequest) {
     // If not enough results from Firestore, search staffdata.xlsx
     if (filteredUsers.length < 10) {
         try {
-            const [staffdata, goastaffdata] = await Promise.all([
-                readStaffDataFromUrl(VADODARA_STAFF_DATA_URL),
-                readStaffDataFromUrl(GOA_STAFF_DATA_URL)
-            ]);
+            const staffdata = await readStaffDataFromUrl(VADODARA_STAFF_DATA_URL);
 
-            const allStaffData = [...staffdata, ...goastaffdata];
+            const allStaffData = [...staffdata];
             const existingEmails = new Set(allUsers.map(u => u.email.toLowerCase()));
 
             let staffMatches: any[] = [];

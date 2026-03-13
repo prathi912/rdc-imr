@@ -102,7 +102,7 @@ export async function addResearchPaper(
     const mainAuthorMisId = mainAuthorData?.misId;
     const mainAuthorCampus = mainAuthorData?.campus;
     
-    const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorMisId}` : `/profile/${mainAuthorMisId}`;
+    const profileLink = `/profile/${mainAuthorMisId}`;
 
     const notificationBatch = adminDb.batch();
     authors.forEach((author) => {
@@ -170,7 +170,7 @@ export async function updateResearchPaper(
     const mainAuthorMisId = mainAuthorData?.misId;
     const mainAuthorCampus = mainAuthorData?.campus;
 
-    const profileLink = mainAuthorCampus === 'Goa' ? `/goa/${mainAuthorMisId}` : `/profile/${mainAuthorMisId}`;
+    const profileLink = `/profile/${mainAuthorMisId}`;
 
     const oldAuthorUids = new Set(oldAuthors.map(a => a.uid));
 

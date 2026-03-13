@@ -153,7 +153,7 @@ export default function ProjectDetailsPage() {
   return (
     <div className="container mx-auto py-10">
       <PageHeader 
-        title={project.title} 
+        title={project.revisedProposalUrl ? `${project.title} [Revised]` : project.title} 
         description={project.type} 
         onBackClick={() => router.back()} 
         backButtonText="Back"

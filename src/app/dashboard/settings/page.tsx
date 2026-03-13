@@ -129,7 +129,7 @@ const goaFaculties = [
     "University Office"
 ];
 
-const campuses = ["Rajkot", "Ahmedabad", "Vadodara", "Goa"];
+const campuses = ["Rajkot", "Ahmedabad", "Vadodara"];
 
 const institutes = [
   "Parul Institute of Technology",

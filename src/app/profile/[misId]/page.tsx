@@ -170,25 +170,61 @@ export default function ProfilePage() {
           showBackButton={true}
           backButtonHref="/dashboard"
         />
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-1">
-            <Card>
-              <CardContent className="p-6">
-                <Skeleton className="h-64 w-full" />
-              </CardContent>
-            </Card>
-          </div>
-          <div className="md:col-span-2 space-y-8">
-            <Card>
-              <CardContent className="p-6">
-                <Skeleton className="h-48 w-full" />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-6">
-                <Skeleton className="h-48 w-full" />
-              </CardContent>
-            </Card>
+        <div className="mt-8 flex flex-col items-center">
+          <Card className="w-full max-w-4xl shadow-xl border-0 bg-card/80 backdrop-blur-lg">
+            <CardContent className="p-6 md:p-8">
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <Skeleton className="h-28 w-28 rounded-full" />
+                <div className="flex flex-col items-center md:items-start text-center md:text-left w-full">
+                  <Skeleton className="h-10 w-56" />
+                  <Skeleton className="h-4 w-40 mt-3" />
+                  <div className="flex justify-center md:justify-start gap-8 my-4">
+                    <Skeleton className="h-10 w-20" />
+                    <Skeleton className="h-10 w-20" />
+                    <Skeleton className="h-10 w-20" />
+                    <Skeleton className="h-10 w-20" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 pt-6 mt-6 border-t">
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-48" />
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-48" />
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                    <Skeleton className="h-6 w-full" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="w-full max-w-4xl mt-8">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-7 w-64" />
+                <Skeleton className="h-10 w-32" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-40 w-full" />
+              </div>
+            </div>
           </div>
         </div>
       </div>

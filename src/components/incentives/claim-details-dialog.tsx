@@ -248,7 +248,7 @@ a.href = url;
     const isPendingForBank = ['Accepted', 'Submitted to Accounts'].includes(claim.status);
     const canGenerateNoting = isEligibleForFinancialDisbursement(claim);
 
-    const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
+    const profileLink = `/profile/${claimant.misId}`;
     const hasProfileLink = claimant && claimant.misId;
 
     return (

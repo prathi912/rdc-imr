@@ -1,7 +1,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import { sendEmailUtility } from '@/lib/email';
+import { sendEmail as sendEmailUtility } from '@/lib/email';
 import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
 
 const EMAIL_RECIPIENT = 'vishal.sandhwar8850@paruluniversity.ac.in';
@@ -49,24 +49,24 @@ export async function POST() {
       .where('pptUrl', '==', null).get();
     const emrPptPending = emrPendSnap.size;
 
-    const emailHtml = \`
-      <div \${EMAIL_STYLES.background}>
-        \${EMAIL_STYLES.logo}
-        <h2 style="color:#ffffff;">RDC Weekly Digest (\${format(weekStart, 'MMM dd')} - \${format(weekEnd, 'MMM dd')})</h2>
+    const emailHtml = `
+      <div ${EMAIL_STYLES.background}>
+        ${EMAIL_STYLES.logo}
+        <h2 style="color:#ffffff;">RDC Weekly Digest (${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd')})</h2>
         <table style="width:100%; border-collapse:collapse; margin:20px 0;">
-          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>IMR Submissions</strong></td><td style="padding:10px; background:#34495e;">\${imrSubs}</td></tr>
-          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>IMR Evaluations</strong></td><td style="padding:10px; background:#34495e;">\${imrEvals}</td></tr>
-          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>IMR Meetings</strong></td><td style="padding:10px; background:#34495e;">\${imrMeets}</td></tr>
-          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>EMR Interests</strong></td><td style="padding:10px; background:#34495e;">\${emrInterests}</td></tr>
-          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>EMR PPT Pending</strong></td><td style="padding:10px; background:#34495e; color:\${emrPptPending > 0 ? '#ff5252' : '#00e676'};">\${emrPptPending}</td></tr>
+          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>IMR Submissions</strong></td><td style="padding:10px; background:#34495e;">${imrSubs}</td></tr>
+          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>IMR Evaluations</strong></td><td style="padding:10px; background:#34495e;">${imrEvals}</td></tr>
+          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>IMR Meetings</strong></td><td style="padding:10px; background:#34495e;">${imrMeets}</td></tr>
+          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>EMR Interests</strong></td><td style="padding:10px; background:#34495e;">${emrInterests}</td></tr>
+          <tr><td style="padding:10px; background:#2c3e50; color:#e0e0e0;"><strong>EMR PPT Pending</strong></td><td style="padding:10px; background:#34495e; color:${emrPptPending > 0 ? '#ff5252' : '#00e676'};">${emrPptPending}</td></tr>
         </table>
-        <p style="color:#e0e0e0;">Dashboard: \${process.env.NEXT_PUBLIC_BASE_URL || 'https://rndprojects.paruluniversity.ac.in'}/dashboard</p>
-        \${EMAIL_STYLES.footer}
-      </div>\`;
+        <p style="color:#e0e0e0;">Dashboard: ${process.env.NEXT_PUBLIC_BASE_URL || 'https://rndprojects.paruluniversity.ac.in'}/dashboard</p>
+        ${EMAIL_STYLES.footer}
+      </div>`;
 
     await sendEmailUtility({
       to: EMAIL_RECIPIENT,
-      subject: \`RDC Weekly Digest: \${format(weekStart, 'MMM dd')} - \${format(weekEnd, 'MMM dd')}\`,
+      subject: `RDC Weekly Digest: ${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd')}`,
       html: emailHtml,
       from: 'default'
     });

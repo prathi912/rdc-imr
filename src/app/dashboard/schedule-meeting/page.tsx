@@ -165,6 +165,9 @@ function HistoryTable({
                                                     {project.title}
                                                 </Link>
                                             </div>
+                                            {project.revisedProposalUrl && (
+                                                <div className="text-xs text-orange-600 font-medium">[Revised]</div>
+                                            )}
                                             <div className="text-xs text-muted-foreground">
                                                 by{' '}
                                                 {piUser?.misId ? (
@@ -348,21 +351,8 @@ export default function ScheduleMeetingPage() {
   
   const selectedPids = useMemo(() => new Set(selectedProjects), [selectedProjects]);
 
-  const hasGoaCampusPi = useMemo(() => {
-    return allProjects.some(p => 
-        selectedPids.has(p.id) && 
-        allUsers.find(u => u.uid === p.pi_uid)?.campus === 'Goa'
-    );
-  }, [selectedPids, allProjects, allUsers]);
-
   const meetingMode = form.watch('mode');
 
-  useEffect(() => {
-      if (hasGoaCampusPi) {
-          form.setValue('mode', 'Online');
-      }
-  }, [hasGoaCampusPi, form]);
-  
   useEffect(() => {
     if (meetingMode === 'Online') {
       form.setValue('venue', '');
@@ -432,7 +422,14 @@ export default function ScheduleMeetingPage() {
   }, [meetingToEdit, form]);
 
   const evaluators = allUsers.filter(u => ['CRO', 'admin', 'Super-admin'].includes(u.role));
+
+  const usersMap = useMemo(() => new Map(allUsers.map(u => [u.uid, u] as const)), [allUsers]);
+  const usersByEmailMap = useMemo(
+    () => new Map(allUsers.filter(u => u.email).map(u => [u.email!.toLowerCase(), u] as const)),
+    [allUsers]
+  );
   
+  const revisedProposals = allProjects.filter(p => Boolean(p.revisedProposalUrl));
   const newSubmissions = allProjects.filter(p => p.status === 'Submitted');
   
   const midTermReviewProjects = allProjects.filter(p => {
@@ -461,7 +458,7 @@ export default function ScheduleMeetingPage() {
     );
   }, [midTermReviewProjects, midTermSearchTerm]);
   
-  const scheduledMeetingsHistory = allProjects.filter(p => p.meetingDetails && ['Under Review', 'Recommended', 'Not Recommended', 'Completed', 'In Progress', 'Pending Completion Approval', 'Sanctioned', 'SANCTIONED'].includes(p.status));
+  const scheduledMeetingsHistory = allProjects.filter(p => p.meetingDetails);
 
   const filteredHistory = useMemo(() => {
     if (historyFilter === 'regular') {
@@ -473,25 +470,34 @@ export default function ScheduleMeetingPage() {
     return scheduledMeetingsHistory; // 'all'
   }, [scheduledMeetingsHistory, historyFilter]);
 
-  const projectsForCurrentTab = activeTab === 'new-submissions' ? newSubmissions : filteredMidTermProjects;
+  const projectsForCurrentTab = useMemo(() => {
+    switch (activeTab) {
+      case 'new-submissions':
+        return newSubmissions;
+      case 'revised-proposals':
+        return revisedProposals;
+      case 'mid-term-review':
+        return filteredMidTermProjects;
+      case 'history':
+        return filteredHistory;
+      default:
+        return newSubmissions;
+    }
+  }, [activeTab, newSubmissions, revisedProposals, filteredMidTermProjects, filteredHistory]);
 
   const totalPages = useMemo(() => {
-    let dataForTab = projectsForCurrentTab;
-    if (activeTab === 'history') {
-      dataForTab = filteredHistory;
-    }
-    return Math.ceil(dataForTab.length / itemsPerPage);
-  }, [projectsForCurrentTab, activeTab, filteredHistory]);
+    return Math.ceil(projectsForCurrentTab.length / itemsPerPage);
+  }, [projectsForCurrentTab, itemsPerPage]);
 
-  const paginatedProjects = (() => {
-    let dataForTab = projectsForCurrentTab;
-    if (activeTab === 'history') {
-      dataForTab = filteredHistory;
-    }
+  const currentTabCount = projectsForCurrentTab.length;
+  const pageStart = (currentPage - 1) * itemsPerPage + 1;
+  const pageEnd = Math.min(currentPage * itemsPerPage, currentTabCount);
+
+  const paginatedProjects = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    return dataForTab.slice(startIndex, endIndex);
-  })();
+    return projectsForCurrentTab.slice(startIndex, endIndex);
+  }, [projectsForCurrentTab, currentPage, itemsPerPage]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -573,60 +579,42 @@ export default function ScheduleMeetingPage() {
         } else {
             throw new Error(result.error);
         }
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send reminders.' });
-    } finally {
-        setIsSendingGlobalReminders(false);
+      } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to send reminders.' });
     }
   };
-  
-  const usersMap = useMemo(() => new Map(allUsers.map(u => [u.uid, u])), [allUsers]);
-  const usersByEmailMap = useMemo(() => new Map(allUsers.map(u => [u.email.toLowerCase(), u])), [allUsers]);
 
-
-  if (loading || !user) {
+  function ScheduleForm({ isEditing }: { isEditing: boolean }) {
     return (
-      <div className="container mx-auto py-10">
-        <PageHeader title="Schedule IMR Meeting" description="Loading projects..." />
-        <Card className="mt-8">
-            <CardHeader>
-                <Skeleton className="h-6 w-1/2" />
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
-                </div>
-            </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{isEditing ? 'Reschedule Meeting' : 'Schedule Meeting'}</CardTitle>
+          <CardDescription>
+            {isEditing
+              ? 'Update the meeting details and all participants will be notified.'
+              : 'Select projects and set the meeting details. Participants will be notified when scheduled.'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} id="schedule-form" className="space-y-6">
+              <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
+              <FormField name="time" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
+              <FormField name="mode" control={form.control} render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Meeting Mode</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Offline" /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Online" /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
+              <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>{meetingMode === 'Online' ? 'Meeting Link' : 'Venue'}</FormLabel><FormControl><Input {...field} placeholder={meetingMode === 'Online' ? 'https://meet.google.com/...' : 'Enter physical venue'} /></FormControl><FormMessage /></FormItem> )} />
+              <FormField control={form.control} name="evaluatorUids" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Assign Evaluators</FormLabel><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="w-full justify-between">{field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}<ChevronDown className="h-4 w-4 opacity-50" /></Button></DropdownMenuTrigger><DropdownMenuContent className="w-[--radix-popover-trigger-width]"><DropdownMenuLabel>Available Staff</DropdownMenuLabel><DropdownMenuSeparator />{evaluators.map((evaluator) => (<DropdownMenuCheckboxItem key={evaluator.uid} checked={field.value?.includes(evaluator.uid)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), evaluator.uid]) : field.onChange(field.value?.filter((id) => id !== evaluator.uid)); }}>{evaluator.name}</DropdownMenuCheckboxItem>))}</DropdownMenuContent></DropdownMenu><FormMessage /></FormItem> )} />
+            </form>
+          </Form>
+        </CardContent>
+        <CardFooter>
+          <Button type="submit" form="schedule-form" className="w-full" disabled={form.formState.isSubmitting || (!isEditing && selectedProjects.length === 0)}>
+            {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? 'Reschedule Meeting' : `Schedule for ${selectedProjects.length} Project(s)`}
+          </Button>
+        </CardFooter>
+      </Card>
     );
   }
-
-  const ScheduleForm = ({ isEditing }: { isEditing: boolean }) => (
-      <Card>
-          <CardHeader>
-              <CardTitle>{isEditing ? 'Reschedule Meeting' : 'Schedule Details'}</CardTitle>
-              <CardDescription>{isEditing ? 'Update the details for this meeting.' : 'Set the time and assign evaluators.'}</CardDescription>
-          </CardHeader>
-          <CardContent>
-              <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} id="schedule-form" className="space-y-6">
-                      <FormField name="date" control={form.control} render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Meeting Date</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal w-full", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar captionLayout="dropdown-buttons" fromYear={new Date().getFullYear()} toYear={new Date().getFullYear() + 5} mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date < startOfToday()} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem> )} />
-                      <FormField name="time" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Meeting Time</FormLabel><FormControl><Input type="time" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                      <FormField name="mode" control={form.control} render={({ field }) => ( <FormItem className="space-y-3"><FormLabel>Meeting Mode</FormLabel>{hasGoaCampusPi && (<Alert variant="default" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700"><Info className="h-4 w-4 text-blue-600" /><AlertTitle>Online Mode Enforced</AlertTitle><AlertDescription className="text-blue-700 dark:text-blue-300">An online meeting is required as one or more selected PIs are from the Goa campus.</AlertDescription></Alert>)}<FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex space-x-4"><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Offline" disabled={hasGoaCampusPi} /></FormControl><FormLabel className="font-normal">Offline</FormLabel></FormItem><FormItem className="flex items-center space-x-2"><FormControl><RadioGroupItem value="Online" /></FormControl><FormLabel className="font-normal">Online</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
-                      <FormField name="venue" control={form.control} render={({ field }) => ( <FormItem><FormLabel>{meetingMode === 'Online' ? 'Meeting Link' : 'Venue'}</FormLabel><FormControl><Input {...field} placeholder={meetingMode === 'Online' ? 'https://meet.google.com/...' : 'Enter physical venue'} /></FormControl><FormMessage /></FormItem> )} />
-                      <FormField control={form.control} name="evaluatorUids" render={({ field }) => ( <FormItem className="flex flex-col"><FormLabel>Assign Evaluators</FormLabel><DropdownMenu><DropdownMenuTrigger asChild><Button variant="outline" className="w-full justify-between">{field.value?.length > 0 ? `${field.value.length} selected` : "Select evaluators"}<ChevronDown className="h-4 w-4 opacity-50" /></Button></DropdownMenuTrigger><DropdownMenuContent className="w-[--radix-popover-trigger-width]"><DropdownMenuLabel>Available Staff</DropdownMenuLabel><DropdownMenuSeparator />{evaluators.map((evaluator) => (<DropdownMenuCheckboxItem key={evaluator.uid} checked={field.value?.includes(evaluator.uid)} onCheckedChange={(checked) => { return checked ? field.onChange([...(field.value || []), evaluator.uid]) : field.onChange(field.value?.filter((id) => id !== evaluator.uid)); }}>{evaluator.name}</DropdownMenuCheckboxItem>))}</DropdownMenuContent></DropdownMenu><FormMessage /></FormItem> )} />
-                  </form>
-              </Form>
-          </CardContent>
-          <CardFooter>
-              <Button type="submit" form="schedule-form" className="w-full" disabled={form.formState.isSubmitting || (!isEditing && selectedProjects.length === 0)}>
-                  {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {isEditing ? 'Reschedule Meeting' : `Schedule for ${selectedProjects.length} Project(s)`}
-              </Button>
-          </CardFooter>
-      </Card>
-  );
 
   return (
     <>
@@ -637,8 +625,9 @@ export default function ScheduleMeetingPage() {
       />
       <div className="mt-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="new-submissions">New Submissions ({newSubmissions.length})</TabsTrigger>
+            <TabsTrigger value="revised-proposals">Revised Proposals ({revisedProposals.length})</TabsTrigger>
             <TabsTrigger value="mid-term-review">Mid-term Review ({midTermReviewProjects.length})</TabsTrigger>
             <TabsTrigger value="history">History ({scheduledMeetingsHistory.length})</TabsTrigger>
           </TabsList>
@@ -651,10 +640,10 @@ export default function ScheduleMeetingPage() {
                   usersMap={usersMap} usersByEmailMap={usersByEmailMap} title="Projects Awaiting Meeting"
                   description="Select new submissions to schedule for their initial evaluation meeting." dateColumnHeader="Submission Date"
                 />
-                {newSubmissions.length > itemsPerPage && (
+                {currentTabCount > itemsPerPage && (
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, newSubmissions.length)} of {newSubmissions.length} projects
+                      Showing {pageStart} to {pageEnd} of {currentTabCount} projects
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -667,14 +656,51 @@ export default function ScheduleMeetingPage() {
                       </Button>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">
-                          Page {currentPage} of {Math.ceil(newSubmissions.length / itemsPerPage)}
+                          Page {currentPage} of {totalPages}
                         </span>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(newSubmissions.length / itemsPerPage), prev + 1))}
-                        disabled={currentPage === Math.ceil(newSubmissions.length / itemsPerPage)}
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
+              <TabsContent value="revised-proposals" className="mt-0 space-y-4">
+                <ProjectListTable
+                  projects={paginatedProjects} selectedProjects={selectedProjects} onSelectAll={handleSelectAll} onSelectOne={handleSelectOne}
+                  usersMap={usersMap} usersByEmailMap={usersByEmailMap} title="Revised Proposal Submissions"
+                  description="Projects that have submitted a revised proposal and require rescheduling or follow-up." dateColumnHeader="Submission Date"
+                />
+                {currentTabCount > itemsPerPage && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {pageStart} to {pageEnd} of {currentTabCount} projects
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
                       >
                         Next
                       </Button>
@@ -690,10 +716,10 @@ export default function ScheduleMeetingPage() {
                   description={`These projects were funded at least ${systemSettings?.imrMidTermReviewMonths ?? 6} months ago and are due for a progress review.`}
                   dateColumnHeader="Last Disbursement Date"
                 />
-                {filteredMidTermProjects.length > itemsPerPage && (
+                {currentTabCount > itemsPerPage && (
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredMidTermProjects.length)} of {filteredMidTermProjects.length} projects
+                      Showing {pageStart} to {pageEnd} of {currentTabCount} projects
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -706,14 +732,14 @@ export default function ScheduleMeetingPage() {
                       </Button>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">
-                          Page {currentPage} of {Math.ceil(filteredMidTermProjects.length / itemsPerPage)}
+                          Page {currentPage} of {totalPages}
                         </span>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredMidTermProjects.length / itemsPerPage), prev + 1))}
-                        disabled={currentPage === Math.ceil(filteredMidTermProjects.length / itemsPerPage)}
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
                       >
                         Next
                       </Button>
@@ -732,10 +758,10 @@ export default function ScheduleMeetingPage() {
                     isReminding={isSendingGlobalReminders}
                     onEdit={setMeetingToEdit}
                 />
-                {filteredHistory.length > itemsPerPage && (
+                {currentTabCount > itemsPerPage && (
                   <div className="flex items-center justify-between mt-4">
                     <p className="text-sm text-muted-foreground">
-                      Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredHistory.length)} of {filteredHistory.length} meetings
+                      Showing {pageStart} to {pageEnd} of {currentTabCount} meetings
                     </p>
                     <div className="flex gap-2">
                       <Button
@@ -748,14 +774,14 @@ export default function ScheduleMeetingPage() {
                       </Button>
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-muted-foreground">
-                          Page {currentPage} of {Math.ceil(filteredHistory.length / itemsPerPage)}
+                          Page {currentPage} of {totalPages}
                         </span>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredHistory.length / itemsPerPage), prev + 1))}
-                        disabled={currentPage === Math.ceil(filteredHistory.length / itemsPerPage)}
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
                       >
                         Next
                       </Button>

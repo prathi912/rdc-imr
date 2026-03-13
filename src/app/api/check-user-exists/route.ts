@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     
     // Server-side validation against allowed domains
     const settings = await getSystemSettings();
-    const allowedDomains = settings.allowedDomains || ['@paruluniversity.ac.in', '@goa.paruluniversity.ac.in'];
+    const allowedDomains = settings.allowedDomains || ['@paruluniversity.ac.in'];
     const isDomainAllowed = allowedDomains.some(domain => lowercasedEmail.endsWith(domain));
     const isSpecialCase = lowercasedEmail === 'rathipranav07@gmail.com';
 

@@ -24,7 +24,7 @@ export function UserNav({ user, onLogout }: UserNavProps) {
     return null;
   }
 
-  const profileLink = user.campus === 'Goa' ? `/goa/${user.misId}` : `/profile/${user.misId}`;
+  const profileLink = `/profile/${user.misId}`;
 
   return (
     <DropdownMenu>

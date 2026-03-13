@@ -36,7 +36,7 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
 
 const EMAIL_STYLES = {
   background:
-    'style="background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;"',
+    'background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); color:#ffffff; font-family:Arial, sans-serif; padding:20px; border-radius:8px;',
   logo: '<div style="text-align:center; margin-bottom:20px;"><img src="https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/RDC-PU-LOGO-WHITE.png" alt="RDC Logo" style="max-width:300px; height:auto;" /></div>',
   footer: ` 
     <p style="color:#b0bec5; margin-top: 30px;">Best Regards,</p>
@@ -226,17 +226,17 @@ export async function registerEmrInterest(
   // Email Super-admin on FIRST EMR interest
   if (isFirstInterest && callTitle) {
     const firstInterestEmail = `
-      <div \${EMAIL_STYLES.background}>
-        \${EMAIL_STYLES.logo}
+      <div ${EMAIL_STYLES.background}>
+        ${EMAIL_STYLES.logo}
         <h2 style="color:#ffffff;">First EMR Interest Registered!</h2>
-        <p style="color:#e0e0e0;"><strong>Call:</strong> "\${callTitle}"</p>
-        <p style="color:#e0e0e0;"><strong>By:</strong> \${user.name} (\${user.email})</p>
-        <p style="color:#cccccc;">Time to schedule evaluation meeting. <a href="\${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/emr-calendar" style="color:#64b5f6;">EMR Calendar</a></p>
-        \${EMAIL_STYLES.footer}
+        <p style="color:#e0e0e0;"><strong>Call:</strong> "${callTitle}"</p>
+        <p style="color:#e0e0e0;"><strong>By:</strong> ${user.name} (${user.email})</p>
+        <p style="color:#cccccc;">Time to schedule evaluation meeting. <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/emr-calendar" style="color:#64b5f6;">EMR Calendar</a></p>
+        ${EMAIL_STYLES.footer}
       </div>`;
     await sendEmailUtility({
       to: 'vishal.sandhwar8850@paruluniversity.ac.in',
-      subject: \`FIRST EMR Interest: \${callTitle}\`,
+      subject: `FIRST EMR Interest: ${callTitle}`,
       html: firstInterestEmail,
       from: 'default'
     });
@@ -247,7 +247,7 @@ export async function registerEmrInterest(
   if (user.email) {
       let emailHtml: string;
       if (registeredByAdmin) {
-        emailHtml = `<div ${EMAIL_STYLES.background}>
+        emailHtml = `<div style="${EMAIL_STYLES.background}">
             ${EMAIL_STYLES.logo}
             <p style="color:#ffffff;">Dear ${user.name},</p>
             <p style="color:#e0e0e0;">This is to inform you that ${registeredByAdmin.adminName} has registered your interest on your behalf for the EMR funding call: "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
@@ -255,7 +255,7 @@ export async function registerEmrInterest(
             ${EMAIL_STYLES.footer}
         </div>`;
       } else {
-        emailHtml = `<div ${EMAIL_STYLES.background}>
+        emailHtml = `<div style="${EMAIL_STYLES.background}">
     ${EMAIL_STYLES.logo}
     <p style="color:#ffffff;">Dear ${user.name},</p>
     <p style="color:#e0e0e0;">

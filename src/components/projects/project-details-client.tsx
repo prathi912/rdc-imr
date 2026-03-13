@@ -433,8 +433,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const isSuperAdmin = user?.role === "Super-admin"
   const isUserAdmin = user && ["Super-admin", "admin"].includes(user.role);
   const isAssignedEvaluator = user && project.meetingDetails?.assignedEvaluators?.includes(user.uid)
-  const isHeadOfGoaCampus = user?.designation === 'Head of Goa Campus';
-  const canViewDocuments = (isPI || isCoPi || isAdmin || isAssignedEvaluator) && !isHeadOfGoaCampus;
+  const canViewDocuments = (isPI || isCoPi || isAdmin || isAssignedEvaluator);
 
 
   const canViewCoPiCVs = useMemo(() => {
@@ -910,7 +909,7 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
     }
   };
 
-  const canViewEvaluations = (isAdmin || isAssignedEvaluator) && !isHeadOfGoaCampus;
+  const canViewEvaluations = (isAdmin || isAssignedEvaluator);
   const showAdminActions = (user?.role === "Super-admin" || user?.role === "admin") && project.status !== 'Draft';
   const canManageCoPi = (isPI || isAdmin) && project.status !== 'Not Recommended';
 
@@ -919,7 +918,8 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
   const showDownloadButton = isUserAdmin && (project.status === 'Recommended' || project.status === 'In Progress');
   const showSanctionOrderButton = isUserAdmin && project.status === 'In Progress';
   const isDurationSet = !!project.projectStartDate && !!project.projectEndDate;
-  const isMeetingScheduled = !!project.meetingDetails?.date;
+  const isMeetingScheduled = !!project.meetingDetails;
+  const isRevisedProposal = !!project.revisedProposalUrl;
   const showBankDetails = isAdmin && ['Recommended', 'In Progress', 'Completed', 'Sanctioned', 'Pending Completion Approval'].includes(project.status);
 
   return (
@@ -1229,7 +1229,9 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
             <>
               <div className="space-y-2 p-4 border rounded-lg bg-secondary/50">
                 <div className="flex justify-between items-start flex-wrap gap-2">
-                  <h3 className="font-semibold text-lg">IMR Evaluation Meeting Details</h3>
+                  <h3 className="font-semibold text-lg">
+                    {isRevisedProposal ? 'Revised Proposal Meeting Details' : 'IMR Evaluation Meeting Details'}
+                  </h3>
                    {isSuperAdmin && project.status === 'Under Review' && (
                     <Button variant="outline" size="sm" onClick={() => setIsAttendanceDialogOpen(true)}>
                         <UserCheck className="mr-2 h-4 w-4" /> Mark Attendance

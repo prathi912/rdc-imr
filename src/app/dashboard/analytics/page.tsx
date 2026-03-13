@@ -24,14 +24,6 @@ import { getStorageUsage } from '@/app/actions';
 
 
 const COLORS = ["#64B5F6", "#81C784", "#FFB74D", "#E57373", "#BA68C8", "#7986CB", "#4DD0E1", "#FFF176", "#FF8A65", "#A1887F", "#90A4AE"];
-const GOA_FACULTIES = [
-    "Faculty of Engineering, IT & CS (Goa)",
-    "Faculty of Management Studies (Goa)",
-    "Faculty of Pharmacy (Goa)",
-    "Faculty of Applied and Health Sciences (Goa)",
-    "Faculty of Nursing (Goa)",
-    "Faculty of Physiotherapy (Goa)"
-];
 
 // A helper component for the Pie chart legend
 const ChartLegendContent = (props: any) => {
@@ -137,17 +129,12 @@ export default function AnalyticsPage() {
     const isCro = user.role === 'CRO';
     const isHod = user.designation === 'HOD';
     const isSpecialPitUser = user.email === 'pit@paruluniversity.ac.in';
-    const isGoaHead = user.designation === 'Head of Goa Campus';
 
 
     if (isCro && user.faculties && user.faculties.length > 0) {
         projectsQuery = query(projectsCollection, where('faculty', 'in', user.faculties));
         emrQuery = query(emrCollection, where('faculty', 'in', user.faculties), where('status', 'in', ['Sanctioned', 'Process Complete']));
         claimsQuery = query(claimsCollection, where('faculty', 'in', user.faculties));
-    } else if (isGoaHead) {
-        projectsQuery = query(projectsCollection, where('campus', '==', 'Goa'));
-        emrQuery = query(emrCollection, where('campus', '==', 'Goa'), where('status', 'in', ['Sanctioned', 'Process Complete']));
-        claimsQuery = query(claimsCollection, where('campus', '==', 'Goa'));
     } else if (isHod && user.department && user.institute) {
         projectsQuery = query(projectsCollection, where('departmentName', '==', user.department), where('institute', '==', user.institute));
         emrQuery = query(emrCollection, where('department', '==', user.department), where('status', 'in', ['Sanctioned', 'Process Complete']));

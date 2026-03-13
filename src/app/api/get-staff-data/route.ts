@@ -20,12 +20,10 @@ interface StaffData {
   ORCID_ID?: string | number;
   Vidwan_ID?: string | number;
   Type?: 'CRO' | 'Institutional' | 'faculty';
-  Campus?: 'Vadodara' | 'Ahmedabad' | 'Rajkot' | 'Goa';
-  // Goa specific columns
+  Campus?: 'Vadodara' | 'Ahmedabad' | 'Rajkot';
   Orcid?: string | number;
 }
 
-const GOA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/goastaffdata.xlsx';
 const VADODARA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/staffdata.xlsx';
 
 const readStaffDataFromUrl = async (url: string): Promise<StaffData[]> => {
@@ -46,10 +44,9 @@ const readStaffDataFromUrl = async (url: string): Promise<StaffData[]> => {
     }
 }
 
-const formatUserRecord = (record: StaffData, defaultCampus: 'Vadodara' | 'Goa') => {
-    const isGoaUser = record.Email?.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
+const formatUserRecord = (record: StaffData, defaultCampus: 'Vadodara') => {
     const instituteName = record.Type === 'Institutional' ? record.Name : record.Institute;
-    const resolvedCampus = record.Campus || (isGoaUser ? 'Goa' : defaultCampus);
+    const resolvedCampus = record.Campus || defaultCampus;
 
     return {
         name: record.Name,
@@ -83,7 +80,7 @@ export async function GET(request: NextRequest) {
   const allFoundRecords: StaffData[] = [];
   const foundEmails = new Set<string>();
 
-  const searchAndAdd = (data: StaffData[], defaultCampus: 'Vadodara' | 'Goa') => {
+  const searchAndAdd = (data: StaffData[], defaultCampus: 'Vadodara') => {
       let foundRecord: StaffData | undefined;
       if (email) {
           foundRecord = data.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
@@ -97,7 +94,7 @@ export async function GET(request: NextRequest) {
       }
   };
   
-  const searchAndAddAll = (data: StaffData[], defaultCampus: 'Vadodara' | 'Goa') => {
+  const searchAndAddAll = (data: StaffData[], defaultCampus: 'Vadodara') => {
       data.forEach(row => {
           if (row['MIS ID'] && String(row['MIS ID']).toLowerCase() === misId?.toLowerCase()) {
              if (row.Email && !foundEmails.has(row.Email.toLowerCase())) {
@@ -108,20 +105,14 @@ export async function GET(request: NextRequest) {
       });
   };
 
-  const [staffdata, goastaffdata] = await Promise.all([
-      readStaffDataFromUrl(VADODARA_STAFF_DATA_URL),
-      readStaffDataFromUrl(GOA_STAFF_DATA_URL)
-  ]);
+  const staffdata = await readStaffDataFromUrl(VADODARA_STAFF_DATA_URL);
 
   if (fetchAll) {
       searchAndAddAll(staffdata, 'Vadodara');
-      searchAndAddAll(goastaffdata, 'Goa');
   } else if (email) {
-    const isGoaEmail = email.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
-    searchAndAdd(isGoaEmail ? goastaffdata : staffdata, isGoaEmail ? 'Goa' : 'Vadodara');
+    searchAndAdd(staffdata, 'Vadodara');
   } else if (misId) {
-    const isGoaContext = userEmailForFileCheck?.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
-    searchAndAdd(isGoaContext ? goastaffdata : staffdata, isGoaContext ? 'Goa' : 'Vadodara');
+    searchAndAdd(staffdata, 'Vadodara');
   }
 
   if (allFoundRecords.length > 0) {

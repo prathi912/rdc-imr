@@ -45,12 +45,8 @@ const superAdminDefaults = [...adminDefaults, "module-management", "arps-calcula
 // Default modules for special designations who are otherwise 'faculty' role
 const principalDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"]
 const hodDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"]
-const goaHeadDefaults = [...coreModules, ...hierarchyCoreModules, "all-projects"] // Read-only access
 
 export function getDefaultModulesForRole(role: User["role"], designation?: User["designation"]): string[] {
-  if (designation === "Head of Goa Campus") {
-    return goaHeadDefaults
-  }
   
   if (role === "faculty") {
     if (designation === "Principal") {

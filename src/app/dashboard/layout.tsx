@@ -454,6 +454,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const thresholdDate = subMonths(new Date(), reviewMonths);
 
         const newSubmissionsQuery = query(collection(db, "projects"), where("status", "==", "Submitted"));
+        const revisedProposalsQuery = query(collection(db, "projects"), where("revisedProposalUrl", "!=", null));
         const midTermQuery = query(
           collection(db, "projects"), 
           where('status', '==', 'In Progress'),
@@ -461,10 +462,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         );
 
         let newCount = 0;
-        let midTermCount = 0;
+        let revisedCount = 0;
 
         const updateTotal = () => {
-          setPendingMeetingsCount(newCount + midTermCount);
+          setPendingMeetingsCount(newCount + revisedCount);
         };
 
         unsubscribeNew = onSnapshot(newSubmissionsQuery, (snapshot) => {
@@ -472,17 +473,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           updateTotal();
         });
 
-        unsubscribeMidTerm = onSnapshot(midTermQuery, (snapshot) => {
-            midTermCount = snapshot.docs.filter(doc => {
-                const project = doc.data();
-                // Additional client-side check if needed, though Firestore should handle it
-                const firstDisbursement = project.grant?.phases?.[0]?.disbursementDate;
-                return firstDisbursement && new Date(firstDisbursement) <= thresholdDate;
-            }).length;
-            updateTotal();
+        const unsubscribeRevised = onSnapshot(revisedProposalsQuery, (snapshot) => {
+          revisedCount = snapshot.size;
+          updateTotal();
         });
 
-        unsubscribes.push(unsubscribeNew, unsubscribeMidTerm);
+        // We keep the mid-term query for potential future use, but it does not affect the sidebar badge.
+        unsubscribeMidTerm = onSnapshot(midTermQuery, () => {
+          // no-op: not included in sidebar badge count
+        });
+
+        unsubscribes.push(unsubscribeNew, unsubscribeRevised, unsubscribeMidTerm);
       };
 
       fetchSettingsAndSubscribe();

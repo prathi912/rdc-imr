@@ -56,28 +56,7 @@ const faculties = [
     "Parul Sevashram Hospital", "RDC", "University Office", "Parul Aarogya Seva Mandal"
 ];
 
-const campuses = ["Rajkot", "Ahmedabad", "Vadodara", "Goa"];
-
-const goaFaculties = [
-    "Faculty of Engineering, IT & CS",
-    "Faculty of Management Studies",
-    "Faculty of Pharmacy",
-    "Faculty of Applied and Health Sciences",
-    "Faculty of Nursing",
-    "Faculty of Physiotherapy",
-    "University Office"
-];
-
-const goaInstitutes = [
-    "Parul College of Applied and Health Sciences",
-    "Parul College of Engineering",
-    "Parul College of Information Technology & Computer Science",
-    "Parul College of Management",
-    "Parul College of Nursing",
-    "Parul College of Pharmacy",
-    "Parul College of Physiotherapy",
-    "University Office"
-];
+const campuses = ["Rajkot", "Ahmedabad", "Vadodara"];
 
 const institutes = [
     "Ahmedabad Homoeopathic Medical College", "Ahmedabad Physiotherapy College",
