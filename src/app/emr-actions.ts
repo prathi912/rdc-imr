@@ -8,7 +8,7 @@ import path from 'path';
 import { sendEmail as sendEmailUtility } from "@/lib/email";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import type * as z from 'zod';
-import { addDays, setHours, setMinutes, setSeconds, addHours, format } from "date-fns";
+import { addDays, setHours, setMinutes, setSeconds, addHours, format, parseISO } from "date-fns";
 import * as XLSX from 'xlsx';
 
 // --- Centralized Logging Service ---
@@ -225,18 +225,17 @@ export async function registerEmrInterest(
 
   // Email Super-admin on FIRST EMR interest
   if (isFirstInterest && callTitle) {
-    const firstInterestEmail = `
-      <div \${EMAIL_STYLES.background}>
-        \${EMAIL_STYLES.logo}
+    const firstInterestEmail = `<div ${EMAIL_STYLES.background}>
+        ${EMAIL_STYLES.logo}
         <h2 style="color:#ffffff;">First EMR Interest Registered!</h2>
-        <p style="color:#e0e0e0;"><strong>Call:</strong> "\${callTitle}"</p>
-        <p style="color:#e0e0e0;"><strong>By:</strong> \${user.name} (\${user.email})</p>
-        <p style="color:#cccccc;">Time to schedule evaluation meeting. <a href="\${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/emr-calendar" style="color:#64b5f6;">EMR Calendar</a></p>
-        \${EMAIL_STYLES.footer}
+        <p style="color:#e0e0e0;"><strong>Call:</strong> "${callTitle}"</p>
+        <p style="color:#e0e0e0;"><strong>By:</strong> ${user.name} (${user.email})</p>
+        <p style="color:#cccccc;">Time to schedule evaluation meeting. <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/emr-calendar" style="color:#64b5f6;">EMR Calendar</a></p>
+        ${EMAIL_STYLES.footer}
       </div>`;
     await sendEmailUtility({
       to: 'vishal.sandhwar8850@paruluniversity.ac.in',
-      subject: \`FIRST EMR Interest: \${callTitle}\`,
+      subject: `FIRST EMR Interest: ${callTitle}`,
       html: firstInterestEmail,
       from: 'default'
     });
@@ -1615,7 +1614,7 @@ export async function markEmrAttendance(callId: string, absentApplicantIds: stri
     }
 }
 
-export async function sendPptReminderEmails(callId: string): Promise<{ success: boolean, sentCount: number, error?: string }> {
+export async function sendPptReminderEmails(callId: string): Promise<{ success: boolean; sentCount: number; error?: string }> {
   try {
     const callRef = adminDb.collection("fundingCalls").doc(callId);
     const callSnap = await callRef.get();
@@ -1625,30 +1624,42 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
     const call = callSnap.data() as FundingCall;
 
     const interestsRef = adminDb.collection("emrInterests");
-    const q = query(
-      interestsRef,
-      where('callId', '==', callId),
-      where('status', '==', 'Evaluation Pending'), // Check for interests that are scheduled
-      where('pptUrl', '==', null) // Only select those who haven't uploaded
-    );
+    // Fetch all interests for this call first
+    const q = interestsRef.where('callId', '==', callId);
+    const snapshot = await q.get();
 
-    const snapshot = await getDocs(q);
-    if (snapshot.empty) {
-      return { success: true, sentCount: 0, error: 'All applicants have already uploaded their presentations.' };
+    // Filter in code to find who needs a reminder
+    const interestsToRemind = snapshot.docs.filter(doc => {
+      const interest = doc.data() as EmrInterest;
+      const needsReminder = (interest.status === 'Registered' || interest.status === 'Evaluation Pending');
+      const hasNotUploaded = !interest.pptUrl;
+      return needsReminder && hasNotUploaded;
+    });
+
+    if (interestsToRemind.length === 0) {
+      return { success: true, sentCount: 0, error: 'All applicants have either uploaded their presentations or are not in a state to be reminded.' };
     }
 
-    const reminderPromises = snapshot.docs.map(doc => {
+    const reminderPromises = interestsToRemind.map(doc => {
       const interest = doc.data() as EmrInterest;
-      if (interest.userEmail && interest.meetingSlot) {
-        const deadline = new Date(interest.meetingSlot.pptDeadline);
+
+      if (interest.userEmail) {
+        const pptDeadline = interest.meetingSlot?.pptDeadline;
+        // Check if pptDeadline is a valid date string before formatting
+        const isValidDate = pptDeadline && !isNaN(parseISO(pptDeadline).getTime());
+
+        const deadlineText = isValidDate
+            ? `Your submission deadline is <strong>${formatInTimeZone(parseISO(pptDeadline!), 'Asia/Kolkata', 'PPpp (z)')}</strong>.`
+            : 'Please upload your presentation at your earliest convenience to be considered for an evaluation slot.';
+
         const emailHtml = `
             <div ${EMAIL_STYLES.background}>
               <p style="color:#ffffff;">Dear ${interest.userName},</p>
               <p style="color:#cccccc;">
                 This is a friendly reminder to upload your presentation for the EMR funding call, "<strong style="color:#ffffff;">${call.title}</strong>".
               </p>
-              <p><strong style="color:#ffffff;">Your submission deadline is ${formatInTimeZone(deadline, 'Asia/Kolkata', 'PPpp (z)')}.</strong></p>
-              <p style="color:#cccccc;">Please upload your presentation from the EMR Calendar page on the portal as soon as possible.</p>
+              <p style="color:#e0e0e0;">${deadlineText}</p>
+              <p style="color:#cccccc;">Please upload your presentation from the EMR Calendar page on the portal.</p>
               ${EMAIL_STYLES.footer}
             </div>
         `;
@@ -1664,13 +1675,13 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
 
     await Promise.all(reminderPromises);
 
-    await logActivity("INFO", `Sent ${reminderPromises.length} manual PPT reminders`, { callId });
-    return { success: true, sentCount: reminderPromises.length };
+    await logActivity("INFO", `Sent ${interestsToRemind.length} manual PPT reminders`, { callId });
+    return { success: true, sentCount: interestsToRemind.length };
 
   } catch (error: any) {
     console.error('Error sending manual PPT reminders:', error);
     await logActivity("ERROR", 'Failed to send manual PPT reminders', { callId, error: error.message, stack: error.stack });
-    return { success: false, sentCount: 0, error: 'Failed to send reminders.' };
+    return { success: false, sentCount: 0, error: error.message || 'An unknown error occurred.' };
   }
 }
     
@@ -1744,22 +1755,3 @@ export async function addSanctionedEmrProject(data: {
         return { success: false, error: 'Failed to add the project.' };
     }
 }
-
-
-
-
-
-
-    
-
-    
-
-
-
-
-
-
-
-
-
-
