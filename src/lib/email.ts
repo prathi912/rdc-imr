@@ -106,7 +106,14 @@ export async function sendEmail({ to, cc, bcc, subject, html, attachments, from 
     console.log(`Email sent successfully to ${to} from ${from} account.`);
     return { success: true };
   } catch (error: any) {
-    console.error(`Failed to send email to ${to} from ${from} account:`, error);
+    console.error(`--- EMAIL SENDING ERROR ---`);
+    console.error(`Timestamp: ${new Date().toISOString()}`);
+    console.error(`Recipient: ${to}`);
+    console.error(`Subject: ${subject}`);
+    console.error(`From: ${fromAddress}`);
+    console.error(`Error Message: ${error.message}`);
+    console.error(`Full Error Object:`, error);
+    console.error(`---------------------------`);
     return { success: false, error: error.message };
   }
 }
