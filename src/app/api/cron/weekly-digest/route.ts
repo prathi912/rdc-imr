@@ -1,7 +1,7 @@
 'use server';
 
 import { adminDb } from '@/lib/admin';
-import { sendEmailUtility } from '@/lib/email';
+import { sendEmail } from '@/lib/email';
 import { format, subDays, startOfWeek, endOfWeek } from 'date-fns';
 
 const EMAIL_RECIPIENT = 'vishal.sandhwar8850@paruluniversity.ac.in';
@@ -64,7 +64,7 @@ export async function POST() {
         ${EMAIL_STYLES.footer}
       </div>`;
 
-    await sendEmailUtility({
+    await sendEmail({
       to: EMAIL_RECIPIENT,
       subject: `RDC Weekly Digest: ${format(weekStart, 'MMM dd')} - ${format(weekEnd, 'MMM dd')}`,
       html: emailHtml,
