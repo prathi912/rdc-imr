@@ -64,6 +64,7 @@ export default function AnalyticsPage() {
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [submissionsByYearType, setSubmissionsByYearType] = useState<'submissions' | 'sanctions'>('submissions');
   const [projectsByGroupType, setProjectsByGroupType] = useState<'imr' | 'emr'>('imr');
+  const [grantDateRange, setGrantDateRange] = useState<{start: string | null, end: string | null}>({start: null, end: null});
   const { toast } = useToast();
   const router = useRouter();
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -107,17 +108,27 @@ export default function AnalyticsPage() {
 
   const imrGrantByInstituteData = useMemo(() => {
     if (!projects) return [];
+    
+    let filteredProjects = projects.filter(p => p.grant && p.grant.totalAmount > 0 && p.institute);
+    
+    if (grantDateRange.start && grantDateRange.end) {
+      const startDate = startOfMonth(parseISO(grantDateRange.start));
+      const endDate = endOfMonth(parseISO(grantDateRange.end));
+      filteredProjects = filteredProjects.filter(p => {
+        const submissionDate = parseISO(p.submissionDate);
+        return submissionDate >= startDate && submissionDate <= endDate;
+      });
+    }
+    
     return Object.entries(
-      projects
-        .filter(p => p.grant && p.grant.totalAmount > 0 && p.institute)
-        .reduce((acc, project) => {
-          const groupKey = project.institute!;
-          acc[groupKey] = (acc[groupKey] || 0) + project.grant!.totalAmount;
-          return acc;
-        }, {} as Record<string, number>)
+      filteredProjects.reduce((acc, project) => {
+        const groupKey = project.institute!;
+        acc[groupKey] = (acc[groupKey] || 0) + project.grant!.totalAmount;
+        return acc;
+      }, {} as Record<string, number>)
     ).map(([institute, amount]) => ({ institute, amount }))
     .sort((a, b) => b.amount - a.amount);
-  }, [projects]);
+  }, [projects, grantDateRange]);
 
   const handleExportImrGrants = useCallback(() => {
     if (imrGrantByInstituteData.length === 0) {
@@ -136,9 +147,15 @@ export default function AnalyticsPage() {
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'IMR Grants by Institute');
-    XLSX.writeFile(workbook, `IMR_Grants_By_Institute_${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast({ title: 'Export Started', description: `Downloading grant data for ${imrGrantByInstituteData.length} institutes.` });
-  }, [imrGrantByInstituteData, toast]);
+    const rangeSuffix = grantDateRange.start && grantDateRange.end 
+        ? `_${grantDateRange.start}_to_${grantDateRange.end}` 
+        : '';
+    XLSX.writeFile(workbook, `IMR_Grants_By_Institute${rangeSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const rangeDesc = grantDateRange.start && grantDateRange.end 
+        ? ` (${format(parseISO(grantDateRange.start), 'MMM yyyy')} - ${format(parseISO(grantDateRange.end), 'MMM yyyy')})`
+        : '';
+    toast({ title: 'Export Started', description: `Downloading grant data for ${imrGrantByInstituteData.length} institutes${rangeDesc}.` });
+  }, [imrGrantByInstituteData, toast, grantDateRange]);
 
     const handleGenerateReport = async () => {
         setIsGeneratingReport(true);
@@ -420,6 +437,37 @@ export default function AnalyticsPage() {
       );
       setAvailableYears(Array.from(years).sort((a,b) => b-a).map(String));
     }
+  }, [filteredProjects]);
+
+  const grantYearOptions = useMemo(() => {
+    const years = ['all', '25-26'];
+    if (availableYears.length > 0) {
+      years.push(...availableYears);
+    }
+    return [...new Set(years)]; // Remove duplicates
+  }, [availableYears]);
+
+  const monthYearOptions = useMemo(() => {
+    if (filteredProjects.length === 0) return [];
+    
+    const dates = filteredProjects
+      .map(p => parseISO(p.submissionDate))
+      .sort((a, b) => a.getTime() - b.getTime());
+    
+    const startDate = dates[0];
+    const endDate = new Date();
+    
+    const options = [];
+    let current = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    
+    while (current <= endDate) {
+      const value = format(current, 'yyyy-MM');
+      const label = format(current, 'MMM yyyy');
+      options.push({ value, label });
+      current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+    }
+    
+    return options.reverse(); // Most recent first
   }, [filteredProjects]);
 
   const submissionsData = useMemo(() => {
@@ -1133,17 +1181,77 @@ export default function AnalyticsPage() {
         <div>
             <Card>
                 <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div>
                             <CardTitle className="flex items-center gap-2">
                                 <Banknote className="h-5 w-5" />IMR Grant Amount by Institute
                             </CardTitle>
                             <CardDescription>Total sanctioned Intra-Mural Research grant amounts per institute.</CardDescription>
                         </div>
-                        <Button variant="outline" size="sm" onClick={handleExportImrGrants} disabled={loading || imrGrantByInstituteData.length === 0}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Export
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                                <span className="text-sm text-muted-foreground">From:</span>
+                                <Select 
+                                    value={grantDateRange.start || ''} 
+                                    onValueChange={(value) => {
+                                        // Keep stored value in yyyy-MM to match the option list.
+                                        setGrantDateRange(prev => ({ 
+                                            ...prev, 
+                                            start: value,
+                                            end: prev.end && prev.end < value ? null : prev.end
+                                        }));
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[120px]">
+                                        <SelectValue placeholder="Start" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {monthYearOptions.map(option => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <span className="text-sm text-muted-foreground">To:</span>
+                                <Select 
+                                    value={grantDateRange.end || ''} 
+                                    onValueChange={(value) => {
+                                        // Keep stored value in yyyy-MM to match the option list.
+                                        setGrantDateRange(prev => ({
+                                            ...prev,
+                                            end: value,
+                                            start: prev.start && prev.start > value ? null : prev.start,
+                                        }));
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[120px]">
+                                        <SelectValue placeholder="End" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {monthYearOptions.map(option => (
+                                            <SelectItem key={option.value} value={option.value}>
+                                                {option.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setGrantDateRange({start: null, end: null})}
+                                disabled={!grantDateRange.start && !grantDateRange.end}
+                            >
+                                Clear
+                            </Button>
+                            <Button variant="outline" size="sm" onClick={handleExportImrGrants} disabled={loading || imrGrantByInstituteData.length === 0}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Export
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
