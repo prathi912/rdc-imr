@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { isFirebaseInitialized } from '@/lib/config';
 import { FirebaseNotConfigured } from '@/components/firebase-not-configured';
 import { AuthInitializer } from '@/components/AuthInitializer';
+import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/react';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -93,11 +94,22 @@ export default function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-       <head>
+      <head>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=G-QV5WLS9XRG"
+          strategy="afterInteractive"
+        />
+        <Script id="gtag-init" strategy="afterInteractive">
+          {`window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+
+gtag('config', 'G-QV5WLS9XRG');`}
+        </Script>
       </head>
       <body className={`${inter.variable} ${sourceCodePro.variable} font-sans`} suppressHydrationWarning>
         <ThemeProvider
