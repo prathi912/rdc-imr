@@ -1080,7 +1080,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="container mx-auto py-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
       <PageHeader title={getPageTitle()} description={getPageDescription()}>
           <div className="flex items-center gap-2">
             <Button onClick={handleGenerateReport} disabled={isGeneratingReport}>
