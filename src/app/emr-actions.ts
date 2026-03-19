@@ -1248,13 +1248,13 @@ export async function notifyDeadlineChangeToStaff(
         <p style="color:#e0e0e0;">The interest registration deadline for the funding call <strong style="color:#ffffff;">"${call.title}"</strong> from <strong style="color:#ffffff;">${call.agency}</strong> has been updated.</p>
         
           <div style="padding: 15px; border: 1px solid #ff9800; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
-          <p style="color:#ff9800; font-weight: bold; font-size: 12px;">Important Notice:</p>
-          <p style="color:#e0e0e0; font-weight: bold; font-size: 12px;">Please note that any interests after the updated deadline will not be entertained.</p>
-          <p style="color:#e0e0e0; font-weight: bold; font-size: 12px;">Proposal prepared for submission to the agency must be uploaded on the portal.</p>
+          <p style="color:#ff9800; font-weight: bold; font-size: 14px;">Important Notice:</p>
+          <p style="color:#e0e0e0; font-weight: bold; font-size: 14px;">Please note that any interests after the updated deadline will not be entertained.</p>
+          <p style="color:#e0e0e0; font-weight: bold; font-size: 14px;">Proposal prepared for submission to the agency must be uploaded on the portal.</p>
         </div>
         <div style="padding: 15px; border: 1px solid #4f5b62; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
           <div style="color:#e0e0e0;" class="prose prose-sm">${call.description || "No description provided."}</div>
-          <p style="color:#e0e0e0;"><strong>New Interest Registration Deadline:</strong> ${formatInTimeZone(newInterestDeadline, timeZone, "PPpp (z)")}</p>
+          <p style="color:#e0e0e0; font-weight: bold; font-size: 14px;"><strong>New Interest Registration Deadline:</strong> ${formatInTimeZone(newInterestDeadline, timeZone, "PPpp (z)")}</p>
           <p style="color:#e0e0e0;"><strong>Agency Application Deadline:</strong> ${formatInTimeZone(call.applyDeadline, timeZone, "PP (z)")}</p>
         </div>
     `
