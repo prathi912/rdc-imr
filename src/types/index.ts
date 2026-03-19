@@ -157,6 +157,8 @@ export type Project = {
   teamInfo: string
   timelineAndOutcomes: string
   submissionDate: string // Should be ISO string
+  sanctionDate?: string // ISO String - Date when project was sanctioned/approved by RDC
+  seedMoneyReceivedDate?: string // ISO String - Date when seed money was first received/disbursed
   proposalUrl?: string
   ethicsUrl?: string
   grant?: GrantDetails

@@ -67,7 +67,7 @@ export async function awardInitialGrant(
             phases: newPhases,
         };
 
-        await projectRef.update({ grant: newGrant, status: 'In Progress' });
+        await projectRef.update({ grant: newGrant, status: 'In Progress', sanctionDate: new Date().toISOString() });
 
         const notification = {
             uid: pi.uid,
@@ -489,7 +489,14 @@ export async function updatePhaseStatus(
     })
 
     const updatedGrant = { ...project.grant, phases: updatedPhases }
-    await projectRef.update({ grant: updatedGrant })
+    
+    // Set seedMoneyReceivedDate when first phase is disbursed
+    const updateData: any = { grant: updatedGrant };
+    if (newStatus === "Disbursed" && phaseIndex === 0 && !project.seedMoneyReceivedDate) {
+      updateData.seedMoneyReceivedDate = new Date().toISOString();
+    }
+    
+    await projectRef.update(updateData);
     await logActivity("INFO", "Grant phase status updated", { projectId, phaseId, newStatus })
 
     // Add notification for grant phase status update for the PI

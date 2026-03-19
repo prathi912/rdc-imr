@@ -398,26 +398,102 @@ export default function ManageIncentiveClaimsPage() {
     }
 
     // Create a map of unique papers with their details
-    const papersMap = new Map<string, { title: string; doi?: string; journalName?: string }>();
+    const papersMap = new Map<string, { 
+      title: string; 
+      doi?: string; 
+      journalName?: string;
+      quartile?: string;
+      pdfLink?: string;
+      firstAuthorName?: string;
+      firstAuthorIsExternal?: boolean;
+      firstAuthorFaculty?: string;
+      firstAuthorInstitute?: string;
+      allPuAuthors?: string;
+      claimData?: IncentiveClaim;
+    }>();
     
     filteredClaims.forEach(claim => {
       const title = getClaimTitle(claim);
       if (title && title !== 'N/A') {
-        papersMap.set(title, {
-          title,
-          doi: claim.doi || '',
-          journalName: claim.journalName || '',
-        });
+        // Only add/update if we don't have it yet or if this claim has more complete data
+        if (!papersMap.has(title) || claim.journalClassification) {
+          // Get first author details
+          let firstAuthorName = '';
+          let firstAuthorIsExternal = false;
+          let firstAuthorFaculty = '';
+          let firstAuthorInstitute = '';
+          let allPuAuthors = '';
+          
+          if (claim.authors && claim.authors.length > 0) {
+            const firstAuthor = claim.authors.find(a => 
+              a.role === 'First Author' || 
+              a.role === 'First & Corresponding Author' ||
+              a.role === 'First & Presenting Author'
+            ) || claim.authors[0];
+            
+            firstAuthorName = firstAuthor.name || '';
+            firstAuthorIsExternal = firstAuthor.isExternal;
+            
+            if (firstAuthor.uid) {
+              const firstAuthorUser = users.find(u => u.uid === firstAuthor.uid);
+              firstAuthorFaculty = firstAuthorUser?.faculty || '';
+              firstAuthorInstitute = firstAuthorUser?.institute || '';
+            }
+
+            // If first author is external, collect all PU authors
+            if (firstAuthorIsExternal) {
+              const puAuthors = claim.authors
+                .filter(author => author.uid && !author.isExternal)
+                .map(author => author.name)
+                .filter(name => name && name.trim() !== '');
+              allPuAuthors = puAuthors.length > 0 ? puAuthors.join(', ') : '';
+            }
+          }
+
+          // Get PDF link (first proof URL if available)
+          const pdfLink = claim.publicationProofUrls && claim.publicationProofUrls.length > 0 
+            ? claim.publicationProofUrls[0] 
+            : '';
+
+          papersMap.set(title, {
+            title,
+            doi: claim.doi || '',
+            journalName: claim.journalName || '',
+            quartile: claim.journalClassification || '',
+            pdfLink,
+            firstAuthorName,
+            firstAuthorIsExternal,
+            firstAuthorFaculty,
+            firstAuthorInstitute,
+            allPuAuthors,
+            claimData: claim
+          });
+        }
       }
     });
 
     // Convert map to array for export
-    const dataToExport = Array.from(papersMap.values()).map((paper, index) => ({
-      'S.No': index + 1,
-      'Paper Title': paper.title,
-      'DOI': paper.doi || 'N/A',
-      'Journal Name': paper.journalName || 'N/A',
-    }));
+    const dataToExport = Array.from(papersMap.values()).map((paper, index) => {
+      const row: any = {
+        'S.No': index + 1,
+        'Paper Title': paper.title,
+        'DOI': paper.doi || 'N/A',
+        'Journal Name': paper.journalName || 'N/A',
+        'Quartile': paper.quartile || 'N/A',
+        'PDF Link': paper.pdfLink || 'N/A',
+        'First Author Name': paper.firstAuthorName || 'N/A',
+      };
+
+      // If first author is external, show all PU authors instead of first author faculty/institute
+      if (paper.firstAuthorIsExternal) {
+        row['All PU Authors'] = paper.allPuAuthors || 'N/A';
+      } else {
+        row['First Author Faculty'] = paper.firstAuthorFaculty || 'N/A';
+        row['First Author Institute'] = paper.firstAuthorInstitute || 'N/A';
+      }
+
+      return row;
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();

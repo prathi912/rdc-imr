@@ -620,7 +620,14 @@ export async function saveProjectSubmission(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const projectRef = adminDb.collection("projects").doc(projectId)
-    await projectRef.set(projectData, { merge: true })
+    
+    // Ensure submissionDate is set when project is submitted
+    const dataToSave = { ...projectData };
+    if (projectData.status === "Submitted" && !projectData.submissionDate) {
+      dataToSave.submissionDate = new Date().toISOString();
+    }
+    
+    await projectRef.set(dataToSave, { merge: true })
 
     // Notify admins only on final submission, not on saving drafts
     if (projectData.status === "Submitted") {
@@ -2378,6 +2385,8 @@ export async function bulkUploadProjects(
         institute: Institute,
         departmentName: Department || '',
         submissionDate: submissionDate.toISOString(),
+        sanctionDate: status === 'Sanctioned' || status === 'In Progress' || status === 'Completed' ? submissionDate.toISOString() : undefined,
+        seedMoneyReceivedDate: grant_amount > 0 ? submissionDate.toISOString() : undefined,
         status: status as Project['status'],
         type: 'Unidisciplinary',
         abstract: 'Historical project data uploaded via bulk process.',
