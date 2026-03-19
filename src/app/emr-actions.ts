@@ -432,7 +432,7 @@ export async function scheduleEmrMeeting(
           `SUMMARY:EMR Presentation: ${call.title}`,
           `DESCRIPTION:Your presentation for the EMR funding call titled '${call.title}' has been scheduled.`,
           `LOCATION:${venue}`,
-          `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER || 'helpdesk.rdc@paruluniversity.ac.in'}`,
+          `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER}`,
           `ATTENDEE;CN=${interest.userName};RSVP=TRUE:mailto:${interest.userEmail}`,
           'END:VEVENT',
           'END:VCALENDAR'
@@ -522,7 +522,7 @@ export async function scheduleEmrMeeting(
               `SUMMARY:EMR Evaluation Meeting: ${call.title}`,
               `DESCRIPTION:Evaluation meeting for EMR call: ${call.title}.`,
               `LOCATION:${venue}`,
-              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER || 'helpdesk.rdc@paruluniversity.ac.in'}`,
+              `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER}`,
               `ATTENDEE;CN=${evaluator.name};RSVP=TRUE:mailto:${evaluator.email}`,
               'END:VEVENT',
               'END:VCALENDAR'
@@ -919,9 +919,96 @@ export async function createFundingCall(
   }
 }
 
+export async function updateFundingCall(
+  callId: string,
+  callData: any,
+  notifyDeadlineChange: boolean = false
+): Promise<{ success: boolean; error?: string; notificationEmailSent?: boolean; notificationMessage?: string }> {
+  try {
+    const callRef = adminDb.collection("fundingCalls").doc(callId)
+    const callSnap = await callRef.get()
+
+    if (!callSnap.exists) {
+      return { success: false, error: "Funding call not found." }
+    }
+
+    const existingCall = callSnap.data() as FundingCall
+    const oldInterestDeadline = existingCall.interestDeadline
+    const newInterestDeadline = callData.interestDeadline.toISOString()
+
+    // Check if interest deadline has changed
+    const deadlineChanged = oldInterestDeadline !== newInterestDeadline
+
+    if (deadlineChanged) {
+      console.log(`⏰ Interest deadline changed for call: ${callData.title} (ID: ${callId})`)
+      console.log(`   Old deadline: ${oldInterestDeadline}`)
+      console.log(`   New deadline: ${newInterestDeadline}`)
+    }
+
+    const attachments: { name: string; url: string }[] = existingCall.attachments || []
+
+    if (callData.attachments && callData.attachments.length > 0) {
+      for (const attachment of callData.attachments) {
+        const path = `emr-attachments/${callId}/${attachment.name}`
+        const result = await uploadFileToServer(attachment.dataUrl, path)
+        if (result.success && result.url) {
+          attachments.push({ name: attachment.name, url: result.url })
+        } else {
+          throw new Error(`Failed to upload attachment: ${attachment.name}`)
+        }
+      }
+    }
+
+    const updatedCallData = {
+      title: callData.title,
+      agency: callData.agency,
+      description: callData.description,
+      callType: callData.callType,
+      applyDeadline: callData.applyDeadline.toISOString(),
+      interestDeadline: newInterestDeadline,
+      detailsUrl: callData.detailsUrl,
+      attachments: attachments,
+      updatedAt: new Date().toISOString(),
+    }
+
+    await callRef.update(updatedCallData)
+
+    // Send notification email if deadline changed and notification requested
+    let notificationEmailSent = false
+    let notificationMessage: string | undefined
+
+    if (deadlineChanged && notifyDeadlineChange) {
+      console.log(`📧 Sending deadline change notification for call: ${callData.title} (ID: ${callId})`)
+      const notificationResult = await notifyDeadlineChangeToStaff(callId, existingCall, newInterestDeadline)
+      if (!notificationResult.success) {
+        throw new Error(notificationResult.error || "Funding call updated, but failed to send deadline change notification.")
+      }
+      notificationEmailSent = true
+      notificationMessage = "Deadline change notification email has been sent to all staff."
+    } else if (deadlineChanged && !notifyDeadlineChange) {
+      console.log(`📧 Deadline changed but notification not requested for call: ${callData.title} (ID: ${callId})`)
+    } else {
+      console.log(`📧 No deadline change for call: ${callData.title} (ID: ${callId})`)
+    }
+
+    await logActivity("INFO", "Funding call updated", { callId, title: callData.title, deadlineChanged })
+
+    return { success: true, notificationEmailSent, notificationMessage }
+  } catch (error: any) {
+    console.error("Error updating funding call:", error)
+    await logActivity("ERROR", "Failed to update funding call", {
+      callId,
+      title: callData.title,
+      error: error.message,
+      stack: error.stack,
+    })
+    return { success: false, error: error.message || "Failed to update funding call." }
+  }
+}
+
 export async function announceEmrCall(callId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    const vadodaraEmail = process.env.ALL_STAFF_EMAIL_VADODARA;
+    const vadodaraEmail = process.env.ALL_STAFF_EMAIL;
 
     if (!vadodaraEmail) {
       return {
@@ -960,7 +1047,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     emailHtml += `
         <p style="margin-top: 20px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">
           <a href="https://rndprojects.paruluniversity.ac.in/login" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
-            View Full Details on the Portal
+            Register Interest on the Portal
           </a>
     `
 
@@ -995,6 +1082,86 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     console.error("Error announcing EMR call:", error)
     await logActivity("ERROR", "Failed to announce EMR call", { callId, error: error.message, stack: error.stack })
     return { success: false, error: error.message || "Failed to send announcement." }
+  }
+}
+
+export async function notifyDeadlineChangeToStaff(
+  callId: string,
+  call: FundingCall,
+  newInterestDeadline: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const vadodaraEmail = process.env.ALL_STAFF_EMAIL_VADODARA;
+
+    if (!vadodaraEmail) {
+      return {
+        success: false,
+        error: "Staff email address is not configured on the server. Please add ALL_STAFF_EMAIL_VADODARA to the .env file.",
+      }
+    }
+
+    const timeZone = "Asia/Kolkata"
+
+    const emailAttachments = (call.attachments || []).map((att) => ({ filename: att.name, path: att.url }))
+
+    let emailHtml = `
+      <div ${EMAIL_STYLES.background}>
+        ${EMAIL_STYLES.logo}
+        <h2 style="color: #ffffff; text-align: center;">Updated Interest Registration Deadline</h2>
+        <p style="color:#e0e0e0;">The interest registration deadline for the funding call <strong style="color:#ffffff;">"${call.title}"</strong> from <strong style="color:#ffffff;">${call.agency}</strong> has been updated.</p>
+        <div style="padding: 15px; border: 1px solid #4f5b62; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
+          <div style="color:#e0e0e0;" class="prose prose-sm">${call.description || "No description provided."}</div>
+          <p style="color:#e0e0e0;"><strong>New Interest Registration Deadline:</strong> ${formatInTimeZone(newInterestDeadline, timeZone, "PPpp (z)")}</p>
+          <p style="color:#e0e0e0;"><strong>Agency Application Deadline:</strong> ${formatInTimeZone(call.applyDeadline, timeZone, "PP (z)")}</p>
+        </div>
+        <div style="padding: 15px; border: 1px solid #ff9800; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
+          <p style="color:#ff9800; font-weight: bold;">Important Notice:</p>
+          <p style="color:#e0e0e0;">Please note that any interests after the updated deadline will not be entertained.</p>
+        </div>
+    `
+
+    if (emailAttachments.length > 0) {
+      emailHtml += `<p style="color:#e0e0e0; margin-top: 20px;">Please find the relevant documents attached to this email.</p>`
+    }
+
+    emailHtml += `
+        <p style="margin-top: 20px; text-align: center; display: flex; justify-content: center; align-items: center; gap: 10px;">
+          <a href="https://rndprojects.paruluniversity.ac.in/login" style="background-color: #64B5F6; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+            Register Interest on the Portal
+          </a>
+    `
+
+    if (call.detailsUrl) {
+      emailHtml += `
+          <a href="${call.detailsUrl}" style="background-color: transparent; border: 1px solid #64B5F6; color: #64B5F6; padding: 10px 15px; text-decoration: none; border-radius: 5px;">
+            Learn More on Funding Agency Website
+          </a>
+      `
+    }
+
+    emailHtml += `
+        </p>
+         ${EMAIL_STYLES.footer}
+      </div>
+    `
+
+    await sendEmailUtility({
+      to: vadodaraEmail,
+      subject: `Updated Interest Registration Deadline: ${call.title}`,
+      from: "rdc",
+      attachments: emailAttachments,
+      html: emailHtml,
+    })
+
+    console.log(`✅ Deadline change notification email sent successfully to ${vadodaraEmail} for call: ${call.title}`)
+
+    await logActivity("INFO", "Deadline change notification sent", { callId, title: call.title })
+
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error sending deadline change notification:", error)
+    await logActivity("ERROR", "Failed to send deadline change notification", { callId, error: error.message, stack: error.stack })
+    return { success: false, error: error.message || "Failed to send notification." }
   }
 }
 

@@ -165,7 +165,7 @@ export async function sendErrorEmail(
   user: User | null
 ): Promise<{ success: boolean }> {
   try {
-    const to = process.env.HELPDESK_EMAIL || "helpdesk.rdc@paruluniversity.ac.in";
+    const to = process.env.HELPDESK_EMAIL || process.env.GMAIL_USER;
     const subject = `RDC Portal Error Report: ${errorDetails.message.substring(0, 50)}...`;
     
     let userHtml = '<p>No user was logged in, or user details could not be retrieved.</p>';
@@ -1017,7 +1017,7 @@ export async function scheduleMeeting(
                 'METHOD:REQUEST', 'BEGIN:VEVENT', `UID:${project.id}@paruluniversity.ac.in`, `DTSTAMP:${dtstamp}`,
                 `DTSTART:${startTimeUTC}`, `DTEND:${endTimeUTC}`, `SUMMARY:${subject}`,
                 `DESCRIPTION:A meeting for the IMR project '${project.title}' has been scheduled.`,
-                `LOCATION:${meetingDetails.venue}`, `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER || 'helpdesk.rdc@paruluniversity.ac.in'}`,
+                `LOCATION:${meetingDetails.venue}`, `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER}`,
                 `ATTENDEE;CN=${user.name};RSVP=TRUE:mailto:${user.email}`, 'END:VEVENT', 'END:VCALENDAR'
             ].join('\r\n');
 

@@ -96,7 +96,7 @@ export async function awardInitialGrant(
                 </div>
             `;
 
-            let ccEmails = 'rdc@paruluniversity.ac.in';
+            let ccEmails = process.env.RDC_EMAIL;
             if (pi.campus === 'Goa') {
                 ccEmails += ', rdc@goa.paruluniversity.ac.in';
             }
