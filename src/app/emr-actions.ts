@@ -1956,7 +1956,7 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
 
         const deadlineText = isValidDate
             ? `Your submission deadline is <strong>${formatInTimeZone(parseISO(pptDeadline!), 'Asia/Kolkata', 'PPpp (z)')}</strong>.`
-            : 'Please upload your presentation at your earliest convenience to be considered for an evaluation slot.';
+            : 'Please upload your presentation & Project Proposal at your earliest convenience to be considered for an evaluation slot. In case you do not wish to apply for call, please withdraw your interest from the portal.';
 
         const emailHtml = `
             <div ${EMAIL_STYLES.background}>
@@ -1965,7 +1965,6 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
                 This is a friendly reminder to upload your presentation for the EMR funding call, "<strong style="color:#ffffff;">${call.title}</strong>".
               </p>
               <p style="color:#e0e0e0;">${deadlineText}</p>
-              <p style="color:#cccccc;">Please upload your presentation from the EMR Calendar page on the portal.</p>
               ${EMAIL_STYLES.footer}
             </div>
         `;
