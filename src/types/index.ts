@@ -467,6 +467,8 @@ export type EmrInterest = {
   registeredAt: string // ISO String
   pptUrl?: string
   pptSubmissionDate?: string // ISO String
+  proposalUrl?: string
+  proposalSubmissionDate?: string // ISO String
   coPiDetails?: CoPiDetails[]
   coPiUids?: string[]
   coPiNames?: string[]

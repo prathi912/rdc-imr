@@ -1150,7 +1150,7 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     if (!vadodaraEmail) {
       return {
         success: false,
-        error: "Staff email address is not configured on the server. Please add ALL_STAFF_EMAIL_VADODARA to the .env file.",
+        error: "Staff email address is not configured on the server. Please add ALL_STAFF_EMAIL to the .env file.",
       }
     }
 
@@ -1228,12 +1228,12 @@ export async function notifyDeadlineChangeToStaff(
   newInterestDeadline: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const vadodaraEmail = process.env.ALL_STAFF_EMAIL_VADODARA;
+    const vadodaraEmail = process.env.ALL_STAFF_EMAIL;
 
     if (!vadodaraEmail) {
       return {
         success: false,
-        error: "Staff email address is not configured on the server. Please add ALL_STAFF_EMAIL_VADODARA to the .env file.",
+        error: "Staff email address is not configured on the server. Please add ALL_STAFF_EMAIL to the .env file.",
       }
     }
 
