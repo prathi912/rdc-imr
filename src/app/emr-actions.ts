@@ -631,6 +631,91 @@ export async function uploadEmrPpt(
   }
 }
 
+export async function uploadEmrProposal(
+  interestId: string,
+  proposalDataUrl: string,
+  originalFileName: string,
+  user: User,
+  adminName?: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId || !proposalDataUrl) {
+      return { success: false, error: "Interest ID and file data are required." };
+    }
+
+    const fileExtension = path.extname(originalFileName).toLowerCase();
+    if (!['.zip', '.pdf'].includes(fileExtension)) {
+      return { success: false, error: "Only ZIP and PDF files are allowed for proposals." };
+    }
+
+    // Enforce maximum file size (15 MB). Data URL size is base64-encoded.
+    const base64Part = proposalDataUrl.split(',')[1] || '';
+    const padding = base64Part.endsWith('==') ? 2 : base64Part.endsWith('=') ? 1 : 0;
+    const fileSizeBytes = Math.floor((base64Part.length * 3) / 4) - padding;
+    const maxBytes = 15 * 1024 * 1024;
+    if (fileSizeBytes > maxBytes) {
+      return { success: false, error: "Proposal exceeds the 15 MB size limit." };
+    }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId);
+    const interestSnap = await interestRef.get();
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." };
+    }
+    const interest = interestSnap.data() as EmrInterest;
+
+    const standardizedName = `emr_proposal_${user.name.replace(/\s+/g, "_")}${fileExtension}`;
+    const filePath = `emr-proposals/${interest.callId}/${interest.userId}/${standardizedName}`;
+    const result = await uploadFileToServer(proposalDataUrl, filePath);
+
+    if (!result.success || !result.url) {
+      throw new Error(result.error || "Proposal upload failed.");
+    }
+
+    await interestRef.update({
+      proposalUrl: result.url,
+      proposalSubmissionDate: new Date().toISOString(),
+    });
+
+    if (adminName && interest.userEmail) {
+        const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
+        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
+
+        const emailHtml = `
+            <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear ${interest.userName},</p>
+                <p style="color:#e0e0e0;">This is to inform you that an administrator, <strong>${adminName}</strong>, has uploaded a proposal on your behalf for the EMR call: "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
+                <p style="color:#e0e0e0;">The uploaded proposal is attached to this email for your reference.</p>
+                ${EMAIL_STYLES.footer}
+            </div>
+        `;
+
+        await sendEmailUtility({
+            to: interest.userEmail,
+            subject: `Proposal Uploaded for EMR Call: ${callTitle}`,
+            html: emailHtml,
+            from: 'default',
+            attachments: [{
+                filename: originalFileName,
+                path: result.url,
+            }]
+        });
+    }
+
+    await logActivity("INFO", "EMR proposal uploaded", { interestId, userId: interest.userId, byAdmin: adminName });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error uploading EMR proposal:", error);
+    await logActivity("ERROR", "Failed to upload EMR proposal", {
+      interestId,
+      error: error.message,
+      stack: error.stack,
+    });
+    return { success: false, error: error.message || "Failed to upload proposal." };
+  }
+}
+
 export async function removeEmrPpt(interestId: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId) {
@@ -678,6 +763,53 @@ export async function removeEmrPpt(interestId: string): Promise<{ success: boole
   }
 }
 
+export async function removeEmrProposal(interestId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!interestId) {
+      return { success: false, error: "Interest ID is required." }
+    }
+
+    const interestRef = adminDb.collection("emrInterests").doc(interestId)
+    const interestSnap = await interestRef.get()
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." }
+    }
+    const interest = interestSnap.data() as EmrInterest
+
+    if (interest.proposalUrl) {
+      const bucket = adminStorage.bucket()
+      const url = new URL(interest.proposalUrl)
+      const filePath = decodeURIComponent(url.pathname.substring(url.pathname.indexOf("/o/") + 3))
+
+      try {
+        await bucket.file(filePath).delete()
+        console.log(`Deleted proposal file from Storage: ${filePath}`)
+      } catch (storageError: any) {
+        // If the file doesn't exist, we can ignore the error and proceed.
+        if (storageError.code !== 404) {
+          throw storageError
+        }
+        console.warn(`Storage proposal file not found during deletion, but proceeding: ${filePath}`)
+      }
+    }
+
+    await interestRef.update({
+      proposalUrl: FieldValue.delete(),
+      proposalSubmissionDate: FieldValue.delete(),
+    })
+    await logActivity("INFO", "EMR proposal removed", { interestId, userId: interest.userId })
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error removing EMR proposal:", error)
+    await logActivity("ERROR", "Failed to remove EMR proposal", {
+      interestId,
+      error: error.message,
+      stack: error.stack,
+    })
+    return { success: false, error: error.message || "Failed to remove proposal." }
+  }
+}
+
 export async function withdrawEmrInterest(interestId: string): Promise<{ success: boolean; error?: string }> {
   try {
     if (!interestId) {
@@ -695,6 +827,11 @@ export async function withdrawEmrInterest(interestId: string): Promise<{ success
     // If a presentation was uploaded, delete it from storage first.
     if (interest.pptUrl) {
       await removeEmrPpt(interest.id)
+    }
+
+    // If a proposal was uploaded, delete it from storage first.
+    if (interest.proposalUrl) {
+      await removeEmrProposal(interest.id)
     }
 
     // Delete the interest document from Firestore.
@@ -1109,14 +1246,16 @@ export async function notifyDeadlineChangeToStaff(
         ${EMAIL_STYLES.logo}
         <h2 style="color: #ffffff; text-align: center;">Updated Interest Registration Deadline</h2>
         <p style="color:#e0e0e0;">The interest registration deadline for the funding call <strong style="color:#ffffff;">"${call.title}"</strong> from <strong style="color:#ffffff;">${call.agency}</strong> has been updated.</p>
+        
+          <div style="padding: 15px; border: 1px solid #ff9800; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
+          <p style="color:#ff9800; font-weight: bold;">Important Notice:</p>
+          <p style="color:#e0e0e0;">Please note that any interests after the updated deadline will not be entertained.</p>
+          <p style="color:#e0e0e0;">Proposal prepared for submission to the agency must be uploaded on the portal.</p>
+        </div>
         <div style="padding: 15px; border: 1px solid #4f5b62; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
           <div style="color:#e0e0e0;" class="prose prose-sm">${call.description || "No description provided."}</div>
           <p style="color:#e0e0e0;"><strong>New Interest Registration Deadline:</strong> ${formatInTimeZone(newInterestDeadline, timeZone, "PPpp (z)")}</p>
           <p style="color:#e0e0e0;"><strong>Agency Application Deadline:</strong> ${formatInTimeZone(call.applyDeadline, timeZone, "PP (z)")}</p>
-        </div>
-        <div style="padding: 15px; border: 1px solid #ff9800; border-radius: 8px; margin-top: 20px; background-color:#2c3e50;">
-          <p style="color:#ff9800; font-weight: bold;">Important Notice:</p>
-          <p style="color:#e0e0e0;">Please note that any interests after the updated deadline will not be entertained.</p>
         </div>
     `
 

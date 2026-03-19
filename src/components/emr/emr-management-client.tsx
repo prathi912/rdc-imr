@@ -54,6 +54,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
 import { UploadPptDialog } from './upload-ppt-dialog';
+import { UploadProposalDialog } from './upload-proposal-dialog';
 import { Checkbox } from '../ui/checkbox';
 import { findUserByMisId } from '@/app/userfinding';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -527,6 +528,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isBulkEditDialogOpen, setIsBulkEditDialogOpen] = useState(false);
     const [isSignEndorsementDialogOpen, setIsSignEndorsementDialogOpen] = useState(false);
     const [interestForPptUpload, setInterestForPptUpload] = useState<EmrInterest | null>(null);
+    const [interestForProposalUpload, setInterestForProposalUpload] = useState<EmrInterest | null>(null);
     const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSendingReminders, setIsSendingReminders] = useState(false);
@@ -601,6 +603,10 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
 
     const handleOpenPptUpload = (interest: EmrInterest) => {
         setInterestForPptUpload(interest);
+    };
+
+    const handleOpenProposalUpload = (interest: EmrInterest) => {
+        setInterestForProposalUpload(interest);
     };
 
     const handleSendPptReminders = async () => {
@@ -846,6 +852,10 @@ return (
                                                         <Upload className="mr-2 h-4 w-4" /> 
                                                         {interest.pptUrl ? 'Upload Revised PPT' : 'Upload PPT'}
                                                     </DropdownMenuItem>
+                                                    <DropdownMenuItem onSelect={() => handleOpenProposalUpload(interest)}>
+                                                        <Upload className="mr-2 h-4 w-4" />
+                                                        {interest.proposalUrl ? 'Manage Proposal' : 'Upload Proposal'}
+                                                    </DropdownMenuItem>
                                                     {interest.isBulkUploaded && (
                                                         <DropdownMenuItem onSelect={() => handleOpenBulkEditDialog(interest)}>
                                                             <Edit className="mr-2 h-4 w-4" /> Edit Bulk Data
@@ -983,6 +993,17 @@ return (
                     adminUser={currentUser}
                     onUploadSuccess={onActionComplete}
                     isRevision={!!interestForPptUpload.revisedPptUrl}
+                />
+            )}
+            {interestForProposalUpload && (
+                <UploadProposalDialog
+                    isOpen={!!interestForProposalUpload}
+                    onOpenChange={() => setInterestForProposalUpload(null)}
+                    interest={interestForProposalUpload}
+                    call={call}
+                    user={userMap.get(interestForProposalUpload.userId)!}
+                    adminUser={currentUser}
+                    onUploadSuccess={onActionComplete}
                 />
             )}
         </Card>

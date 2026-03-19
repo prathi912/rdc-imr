@@ -37,6 +37,7 @@ import { isAfter, parseISO, addDays, setHours, setMinutes, setSeconds, subDays }
 import { Label } from '../ui/label';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { UploadPptDialog } from './upload-ppt-dialog';
+import { UploadProposalDialog } from './upload-proposal-dialog';
 import { format } from 'date-fns';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
@@ -401,6 +402,7 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
 export function EmrActions({ user, call, interestDetails, onActionComplete, isDashboardView = false }: EmrActionsProps) {
     const [isRegisterInterestOpen, setIsRegisterInterestOpen] = useState(false);
     const [isUploadPptOpen, setIsUploadPptOpen] = useState(false);
+    const [isUploadProposalOpen, setIsUploadProposalOpen] = useState(false);
     const [isRevisionUploadOpen, setIsRevisionUploadOpen] = useState(false);
     const [isWithdrawConfirmationOpen, setIsWithdrawConfirmationOpen] = useState(false);
     const [isEndorsementUploadOpen, setIsEndorsementUploadOpen] = useState(false);
@@ -504,9 +506,14 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                             {call.status === 'Open' && interestDetails.status === 'Registered' && <Button variant="destructive" size="sm" onClick={() => setIsWithdrawConfirmationOpen(true)}>Withdraw</Button>}
                             
                             {!showEndorsementActions && !showSubmitToAgencyAction && !showFinalStatusAction && (
-                                <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
-                                    {interestDetails?.pptUrl ? <><Eye className="h-4 w-4 mr-2" /> Manage PPT</> : <><Upload className="h-4 w-4 mr-2" /> Upload PPT</>}
-                                </Button>
+                                <>
+                                    <Button size="sm" variant="outline" onClick={() => setIsUploadPptOpen(true)}>
+                                        {interestDetails?.pptUrl ? <><Eye className="h-4 w-4 mr-2" /> Manage PPT</> : <><Upload className="h-4 w-4 mr-2" /> Upload PPT</>}
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => setIsUploadProposalOpen(true)}>
+                                        {interestDetails?.proposalUrl ? <><Eye className="h-4 w-4 mr-2" /> Manage Proposal</> : <><Upload className="h-4 w-4 mr-2" /> Upload Proposal</>}
+                                    </Button>
+                                </>
                             )}
                             
                             {showEndorsementActions && (
@@ -543,6 +550,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                         </div>
                     )}
                     {isUploadPptOpen && <UploadPptDialog isOpen={isUploadPptOpen} onOpenChange={setIsUploadPptOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} />}
+                    {isUploadProposalOpen && <UploadProposalDialog isOpen={isUploadProposalOpen} onOpenChange={setIsUploadProposalOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} />}
                     {isRevisionUploadOpen && <UploadPptDialog isOpen={isRevisionUploadOpen} onOpenChange={setIsRevisionUploadOpen} interest={interestDetails} call={call} user={user} onUploadSuccess={onActionComplete} isRevision={true} />}
                     {isEndorsementUploadOpen && <EndorsementUploadDialog isOpen={isEndorsementUploadOpen} onOpenChange={setIsEndorsementUploadOpen} interest={interestDetails} onUploadSuccess={onActionComplete} />}
                     {isSubmitToAgencyOpen && <SubmitToAgencyDialog isOpen={isSubmitToAgencyOpen} onOpenChange={setIsSubmitToAgencyOpen} interest={interestDetails} onActionComplete={onActionComplete} />}
@@ -551,7 +559,7 @@ export function EmrActions({ user, call, interestDetails, onActionComplete, isDa
                         <AlertDialogContent>
                             <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>This will withdraw your interest from the call. Any uploaded presentation will also be deleted. This action cannot be undone.</AlertDialogDescription>
+                                <AlertDialogDescription>This will withdraw your interest from the call. Any uploaded presentation or proposal will also be deleted. This action cannot be undone.</AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
