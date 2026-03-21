@@ -149,6 +149,7 @@ export type Project = {
     | "Submitted"
     | "Under Review"
     | "Revision Needed"
+    | "Revision Submitted"
     | "Sanctioned"
     | "Not Recommended"
     | "In Progress"
