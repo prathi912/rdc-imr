@@ -808,7 +808,23 @@ export default function ScheduleMeetingPage() {
             </div>
             
             {activeTab !== 'history' && (
-              <div className="lg:col-span-1">
+              <div className="lg:col-span-1 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Submission Counts</CardTitle>
+                    <CardDescription>Quick overview before scheduling.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Fresh Submissions</span>
+                      <span className="font-semibold">{newSubmissions.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Revised Submissions</span>
+                      <span className="font-semibold">{revisedProposalProjects.length}</span>
+                    </div>
+                  </CardContent>
+                </Card>
                 <ScheduleForm isEditing={false} />
               </div>
             )}

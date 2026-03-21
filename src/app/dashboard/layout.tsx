@@ -446,6 +446,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // Pending Meetings listener (for admins)
     if (user.allowedModules?.includes("schedule-meeting")) {
       let unsubscribeNew: () => void;
+      let unsubscribeRevision: () => void;
       let unsubscribeMidTerm: () => void;
 
       const fetchSettingsAndSubscribe = async () => {
@@ -454,6 +455,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const thresholdDate = subMonths(new Date(), reviewMonths);
 
         const newSubmissionsQuery = query(collection(db, "projects"), where("status", "==", "Submitted"));
+        const revisionSubmissionsQuery = query(collection(db, "projects"), where("status", "==", "Revision Submitted"));
         const midTermQuery = query(
           collection(db, "projects"), 
           where('status', '==', 'In Progress'),
@@ -461,14 +463,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         );
 
         let newCount = 0;
+        let revisionCount = 0;
         let midTermCount = 0;
 
         const updateTotal = () => {
-          setPendingMeetingsCount(newCount + midTermCount);
+          setPendingMeetingsCount(newCount + revisionCount + midTermCount);
         };
 
         unsubscribeNew = onSnapshot(newSubmissionsQuery, (snapshot) => {
           newCount = snapshot.size;
+          updateTotal();
+        });
+
+        unsubscribeRevision = onSnapshot(revisionSubmissionsQuery, (snapshot) => {
+          revisionCount = snapshot.size;
           updateTotal();
         });
 
@@ -482,7 +490,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             updateTotal();
         });
 
-        unsubscribes.push(unsubscribeNew, unsubscribeMidTerm);
+        unsubscribes.push(unsubscribeNew, unsubscribeRevision, unsubscribeMidTerm);
       };
 
       fetchSettingsAndSubscribe();
