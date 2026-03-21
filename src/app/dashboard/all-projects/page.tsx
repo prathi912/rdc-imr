@@ -40,7 +40,7 @@ import { findUserByMisId } from '@/app/userfinding';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
-const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval', 'Sanctioned'];
+const STATUSES: Project['status'][] = ['Submitted', 'Under Review', 'Revision Submitted', 'Recommended', 'Not Recommended', 'In Progress', 'Completed', 'Pending Completion Approval', 'Sanctioned'];
 const CAMPUSES = ['Vadodara', 'Goa', 'Ahmedabad', 'Rajkot'];
 
 const IMR_EXPORT_COLUMNS = [

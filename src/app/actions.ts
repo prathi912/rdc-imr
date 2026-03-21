@@ -1662,7 +1662,7 @@ export async function updateProjectWithRevision(
     await projectRef.update({
       revisedProposalUrl: revisedProposalUrl,
       revisionSubmissionDate: new Date().toISOString(),
-      status: "Under Review",
+      status: "Revision Submitted",
     })
 
     const projectSnap = await projectRef.get()
@@ -1849,6 +1849,11 @@ export async function updateCoInvestigators(
               <p style="color:#ffffff;">Dear ${coPi.name},</p>
               <p style="color:#e0e0e0;">You have been added as a Co-PI to the IMR project titled "<strong style="color:#ffffff;">${project.title}</strong>" by ${project.pi}.</p>
               <p style="color:#e0e0e0;">You can view the project details on the PU Research Projects Portal</p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/project/${projectId}" style="background-color: #64B5F6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                  View Project Details
+                </a>
+              </div>
               ${EMAIL_STYLES.footer}
             </div>`
           await sendEmailUtility({

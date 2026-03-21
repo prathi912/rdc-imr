@@ -260,7 +260,7 @@ export async function registerEmrInterest(
     <p style="color:#e0e0e0;">
         Your interest for the EMR funding call 
         "<strong style="color:#ffffff;">${callTitle}</strong>" has been successfully registered. 
-        You are requested to upload your presentation (PPT) on the portal so that your proposal can be considered for the presentation round.
+        You are requested to upload your presentation (PPT) & Project Proposal (zip, pdf) on the portal so that your proposal can be considered for the presentation round.
     </p>
     ${EMAIL_STYLES.footer}
 </div>`;

@@ -436,9 +436,7 @@ export default function ScheduleMeetingPage() {
   const newSubmissions = allProjects.filter(p => p.status === 'Submitted');
   
   const revisedProposalProjects = allProjects.filter(p => 
-    p.status === 'Under Review' && 
-    p.revisedProposalUrl && 
-    !p.meetingDetails?.date // Has submitted revision but no meeting scheduled yet
+    p.status === 'Revision Submitted'
   );
   
   const midTermReviewProjects = allProjects.filter(p => {
