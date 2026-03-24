@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send, Search } from 'lucide-react';
+import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send, Search, X } from 'lucide-react';
 import type { FundingCall, User, EmrInterest, CoPiDetails, FoundUser } from '@/types';
 import { registerEmrInterest, withdrawEmrInterest, uploadEndorsementForm, submitToAgency, updateEmrFinalStatus } from '@/app/emr-actions';
 import { uploadFileToServer } from '@/app/actions';
@@ -294,6 +294,17 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
     const [foundCoPis, setFoundCoPis] = useState<FoundUser[]>([]);
     const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
     const [coPiList, setCoPiList] = useState<CoPiDetails[]>([]);
+    const searchRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+                setFoundCoPis([]);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const form = useForm<z.infer<typeof registerInterestSchema>>({
         resolver: zodResolver(registerInterestSchema),
@@ -376,7 +387,7 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
                         <Label>Add Co-PI</Label>
-                        <div className="relative">
+                        <div className="relative" ref={searchRef}>
                             <div className="flex items-center gap-2">
                                 <div className="relative flex-grow">
                                     <Input
@@ -384,6 +395,15 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
                                         value={coPiSearchTerm}
                                         onChange={(e) => handleSearchCoPi(e.target.value)}
                                     />
+                                    {coPiSearchTerm && !isSearching && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { setCoPiSearchTerm(''); setFoundCoPis([]); }}
+                                            className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground"
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    )}
                                     {isSearching && <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />}
                                 </div>
                             </div>
@@ -402,6 +422,11 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
                                             <Button type="button" size="sm" variant="ghost">Add</Button>
                                         </div>
                                     ))}
+                                    <div className="p-1 border-t flex justify-center">
+                                        <Button type="button" variant="ghost" size="sm" className="w-full text-xs" onClick={() => setFoundCoPis([])}>
+                                            Close List
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                         </div>
