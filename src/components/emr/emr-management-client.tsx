@@ -887,7 +887,7 @@ return (
                                 <TableCell>
                                     <Badge variant={
                                         interest.status === 'Sanctioned' ? 'default' :
-                                        interest.status === 'Rejected' ? 'destructive' : 'secondary'
+                                        (interest.status === 'Not Recommended' || interest.status === 'Not Sanctioned') ? 'destructive' : 'secondary'
                                     }>
                                         {interest.status}
                                     </Badge>
@@ -926,25 +926,25 @@ return (
                                                     Update Status
                                                 </DropdownMenuSubTrigger>
                                                 <DropdownMenuSubContent>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Interest Registered')}>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Registered')}>
                                                         Interest Registered
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Evaluated')}>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Evaluation Done')}>
                                                         Evaluated
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Endorsement Pending')}>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Endorsement Submitted')}>
                                                         Endorsement Pending
                                                     </DropdownMenuItem>
                                                      <DropdownMenuItem onClick={() => handleOpenSignDialog(interest)}>
                                                         Sign Endorsement
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Proposal Submitted')}>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'PPT Submitted')}>
                                                         Proposal Submitted
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Sanctioned')}>
                                                         Sanctioned
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Rejected')}>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Not Recommended')}>
                                                         Rejected
                                                     </DropdownMenuItem>
                                                 </DropdownMenuSubContent>
@@ -996,9 +996,10 @@ return (
         call={call}
         interests={interests}
         allUsers={allUsers}
-        onUpdate={() => {
-            onActionComplete();
+        currentUser={currentUser}
+        onActionComplete={() => {
             fetchInterests();
+            onActionComplete();
         }}
     />
 
@@ -1013,34 +1014,56 @@ return (
         }}
     />
 
-    <SignEndorsementDialog
-        interest={interestToUpdate!}
-        isOpen={isSignEndorsementDialogOpen}
-        onOpenChange={setIsSignEndorsementDialogOpen}
-        onUpdate={() => {
-            onActionComplete();
-            fetchInterests();
-        }}
-    />
+    {interestToUpdate && (
+        <SignEndorsementDialog
+            interest={interestToUpdate}
+            isOpen={isSignEndorsementDialogOpen}
+            onOpenChange={setIsSignEndorsementDialogOpen}
+            onUpdate={() => {
+                onActionComplete();
+                fetchInterests();
+            }}
+        />
+    )}
 
-    <EditBulkEmrDialog
-        interest={interestToUpdate!}
-        isOpen={isBulkEditDialogOpen}
-        onOpenChange={setIsBulkEditDialogOpen}
-        onUpdate={() => fetchInterests()}
-    />
+    {interestToUpdate && (
+        <EditBulkEmrDialog
+            interest={interestToUpdate}
+            isOpen={isBulkEditDialogOpen}
+            onOpenChange={setIsBulkEditDialogOpen}
+            onUpdate={() => fetchInterests()}
+        />
+    )}
 
-    <UploadPptDialog
-        interest={interestForPptUpload}
-        onOpenChange={() => setInterestForPptUpload(null)}
-        onUpdate={() => fetchInterests()}
-    />
+    {interestForPptUpload && (
+        <UploadPptDialog
+            interest={interestForPptUpload}
+            call={call}
+            user={allUsers.find(u => u.uid === interestForPptUpload.userId)!}
+            adminUser={currentUser}
+            isOpen={!!interestForPptUpload}
+            onOpenChange={(open) => !open && setInterestForPptUpload(null)}
+            onUploadSuccess={() => {
+                onActionComplete();
+                fetchInterests();
+            }}
+        />
+    )}
 
-    <UploadProposalDialog
-        interest={interestForProposalUpload}
-        onOpenChange={() => setInterestForProposalUpload(null)}
-        onUpdate={() => fetchInterests()}
-    />
+    {interestForProposalUpload && (
+        <UploadProposalDialog
+            interest={interestForProposalUpload}
+            call={call}
+            user={allUsers.find(u => u.uid === interestForProposalUpload.userId)!}
+            adminUser={currentUser}
+            isOpen={!!interestForProposalUpload}
+            onOpenChange={(open) => !open && setInterestForProposalUpload(null)}
+            onUploadSuccess={() => {
+                onActionComplete();
+                fetchInterests();
+            }}
+        />
+    )}
 
     <AttendanceDialog
         call={call}

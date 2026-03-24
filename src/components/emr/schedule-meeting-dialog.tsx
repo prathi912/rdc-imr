@@ -174,7 +174,7 @@ export function ScheduleMeetingDialog({ call, interests, allUsers, currentUser, 
         const isAdminRole = ['Super-admin', 'admin', 'CRO'].includes(u.role);
         const isNotAnApplicant = !usersWithInterest.some(interest => interest.userId === u.uid);
         
-        if (currentUser.designation === 'Head of Goa Campus') {
+        if (currentUser?.designation === 'Head of Goa Campus') {
             return isAdminRole && isNotAnApplicant && u.campus === 'Goa';
         }
         
