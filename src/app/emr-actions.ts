@@ -139,6 +139,7 @@ export async function uploadFileToServer(
 export async function registerEmrInterest(
   callId: string,
   user: User,
+  pptData: { dataUrl: string; fileName: string },
   coPis: CoPiDetails[] = [],
   registeredByAdmin?: { adminUid: string, adminName: string }
 ): Promise<{ success: boolean; error?: string }> {
@@ -150,11 +151,27 @@ export async function registerEmrInterest(
       }
     }
 
+    if (!pptData || !pptData.dataUrl) {
+      return {
+        success: false,
+        error: "Presentation (PPT) upload is mandatory.",
+      }
+    }
+
     const interestsRef = adminDb.collection("emrInterests")
     const q = interestsRef.where("callId", "==", callId).where("userId", "==", user.uid)
     const docSnap = await q.get()
     if (!docSnap.empty) {
       return { success: false, error: "This user has already registered interest for this call." }
+    }
+
+    const fileExtension = path.extname(pptData.fileName);
+    const standardizedName = `emr_${user.name.replace(/\s+/g, "_")}${fileExtension}`;
+    const filePath = `emr-presentations/${callId}/${user.uid}/${standardizedName}`;
+    const uploadResult = await uploadFileToServer(pptData.dataUrl, filePath);
+
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(uploadResult.error || "PPT upload failed.");
     }
 
     const allInterestsForCallQuery = interestsRef.where("callId", "==", callId)
@@ -182,11 +199,13 @@ export async function registerEmrInterest(
         faculty: user.faculty || "N/A",
         department: user.department || "N/A",
         registeredAt: new Date().toISOString(),
-        status: "Registered",
+        status: "PPT Submitted",
         coPiDetails: coPis,
         coPiUids: coPis.map((p) => p.uid).filter(Boolean) as string[],
         coPiNames: coPis.map((p) => p.name),
         coPiEmails: coPis.map((p) => p.email.toLowerCase()),
+        pptUrl: uploadResult.url,
+        pptSubmissionDate: new Date().toISOString(),
       }
       
       if (registeredByAdmin) {

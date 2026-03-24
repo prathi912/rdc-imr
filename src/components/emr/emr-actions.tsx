@@ -26,7 +26,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { CheckCircle, Loader2, Replace, Trash2, Upload, Eye, MessageSquareWarning, Pencil, CalendarClock, FileUp, FileText as ViewIcon, Send, Search } from 'lucide-react';
 import type { FundingCall, User, EmrInterest, CoPiDetails } from '@/types';
@@ -54,6 +54,9 @@ interface EmrActionsProps {
 
 const registerInterestSchema = z.object({
   coPis: z.array(z.object({ uid: z.string(), name: z.string() })).optional(),
+  ppt: z.any()
+    .refine(files => files?.length > 0, "Presentation (PPT) is mandatory.")
+    .refine(files => files?.[0]?.size <= 10 * 1024 * 1024, "Presentation size must be less than 10MB."),
 });
 
 const submitToAgencySchema = z.object({
@@ -296,10 +299,17 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
         resolver: zodResolver(registerInterestSchema),
     });
 
-    const handleRegister = async () => {
+    const handleRegister = async (values: z.infer<typeof registerInterestSchema>) => {
         setIsSubmitting(true);
         try {
-            const result = await registerEmrInterest(call.id, user, coPiList);
+            const pptFile = values.ppt[0];
+            const dataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(pptFile);
+            });
+
+            const result = await registerEmrInterest(call.id, user, { dataUrl, fileName: pptFile.name }, coPiList);
             if (result.success) {
                 toast({ title: 'Interest Registered!', description: 'Your interest has been successfully recorded.' });
                 onRegisterSuccess();
@@ -307,6 +317,8 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
             } else {
                 toast({ variant: 'destructive', title: 'Registration Failed', description: result.error });
             }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'An error occurred during registration.' });
         } finally {
             setIsSubmitting(false);
         }
@@ -387,10 +399,38 @@ function RegisterInterestDialog({ call, user, isOpen, onOpenChange, onRegisterSu
                             <p className="text-sm text-muted-foreground">No Co-PIs added.</p>
                         )}
                     </div>
+
+                    <div className="space-y-2 border-t pt-4">
+                        <Form {...form}>
+                            <form id="register-interest-form" onSubmit={form.handleSubmit(handleRegister)} className="space-y-4">
+                                <FormField
+                                    name="ppt"
+                                    control={form.control}
+                                    render={({ field: { onChange, value, ...rest } }) => (
+                                        <FormItem>
+                                            <FormLabel>Presentation (PPT/PDF) <span className="text-destructive">*</span></FormLabel>
+                                            <FormControl>
+                                                <Input 
+                                                    type="file" 
+                                                    accept=".ppt,.pptx,.pdf" 
+                                                    onChange={(e) => onChange(e.target.files)} 
+                                                    {...rest} 
+                                                />
+                                            </FormControl>
+                                            <FormDescription>
+                                                Uploading a presentation (PPT or PDF) is mandatory to register interest. (Max size: 10MB)
+                                            </FormDescription>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </form>
+                        </Form>
+                    </div>
                 </div>
                 <DialogFooter>
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                    <Button onClick={handleRegister} disabled={isSubmitting}>
+                    <Button type="submit" form="register-interest-form" disabled={isSubmitting}>
                         {isSubmitting ? 'Registering...' : 'Confirm Registration'}
                     </Button>
                 </DialogFooter>

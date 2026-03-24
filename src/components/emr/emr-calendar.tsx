@@ -34,6 +34,8 @@ import {
 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -95,6 +97,8 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
     const [searchTerm, setSearchTerm] = useState('');
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [pptFile, setPptFile] = useState<File | null>(null);
+
 
     const handleSearch = async () => {
         if (!searchTerm.trim()) return;
@@ -110,9 +114,18 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
     };
 
     const handleRegister = async (userToRegister: User) => {
+        if (!pptFile) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please upload a presentation (PPT) first.' });
+            return;
+        }
+        if (pptFile.size > 10 * 1024 * 1024) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Presentation size must be less than 10MB.' });
+            return;
+        }
         setIsSubmitting(true);
+
         try {
-            const result = await registerEmrInterest(call.id, userToRegister, [], { adminUid: adminUser.uid, adminName: adminUser.name });
+            const result = await registerEmrInterest(call.id, userToRegister, { dataUrl: await fileToDataUrl(pptFile!), fileName: pptFile!.name }, [], { adminUid: adminUser.uid, adminName: adminUser.name });
             if (result.success) {
                 toast({ title: 'Success', description: `${userToRegister.name} has been registered for the call.` });
                 onRegisterSuccess();
@@ -130,12 +143,18 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Register a User for: {call.title}</DialogTitle>
-                    <DialogDescription>Search for a user by their MIS ID to register them for this funding call.</DialogDescription>
+                    <DialogDescription>Search for a user by their MIS ID and upload their presentation to register them.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                        <Label>User Presentation (PPT/PDF) <span className="text-destructive">*</span></Label>
+                        <Input type="file" accept=".ppt,.pptx,.pdf" onChange={(e) => setPptFile(e.target.files?.[0] || null)} />
+                        <p className="text-xs text-muted-foreground">Uploading a presentation (PPT or PDF) is mandatory for EMR registration. (Max size: 10MB)</p>
+                    </div>
+
                     <div className="flex items-center gap-2">
                         <Input placeholder="Enter user's MIS ID" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                        <Button onClick={handleSearch} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                        <Button onClick={handleSearch} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search User'}</Button>
                     </div>
                     {foundUsers.length > 0 && (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -145,7 +164,9 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
                                         <p className="font-semibold">{user.name}</p>
                                         <p className="text-xs text-muted-foreground">{user.email}</p>
                                     </div>
-                                    <Button size="sm" onClick={() => handleRegister(user)} disabled={isSubmitting}>Register</Button>
+                                    <Button size="sm" onClick={() => handleRegister(user)} disabled={isSubmitting || !pptFile}>
+                                        {isSubmitting ? 'Registering...' : 'Register'}
+                                    </Button>
                                 </div>
                             ))}
                         </div>
@@ -469,7 +490,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
 
             const userInterestsQuery = query(collection(db, 'emrInterests'), where('userId', '==', user.uid));
             const unsubscribeUserInterests = onSnapshot(userInterestsQuery, (snapshot) => {
-                setUserInterests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as EmrInterest})));
+                setUserInterests(snapshot.docs.map(doc => ({ ...doc.data() as EmrInterest, id: doc.id })));
             });
             
             setLoading(false);

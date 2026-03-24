@@ -14,11 +14,11 @@ import Link from 'next/link';
 import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search, Send, CalendarDays } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Textarea } from '../ui/textarea';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '../ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '../ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useForm } from 'react-hook-form';
-import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement, markEmrAttendance, registerEmrInterest, sendPptReminderEmails } from '@/app/emr-actions';
+import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement, markEmrAttendance, registerEmrInterest, sendPptReminderEmails, uploadFileToServer } from '@/app/emr-actions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +72,15 @@ interface EmrManagementClientProps {
     onActionComplete: () => void;
 }
 
+const fileToDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
+
 const deleteRegistrationSchema = z.object({
     remarks: z.string().min(10, "Please provide a reason for deleting the registration."),
 });
@@ -106,6 +115,8 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
     const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
 
+    const [pptFile, setPptFile] = useState<File | null>(null);
+
     const handleSearch = async () => {
         if (!searchTerm.trim()) return;
         setIsSearching(true);
@@ -120,9 +131,18 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
     };
 
     const handleRegister = async (userToRegister: User) => {
+        if (!pptFile) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please upload a presentation (PPT) first.' });
+            return;
+        }
+        if (pptFile.size > 10 * 1024 * 1024) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Presentation size must be less than 10MB.' });
+            return;
+        }
         setIsSubmitting(true);
         try {
-            const result = await registerEmrInterest(call.id, userToRegister, [], { adminUid: adminUser.uid, adminName: adminUser.name });
+            const dataUrl = await fileToDataUrl(pptFile);
+            const result = await registerEmrInterest(call.id, userToRegister, { dataUrl, fileName: pptFile.name }, [], { adminUid: adminUser.uid, adminName: adminUser.name });
             if (result.success) {
                 toast({ title: 'Success', description: `${userToRegister.name} has been registered for the call.` });
                 onRegisterSuccess();
@@ -130,6 +150,8 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
             } else {
                 toast({ variant: 'destructive', title: 'Registration Failed', description: result.error });
             }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'An error occurred during registration.' });
         } finally {
             setIsSubmitting(false);
         }
@@ -140,12 +162,18 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Register a User for: {call.title}</DialogTitle>
-                    <DialogDescription>Search for a user by their MIS ID to register them for this funding call.</DialogDescription>
+                    <DialogDescription>Search for a user by their MIS ID and upload their presentation to register them.</DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-4">
+                    <div className="space-y-2">
+                        <Label>User Presentation (PPT/PDF) <span className="text-destructive">*</span></Label>
+                        <Input type="file" accept=".ppt,.pptx,.pdf" onChange={(e) => setPptFile(e.target.files?.[0] || null)} />
+                        <p className="text-xs text-muted-foreground">Uploading a presentation (PPT or PDF) is mandatory for EMR registration. (Max size: 10MB)</p>
+                    </div>
+
                     <div className="flex items-center gap-2">
                         <Input placeholder="Enter user's MIS ID" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                        <Button onClick={handleSearch} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search'}</Button>
+                        <Button onClick={handleSearch} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Search User'}</Button>
                     </div>
                     {foundUsers.length > 0 && (
                         <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -155,7 +183,9 @@ function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterS
                                         <p className="font-semibold">{user.name}</p>
                                         <p className="text-xs text-muted-foreground">{user.email}</p>
                                     </div>
-                                    <Button size="sm" onClick={() => handleRegister(user)} disabled={isSubmitting}>Register</Button>
+                                    <Button size="sm" onClick={() => handleRegister(user)} disabled={isSubmitting || !pptFile}>
+                                        {isSubmitting ? 'Registering...' : 'Register'}
+                                    </Button>
                                 </div>
                             ))}
                         </div>
@@ -231,7 +261,7 @@ function AttendanceDialog({ call, interests, allUsers, isOpen, onOpenChange, onU
                                                         }}
                                                     />
                                                 </FormControl>
-                                                <FormLabel className="font-normal">{interest.userName}</FormLabel>
+                                                <Label className="font-normal">{interest.userName}</Label>
                                             </FormItem>
                                         )}
                                     />
@@ -284,15 +314,6 @@ function SignEndorsementDialog({ interest, isOpen, onOpenChange, onUpdate }: { i
     const form = useForm<z.infer<typeof signEndorsementSchema>>({
         resolver: zodResolver(signEndorsementSchema),
     });
-
-    const fileToDataUrl = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = error => reject(error);
-            reader.readAsDataURL(file);
-        });
-    };
 
     const handleSubmit = async (values: z.infer<typeof signEndorsementSchema>) => {
         setIsSubmitting(true);
