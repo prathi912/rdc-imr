@@ -8,7 +8,7 @@ import type { Project, User, EmrInterest, FundingCall } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
 import { db } from "@/lib/config"
-import { collection, getDocs, query, where, or, orderBy } from "firebase/firestore"
+import { collection, getDocs, query, where, or, orderBy, limit, startAfter } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { format } from "date-fns"
 import { Button } from "@/components/ui/button"
-import { FileText } from "lucide-react"
+import { FileText, Loader2 } from "lucide-react"
 
 function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls: FundingCall[] }) {
   if (interests.length === 0) {
@@ -91,6 +91,12 @@ export default function MyProjectsPage() {
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
+  
+  const [lastVisibleImr, setLastVisibleImr] = useState<any>(null)
+  const [lastVisibleEmr, setLastVisibleEmr] = useState<any>(null)
+  const [hasMoreImr, setHasMoreImr] = useState(false)
+  const [hasMoreEmr, setHasMoreEmr] = useState(false)
+  const itemsPerPage = 20
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -102,68 +108,91 @@ export default function MyProjectsPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (!user) return
-
-    const fetchAllData = async () => {
-      setLoading(true)
-      try {
-        // Fetch IMR Projects where the user is PI, Co-PI, or PI by email (for historical data)
-        const projectsRef = collection(db, "projects")
-        const imrQuery = query(
-          projectsRef,
-          or(
-            where("pi_uid", "==", user.uid), 
-            where("coPiUids", "array-contains", user.uid),
-            where("pi_email", "==", user.email)
-          )
-        );
-
-        // Fetch EMR Interests
-        const emrInterestsRef = collection(db, "emrInterests")
-        const emrQuery = query(
-          emrInterestsRef,
-          or(
-            where("userId", "==", user.uid),
-            where("coPiUids", "array-contains", user.uid)
-          )
-        );
-
-        // Fetch Funding Calls
-        const callsRef = collection(db, "fundingCalls")
-        const callsQuery = query(callsRef)
-
-        const [imrSnapshot, emrSnapshot, callsSnapshot] = await Promise.all([
-          getDocs(imrQuery),
-          getDocs(emrQuery),
-          getDocs(callsQuery),
-        ])
-
-        const imrProjectList = imrSnapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() } as Project))
-          .sort((a, b) => new Date(b.submissionDate).getTime() - new Date(a.submissionDate).getTime())
-
-        const emrInterestList = emrSnapshot.docs
-          .map((doc) => ({ id: doc.id, ...doc.data() } as EmrInterest))
-          .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
-
-        setMyProjects(imrProjectList)
-        setMyEmrInterests(emrInterestList)
-        setFundingCalls(callsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as FundingCall)))
-      } catch (error: any) {
-        console.error("Error fetching user's projects:", error)
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: `Could not fetch your projects. ${error.message || "Please try again later."}`,
-        })
-      } finally {
-        setLoading(false)
-      }
+  const fetchFundingCalls = async () => {
+    try {
+      const callsRef = collection(db, "fundingCalls")
+      const snapshot = await getDocs(query(callsRef))
+      setFundingCalls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)))
+    } catch (error) {
+      console.error("Error fetching funding calls:", error)
     }
+  }
 
-    fetchAllData()
-  }, [user, toast])
+  const fetchImrProjects = async (isLoadMore = false) => {
+    if (!user) return
+    if (!isLoadMore) setLoading(true)
+    try {
+      const projectsRef = collection(db, "projects")
+      let constraints: any[] = [
+        or(
+          where("pi_uid", "==", user.uid), 
+          where("coPiUids", "array-contains", user.uid),
+          where("pi_email", "==", user.email)
+        ),
+        orderBy("submissionDate", "desc"),
+        limit(itemsPerPage)
+      ]
+
+      if (isLoadMore && lastVisibleImr) {
+        constraints.push(startAfter(lastVisibleImr))
+      }
+
+      const q = query(projectsRef, ...constraints)
+      const snapshot = await getDocs(q)
+      const newList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project))
+      
+      setMyProjects(prev => isLoadMore ? [...prev, ...newList] : newList)
+      setLastVisibleImr(snapshot.docs[snapshot.docs.length - 1])
+      setHasMoreImr(snapshot.docs.length === itemsPerPage)
+    } catch (error: any) {
+      console.error("Error fetching IMR projects:", error)
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch IMR projects." })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchEmrInterests = async (isLoadMore = false) => {
+    if (!user) return
+    if (!isLoadMore) setLoading(true)
+    try {
+      const emrInterestsRef = collection(db, "emrInterests")
+      let constraints: any[] = [
+        or(
+          where("userId", "==", user.uid),
+          where("coPiUids", "array-contains", user.uid)
+        ),
+        orderBy("registeredAt", "desc"),
+        limit(itemsPerPage)
+      ]
+
+      if (isLoadMore && lastVisibleEmr) {
+        constraints.push(startAfter(lastVisibleEmr))
+      }
+
+      const q = query(emrInterestsRef, ...constraints)
+      const snapshot = await getDocs(q)
+      const newList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest))
+
+      setMyEmrInterests(prev => isLoadMore ? [...prev, ...newList] : newList)
+      setLastVisibleEmr(snapshot.docs[snapshot.docs.length - 1])
+      setHasMoreEmr(snapshot.docs.length === itemsPerPage)
+    } catch (error: any) {
+      console.error("Error fetching EMR interests:", error)
+      toast({ variant: "destructive", title: "Error", description: "Could not fetch EMR interests." })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      fetchFundingCalls()
+      fetchImrProjects()
+      fetchEmrInterests()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   const filteredImrProjects = useMemo(() => {
     if (!searchTerm) return myProjects
@@ -178,7 +207,7 @@ export default function MyProjectsPage() {
     });
   }, [myEmrInterests, fundingCalls, searchTerm]);
 
-  if (loading || !user) {
+  if (loading && myProjects.length === 0 && myEmrInterests.length === 0) {
     return (
       <div className="container mx-auto py-10">
         <PageHeader title="My Projects" description="A list of all projects you have submitted or are associated with." />
@@ -197,15 +226,23 @@ export default function MyProjectsPage() {
     )
   }
 
+  if (!user && !loading) {
+    return (
+        <div className="container mx-auto py-10 text-center">
+            <h1 className="text-2xl font-bold">Please login to view your projects.</h1>
+        </div>
+    )
+  }
+
   return (
-    <div className="container mx-auto py-10">
+    <div className="container mx-auto py-10 px-4">
       <PageHeader
         title="My Projects"
         description="A list of all projects you are associated with as a PI or Co-PI, for both Intramural (IMR) and Extramural (EMR) funding."
       />
       <div className="mt-8">
         <Tabs defaultValue="imr" className="w-full">
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
             <TabsList>
               <TabsTrigger value="imr">Intramural Research (IMR)</TabsTrigger>
               <TabsTrigger value="emr">Extramural Research (EMR)</TabsTrigger>
@@ -218,18 +255,38 @@ export default function MyProjectsPage() {
             />
           </div>
           <TabsContent value="imr">
-            {filteredImrProjects.length === 0 && !loading ? (
+            {myProjects.length === 0 && !loading ? (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   You have not submitted any IMR projects yet.
                 </CardContent>
               </Card>
             ) : (
-              <ProjectList projects={filteredImrProjects} currentUser={user} />
+              <div className="space-y-6">
+                <ProjectList projects={filteredImrProjects} currentUser={user!} />
+                {hasMoreImr && (
+                    <div className="flex justify-center">
+                        <Button variant="outline" onClick={() => fetchImrProjects(true)} disabled={loading}>
+                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Load More IMR Projects
+                        </Button>
+                    </div>
+                )}
+              </div>
             )}
           </TabsContent>
           <TabsContent value="emr">
-            <EmrProjectList interests={filteredEmrInterests} calls={fundingCalls} />
+            <div className="space-y-6">
+                <EmrProjectList interests={filteredEmrInterests} calls={fundingCalls} />
+                {hasMoreEmr && (
+                    <div className="flex justify-center">
+                        <Button variant="outline" onClick={() => fetchEmrInterests(true)} disabled={loading}>
+                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Load More EMR Interests
+                        </Button>
+                    </div>
+                )}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

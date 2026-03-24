@@ -1,9 +1,8 @@
 
-
 // src/components/emr/emr-management-client.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FundingCall, User, EmrInterest } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -11,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search, Send, CalendarDays } from 'lucide-react';
+import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search, Send, CalendarDays, ChevronRight } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '../ui/form';
@@ -62,11 +61,12 @@ import { format, parseISO } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { db } from '@/lib/config';
+import { collection, query, where, getDocs, limit, startAfter, QueryDocumentSnapshot, DocumentData, orderBy } from 'firebase/firestore';
 
 
 interface EmrManagementClientProps {
     call: FundingCall;
-    interests: EmrInterest[];
     allUsers: User[];
     currentUser: User;
     onActionComplete: () => void;
@@ -87,11 +87,6 @@ const deleteRegistrationSchema = z.object({
 
 const adminRemarksSchema = z.object({
     remarks: z.string().min(10, "Please provide remarks for the applicant."),
-});
-
-const bulkEditSchema = z.object({
-    durationAmount: z.string().optional(),
-    isOpenToPi: z.boolean().default(false),
 });
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -536,9 +531,16 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
 }
 
 
-export function EmrManagementClient({ call, interests, allUsers, currentUser, onActionComplete }: EmrManagementClientProps) {
+export function EmrManagementClient({ call, allUsers, currentUser, onActionComplete }: EmrManagementClientProps) {
     const { toast } = useToast();
     const userMap = useMemo(() => new Map(allUsers.map(u => [u.uid, u])), [allUsers]);
+    
+    const [interests, setInterests] = useState<EmrInterest[]>([]);
+    const [loadingInterests, setLoadingInterests] = useState(false);
+    const [lastVisibleDoc, setLastVisibleDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+    const [hasMore, setHasMore] = useState(true);
+    const pageSize = 10;
+
     const [isDeleting, setIsDeleting] = useState(false);
     const [interestToUpdate, setInterestToUpdate] = useState<EmrInterest | null>(null);
     const [statusToUpdate, setStatusToUpdate] = useState<EmrInterest['status'] | null>(null);
@@ -553,6 +555,45 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
     const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isSendingReminders, setIsSendingReminders] = useState(false);
+
+
+    const fetchInterests = useCallback(async (isLoadMore = false) => {
+        if (loadingInterests || (!hasMore && isLoadMore)) return;
+        setLoadingInterests(true);
+        try {
+            let interestsQuery = query(
+                collection(db, 'emrInterests'),
+                where('callId', '==', call.id),
+                orderBy('userName', 'asc'),
+                limit(pageSize)
+            );
+
+            if (isLoadMore && lastVisibleDoc) {
+                interestsQuery = query(interestsQuery, startAfter(lastVisibleDoc));
+            }
+
+            const snapshot = await getDocs(interestsQuery);
+            const newInterests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest));
+
+            if (isLoadMore) {
+                setInterests(prev => [...prev, ...newInterests]);
+            } else {
+                setInterests(newInterests);
+            }
+
+            setLastVisibleDoc(snapshot.docs[snapshot.docs.length - 1] || null);
+            setHasMore(snapshot.docs.length === pageSize);
+        } catch (error) {
+            console.error("Error fetching interests:", error);
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch registrations.' });
+        } finally {
+            setLoadingInterests(false);
+        }
+    }, [call.id, hasMore, lastVisibleDoc, loadingInterests, toast]);
+
+    useEffect(() => {
+        fetchInterests();
+    }, [fetchInterests]);
 
 
     const deleteForm = useForm<z.infer<typeof deleteRegistrationSchema>>({
@@ -573,7 +614,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
                 toast({ title: "Registration Deleted", description: "The user has been notified." });
                 setIsDeleteDialogOpen(false);
                 setInterestToUpdate(null);
-                onActionComplete();
+                fetchInterests(); // Refresh list after delete
             } else {
                 toast({ variant: 'destructive', title: "Error", description: result.error });
             }
@@ -593,6 +634,7 @@ export function EmrManagementClient({ call, interests, allUsers, currentUser, on
          if (result.success) {
             toast({ title: "Status Updated", description: "The applicant has been notified." });
             onActionComplete();
+            fetchInterests(); // Refresh
         } else {
             toast({ variant: 'destructive', title: "Error", description: result.error });
         }
@@ -735,7 +777,7 @@ return (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <CardTitle>
-                    Applicant Registrations ({interests.length})
+                    Applicant Registrations ({interests.length}{hasMore ? '+' : ''})
                 </CardTitle>
                 <CardDescription>
                     Review and manage all applicants for this call.
@@ -800,242 +842,300 @@ return (
             />
         </div>
     </CardHeader>
-            <CardContent className="overflow-x-auto">
-                 {filteredInterests.length > 0 ? (
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>PI</TableHead>
-                                <TableHead>Co-PIs</TableHead>
-                                <TableHead className="hidden sm:table-cell">Status</TableHead>
-                                <TableHead>Docs</TableHead>
-                                <TableHead className="text-right">Actions</TableHead>
+    <CardContent>
+        <div className="rounded-md border overflow-x-auto">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Interest ID</TableHead>
+                        <TableHead>Principal Investigator</TableHead>
+                        <TableHead>Co-PIs</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Presentation</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {filteredInterests.length === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                {loadingInterests ? <Loader2 className="h-8 w-8 animate-spin mx-auto" /> : 'No registrations found.'}
+                            </TableCell>
+                        </TableRow>
+                    ) : (
+                        filteredInterests.map((interest) => (
+                            <TableRow key={interest.id}>
+                                <TableCell className="font-medium">{interest.interestId || 'N/A'}</TableCell>
+                                <TableCell>
+                                    <div className="flex flex-col">
+                                        <span>{interest.userName}</span>
+                                        <span className="text-xs text-muted-foreground">{interest.userEmail}</span>
+                                        <span className="text-xs text-muted-foreground">{userMap.get(interest.userId)?.department || interest.department}</span>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex flex-col gap-1">
+                                        {interest.coPiNames && interest.coPiNames.length > 0 ? (
+                                            interest.coPiNames.map((name, i) => (
+                                                <Badge key={i} variant="outline" className="w-fit text-[10px]">{name}</Badge>
+                                            ))
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">None</span>
+                                        )}
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant={
+                                        interest.status === 'Sanctioned' ? 'default' :
+                                        interest.status === 'Rejected' ? 'destructive' : 'secondary'
+                                    }>
+                                        {interest.status}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    {interest.pptUrl ? (
+                                        <Button variant="ghost" size="sm" asChild>
+                                            <a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">
+                                                <ViewIcon className="h-4 w-4 mr-2" />
+                                                View
+                                            </a>
+                                        </Button>
+                                    ) : (
+                                        <span className="text-xs text-destructive italic">Not Uploaded</span>
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuLabel>Manage Registration</DropdownMenuLabel>
+                                            <DropdownMenuItem onClick={() => handleOpenBulkEditDialog(interest)}>
+                                                <Edit className="mr-2 h-4 w-4" />
+                                                Edit Details
+                                            </DropdownMenuItem>
+                                            
+                                            <DropdownMenuSeparator />
+                                            
+                                            <DropdownMenuSub>
+                                                <DropdownMenuSubTrigger>
+                                                    <MessageSquare className="mr-2 h-4 w-4" />
+                                                    Update Status
+                                                </DropdownMenuSubTrigger>
+                                                <DropdownMenuSubContent>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Interest Registered')}>
+                                                        Interest Registered
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Evaluated')}>
+                                                        Evaluated
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Endorsement Pending')}>
+                                                        Endorsement Pending
+                                                    </DropdownMenuItem>
+                                                     <DropdownMenuItem onClick={() => handleOpenSignDialog(interest)}>
+                                                        Sign Endorsement
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Proposal Submitted')}>
+                                                        Proposal Submitted
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Sanctioned')}>
+                                                        Sanctioned
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Rejected')}>
+                                                        Rejected
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuSubContent>
+                                            </DropdownMenuSub>
+
+                                            <DropdownMenuSeparator />
+
+                                            <DropdownMenuItem onClick={() => handleOpenPptUpload(interest)}>
+                                                <Upload className="mr-2 h-4 w-4" />
+                                                Upload/Replace PPT
+                                            </DropdownMenuItem>
+
+                                            <DropdownMenuItem onClick={() => handleOpenProposalUpload(interest)}>
+                                                <FileUp className="mr-2 h-4 w-4" />
+                                                Upload Proposal
+                                            </DropdownMenuItem>
+
+                                            <DropdownMenuSeparator />
+
+                                            <DropdownMenuItem
+                                                className="text-destructive focus:text-destructive"
+                                                onClick={() => handleOpenDeleteDialog(interest)}
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Delete Registration
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {filteredInterests.map(interest => {
-                                const interestedUser = userMap.get(interest.userId);
-                                const isMeetingScheduled = !!interest.meetingSlot;
-                                const isPostDecision = ['Recommended', 'Not Recommended', 'Revision Needed', 'Endorsement Submitted', 'Endorsement Signed', 'Submitted to Agency'].includes(interest.status);
-                                
-                                return (
-                                    <TableRow key={interest.id}>
-                                        <TableCell className="font-medium whitespace-nowrap">
-                                            {interestedUser?.misId ? (
-                                                <Link href={`/profile/${interestedUser.misId}`} target="_blank" className="text-primary hover:underline">
-                                                    {interest.userName}
-                                                </Link>
-                                            ) : (
-                                                interest.userName
-                                            )}
-                                            <div className="text-xs text-muted-foreground">{interestedUser?.department}, {interestedUser?.institute}</div>
-                                            <div className="text-xs text-muted-foreground">{interest.interestId}</div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex flex-col text-xs text-muted-foreground">
-                                                {(interest.coPiDetails || []).map(coPi => {
-                                                    const coPiUser = allUsers.find(u => u.uid === coPi.uid);
-                                                    return (
-                                                        <div key={coPi.email} className="mb-1">
-                                                            {coPiUser?.misId ? (
-                                                                <Link href={`/profile/${coPiUser.misId}`} target="_blank" className="text-primary hover:underline">
-                                                                    {coPi.name}
-                                                                </Link>
-                                                            ) : (
-                                                                coPi.name
-                                                            )}
-                                                            <div className="text-xs text-muted-foreground/80">{coPiUser?.department}, {coPiUser?.institute}</div>
-                                                        </div>
-                                                    );
-                                                })}
-                                                {interest.coPiDetails?.length === 0 && 'None'}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="hidden sm:table-cell">
-                                            <Badge variant={interest.status === 'Recommended' ? 'default' : 'secondary'}>{interest.status}</Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2">
-                                                {interest.pptUrl && <Button asChild size="icon" variant="ghost"><a href={interest.pptUrl} target="_blank" rel="noopener noreferrer" title="View Presentation"><ViewIcon className="h-4 w-4" /></a></Button>}
-                                                {interest.revisedPptUrl && <Button asChild size="icon" variant="ghost"><a href={interest.revisedPptUrl} target="_blank" rel="noopener noreferrer" title="View Revised Presentation"><FileUp className="h-4 w-4" /></a></Button>}
-                                                {interest.endorsementFormUrl && <Button asChild size="icon" variant="ghost"><a href={interest.endorsementFormUrl} target="_blank" rel="noopener noreferrer" title="View Endorsement Form"><FileUp className="h-4 w-4" /></a></Button>}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Actions</span></Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onSelect={() => handleOpenPptUpload(interest)}>
-                                                        <Upload className="mr-2 h-4 w-4" /> 
-                                                        {interest.pptUrl ? 'Upload Revised PPT' : 'Upload PPT'}
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onSelect={() => handleOpenProposalUpload(interest)}>
-                                                        <Upload className="mr-2 h-4 w-4" />
-                                                        {interest.proposalUrl ? 'Manage Proposal' : 'Upload Proposal'}
-                                                    </DropdownMenuItem>
-                                                    {interest.isBulkUploaded && (
-                                                        <DropdownMenuItem onSelect={() => handleOpenBulkEditDialog(interest)}>
-                                                            <Edit className="mr-2 h-4 w-4" /> Edit Bulk Data
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    {isMeetingScheduled && (
-                                                        <>
-                                                            {interest.status === 'Endorsement Submitted' && (
-                                                                <DropdownMenuItem onSelect={() => handleOpenSignDialog(interest)}>Mark as Endorsement Signed</DropdownMenuItem>
-                                                            )}
-                                                            
-                                                            {!isPostDecision && (
-                                                                <>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Recommended')}>Recommended</DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Revision Needed')}>Revision is Needed</DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => handleStatusUpdate(interest.id, 'Not Recommended')}>Not Recommended</DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                            <DropdownMenuSeparator />
-                                                        </>
-                                                    )}
-                                                    <DropdownMenuItem className="text-destructive" onSelect={() => handleOpenDeleteDialog(interest)}>
-                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete Registration
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })}
-                        </TableBody>
-                    </Table>
-                ) : (
-                    <div className="text-center p-8 text-muted-foreground">
-                        <p>No registered applicants match your search criteria.</p>
-                    </div>
-                )}
-            </CardContent>
+                        ))
+                    )}
+                </TableBody>
+            </Table>
+        </div>
+        {hasMore && (
+            <div className="flex justify-center py-4">
+                <Button variant="outline" size="sm" onClick={() => fetchInterests(true)} disabled={loadingInterests}>
+                    {loadingInterests ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <ChevronRight className="h-4 w-4 mr-2 rotate-90"/>}
+                    Load More
+                </Button>
+            </div>
+        )}
+    </CardContent>
 
-             <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Registration for {interestToUpdate?.userName}?</AlertDialogTitle>
-                        <AlertDialogDescription>Please provide a reason for this deletion. The user will be notified.</AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <Form {...deleteForm}>
-                        <form id="delete-interest-form" onSubmit={deleteForm.handleSubmit(handleDeleteInterest)}>
-                            <FormField
-                                control={deleteForm.control}
-                                name="remarks"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl><Textarea {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </form>
-                    </Form>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction type="submit" form="delete-interest-form" disabled={isDeleting}>
-                            {isDeleting ? "Deleting..." : "Confirm & Delete"}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-            <Dialog open={isRemarksDialogOpen} onOpenChange={setIsRemarksDialogOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Provide Remarks for {statusToUpdate}</DialogTitle>
-                        <DialogDescription>These comments will be sent to the applicant.</DialogDescription>
-                    </DialogHeader>
-                     <Form {...remarksForm}>
-                        <form id="remarks-form" onSubmit={remarksForm.handleSubmit(handleRemarksSubmit)} className="py-4">
-                            <FormField
-                                control={remarksForm.control}
-                                name="remarks"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormControl><Textarea rows={4} {...field} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </form>
-                    </Form>
-                    <DialogFooter>
-                        <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                        <Button type="submit" form="remarks-form">Submit Remarks</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-            <ScheduleMeetingDialog
-                isOpen={isScheduleDialogOpen}
-                onOpenChange={setIsScheduleDialogOpen}
-                onActionComplete={onActionComplete}
-                call={call}
-                interests={interests}
-                allUsers={allUsers}
-                currentUser={currentUser}
-             />
-             <AttendanceDialog
-                isOpen={isAttendanceDialogOpen}
-                onOpenChange={setIsAttendanceDialogOpen}
-                onUpdate={onActionComplete}
-                call={call}
-                interests={interests}
-                allUsers={allUsers}
-             />
-             {interestToUpdate && (
-                 <>
-                    <EditBulkEmrDialog 
-                        interest={interestToUpdate} 
-                        isOpen={isBulkEditDialogOpen} 
-                        onOpenChange={setIsBulkEditDialogOpen}
-                        onUpdate={onActionComplete}
-                    />
-                    <SignEndorsementDialog
-                        interest={interestToUpdate}
-                        isOpen={isSignEndorsementDialogOpen}
-                        onOpenChange={setIsSignEndorsementDialogOpen}
-                        onUpdate={onActionComplete}
-                    />
-                 </>
-             )}
-             {interestForPptUpload && (
-                <UploadPptDialog
-                    isOpen={!!interestForPptUpload}
-                    onOpenChange={() => setInterestForPptUpload(null)}
-                    interest={interestForPptUpload}
-                    call={call}
-                    user={userMap.get(interestForPptUpload.userId)!}
-                    adminUser={currentUser}
-                    onUploadSuccess={onActionComplete}
-                    isRevision={!!interestForPptUpload.revisedPptUrl}
-                />
-            )}
-            {interestForProposalUpload && (
-                <UploadProposalDialog
-                    isOpen={!!interestForProposalUpload}
-                    onOpenChange={() => setInterestForProposalUpload(null)}
-                    interest={interestForProposalUpload}
-                    call={call}
-                    user={userMap.get(interestForProposalUpload.userId)!}
-                    adminUser={currentUser}
-                    onUploadSuccess={onActionComplete}
-                />
-            )}
-        </Card>
-   
-<RegisterUserDialog 
-    call={call}
-    adminUser={currentUser}
-    isOpen={isRegisterUserDialogOpen}
-    onOpenChange={setIsRegisterUserDialogOpen}
-    onRegisterSuccess={onActionComplete}
-/>
+    <ScheduleMeetingDialog
+        isOpen={isScheduleDialogOpen}
+        onOpenChange={setIsScheduleDialogOpen}
+        call={call}
+        interests={interests}
+        allUsers={allUsers}
+        onUpdate={() => {
+            onActionComplete();
+            fetchInterests();
+        }}
+    />
 
+    <RegisterUserDialog
+        call={call}
+        adminUser={currentUser}
+        isOpen={isRegisterUserDialogOpen}
+        onOpenChange={setIsRegisterUserDialogOpen}
+        onRegisterSuccess={() => {
+            onActionComplete();
+            fetchInterests();
+        }}
+    />
+
+    <SignEndorsementDialog
+        interest={interestToUpdate!}
+        isOpen={isSignEndorsementDialogOpen}
+        onOpenChange={setIsSignEndorsementDialogOpen}
+        onUpdate={() => {
+            onActionComplete();
+            fetchInterests();
+        }}
+    />
+
+    <EditBulkEmrDialog
+        interest={interestToUpdate!}
+        isOpen={isBulkEditDialogOpen}
+        onOpenChange={setIsBulkEditDialogOpen}
+        onUpdate={() => fetchInterests()}
+    />
+
+    <UploadPptDialog
+        interest={interestForPptUpload}
+        onOpenChange={() => setInterestForPptUpload(null)}
+        onUpdate={() => fetchInterests()}
+    />
+
+    <UploadProposalDialog
+        interest={interestForProposalUpload}
+        onOpenChange={() => setInterestForProposalUpload(null)}
+        onUpdate={() => fetchInterests()}
+    />
+
+    <AttendanceDialog
+        call={call}
+        interests={interests}
+        allUsers={allUsers}
+        isOpen={isAttendanceDialogOpen}
+        onOpenChange={setIsAttendanceDialogOpen}
+        onUpdate={() => {
+            onActionComplete();
+            fetchInterests();
+        }}
+    />
+
+    {/* Admin Remarks Dialog */}
+    <Dialog open={isRemarksDialogOpen} onOpenChange={setIsRemarksDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Add Admin Remarks</DialogTitle>
+                <DialogDescription>
+                    Provide any notes or remarks for the applicant regarding this status change.
+                </DialogDescription>
+            </DialogHeader>
+            <Form {...remarksForm}>
+                <form id="remarks-form" onSubmit={remarksForm.handleSubmit(handleRemarksSubmit)} className="space-y-4 py-4">
+                    <FormField
+                        control={remarksForm.control}
+                        name="remarks"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Remarks</FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder="Enter your remarks here..."
+                                        className="min-h-[100px]"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </form>
+            </Form>
+            <DialogFooter>
+                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                <Button type="submit" form="remarks-form">Update Status</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
+
+    {/* Delete Registration Dialog */}
+    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will permanently delete the registration for <strong>{interestToUpdate?.userName}</strong>.
+                    This action cannot be undone and the user will be notified.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Form {...deleteForm}>
+                <form id="delete-form" onSubmit={deleteForm.handleSubmit(handleDeleteInterest)} className="py-2">
+                    <FormField
+                        control={deleteForm.control}
+                        name="remarks"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Reason for Deletion</FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder="Provide a reason for the user..."
+                                        className="min-h-[80px]"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </form>
+            </Form>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={deleteForm.handleSubmit(handleDeleteInterest)}
+                    className="bg-destructive hover:bg-destructive/90"
+                    disabled={isDeleting}
+                >
+                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Confirm Delete
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+</Card>
 </>
-)};
+);
+}

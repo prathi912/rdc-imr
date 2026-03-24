@@ -150,6 +150,7 @@ export type Project = {
     | "Under Review"
     | "Revision Needed"
     | "Revision Submitted"
+    | "Recommended"
     | "Sanctioned"
     | "Not Recommended"
     | "In Progress"
@@ -366,7 +367,7 @@ export type IncentiveClaim = {
   bookTotalPages?: number
   bookTotalChapters?: number
   chaptersInSameBook?: number
-  publicationYear?: number
+  bookPublicationYear?: number
   authorRole?: "Author" | "Editor"
   totalPuStudents?: number
   publisherName?: string
@@ -513,6 +514,7 @@ export type EmrInterest = {
   proofUrl?: string
   sanctionDate?: string // ISO String
   wasAbsent?: boolean
+  campus?: string
 }
 
 export type EmrEvaluation = {

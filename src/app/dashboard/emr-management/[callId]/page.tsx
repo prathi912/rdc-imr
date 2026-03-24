@@ -19,7 +19,6 @@ export default function EmrManagementPage() {
     const { toast } = useToast();
 
     const [call, setCall] = useState<FundingCall | null>(null);
-    const [interests, setInterests] = useState<EmrInterest[]>([]);
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
@@ -51,12 +50,10 @@ export default function EmrManagementPage() {
         try {
             // Fetch all necessary data in parallel
             const callDocRef = doc(db, 'fundingCalls', callId);
-            const interestsQuery = query(collection(db, 'emrInterests'), where('callId', '==', callId));
             const usersQuery = query(collection(db, 'users'));
 
-            const [callDoc, interestsSnapshot, usersSnapshot] = await Promise.all([
+            const [callDoc, usersSnapshot] = await Promise.all([
                 getDoc(callDocRef),
-                getDocs(interestsQuery),
                 getDocs(usersQuery),
             ]);
 
@@ -67,7 +64,6 @@ export default function EmrManagementPage() {
             }
 
             setCall({ id: callDoc.id, ...callDoc.data() } as FundingCall);
-            setInterests(interestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EmrInterest)));
             setAllUsers(usersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as User)));
 
         } catch (error) {
@@ -109,7 +105,6 @@ export default function EmrManagementPage() {
             <div className="mt-8">
                 <EmrManagementClient
                     call={call}
-                    interests={interests}
                     allUsers={allUsers}
                     currentUser={currentUser}
                     onActionComplete={fetchData}

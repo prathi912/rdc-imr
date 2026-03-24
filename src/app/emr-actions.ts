@@ -120,7 +120,7 @@ export async function uploadFileToServer(
 
     // Make the file public
     await file.makePublic();
-    
+
     // Get the public URL
     const publicUrl = file.publicUrl();
 
@@ -207,7 +207,7 @@ export async function registerEmrInterest(
         pptUrl: uploadResult.url,
         pptSubmissionDate: new Date().toISOString(),
       }
-      
+
       if (registeredByAdmin) {
         newInterestDoc.adminRemarks = `Registered on behalf of the user by ${registeredByAdmin.adminName}.`;
       }
@@ -238,13 +238,13 @@ export async function registerEmrInterest(
             isRead: false,
           })
         })
-      await batch.commit()
+        await batch.commit()
+      }
     }
-  }
 
-  // Email Super-admin on FIRST EMR interest
-  if (isFirstInterest && callTitle) {
-    const firstInterestEmail = `<div ${EMAIL_STYLES.background}>
+    // Email Super-admin on FIRST EMR interest
+    if (isFirstInterest && callTitle) {
+      const firstInterestEmail = `<div ${EMAIL_STYLES.background}>
         ${EMAIL_STYLES.logo}
         <h2 style="color:#ffffff;">First EMR Interest Registered!</h2>
         <p style="color:#e0e0e0;"><strong>Call:</strong> "${callTitle}"</p>
@@ -252,17 +252,17 @@ export async function registerEmrInterest(
         <p style="color:#cccccc;">Time to schedule evaluation meeting. <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/emr-calendar" style="color:#64b5f6;">EMR Calendar</a></p>
         ${EMAIL_STYLES.footer}
       </div>`;
-    await sendEmailUtility({
-      to: 'vishal.sandhwar8850@paruluniversity.ac.in',
-      subject: `FIRST EMR Interest: ${callTitle}`,
-      html: firstInterestEmail,
-      from: 'default'
-    });
-    await logActivity("INFO", "First EMR interest email sent to super-admin", { callId, userId: user.uid });
-  }
-  
-  // Notify the user who was registered, especially if done by an admin.
-  if (user.email) {
+      await sendEmailUtility({
+        to: 'vishal.sandhwar8850@paruluniversity.ac.in',
+        subject: `FIRST EMR Interest: ${callTitle}`,
+        html: firstInterestEmail,
+        from: 'default'
+      });
+      await logActivity("INFO", "First EMR interest email sent to super-admin", { callId, userId: user.uid });
+    }
+
+    // Notify the user who was registered, especially if done by an admin.
+    if (user.email) {
       let emailHtml: string;
       if (registeredByAdmin) {
         emailHtml = `<div ${EMAIL_STYLES.background}>
@@ -279,7 +279,7 @@ export async function registerEmrInterest(
     <p style="color:#e0e0e0;">
         Your interest for the EMR funding call 
         "<strong style="color:#ffffff;">${callTitle}</strong>" has been successfully registered. 
-        You are requested to upload your presentation (PPT) & Project Proposal (zip, pdf) on the portal so that your proposal can be considered for the presentation round.
+        You are requested to upload your Project Proposal (zip, pdf) on the portal so that your proposal can be considered for the presentation round.
     </p>
     ${EMAIL_STYLES.footer}
 </div>`;
@@ -374,7 +374,7 @@ export async function scheduleEmrMeeting(
     const subjectOnlineIndicator = mode === 'Online' ? ' (Online)' : '';
 
     const meetingDate = toDate(meetingDateTimeString, { timeZone });
-    
+
     // Format for ICS
     const startTimeUTC = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
     const endTimeUTC = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
@@ -437,25 +437,25 @@ export async function scheduleEmrMeeting(
               ${EMAIL_STYLES.footer}
           </div>
       `
-      
+
       const icalContent = [
-          'BEGIN:VCALENDAR',
-          'VERSION:2.0',
-          'PRODID:-//ParulUniversity//RDC-Portal//EN',
-          'METHOD:REQUEST',
-          'BEGIN:VEVENT',
-          `UID:${interest.id}@paruluniversity.ac.in`,
-          `DTSTAMP:${dtstamp}`,
-          `DTSTART:${startTimeUTC}`,
-          `DTEND:${endTimeUTC}`,
-          `SUMMARY:EMR Presentation: ${call.title}`,
-          `DESCRIPTION:Your presentation for the EMR funding call titled '${call.title}' has been scheduled.`,
-          `LOCATION:${venue}`,
-          `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER}`,
-          `ATTENDEE;CN=${interest.userName};RSVP=TRUE:mailto:${interest.userEmail}`,
-          'END:VEVENT',
-          'END:VCALENDAR'
-        ].join('\r\n');
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//ParulUniversity//RDC-Portal//EN',
+        'METHOD:REQUEST',
+        'BEGIN:VEVENT',
+        `UID:${interest.id}@paruluniversity.ac.in`,
+        `DTSTAMP:${dtstamp}`,
+        `DTSTART:${startTimeUTC}`,
+        `DTEND:${endTimeUTC}`,
+        `SUMMARY:EMR Presentation: ${call.title}`,
+        `DESCRIPTION:Your presentation for the EMR funding call titled '${call.title}' has been scheduled.`,
+        `LOCATION:${venue}`,
+        `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER}`,
+        `ATTENDEE;CN=${interest.userName};RSVP=TRUE:mailto:${interest.userEmail}`,
+        'END:VEVENT',
+        'END:VCALENDAR'
+      ].join('\r\n');
 
       if (interest.userEmail) {
         emailPromises.push(
@@ -491,9 +491,9 @@ export async function scheduleEmrMeeting(
           return null;
         })
       );
-  
+
       const validApplicantUsers = applicantUsers.filter(user => user !== null) as { name: string; institute: string }[];
-  
+
       const piListHtml = validApplicantUsers.map(pi => `<li>${pi.name} (${pi.institute})</li>`).join('');
 
       for (const evaluatorDoc of evaluatorDocs) {
@@ -507,7 +507,7 @@ export async function scheduleEmrMeeting(
             createdAt: new Date().toISOString(),
             isRead: false,
           })
-          
+
           if (evaluator.email) {
             const emailHtml = `
               <div ${EMAIL_STYLES.background}>
@@ -595,7 +595,7 @@ export async function uploadEmrPpt(
       return { success: false, error: "Interest registration not found." };
     }
     const interest = interestSnap.data() as EmrInterest;
-    
+
     const fileExtension = path.extname(originalFileName);
     const standardizedName = `emr_${user.name.replace(/\s+/g, "_")}${fileExtension}`;
     const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`;
@@ -612,10 +612,10 @@ export async function uploadEmrPpt(
     });
 
     if (adminName && interest.userEmail) {
-        const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
-        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
-        
-        const emailHtml = `
+      const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
+      const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
+
+      const emailHtml = `
             <div ${EMAIL_STYLES.background}>
                 ${EMAIL_STYLES.logo}
                 <p style="color:#ffffff;">Dear ${interest.userName},</p>
@@ -624,17 +624,17 @@ export async function uploadEmrPpt(
                 ${EMAIL_STYLES.footer}
             </div>
         `;
-        
-        await sendEmailUtility({
-            to: interest.userEmail,
-            subject: `Presentation Uploaded for EMR Call: ${callTitle}`,
-            html: emailHtml,
-            from: 'default',
-            attachments: [{
-                filename: originalFileName,
-                path: result.url,
-            }]
-        });
+
+      await sendEmailUtility({
+        to: interest.userEmail,
+        subject: `Presentation Uploaded for EMR Call: ${callTitle}`,
+        html: emailHtml,
+        from: 'default',
+        attachments: [{
+          filename: originalFileName,
+          path: result.url,
+        }]
+      });
     }
 
     await logActivity("INFO", "EMR presentation uploaded", { interestId, userId: interest.userId, byAdmin: adminName });
@@ -697,10 +697,10 @@ export async function uploadEmrProposal(
     });
 
     if (adminName && interest.userEmail) {
-        const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
-        const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
+      const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
+      const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
 
-        const emailHtml = `
+      const emailHtml = `
             <div ${EMAIL_STYLES.background}>
                 ${EMAIL_STYLES.logo}
                 <p style="color:#ffffff;">Dear ${interest.userName},</p>
@@ -710,16 +710,16 @@ export async function uploadEmrProposal(
             </div>
         `;
 
-        await sendEmailUtility({
-            to: interest.userEmail,
-            subject: `Proposal Uploaded for EMR Call: ${callTitle}`,
-            html: emailHtml,
-            from: 'default',
-            attachments: [{
-                filename: originalFileName,
-                path: result.url,
-            }]
-        });
+      await sendEmailUtility({
+        to: interest.userEmail,
+        subject: `Proposal Uploaded for EMR Call: ${callTitle}`,
+        html: emailHtml,
+        from: 'default',
+        attachments: [{
+          filename: originalFileName,
+          path: result.url,
+        }]
+      });
     }
 
     await logActivity("INFO", "EMR proposal uploaded", { interestId, userId: interest.userId, byAdmin: adminName });
@@ -967,7 +967,7 @@ export async function addEmrEvaluation(
 
     const interestRef = adminDb.collection("emrInterests").doc(interestId);
     await interestRef.update({
-        evaluatedBy: FieldValue.arrayUnion(evaluator.uid)
+      evaluatedBy: FieldValue.arrayUnion(evaluator.uid)
     });
 
     await logActivity("INFO", "EMR evaluation added", { interestId, evaluatorUid: evaluator.uid })
@@ -1380,9 +1380,9 @@ export async function updateEmrStatus(
           if (callSnap.exists) {
             const call = callSnap.data() as FundingCall
             if (call.meetingDetails?.date) {
-                const meetingDateTime = new Date(call.meetingDetails.date.replace(/-/g, '/')); // Safer date parsing
-                const deadline = setSeconds(setMinutes(setHours(addDays(meetingDateTime, 3), 17), 0), 0); // 3 days after meeting at 5:00 PM
-                emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Please submit your revised presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(deadline, "Asia/Kolkata", "PPpp (z)")}</strong>.</p>`
+              const meetingDateTime = new Date(call.meetingDetails.date.replace(/-/g, '/')); // Safer date parsing
+              const deadline = setSeconds(setMinutes(setHours(addDays(meetingDateTime, 3), 17), 0), 0); // 3 days after meeting at 5:00 PM
+              emailHtml += `<p style="color:#e0e0e0; margin-top:15px;">Please submit your revised presentation on the portal by <strong style="color:#ffffff;">${formatInTimeZone(deadline, "Asia/Kolkata", "PPpp (z)")}</strong>.</p>`
             }
           }
         }
@@ -1428,7 +1428,7 @@ export async function uploadRevisedEmrPpt(
       return { success: false, error: "Interest registration not found." };
     }
     const interest = interestSnap.data() as EmrInterest;
-    
+
     const fileExtension = path.extname(originalFileName);
     const standardizedName = `${user.name.replace(/\s+/g, "_")}_revised_${new Date().getTime()}${fileExtension}`;
     const filePath = `emr-presentations/${interest.callId}/${interest.userId}/${standardizedName}`;
@@ -1446,7 +1446,7 @@ export async function uploadRevisedEmrPpt(
     if (adminName && interest.userEmail) {
       const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
       const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
-      
+
       const emailHtml = `
           <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
@@ -1456,16 +1456,16 @@ export async function uploadRevisedEmrPpt(
               ${EMAIL_STYLES.footer}
           </div>
       `;
-      
+
       await sendEmailUtility({
-          to: interest.userEmail,
-          subject: `Revised Presentation Uploaded for EMR Call: ${callTitle}`,
-          html: emailHtml,
-          from: 'default',
-          attachments: [{
-              filename: originalFileName,
-              path: result.url,
-          }]
+        to: interest.userEmail,
+        subject: `Revised Presentation Uploaded for EMR Call: ${callTitle}`,
+        html: emailHtml,
+        from: 'default',
+        attachments: [{
+          filename: originalFileName,
+          path: result.url,
+        }]
       });
     }
 
@@ -1757,60 +1757,60 @@ export async function updateEmrInterestCoPis(
 }
 
 export async function updateEmrInterestDetails(
-    interestId: string,
-    updates: Partial<EmrInterest>
+  interestId: string,
+  updates: Partial<EmrInterest>
 ): Promise<{ success: boolean; error?: string }> {
-    try {
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        await interestRef.update(updates);
-        await logActivity('INFO', 'EMR interest details updated', { interestId, updates });
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error updating EMR interest details:", error);
-        await logActivity('ERROR', 'Failed to update EMR interest details', {
-            interestId,
-            error: error.message,
-            stack: error.stack
-        });
-        return { success: false, error: 'Failed to update details.' };
-    }
+  try {
+    const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    await interestRef.update(updates);
+    await logActivity('INFO', 'EMR interest details updated', { interestId, updates });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating EMR interest details:", error);
+    await logActivity('ERROR', 'Failed to update EMR interest details', {
+      interestId,
+      error: error.message,
+      stack: error.stack
+    });
+    return { success: false, error: 'Failed to update details.' };
+  }
 }
 
 export async function signAndUploadEndorsement(interestId: string, signedEndorsementDataUrl: string, fileName: string): Promise<{ success: boolean; error?: string }> {
-    try {
-        if (!interestId || !signedEndorsementDataUrl) {
-            return { success: false, error: "Interest ID and signed endorsement form URL are required." };
-        }
-        
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const interestSnap = await interestRef.get();
-        if (!interestSnap.exists) {
-            return { success: false, error: "Interest registration not found." };
-        }
-        const interest = interestSnap.data() as EmrInterest;
-        
-        const path = `emr-endorsements/${interest.callId}/${interest.userId}/signed_${fileName}`;
-        const uploadResult = await uploadFileToServer(signedEndorsementDataUrl, path);
+  try {
+    if (!interestId || !signedEndorsementDataUrl) {
+      return { success: false, error: "Interest ID and signed endorsement form URL are required." };
+    }
 
-        if (!uploadResult.success || !uploadResult.url) {
-            throw new Error(uploadResult.error || "Failed to upload signed endorsement form.");
-        }
-        
-        await interestRef.update({
-            signedEndorsementUrl: uploadResult.url,
-            status: 'Endorsement Signed',
-            endorsementSignedAt: new Date().toISOString()
-        });
-        
-        await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
-        
-        if (interest.userEmail) {
-            // Fetch the call title to ensure it's in the email
-            const callRef = adminDb.collection("fundingCalls").doc(interest.callId);
-            const callSnap = await callRef.get();
-            const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : interest.callTitle || 'N/A';
+    const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    const interestSnap = await interestRef.get();
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." };
+    }
+    const interest = interestSnap.data() as EmrInterest;
 
-            const emailHtml = `
+    const path = `emr-endorsements/${interest.callId}/${interest.userId}/signed_${fileName}`;
+    const uploadResult = await uploadFileToServer(signedEndorsementDataUrl, path);
+
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(uploadResult.error || "Failed to upload signed endorsement form.");
+    }
+
+    await interestRef.update({
+      signedEndorsementUrl: uploadResult.url,
+      status: 'Endorsement Signed',
+      endorsementSignedAt: new Date().toISOString()
+    });
+
+    await logActivity('INFO', 'EMR endorsement form signed and uploaded', { interestId, userId: interest.userId });
+
+    if (interest.userEmail) {
+      // Fetch the call title to ensure it's in the email
+      const callRef = adminDb.collection("fundingCalls").doc(interest.callId);
+      const callSnap = await callRef.get();
+      const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : interest.callTitle || 'N/A';
+
+      const emailHtml = `
                 <div ${EMAIL_STYLES.background}>
                     ${EMAIL_STYLES.logo}
                     <p style="color:#ffffff;">Dear ${interest.userName},</p>
@@ -1820,123 +1820,123 @@ export async function signAndUploadEndorsement(interestId: string, signedEndorse
                     ${EMAIL_STYLES.footer}
                 </div>
             `;
-            await sendEmailUtility({
-                to: interest.userEmail,
-                cc: interest.coPiEmails?.join(','),
-                subject: `Your EMR Endorsement Form is Ready`,
-                html: emailHtml,
-                from: 'default',
-                attachments: [{
-                    filename: `Signed_Endorsement_${interest.userName.replace(/\s/g, '_')}.pdf`,
-                    path: uploadResult.url
-                }]
-            });
-        }
-
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error signing endorsement form:", error);
-        await logActivity('ERROR', 'Failed to sign and upload EMR endorsement form', {
-            interestId,
-            error: error.message,
-            stack: error.stack
-        });
-        return { success: false, error: 'Failed to sign and upload endorsement form.' };
+      await sendEmailUtility({
+        to: interest.userEmail,
+        cc: interest.coPiEmails?.join(','),
+        subject: `Your EMR Endorsement Form is Ready`,
+        html: emailHtml,
+        from: 'default',
+        attachments: [{
+          filename: `Signed_Endorsement_${interest.userName.replace(/\s/g, '_')}.pdf`,
+          path: uploadResult.url
+        }]
+      });
     }
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error signing endorsement form:", error);
+    await logActivity('ERROR', 'Failed to sign and upload EMR endorsement form', {
+      interestId,
+      error: error.message,
+      stack: error.stack
+    });
+    return { success: false, error: 'Failed to sign and upload endorsement form.' };
+  }
 }
 
 export async function updateEmrFinalStatus(interestId: string, status: 'Sanctioned' | 'Not Sanctioned', proofDataUrl: string, fileName: string): Promise<{ success: boolean, error?: string }> {
-    try {
-        if (!interestId || !status || !proofDataUrl) {
-            return { success: false, error: "Interest ID, status, and proof are required." };
-        }
-
-        const interestRef = adminDb.collection('emrInterests').doc(interestId);
-        const interestSnap = await interestRef.get();
-        if (!interestSnap.exists) {
-            return { success: false, error: "Interest registration not found." };
-        }
-        const interest = interestSnap.data() as EmrInterest;
-
-        // Upload proof
-        const path = `emr-final-proofs/${interest.callId}/${interest.userId}/${fileName}`;
-        const uploadResult = await uploadFileToServer(proofDataUrl, path);
-        if (!uploadResult.success || !uploadResult.url) {
-            throw new Error(uploadResult.error || "Failed to upload final proof.");
-        }
-
-        // Update interest document
-        await interestRef.update({
-            status,
-            finalProofUrl: uploadResult.url,
-        });
-
-        // Notify Super Admins
-        const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
-        if (!superAdminUsersSnapshot.empty) {
-            const batch = adminDb.batch();
-            const notificationTitle = `EMR final status for ${interest.userName} updated to: ${status}`;
-            superAdminUsersSnapshot.forEach(userDoc => {
-                const notificationRef = adminDb.collection("notifications").doc();
-                batch.set(notificationRef, {
-                    uid: userDoc.id,
-                    title: notificationTitle,
-                    createdAt: new Date().toISOString(),
-                    isRead: false
-                });
-            });
-            await batch.commit();
-        }
-
-        await logActivity('INFO', 'EMR final status updated', { interestId, userId: interest.userId, newStatus: status });
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error updating EMR final status:", error);
-        await logActivity('ERROR', 'Failed to update EMR final status', {
-            interestId,
-            status,
-            error: error.message,
-            stack: error.stack
-        });
-        return { success: false, error: 'Failed to update final status.' };
+  try {
+    if (!interestId || !status || !proofDataUrl) {
+      return { success: false, error: "Interest ID, status, and proof are required." };
     }
+
+    const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    const interestSnap = await interestRef.get();
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." };
+    }
+    const interest = interestSnap.data() as EmrInterest;
+
+    // Upload proof
+    const path = `emr-final-proofs/${interest.callId}/${interest.userId}/${fileName}`;
+    const uploadResult = await uploadFileToServer(proofDataUrl, path);
+    if (!uploadResult.success || !uploadResult.url) {
+      throw new Error(uploadResult.error || "Failed to upload final proof.");
+    }
+
+    // Update interest document
+    await interestRef.update({
+      status,
+      finalProofUrl: uploadResult.url,
+    });
+
+    // Notify Super Admins
+    const superAdminUsersSnapshot = await adminDb.collection("users").where("role", "==", "Super-admin").get();
+    if (!superAdminUsersSnapshot.empty) {
+      const batch = adminDb.batch();
+      const notificationTitle = `EMR final status for ${interest.userName} updated to: ${status}`;
+      superAdminUsersSnapshot.forEach(userDoc => {
+        const notificationRef = adminDb.collection("notifications").doc();
+        batch.set(notificationRef, {
+          uid: userDoc.id,
+          title: notificationTitle,
+          createdAt: new Date().toISOString(),
+          isRead: false
+        });
+      });
+      await batch.commit();
+    }
+
+    await logActivity('INFO', 'EMR final status updated', { interestId, userId: interest.userId, newStatus: status });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error updating EMR final status:", error);
+    await logActivity('ERROR', 'Failed to update EMR final status', {
+      interestId,
+      status,
+      error: error.message,
+      stack: error.stack
+    });
+    return { success: false, error: 'Failed to update final status.' };
+  }
 }
 
 export async function markEmrAttendance(callId: string, absentApplicantIds: string[], absentEvaluatorUids: string[]): Promise<{ success: boolean; error?: string }> {
-    try {
-        const batch = adminDb.batch();
+  try {
+    const batch = adminDb.batch();
 
-        // Handle absent applicants
-        for (const interestId of absentApplicantIds) {
-            const interestRef = adminDb.collection('emrInterests').doc(interestId);
-            batch.update(interestRef, {
-                status: 'Awaiting Rescheduling',
-                wasAbsent: true,
-                adminRemarks: 'Marked as absent from the evaluation meeting.',
-                meetingSlot: FieldValue.delete(), // Remove the meeting slot to allow rescheduling
-            });
-        }
-        
-        // Handle absent evaluators
-        if (absentEvaluatorUids.length > 0) {
-            const callRef = adminDb.collection('fundingCalls').doc(callId);
-            batch.update(callRef, {
-                'meetingDetails.absentEvaluators': FieldValue.arrayUnion(...absentEvaluatorUids)
-            });
-        }
-
-        await batch.commit();
-        await logActivity('INFO', 'EMR meeting attendance marked', { callId, absentApplicantIds, absentEvaluatorUids });
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error marking EMR attendance:", error);
-        await logActivity('ERROR', 'Failed to mark EMR attendance', {
-            callId,
-            error: error.message,
-            stack: error.stack
-        });
-        return { success: false, error: "Failed to update attendance." };
+    // Handle absent applicants
+    for (const interestId of absentApplicantIds) {
+      const interestRef = adminDb.collection('emrInterests').doc(interestId);
+      batch.update(interestRef, {
+        status: 'Awaiting Rescheduling',
+        wasAbsent: true,
+        adminRemarks: 'Marked as absent from the evaluation meeting.',
+        meetingSlot: FieldValue.delete(), // Remove the meeting slot to allow rescheduling
+      });
     }
+
+    // Handle absent evaluators
+    if (absentEvaluatorUids.length > 0) {
+      const callRef = adminDb.collection('fundingCalls').doc(callId);
+      batch.update(callRef, {
+        'meetingDetails.absentEvaluators': FieldValue.arrayUnion(...absentEvaluatorUids)
+      });
+    }
+
+    await batch.commit();
+    await logActivity('INFO', 'EMR meeting attendance marked', { callId, absentApplicantIds, absentEvaluatorUids });
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error marking EMR attendance:", error);
+    await logActivity('ERROR', 'Failed to mark EMR attendance', {
+      callId,
+      error: error.message,
+      stack: error.stack
+    });
+    return { success: false, error: "Failed to update attendance." };
+  }
 }
 
 export async function sendPptReminderEmails(callId: string): Promise<{ success: boolean; sentCount: number; error?: string }> {
@@ -1944,7 +1944,7 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
     const callRef = adminDb.collection("fundingCalls").doc(callId);
     const callSnap = await callRef.get();
     if (!callSnap.exists) {
-        return { success: false, sentCount: 0, error: "Funding call not found." };
+      return { success: false, sentCount: 0, error: "Funding call not found." };
     }
     const call = callSnap.data() as FundingCall;
 
@@ -1974,8 +1974,8 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
         const isValidDate = pptDeadline && !isNaN(parseISO(pptDeadline).getTime());
 
         const deadlineText = isValidDate
-            ? `Your submission deadline is <strong>${formatInTimeZone(parseISO(pptDeadline!), 'Asia/Kolkata', 'PPpp (z)')}</strong>.`
-            : 'Please upload your presentation & Project Proposal at your earliest convenience to be considered for an evaluation slot. In case you do not wish to apply for call, please withdraw your interest from the portal.';
+          ? `Your submission deadline is <strong>${formatInTimeZone(parseISO(pptDeadline!), 'Asia/Kolkata', 'PPpp (z)')}</strong>.`
+          : 'Please upload your presentation & Project Proposal at your earliest convenience to be considered for an evaluation slot. In case you do not wish to apply for call, please withdraw your interest from the portal.';
 
         const emailHtml = `
             <div ${EMAIL_STYLES.background}>
@@ -2008,47 +2008,47 @@ export async function sendPptReminderEmails(callId: string): Promise<{ success: 
     return { success: false, sentCount: 0, error: error.message || 'An unknown error occurred.' };
   }
 }
-    
+
 export async function addSanctionedEmrProject(data: {
-    pi: { uid: string, name: string, email: string };
-    coPis: CoPiDetails[];
-    title: string;
-    agency: string;
-    sanctionDate?: Date;
-    durationAmount: string;
+  pi: { uid: string, name: string, email: string };
+  coPis: CoPiDetails[];
+  title: string;
+  agency: string;
+  sanctionDate?: Date;
+  durationAmount: string;
 }): Promise<{ success: boolean; error?: string }> {
-    try {
-        const piUserSnap = await adminDb.collection('users').doc(data.pi.uid).get();
-        if (!piUserSnap.exists) {
-            return { success: false, error: "Principal Investigator not found." };
-        }
-        const piUser = piUserSnap.data() as User;
+  try {
+    const piUserSnap = await adminDb.collection('users').doc(data.pi.uid).get();
+    if (!piUserSnap.exists) {
+      return { success: false, error: "Principal Investigator not found." };
+    }
+    const piUser = piUserSnap.data() as User;
 
-        const newInterestDoc: Omit<EmrInterest, "id"> = {
-            callId: "ADMIN_ADDED",
-            callTitle: data.title,
-            agency: data.agency,
-            userId: data.pi.uid,
-            userName: data.pi.name,
-            userEmail: data.pi.email,
-            faculty: piUser.faculty || 'N/A',
-            department: piUser.department || 'N/A',
-            registeredAt: new Date().toISOString(),
-            status: "Sanctioned",
-            durationAmount: data.durationAmount,
-            sanctionDate: data.sanctionDate?.toISOString(),
-            coPiDetails: data.coPis,
-            coPiUids: data.coPis.map(p => p.uid).filter((uid): uid is string => !!uid),
-            coPiNames: data.coPis.map(p => p.name),
-            coPiEmails: data.coPis.map(p => p.email),
-            isBulkUploaded: true, 
-            isOpenToPi: true, 
-        };
+    const newInterestDoc: Omit<EmrInterest, "id"> = {
+      callId: "ADMIN_ADDED",
+      callTitle: data.title,
+      agency: data.agency,
+      userId: data.pi.uid,
+      userName: data.pi.name,
+      userEmail: data.pi.email,
+      faculty: piUser.faculty || 'N/A',
+      department: piUser.department || 'N/A',
+      registeredAt: new Date().toISOString(),
+      status: "Sanctioned",
+      durationAmount: data.durationAmount,
+      sanctionDate: data.sanctionDate?.toISOString(),
+      coPiDetails: data.coPis,
+      coPiUids: data.coPis.map(p => p.uid).filter((uid): uid is string => !!uid),
+      coPiNames: data.coPis.map(p => p.name),
+      coPiEmails: data.coPis.map(p => p.email),
+      isBulkUploaded: true,
+      isOpenToPi: true,
+    };
 
-        const docRef = await adminDb.collection("emrInterests").add(newInterestDoc);
-        
-        // Notify PI
-        const emailHtml = `
+    const docRef = await adminDb.collection("emrInterests").add(newInterestDoc);
+
+    // Notify PI
+    const emailHtml = `
             <div ${EMAIL_STYLES.background}>
                 ${EMAIL_STYLES.logo}
                 <p style="color:#ffffff;">Dear ${data.pi.name},</p>
@@ -2063,19 +2063,19 @@ export async function addSanctionedEmrProject(data: {
             </div>
         `;
 
-        await sendEmailUtility({
-            to: data.pi.email,
-            subject: `Your EMR Project "${data.title}" has been Added to the R&D Portal`,
-            html: emailHtml,
-            from: 'default',
-        });
-        
-        await logActivity('INFO', 'Admin manually added sanctioned EMR project', { projectId: docRef.id, title: data.title });
+    await sendEmailUtility({
+      to: data.pi.email,
+      subject: `Your EMR Project "${data.title}" has been Added to the R&D Portal`,
+      html: emailHtml,
+      from: 'default',
+    });
 
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error adding sanctioned EMR project:", error);
-        await logActivity('ERROR', 'Failed to add sanctioned EMR project', { error: error.message });
-        return { success: false, error: 'Failed to add the project.' };
-    }
+    await logActivity('INFO', 'Admin manually added sanctioned EMR project', { projectId: docRef.id, title: data.title });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error adding sanctioned EMR project:", error);
+    await logActivity('ERROR', 'Failed to add sanctioned EMR project', { error: error.message });
+    return { success: false, error: 'Failed to add the project.' };
+  }
 }
