@@ -266,6 +266,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         badge: pendingBankClaimsCount,
       },
       {
+        id: "system-analytics",
+        href: "/dashboard/system-analytics",
+        tooltip: "System Analytics",
+        icon: ShieldCheck,
+        label: "System Analytics",
+        condition: user?.role === "Super-admin",
+      },
+      {
         id: "bulk-upload",
         href: "/dashboard/bulk-upload",
         tooltip: "Bulk Upload Projects",
