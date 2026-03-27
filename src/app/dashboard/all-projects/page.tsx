@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import * as XLSX from 'xlsx';
-import { format, isAfter, isBefore, startOfToday, parseISO } from 'date-fns';
+import { format, isAfter, isBefore, startOfToday, parseISO, differenceInMonths, addDays } from 'date-fns';
 import type { DateRange } from 'react-day-picker';
 import { PageHeader } from '@/components/page-header';
 import { ProjectList } from '@/components/projects/project-list';
@@ -708,6 +708,20 @@ export default function AllProjectsPage() {
       // Remarks - show current project status
       const remarks = p.status || 'NA';
       
+      // Calculate project duration in months if dates are available
+      let durationInMonths = p.projectDuration || 'NA';
+      if (p.projectStartDate && p.projectEndDate) {
+        try {
+          const startDate = parseISO(p.projectStartDate);
+          const endDate = parseISO(p.projectEndDate);
+          // Add 1 day to end date to make the calculation inclusive (e.g., 10th to 9th is a full month)
+          const months = differenceInMonths(addDays(endDate, 1), startDate);
+          durationInMonths = months.toString();
+        } catch (e) {
+          console.error("Error calculating duration:", e);
+        }
+      }
+
       const row: { [key: string]: any } = {};
       selectedExportColumns.forEach(colId => {
         const column = IMR_EXPORT_COLUMNS.find(c => c.id === colId);
@@ -726,7 +740,7 @@ export default function AllProjectsPage() {
             teamMembers: teamMembers,
             submissionDate: submissionDateFormatted,
             sanctionDate: sanctionDateFormatted,
-            projectDuration: p.projectDuration || 'NA',
+            projectDuration: durationInMonths,
             seedMoney: seedMoney,
             seedMoneyMonth: seedMoneyMonth,
             seedMoneyYear: seedMoneyYear,

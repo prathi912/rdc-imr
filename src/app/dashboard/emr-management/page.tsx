@@ -363,6 +363,32 @@ export default function EmrManagementOverviewPage() {
 
     const isSuperAdmin = user?.role === 'Super-admin';
 
+    const handleExportCalls = () => {
+        const dataToExport = filteredCalls.map(call => {
+            const isClosed = isAfter(new Date(), parseISO(call.interestDeadline));
+            let status = "Open";
+            if (call.status === 'Meeting Scheduled') {
+                status = "Meeting Scheduled";
+            } else if (isClosed) {
+                status = "Closed";
+            }
+            
+            return {
+                'Call Title': call.title,
+                'Agency': call.agency,
+                'Agency Deadline': call.applyDeadline ? format(parseISO(call.applyDeadline), 'PP') : 'N/A',
+                'Registrations': interestCounts[call.id] || 0,
+                'Date Added': format(parseISO(call.createdAt), 'PP'),
+                'Status': status,
+                'Announced': call.isAnnounced ? 'Yes' : 'No',
+            };
+        });
+        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Funding_Calls');
+        XLSX.writeFile(workbook, `funding_calls_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
     if (!user || loading) {
         return (
             <div className="container mx-auto py-10">
@@ -399,6 +425,14 @@ export default function EmrManagementOverviewPage() {
                                     onChange={(e) => setSearchTerm(e.target.value)} 
                                     className="max-w-sm" 
                                 />
+                                <Button 
+                                    onClick={handleExportCalls} 
+                                    disabled={loading || filteredCalls.length === 0} 
+                                    variant="outline"
+                                >
+                                    <Download className="mr-2 h-4 w-4" /> 
+                                    Export Calls List
+                                </Button>
                             </div>
                             <Card>
                                  <CardHeader>
