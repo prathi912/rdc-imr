@@ -95,9 +95,9 @@ These roles provide a hierarchical, read-only oversight of the research activiti
     -   **Principal:** Filtered by your assigned Institute.
     -   **HOD:** Filtered by your assigned Department.
 -   **Analytics:** Navigate to the **Analytics** dashboard. Data is automatically aggregated to provide relevant insights:
-    -   **CRO:** Data aggregated by Institute.
-    -   **Principal:** Data aggregated by Department.
-    -   **HOD:** Data specific to your Department.
+    -   **CRO:** Data aggregated by Faculty.
+    -   **Principal:** Data aggregated by Institute.
+    -   **HOD:** Data specific by Department.
 
 ---
 
