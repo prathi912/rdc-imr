@@ -52,109 +52,109 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
 
 // --- Google Drive Upload Logic ---
 async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string, filePath: string): Promise<{ success: boolean; url?: string; error?: string }> {
-    try {
-        const { google } = await import('googleapis');
-        const { Readable } = await import('stream');
+  try {
+    const { google } = await import('googleapis');
+    const { Readable } = await import('stream');
 
-        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
-        if (!clientEmail || !privateKey) {
-            throw new Error('Google Drive API credentials are not configured on the server.');
-        }
-
-        const auth = new google.auth.GoogleAuth({
-            credentials: {
-                client_email: clientEmail,
-                private_key: privateKey,
-            },
-            scopes: ['https://www.googleapis.com/auth/drive.file'],
-        });
-
-        const drive = google.drive({ version: 'v3', auth });
-
-        // --- Find or create the main folder ---
-        let parentFolderId: string | undefined;
-        const mainFolderName = 'R&D Portal Incentive Proofs';
-        
-        // 1. Check Firestore for the stored folder ID
-        const settings = await getSystemSettings();
-        parentFolderId = settings.driveParentFolderId;
-
-        // 2. If not in Firestore, search or create on Drive
-        if (!parentFolderId) {
-            const folderRes = await drive.files.list({
-                q: `mimeType='application/vnd.google-apps.folder' and name='${mainFolderName}' and trashed=false`,
-                fields: 'files(id, name)',
-                spaces: 'drive',
-            });
-
-            if (folderRes.data.files && folderRes.data.files.length > 0) {
-                parentFolderId = folderRes.data.files[0].id!;
-            } else {
-                const fileMetadata = {
-                    name: mainFolderName,
-                    mimeType: 'application/vnd.google-apps.folder',
-                };
-                const newFolder = await drive.files.create({
-                    resource: fileMetadata,
-                    fields: 'id',
-                });
-                parentFolderId = newFolder.data.id!;
-            }
-            
-            // 3. If we found or created it, save the ID to Firestore for next time
-            if (parentFolderId) {
-                await updateSystemSettings({ ...settings, driveParentFolderId: parentFolderId });
-            }
-        }
-        
-        if (!parentFolderId) {
-            throw new Error("Could not find or create the parent folder in Google Drive.");
-        }
-
-        // 4. Upload the file
-        const fileMetadata = {
-            name: fileName,
-            parents: [parentFolderId],
-        };
-        const media = {
-            mimeType: mimeType,
-            body: Readable.from(buffer),
-        };
-
-        const file = await drive.files.create({
-            resource: fileMetadata,
-            media: media,
-            fields: 'id, webViewLink',
-        });
-        
-        const fileId = file.data.id;
-        if (!fileId) {
-            throw new Error("File upload to Google Drive failed, no file ID returned.");
-        }
-
-        // 5. Make the file publicly readable
-        await drive.permissions.create({
-            fileId: fileId,
-            resource: {
-                role: 'reader',
-                type: 'anyone',
-            },
-        });
-        
-        const webViewLink = file.data.webViewLink;
-
-        if (!webViewLink) {
-            throw new Error("Could not retrieve a shareable link for the uploaded file.");
-        }
-
-        return { success: true, url: webViewLink };
-    } catch (error: any) {
-        console.error("Google Drive upload error:", error);
-        await logActivity('ERROR', 'Google Drive upload failed', { path: filePath, error: error.message });
-        return { success: false, error: `Google Drive upload failed: ${error.message}.` };
+    if (!clientEmail || !privateKey) {
+      throw new Error('Google Drive API credentials are not configured on the server.');
     }
+
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: clientEmail,
+        private_key: privateKey,
+      },
+      scopes: ['https://www.googleapis.com/auth/drive.file'],
+    });
+
+    const drive = google.drive({ version: 'v3', auth });
+
+    // --- Find or create the main folder ---
+    let parentFolderId: string | undefined;
+    const mainFolderName = 'R&D Portal Incentive Proofs';
+
+    // 1. Check Firestore for the stored folder ID
+    const settings = await getSystemSettings();
+    parentFolderId = settings.driveParentFolderId;
+
+    // 2. If not in Firestore, search or create on Drive
+    if (!parentFolderId) {
+      const folderRes = await drive.files.list({
+        q: `mimeType='application/vnd.google-apps.folder' and name='${mainFolderName}' and trashed=false`,
+        fields: 'files(id, name)',
+        spaces: 'drive',
+      });
+
+      if (folderRes.data.files && folderRes.data.files.length > 0) {
+        parentFolderId = folderRes.data.files[0].id!;
+      } else {
+        const fileMetadata = {
+          name: mainFolderName,
+          mimeType: 'application/vnd.google-apps.folder',
+        };
+        const newFolder = await drive.files.create({
+          resource: fileMetadata,
+          fields: 'id',
+        });
+        parentFolderId = newFolder.data.id!;
+      }
+
+      // 3. If we found or created it, save the ID to Firestore for next time
+      if (parentFolderId) {
+        await updateSystemSettings({ ...settings, driveParentFolderId: parentFolderId });
+      }
+    }
+
+    if (!parentFolderId) {
+      throw new Error("Could not find or create the parent folder in Google Drive.");
+    }
+
+    // 4. Upload the file
+    const fileMetadata = {
+      name: fileName,
+      parents: [parentFolderId],
+    };
+    const media = {
+      mimeType: mimeType,
+      body: Readable.from(buffer),
+    };
+
+    const file = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id, webViewLink',
+    });
+
+    const fileId = file.data.id;
+    if (!fileId) {
+      throw new Error("File upload to Google Drive failed, no file ID returned.");
+    }
+
+    // 5. Make the file publicly readable
+    await drive.permissions.create({
+      fileId: fileId,
+      resource: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+
+    const webViewLink = file.data.webViewLink;
+
+    if (!webViewLink) {
+      throw new Error("Could not retrieve a shareable link for the uploaded file.");
+    }
+
+    return { success: true, url: webViewLink };
+  } catch (error: any) {
+    console.error("Google Drive upload error:", error);
+    await logActivity('ERROR', 'Google Drive upload failed', { path: filePath, error: error.message });
+    return { success: false, error: `Google Drive upload failed: ${error.message}.` };
+  }
 }
 
 
@@ -167,10 +167,10 @@ export async function sendErrorEmail(
   try {
     const to = process.env.HELPDESK_EMAIL || process.env.GMAIL_USER;
     const subject = `RDC Portal Error Report: ${errorDetails.message.substring(0, 50)}...`;
-    
+
     let userHtml = '<p>No user was logged in, or user details could not be retrieved.</p>';
     if (user) {
-        userHtml = `
+      userHtml = `
             <h3 style="color:#ffffff;">User Details:</h3>
             <ul>
                 <li><strong>Name:</strong> ${user.name || 'N/A'}</li>
@@ -199,12 +199,12 @@ export async function sendErrorEmail(
             <p style="margin-top: 20px; font-size: 0.9em; color: #555;">This is an automated email. Please investigate the issue based on the provided details.</p>
         </div>
     `;
-    
+
     await sendEmailUtility({
-        to,
-        subject,
-        html: emailHtml,
-        from: 'default'
+      to,
+      subject,
+      html: emailHtml,
+      from: 'default'
     });
 
     return { success: true };
@@ -249,7 +249,7 @@ export async function getStorageUsage(): Promise<{ success: boolean; totalSizeMB
   try {
     const bucket = adminStorage.bucket();
     const [files] = await bucket.getFiles();
-    
+
     let totalSizeBytes = 0;
     files.forEach(file => {
       totalSizeBytes += parseInt(file.metadata.size as string, 10);
@@ -321,7 +321,7 @@ export async function deleteImrProject(
         from: "default",
       })
     }
-    
+
     await logActivity("INFO", "IMR project deleted", { projectId, title: project.title, deletedBy, reason });
     return { success: true }
   } catch (error: any) {
@@ -337,34 +337,34 @@ export async function deleteImrProject(
 }
 
 export async function checkPatentUniqueness(title: string, applicationNumber: string, currentClaimId?: string): Promise<{ isUnique: boolean; message?: string }> {
-    try {
-        const claimsRef = adminDb.collection('incentiveClaims');
-        
-        const titleQuery = claimsRef.where('patentTitle', '==', title);
-        const appNumberQuery = claimsRef.where('patentApplicationNumber', '==', applicationNumber);
+  try {
+    const claimsRef = adminDb.collection('incentiveClaims');
 
-        const [titleSnapshot, appNumberSnapshot] = await Promise.all([
-            titleQuery.get(),
-            appNumberQuery.get()
-        ]);
-        
-        const conflictingTitle = titleSnapshot.docs.find(doc => doc.id !== currentClaimId);
-        if (conflictingTitle) {
-            return { isUnique: false, message: `A claim with the title "${title}" already exists.` };
-        }
+    const titleQuery = claimsRef.where('patentTitle', '==', title);
+    const appNumberQuery = claimsRef.where('patentApplicationNumber', '==', applicationNumber);
 
-        const conflictingAppNumber = appNumberSnapshot.docs.find(doc => doc.id !== currentClaimId);
-        if (conflictingAppNumber) {
-            return { isUnique: false, message: `A claim with the application number "${applicationNumber}" already exists.` };
-        }
+    const [titleSnapshot, appNumberSnapshot] = await Promise.all([
+      titleQuery.get(),
+      appNumberQuery.get()
+    ]);
 
-        return { isUnique: true };
-    } catch (error: any) {
-        console.error("Error checking patent uniqueness:", error);
-        await logActivity('ERROR', 'Failed to check patent uniqueness', { title, applicationNumber, error: error.message });
-        // Fail open to avoid blocking users due to server errors, but log it.
-        return { isUnique: true }; 
+    const conflictingTitle = titleSnapshot.docs.find(doc => doc.id !== currentClaimId);
+    if (conflictingTitle) {
+      return { isUnique: false, message: `A claim with the title "${title}" already exists.` };
     }
+
+    const conflictingAppNumber = appNumberSnapshot.docs.find(doc => doc.id !== currentClaimId);
+    if (conflictingAppNumber) {
+      return { isUnique: false, message: `A claim with the application number "${applicationNumber}" already exists.` };
+    }
+
+    return { isUnique: true };
+  } catch (error: any) {
+    console.error("Error checking patent uniqueness:", error);
+    await logActivity('ERROR', 'Failed to check patent uniqueness', { title, applicationNumber, error: error.message });
+    // Fail open to avoid blocking users due to server errors, but log it.
+    return { isUnique: true };
+  }
 }
 
 export async function bulkGrantModuleAccess(
@@ -523,22 +523,22 @@ export async function uploadApproverSignature(
     if (!uploadResult.success || !uploadResult.url) {
       throw new Error(uploadResult.error || "Signature upload failed.");
     }
-    
+
     const settings = await getSystemSettings();
     const currentApprovers = settings.incentiveApprovers || [];
     const approverIndex = currentApprovers.findIndex(a => a.stage === stage);
-    
+
     if (approverIndex !== -1) {
       currentApprovers[approverIndex].signatureUrl = uploadResult.url;
     } else {
       // This case should ideally not happen if an approver email is set, but handle it defensively.
       const newApprover = { stage, email: '', signatureUrl: uploadResult.url };
       currentApprovers.push(newApprover);
-      currentApprovers.sort((a,b) => a.stage - b.stage);
+      currentApprovers.sort((a, b) => a.stage - b.stage);
     }
-    
+
     await updateSystemSettings({ ...settings, incentiveApprovers: currentApprovers });
-    
+
     await logActivity('INFO', `Approver signature for stage ${stage} updated.`);
     return { success: true, url: uploadResult.url };
 
@@ -620,13 +620,13 @@ export async function saveProjectSubmission(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const projectRef = adminDb.collection("projects").doc(projectId)
-    
+
     // Ensure submissionDate is set when project is submitted
     const dataToSave = { ...projectData };
     if (projectData.status === "Submitted" && !projectData.submissionDate) {
       dataToSave.submissionDate = new Date().toISOString();
     }
-    
+
     await projectRef.set(dataToSave, { merge: true })
 
     // Notify admins only on final submission, not on saving drafts
@@ -764,7 +764,7 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
           </div>
         `
       if (newStatus === 'Revision Needed') {
-         emailHtml += `<p style="color:#e0e0e0; margin-top:20px;">Please submit the revised proposal from your project details page on the portal.</p>`
+        emailHtml += `<p style="color:#e0e0e0; margin-top:20px;">Please submit the revised proposal from your project details page on the portal.</p>`
       }
     }
 
@@ -888,11 +888,11 @@ export async function scheduleMeeting(
     const dtstamp = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
 
     const newMeetingDetails = {
-        date: meetingDetails.date,
-        time: meetingDetails.time,
-        venue: meetingDetails.venue,
-        mode: meetingDetails.mode,
-        assignedEvaluators: meetingDetails.evaluatorUids,
+      date: meetingDetails.date,
+      time: meetingDetails.time,
+      venue: meetingDetails.venue,
+      mode: meetingDetails.mode,
+      assignedEvaluators: meetingDetails.evaluatorUids,
     };
 
     const allUsersToNotify = new Map<string, User>();
@@ -920,54 +920,55 @@ export async function scheduleMeeting(
       // Collect users to notify
       if (projectData.pi_uid) {
         const piSnap = await adminDb.collection("users").doc(projectData.pi_uid).get();
-        if(piSnap.exists) allUsersToNotify.set(projectData.pi_uid, piSnap.data() as User);
+        if (piSnap.exists) allUsersToNotify.set(projectData.pi_uid, piSnap.data() as User);
       }
 
       if (isReschedule && existingProject?.meetingDetails?.assignedEvaluators) {
-          for(const uid of existingProject.meetingDetails.assignedEvaluators) {
-              if(!allUsersToNotify.has(uid) && uid) {
-                  const userSnap = await adminDb.collection("users").doc(uid).get();
-                  if(userSnap.exists) allUsersToNotify.set(uid, userSnap.data() as User);
-              }
+        for (const uid of existingProject.meetingDetails.assignedEvaluators) {
+          if (!allUsersToNotify.has(uid) && uid) {
+            const userSnap = await adminDb.collection("users").doc(uid).get();
+            if (userSnap.exists) allUsersToNotify.set(uid, userSnap.data() as User);
           }
+        }
       }
-      for(const uid of meetingDetails.evaluatorUids) {
-          if(!allUsersToNotify.has(uid) && uid) {
-              const userSnap = await adminDb.collection("users").doc(uid).get();
-              if(userSnap.exists) allUsersToNotify.set(uid, userSnap.data() as User);
-          }
+      for (const uid of meetingDetails.evaluatorUids) {
+        if (!allUsersToNotify.has(uid) && uid) {
+          const userSnap = await adminDb.collection("users").doc(uid).get();
+          if (userSnap.exists) allUsersToNotify.set(uid, userSnap.data() as User);
+        }
       }
     }
-    
+
     await batch.commit(); // Commit all project updates first
 
     // Send notifications to registered users
     for (const [uid, user] of allUsersToNotify.entries()) {
-        const isPI = projectsToSchedule.some(p => p.pi_uid === uid);
-        
-        const project = projectsToSchedule.find(p => p.pi_uid === uid) || projectsToSchedule[0]; // Get relevant project
-        const isReschedule = rescheduleMap.get(project.id) || false;
+      const isPI = projectsToSchedule.some(p => p.pi_uid === uid);
 
-        const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting";
-        const subjectPrefix = isReschedule ? `RESCHEDULED: ${meetingType}` : meetingType;
-        
-        const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy");
-        const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)");
-        
-        const projectTitles = projectsToSchedule.map(p => `<li style="color: #cccccc;">${p.title}</li>`).join("");
-        
-        let subject = '';
-        let htmlContent = '';
+      const project = projectsToSchedule.find(p => p.pi_uid === uid) || projectsToSchedule[0]; // Get relevant project
+      const isReschedule = rescheduleMap.get(project.id) || false;
 
-        if (isPI) {
-            subject = `${subjectPrefix} for Your Project: ${project.title}`;
-            htmlContent = `
+      const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting";
+      const subjectPrefix = isReschedule ? `RESCHEDULED: ${meetingType}` : meetingType;
+
+      const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy");
+      const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)");
+
+      const projectTitles = projectsToSchedule.map(p => `<li style="color: #cccccc;">${p.title}</li>`).join("");
+
+      let subject = '';
+      let htmlContent = '';
+
+      if (isPI) {
+        subject = `${subjectPrefix} for Your Project: ${project.title}`;
+        htmlContent = `
                 <div ${EMAIL_STYLES.background}>
                   ${EMAIL_STYLES.logo}
                   <p style="color: #ffffff;">Dear Researcher,</p>
                   <p style="color: #e0e0e0;">
                     An <strong style="color: #ffffff;">${meetingType}</strong> has been ${isReschedule ? 'rescheduled' : 'scheduled'} for your project, 
                     "<strong style="color: #ffffff;">${project.title}</strong>".
+                    Please ensure you carry a <strong style="color: #ffffff;">pendrive containing your presentation (PPT)</strong> for the session.
                   </p>
                    ${isReschedule ? `<p style="color: #ffcdd2;">Please note the updated time/date.</p>` : ''}
                   <p><strong style="color: #ffffff;">Date:</strong> ${formattedDate}</p>
@@ -984,9 +985,9 @@ export async function scheduleMeeting(
                   ${EMAIL_STYLES.footer}
                 </div>
               `;
-        } else { // Is an evaluator
-            subject = `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term' : 'New Submission'}) ${isReschedule ? '- RESCHEDULED' : ''}`;
-             htmlContent = `
+      } else { // Is an evaluator
+        subject = `IMR Evaluation Assignment (${isMidTermReview ? 'Mid-term' : 'New Submission'}) ${isReschedule ? '- RESCHEDULED' : ''}`;
+        htmlContent = `
                   <div ${EMAIL_STYLES.background}>
                       ${EMAIL_STYLES.logo}
                       <p style="color: #ffffff;">Dear ${user.name},</p>
@@ -1013,47 +1014,47 @@ export async function scheduleMeeting(
                       ${EMAIL_STYLES.footer}
                   </div>
               `;
-        }
+      }
 
-        if(user.email) {
-            const startTimeUTC = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
-            const endTimeUTC = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
+      if (user.email) {
+        const startTimeUTC = format(meetingDate, "yyyyMMdd'T'HHmmss'Z'");
+        const endTimeUTC = format(addHours(meetingDate, 1), "yyyyMMdd'T'HHmmss'Z'");
 
-            const icalContent = [
-                'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ParulUniversity//RDC-Portal//EN',
-                'METHOD:REQUEST', 'BEGIN:VEVENT', `UID:${project.id}@paruluniversity.ac.in`, `DTSTAMP:${dtstamp}`,
-                `DTSTART:${startTimeUTC}`, `DTEND:${endTimeUTC}`, `SUMMARY:${subject}`,
-                `DESCRIPTION:A meeting for the IMR project '${project.title}' has been scheduled.`,
-                `LOCATION:${meetingDetails.venue}`, `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER}`,
-                `ATTENDEE;CN=${user.name};RSVP=TRUE:mailto:${user.email}`, 'END:VEVENT', 'END:VCALENDAR'
-            ].join('\r\n');
+        const icalContent = [
+          'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//ParulUniversity//RDC-Portal//EN',
+          'METHOD:REQUEST', 'BEGIN:VEVENT', `UID:${project.id}@paruluniversity.ac.in`, `DTSTAMP:${dtstamp}`,
+          `DTSTART:${startTimeUTC}`, `DTEND:${endTimeUTC}`, `SUMMARY:${subject}`,
+          `DESCRIPTION:A meeting for the IMR project '${project.title}' has been scheduled.`,
+          `LOCATION:${meetingDetails.venue}`, `ORGANIZER;CN=RDC Parul University:mailto:${process.env.GMAIL_USER}`,
+          `ATTENDEE;CN=${user.name};RSVP=TRUE:mailto:${user.email}`, 'END:VEVENT', 'END:VCALENDAR'
+        ].join('\r\n');
 
-            await sendEmailUtility({
-              to: user.email,
-              subject,
-              html: htmlContent,
-              from: "default",
-              icalEvent: {
-                filename: 'invite.ics',
-                method: 'REQUEST',
-                content: icalContent
-              }
-            });
-        }
+        await sendEmailUtility({
+          to: user.email,
+          subject,
+          html: htmlContent,
+          from: "default",
+          icalEvent: {
+            filename: 'invite.ics',
+            method: 'REQUEST',
+            content: icalContent
+          }
+        });
+      }
     }
-    
+
     // Handle unregistered PIs
     const unregisteredPis = projectsToSchedule.filter(p => !p.pi_uid && p.pi_email);
     for (const projectData of unregisteredPis) {
-        const isReschedule = rescheduleMap.get(projectData.id) || false;
-        const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting";
-        const subjectPrefix = isReschedule ? `RESCHEDULED: ${meetingType}` : meetingType;
-        const subject = `${subjectPrefix} for Your Project: ${projectData.title}`;
+      const isReschedule = rescheduleMap.get(projectData.id) || false;
+      const meetingType = isMidTermReview ? "IMR Mid-term Review Meeting" : "IMR Evaluation Meeting";
+      const subjectPrefix = isReschedule ? `RESCHEDULED: ${meetingType}` : meetingType;
+      const subject = `${subjectPrefix} for Your Project: ${projectData.title}`;
 
-        const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy");
-        const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)");
-        
-        const htmlContent = `
+      const formattedDate = formatInTimeZone(meetingDateTimeString, timeZone, "MMMM d, yyyy");
+      const formattedTime = formatInTimeZone(meetingDateTimeString, timeZone, "h:mm a (z)");
+
+      const htmlContent = `
             <div ${EMAIL_STYLES.background}>
               ${EMAIL_STYLES.logo}
               <p style="color: #ffffff;">Dear ${projectData.pi},</p>
@@ -1076,13 +1077,13 @@ export async function scheduleMeeting(
               ${EMAIL_STYLES.footer}
             </div>
           `;
-            
-        await sendEmailUtility({
-            to: projectData.pi_email!,
-            subject,
-            html: htmlContent,
-            from: "default"
-        });
+
+      await sendEmailUtility({
+        to: projectData.pi_email!,
+        subject,
+        html: htmlContent,
+        from: "default"
+      });
     }
 
     await logActivity("INFO", `IMR ${isMidTermReview ? 'mid-term review' : ''} meeting scheduled/rescheduled`, {
@@ -1109,7 +1110,7 @@ export async function uploadFileToServer(
     }
     const match = fileDataUrl.match(/^data:(.+);base64,(.+)$/);
     if (!match) {
-        throw new Error("Invalid data URL format.");
+      throw new Error("Invalid data URL format.");
     }
     const buffer = Buffer.from(match[2], 'base64');
     const mimeType = match[1];
@@ -1117,48 +1118,48 @@ export async function uploadFileToServer(
 
     // If the path is for an incentive proof, use Google Drive
     if (path.startsWith('incentive-proofs/')) {
-        console.log(`Uploading incentive proof to Google Drive: ${fileName}`);
-        const driveResult = await uploadToDrive(buffer, fileName, mimeType, path);
-        if (driveResult.success) {
-            return driveResult;
-        }
-        // If Drive upload fails, log it and fall through to the default (Firebase) method.
-        const errorMessage = `Google Drive upload failed. Falling back to default storage for ${path}. Error: ${driveResult.error}`;
-        console.warn(errorMessage);
-        await logActivity("WARNING", "Google Drive upload failed; falling back to default storage", { path, driveError: driveResult.error });
+      console.log(`Uploading incentive proof to Google Drive: ${fileName}`);
+      const driveResult = await uploadToDrive(buffer, fileName, mimeType, path);
+      if (driveResult.success) {
+        return driveResult;
+      }
+      // If Drive upload fails, log it and fall through to the default (Firebase) method.
+      const errorMessage = `Google Drive upload failed. Falling back to default storage for ${path}. Error: ${driveResult.error}`;
+      console.warn(errorMessage);
+      await logActivity("WARNING", "Google Drive upload failed; falling back to default storage", { path, driveError: driveResult.error });
     }
 
     // Try Firebase first
     try {
-        const bucket = adminStorage.bucket();
-        const file = bucket.file(path);
-        await file.save(buffer, { metadata: { contentType: mimeType } });
-        await file.makePublic();
-        const publicUrl = file.publicUrl();
-        console.log(`File uploaded to Firebase Storage at ${path}`);
-        return { success: true, url: publicUrl };
+      const bucket = adminStorage.bucket();
+      const file = bucket.file(path);
+      await file.save(buffer, { metadata: { contentType: mimeType } });
+      await file.makePublic();
+      const publicUrl = file.publicUrl();
+      console.log(`File uploaded to Firebase Storage at ${path}`);
+      return { success: true, url: publicUrl };
     } catch (firebaseError: any) {
-        console.warn("Firebase upload failed, falling back to Vercel Blob:", firebaseError.message);
-        await logActivity("WARNING", "Firebase upload failed, falling back to Vercel Blob", { path, error: firebaseError.message });
-        
-        // Fallback to Vercel Blob
-        try {
-            const blob = await put(path, buffer, {
-                access: 'public',
-                contentType: mimeType,
-                token: process.env.RDC_READ_WRITE_TOKEN,
-            });
-            console.log(`File uploaded to Vercel Blob: ${blob.url}`);
-            return { success: true, url: blob.url };
-        } catch (blobError: any) {
-            console.error("FATAL: Both Firebase and Vercel Blob uploads failed:", blobError.message);
-            await logActivity("ERROR", "Vercel Blob upload failed after Firebase failure", { path, error: blobError.message });
-            return { success: false, error: blobError.message || "Both Firebase and Vercel Blob uploads failed." };
-        }
+      console.warn("Firebase upload failed, falling back to Vercel Blob:", firebaseError.message);
+      await logActivity("WARNING", "Firebase upload failed, falling back to Vercel Blob", { path, error: firebaseError.message });
+
+      // Fallback to Vercel Blob
+      try {
+        const blob = await put(path, buffer, {
+          access: 'public',
+          contentType: mimeType,
+          token: process.env.RDC_READ_WRITE_TOKEN,
+        });
+        console.log(`File uploaded to Vercel Blob: ${blob.url}`);
+        return { success: true, url: blob.url };
+      } catch (blobError: any) {
+        console.error("FATAL: Both Firebase and Vercel Blob uploads failed:", blobError.message);
+        await logActivity("ERROR", "Vercel Blob upload failed after Firebase failure", { path, error: blobError.message });
+        return { success: false, error: blobError.message || "Both Firebase and Vercel Blob uploads failed." };
+      }
     }
   } catch (error: any) {
-      console.error("Unhandled error in uploadFileToServer:", error.message);
-      return { success: false, error: error.message || "An unexpected error occurred during file upload." };
+    console.error("Unhandled error in uploadFileToServer:", error.message);
+    return { success: false, error: error.message || "An unexpected error occurred during file upload." };
   }
 }
 
@@ -1247,10 +1248,10 @@ export async function notifySuperAdminsOnEvaluation(projectId: string, projectNa
 export async function notifyAdminsOnCompletionRequest(projectId: string, projectTitle: string, piName: string) {
   try {
     const settings = await getSystemSettings();
-    
+
     // Send email notification only to the designated email address, if it exists
     if (settings.utilizationNotificationEmail) {
-        const emailHtml = `
+      const emailHtml = `
             <div ${EMAIL_STYLES.background}>
                 ${EMAIL_STYLES.logo}
                 <p style="color:#ffffff;">Dear Administrator,</p>
@@ -1260,15 +1261,15 @@ export async function notifyAdminsOnCompletionRequest(projectId: string, project
                 ${EMAIL_STYLES.footer}
             </div>
         `;
-        await sendEmailUtility({
-            to: settings.utilizationNotificationEmail,
-            subject: `Action Required: Next Grant Phase Request for Project: ${projectTitle}`,
-            html: emailHtml,
-            from: 'default'
-        });
-        await logActivity("INFO", "Utilization report notification sent to designated email", { projectId, projectTitle, notifiedEmail: settings.utilizationNotificationEmail });
+      await sendEmailUtility({
+        to: settings.utilizationNotificationEmail,
+        subject: `Action Required: Next Grant Phase Request for Project: ${projectTitle}`,
+        html: emailHtml,
+        from: 'default'
+      });
+      await logActivity("INFO", "Utilization report notification sent to designated email", { projectId, projectTitle, notifiedEmail: settings.utilizationNotificationEmail });
     } else {
-        await logActivity("WARNING", "Utilization report submitted, but no notification email is configured in system settings.", { projectId, projectTitle });
+      await logActivity("WARNING", "Utilization report submitted, but no notification email is configured in system settings.", { projectId, projectTitle });
     }
 
     // Send in-app notifications to all admins and super-admins
@@ -2065,16 +2066,16 @@ export async function markImrAttendance(
 
     // If triggered from a single project detail page, find all other projects in the same meeting
     if (meetingIdentifier) {
-        const q = projectsRef
-            .where('meetingDetails.date', '==', meetingIdentifier.date)
-            .where('meetingDetails.time', '==', meetingIdentifier.time)
-            .where('meetingDetails.venue', '==', meetingIdentifier.venue);
-        
-        const meetingSnapshot = await q.get();
-        allMeetingProjects = meetingSnapshot.docs.map(doc => ({
-            projectId: doc.id,
-            piUid: doc.data().pi_uid,
-        }));
+      const q = projectsRef
+        .where('meetingDetails.date', '==', meetingIdentifier.date)
+        .where('meetingDetails.time', '==', meetingIdentifier.time)
+        .where('meetingDetails.venue', '==', meetingIdentifier.venue);
+
+      const meetingSnapshot = await q.get();
+      allMeetingProjects = meetingSnapshot.docs.map(doc => ({
+        projectId: doc.id,
+        piUid: doc.data().pi_uid,
+      }));
     }
 
     const presentProjects = allMeetingProjects.filter(p => !absentPiUids.includes(p.piUid));
@@ -2103,10 +2104,10 @@ export async function markImrAttendance(
     }
 
     await batch.commit();
-    await logActivity('INFO', 'IMR meeting attendance marked', { 
+    await logActivity('INFO', 'IMR meeting attendance marked', {
       totalProjects: allMeetingProjects.length,
-      absentPiUids, 
-      absentEvaluatorUids 
+      absentPiUids,
+      absentEvaluatorUids
     });
     return { success: true };
   } catch (error: any) {
@@ -2120,80 +2121,80 @@ export async function markImrAttendance(
 }
 
 export async function sendGlobalEvaluationReminders(adminName: string): Promise<{ success: boolean; sentCount: number; error?: string }> {
-    try {
-        const projectsRef = adminDb.collection('projects');
-        const q = projectsRef.where('status', '==', 'Under Review');
-        const projectsSnapshot = await q.get();
+  try {
+    const projectsRef = adminDb.collection('projects');
+    const q = projectsRef.where('status', '==', 'Under Review');
+    const projectsSnapshot = await q.get();
 
-        if (projectsSnapshot.empty) {
-            return { success: true, sentCount: 0, error: "No projects are currently under review." };
+    if (projectsSnapshot.empty) {
+      return { success: true, sentCount: 0, error: "No projects are currently under review." };
+    }
+
+    const projectsToReview = projectsSnapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as Project))
+      .filter(project => {
+        if (!project.meetingDetails?.date) {
+          return true; // Should not happen for "Under Review" projects, but as a safeguard.
         }
+        const meetingDate = parseISO(project.meetingDetails.date);
+        // Exclude projects with meetings scheduled for today to avoid sending nuisance reminders.
+        return !isToday(meetingDate);
+      });
 
-        const projectsToReview = projectsSnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as Project))
-            .filter(project => {
-                if (!project.meetingDetails?.date) {
-                    return true; // Should not happen for "Under Review" projects, but as a safeguard.
-                }
-                const meetingDate = parseISO(project.meetingDetails.date);
-                // Exclude projects with meetings scheduled for today to avoid sending nuisance reminders.
-                return !isToday(meetingDate);
-            });
-            
-        if (projectsToReview.length === 0) {
-            return { success: true, sentCount: 0, error: "No projects with past meetings need reminders." };
-        }
+    if (projectsToReview.length === 0) {
+      return { success: true, sentCount: 0, error: "No projects with past meetings need reminders." };
+    }
 
-        const pendingEvaluationsMap = new Map<string, { evaluator: User, projects: Project[] }>();
+    const pendingEvaluationsMap = new Map<string, { evaluator: User, projects: Project[] }>();
 
-        // Get all potential evaluators in one go to minimize reads
-        const allPotentialEvaluatorUids = [...new Set(projectsToReview.flatMap(p => p.meetingDetails?.assignedEvaluators || []))];
-        if (allPotentialEvaluatorUids.length === 0) {
-            return { success: true, sentCount: 0 };
-        }
-        
-        // Firestore 'in' query has a limit of 30 elements, so we need to chunk it.
-        const usersRef = adminDb.collection('users');
-        const evaluatorsMap = new Map<string, User>();
-        const chunkSize = 30;
-        for (let i = 0; i < allPotentialEvaluatorUids.length; i += chunkSize) {
-            const chunk = allPotentialEvaluatorUids.slice(i, i + chunkSize);
-            if (chunk.length === 0) continue;
-            const evaluatorsSnapshot = await usersRef.where('__name__', 'in', chunk).get();
-            evaluatorsSnapshot.forEach(doc => evaluatorsMap.set(doc.id, doc.data() as User));
-        }
+    // Get all potential evaluators in one go to minimize reads
+    const allPotentialEvaluatorUids = [...new Set(projectsToReview.flatMap(p => p.meetingDetails?.assignedEvaluators || []))];
+    if (allPotentialEvaluatorUids.length === 0) {
+      return { success: true, sentCount: 0 };
+    }
 
-        // Determine pending evaluations for each evaluator across all projects
-        for (const project of projectsToReview) {
-            const assigned = project.meetingDetails?.assignedEvaluators || [];
-            const evaluated = project.evaluatedBy || [];
+    // Firestore 'in' query has a limit of 30 elements, so we need to chunk it.
+    const usersRef = adminDb.collection('users');
+    const evaluatorsMap = new Map<string, User>();
+    const chunkSize = 30;
+    for (let i = 0; i < allPotentialEvaluatorUids.length; i += chunkSize) {
+      const chunk = allPotentialEvaluatorUids.slice(i, i + chunkSize);
+      if (chunk.length === 0) continue;
+      const evaluatorsSnapshot = await usersRef.where('__name__', 'in', chunk).get();
+      evaluatorsSnapshot.forEach(doc => evaluatorsMap.set(doc.id, doc.data() as User));
+    }
 
-            for (const evaluatorUid of assigned) {
-                if (!evaluated.includes(evaluatorUid)) {
-                    const evaluator = evaluatorsMap.get(evaluatorUid);
-                    if (evaluator) {
-                        if (!pendingEvaluationsMap.has(evaluatorUid)) {
-                            pendingEvaluationsMap.set(evaluatorUid, { evaluator, projects: [] });
-                        }
-                        pendingEvaluationsMap.get(evaluatorUid)!.projects.push(project);
-                    }
-                }
+    // Determine pending evaluations for each evaluator across all projects
+    for (const project of projectsToReview) {
+      const assigned = project.meetingDetails?.assignedEvaluators || [];
+      const evaluated = project.evaluatedBy || [];
+
+      for (const evaluatorUid of assigned) {
+        if (!evaluated.includes(evaluatorUid)) {
+          const evaluator = evaluatorsMap.get(evaluatorUid);
+          if (evaluator) {
+            if (!pendingEvaluationsMap.has(evaluatorUid)) {
+              pendingEvaluationsMap.set(evaluatorUid, { evaluator, projects: [] });
             }
+            pendingEvaluationsMap.get(evaluatorUid)!.projects.push(project);
+          }
         }
-        
-        let emailsSentCount = 0;
-        const emailPromises = [];
+      }
+    }
 
-        // Send grouped emails
-        for (const { evaluator, projects } of pendingEvaluationsMap.values()) {
-            if (evaluator.email && projects.length > 0) {
-                const projectListHtml = projects.map(p => 
-                    `<li style="color: #cccccc;">
+    let emailsSentCount = 0;
+    const emailPromises = [];
+
+    // Send grouped emails
+    for (const { evaluator, projects } of pendingEvaluationsMap.values()) {
+      if (evaluator.email && projects.length > 0) {
+        const projectListHtml = projects.map(p =>
+          `<li style="color: #cccccc;">
                         <strong>${p.title}</strong> (PI: ${p.pi}) - Meeting on ${format(parseISO(p.meetingDetails!.date), 'PPP')}
                     </li>`
-                ).join('');
-                
-                const emailHtml = `
+        ).join('');
+
+        const emailHtml = `
                     <div ${EMAIL_STYLES.background}>
                         ${EMAIL_STYLES.logo}
                         <h2 style="color:#ffffff;">Gentle Reminder: Pending IMR Evaluations</h2>
@@ -2215,48 +2216,48 @@ export async function sendGlobalEvaluationReminders(adminName: string): Promise<
                         ${EMAIL_STYLES.footer}
                     </div>
                 `;
-                
-                emailPromises.push(sendEmailUtility({
-                    to: evaluator.email,
-                    subject: `Reminder: You have ${projects.length} pending IMR evaluations`,
-                    html: emailHtml,
-                    from: 'default'
-                }));
-                emailsSentCount++;
-            }
-        }
-        
-        await Promise.all(emailPromises);
-        await logActivity('INFO', `${adminName} sent ${emailsSentCount} global IMR evaluation reminders`, { sentCount: emailsSentCount });
-        
-        return { success: true, sentCount: emailsSentCount };
-    } catch (error: any) {
-        console.error('Error sending global IMR evaluation reminders:', error);
-        await logActivity('ERROR', 'Failed to send global IMR evaluation reminders', { error: error.message });
-        return { success: false, sentCount: 0, error: error.message || 'An unknown server error occurred.' };
+
+        emailPromises.push(sendEmailUtility({
+          to: evaluator.email,
+          subject: `Reminder: You have ${projects.length} pending IMR evaluations`,
+          html: emailHtml,
+          from: 'default'
+        }));
+        emailsSentCount++;
+      }
     }
+
+    await Promise.all(emailPromises);
+    await logActivity('INFO', `${adminName} sent ${emailsSentCount} global IMR evaluation reminders`, { sentCount: emailsSentCount });
+
+    return { success: true, sentCount: emailsSentCount };
+  } catch (error: any) {
+    console.error('Error sending global IMR evaluation reminders:', error);
+    await logActivity('ERROR', 'Failed to send global IMR evaluation reminders', { error: error.message });
+    return { success: false, sentCount: 0, error: error.message || 'An unknown server error occurred.' };
+  }
 }
 
 
 export async function addTransaction(
   ...args: Parameters<typeof import('./grant-actions').addTransaction>
 ): ReturnType<typeof import('./grant-actions').addTransaction> {
-    const { addTransaction: originalAddTransaction } = await import('./grant-actions');
-    return originalAddTransaction(...args);
+  const { addTransaction: originalAddTransaction } = await import('./grant-actions');
+  return originalAddTransaction(...args);
 }
 
 export async function deleteTransaction(
   ...args: Parameters<typeof import('./grant-actions').deleteTransaction>
 ): ReturnType<typeof import('./grant-actions').deleteTransaction> {
-    const { deleteTransaction: originalDeleteTransaction } = await import('./grant-actions');
-    return originalDeleteTransaction(...args);
+  const { deleteTransaction: originalDeleteTransaction } = await import('./grant-actions');
+  return originalDeleteTransaction(...args);
 }
 
 export async function updateTransaction(
   ...args: Parameters<typeof import('./grant-actions').updateTransaction>
 ): ReturnType<typeof import('./grant-actions').updateTransaction> {
-    const { updateTransaction: originalUpdateTransaction } = await import('./grant-actions');
-    return originalUpdateTransaction(...args);
+  const { updateTransaction: originalUpdateTransaction } = await import('./grant-actions');
+  return originalUpdateTransaction(...args);
 }
 
 
@@ -2373,12 +2374,12 @@ export async function bulkUploadProjects(
         sanctionNumber: sanction_number || '',
         status: grant_amount > 0 ? 'Awarded' : 'Pending',
         phases: grant_amount > 0 ? [{
-            id: new Date().toISOString(),
-            name: "Phase 1",
-            amount: grant_amount,
-            status: "Disbursed",
-            disbursementDate: submissionDate.toISOString(),
-            transactions: []
+          id: new Date().toISOString(),
+          name: "Phase 1",
+          amount: grant_amount,
+          status: "Disbursed",
+          disbursementDate: submissionDate.toISOString(),
+          transactions: []
         }] : []
       };
 
@@ -2473,7 +2474,7 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
 
     await batch.commit();
     await Promise.all(emailPromises);
-    
+
     await logActivity("INFO", `Notified ${querySnapshot.size} admins for recruitment approval`, { jobTitle, postedBy });
     return { success: true };
   } catch (error: any) {
@@ -2482,4 +2483,4 @@ export async function notifyForRecruitmentApproval(jobTitle: string, postedBy: s
     return { success: false, error: error.message || "Failed to send notifications." };
   }
 }
-    
+
