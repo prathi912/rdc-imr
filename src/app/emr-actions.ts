@@ -392,6 +392,8 @@ export async function scheduleEmrMeeting(
       },
     });
 
+    let anyDocumentUploaded = false;
+
     for (const userId of applicantUids) {
       const interestsRef = adminDb.collection("emrInterests")
       const q = interestsRef.where("callId", "==", callId).where("userId", "==", userId)
@@ -402,6 +404,10 @@ export async function scheduleEmrMeeting(
       const interestDoc = interestSnapshot.docs[0]
       const interestRef = interestDoc.ref
       const interest = interestDoc.data() as EmrInterest
+
+      if (interest.pptUrl || interest.proposalUrl) {
+          anyDocumentUploaded = true;
+      }
 
       batch.update(interestRef, {
         meetingSlot: { date, time, pptDeadline },
@@ -523,7 +529,13 @@ export async function scheduleEmrMeeting(
                   <p><strong style="color: #ffffff;">${mode === 'Online' ? 'Meeting Link:' : 'Venue:'}</strong> 
                       ${mode === 'Online' ? `<a href="${venue}" style="color: #64b5f6; text-decoration: underline;">${venue}</a>` : venue}
                   </p>
+                  ${anyDocumentUploaded ? `
+                  <p style="color: #e0e0e0; margin-top: 15px;">The PI(s) have uploaded their Presentations/Proposals. You can view them directly on the portal:</p>
+                  <a href="${process.env.NEXT_PUBLIC_BASE_URL}/dashboard/evaluator-dashboard" style="display: inline-block; padding: 10px 20px; margin-top: 10px; font-size: 14px; font-weight: bold; color: #ffffff; background-color: #64b5f6; text-decoration: none; border-radius: 5px;">View on Evaluation Dashboard</a>
+                  <br/><br/>
+                  ` : `
                   <p style="color: #cccccc; margin-top: 15px;">Please review the assigned presentations on the PU Research Projects Portal.</p>
+                  `}
                   ${EMAIL_STYLES.footer}
               </div>
             `;
