@@ -37,6 +37,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { updateEmrFinalStatus, updateEmrInterestCoPis, updateEmrInterestDetails, addSanctionedEmrProject } from '@/app/emr-actions';
 import { findUserByMisId } from '@/app/userfinding';
+import { reportSystemError } from '@/lib/error-reporting';
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 
@@ -524,6 +525,7 @@ export default function AllProjectsPage() {
 
     } catch (error) {
         console.error("Error fetching projects: ", error);
+        reportSystemError(error, user);
         toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch project data.' });
     } finally {
         setLoading(false);

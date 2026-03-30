@@ -160,6 +160,83 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string,
 
 export { awardInitialGrant, addGrantPhase, updatePhaseStatus, generateSanctionOrder };
 
+export async function reportErrorToHelpdesk(
+  error: { message: string, stack?: string },
+  pageUrl: string,
+  user: User | null
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const to = "helpdesk.rdc@paruluniversity.ac.in";
+    const subject = `CRITICAL: RDC Portal System Error - ${error.message.substring(0, 50)}`;
+
+    const indexLinkMatch = error.message.match(/https:\/\/console\.firebase\.google\.com\/[^\s]+/);
+    const indexLink = indexLinkMatch ? indexLinkMatch[0] : null;
+
+    let userHtml = '<p style="color:#e0e0e0;">Guest / Not logged in</p>';
+    if (user) {
+      userHtml = `
+            <ul style="color:#e0e0e0; list-style: none; padding: 0; margin-top: 5px;">
+                <li><strong>Name:</strong> ${user.name || 'N/A'}</li>
+                <li><strong>Email:</strong> ${user.email || 'N/A'}</li>
+                <li><strong>MIS ID:</strong> ${user.misId || 'N/A'}</li>
+                <li><strong>Role:</strong> ${user.role || 'N/A'}</li>
+                <li><strong>Campus:</strong> ${user.campus || 'N/A'}</li>
+            </ul>
+        `;
+    }
+
+    const emailHtml = `
+        <div ${EMAIL_STYLES.background}>
+            ${EMAIL_STYLES.logo}
+            <h2 style="color: #ff5252; text-align: center; border-bottom: 2px solid #ff5252; padding-bottom: 10px;">System Error Report</h2>
+            
+            <div style="margin-top: 20px; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px;">
+                <h3 style="color: #ffca28; margin-top: 0;">Error Message</h3>
+                <p style="color: #ffffff; font-family: monospace; background: #1a2a33; padding: 15px; border-radius: 4px; border-left: 4px solid #ff5252; overflow-x: auto; margin-bottom: 0;">
+                    ${error.message}
+                </p>
+                ${indexLink ? `
+                <div style="margin-top: 15px; padding: 15px; background: #1b5e20; border-radius: 4px; border: 1px solid #4caf50;">
+                    <p style="color: #ffffff; margin: 0 0 5px 0;"><strong>Required Index Action:</strong></p>
+                    <a href="${indexLink}" style="color: #81c784; text-decoration: underline; word-break: break-all;">${indexLink}</a>
+                </div>` : ''}
+            </div>
+
+            <div style="margin-top: 20px; background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px;">
+                <h3 style="color: #64b5f6; margin-top: 0;">Technical Context</h3>
+                <p style="color: #e0e0e0; margin-bottom: 10px;"><strong>Page URL:</strong> <a href="${pageUrl}" style="color: #64b5f6;">${pageUrl}</a></p>
+                <div style="border-top: 1px solid #4f5b62; padding-top: 10px;">
+                    <h4 style="color: #64b5f6; margin: 0 0 5px 0;">User Information</h4>
+                    ${userHtml}
+                </div>
+            </div>
+
+            ${error.stack ? `
+            <div style="margin-top: 20px;">
+                <details style="color: #b0bec5; cursor: pointer;">
+                    <summary style="padding: 5px; background: rgba(255,255,255,0.05); border-radius: 4px;">View Technical Stack Trace</summary>
+                    <pre style="font-size: 11px; color: #90a4ae; background: #000; padding: 10px; margin-top: 10px; overflow: auto; max-height: 300px; border-radius: 4px;">${error.stack}</pre>
+                </details>
+            </div>` : ''}
+
+            ${EMAIL_STYLES.footer}
+        </div>
+    `;
+
+    await sendEmailUtility({
+      to,
+      subject,
+      html: emailHtml,
+      from: 'default'
+    });
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("Failed to report system error:", err);
+    return { success: false, error: err.message };
+  }
+}
+
 export async function sendErrorEmail(
   errorDetails: { message: string; digest?: string },
   user: User | null

@@ -61,6 +61,7 @@ import { format, parseISO } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
+import { reportSystemError } from '@/lib/error-reporting';
 import { db } from '@/lib/config';
 import { collection, query, where, getDocs, limit, startAfter, QueryDocumentSnapshot, DocumentData, orderBy } from 'firebase/firestore';
 
@@ -434,6 +435,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                 coPiDetails: coPis,
                 coPiUids: coPis.map(c => c.uid).filter(Boolean) as string[],
                 coPiNames: coPis.map(c => c.name),
+                coPiEmails: coPis.map(c => c.email.toLowerCase()),
                 proofUrl,
             };
             const result = await updateEmrInterestDetails(interest.id, updates);
@@ -585,6 +587,7 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
             setHasMore(snapshot.docs.length === pageSize);
         } catch (error) {
             console.error("Error fetching interests:", error);
+            reportSystemError(error, currentUser);
             toast({ variant: 'destructive', title: 'Error', description: 'Could not fetch registrations.' });
         } finally {
             setLoadingInterests(false);

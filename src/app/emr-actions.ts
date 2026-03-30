@@ -294,40 +294,40 @@ export async function registerEmrInterest(
 
 
     if (coPis && coPis.length > 0) {
-      const usersRef = adminDb.collection("users")
-      const coPiUids = coPis.map((p) => p.uid).filter(Boolean) as string[]
+      const batch = adminDb.batch();
+      
+      for (const coPi of coPis) {
+        // 1. Send Email Notification to all Co-PIs
+        if (coPi.email) {
+          await sendEmailUtility({
+            to: coPi.email,
+            subject: `You've been added to an EMR Application`,
+            html: `
+              <div ${EMAIL_STYLES.background}>
+                ${EMAIL_STYLES.logo}
+                <p style="color:#ffffff;">Dear ${coPi.name},</p>
+                <p style="color:#e0e0e0;">You have been added as a Co-PI by ${user.name} for the EMR funding opportunity titled "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
+                <p style="color:#cccccc; font-size: 14px; margin-top: 20px;">You can track this application on the R&D Portal using your institutional credentials.</p>
+                ${EMAIL_STYLES.footer}
+              </div>`,
+            from: "default",
+          });
+        }
 
-      if (coPiUids.length > 0) {
-        const usersQuery = usersRef.where(adminDb.firestore.FieldPath.documentId(), "in", coPiUids)
-        const coPiDocs = await usersQuery.get()
-        const batch = adminDb.batch()
-
-        for (const userDoc of coPiDocs.docs) {
-          const coPi = userDoc.data() as User
-          const notificationRef = adminDb.collection("notifications").doc()
+        // 2. Create In-App Notification for registered Co-PIs
+        if (coPi.uid) {
+          const notificationRef = adminDb.collection("notifications").doc();
           batch.set(notificationRef, {
             uid: coPi.uid,
             title: `You've been added as a Co-PI for the EMR call: "${callTitle}"`,
             createdAt: new Date().toISOString(),
             isRead: false,
-          })
-
-          if (coPi.email) {
-            await sendEmailUtility({
-              to: coPi.email,
-              subject: `You've been added to an EMR Application `,
-              html: `
-                            <div ${EMAIL_STYLES.background}>
-                                ${EMAIL_STYLES.logo}
-                                <p style="color:#ffffff;">Dear ${coPi.name},</p>
-                                <p style="color:#e0e0e0;">You have been added as a Co-PI by ${user.name} for the EMR funding opportunity titled "<strong style="color:#ffffff;">${callTitle}</strong>".</p>
-                                 ${EMAIL_STYLES.footer}
-                            </div>`,
-              from: "default",
-            })
-          }
+          });
         }
-        await batch.commit()
+      }
+      
+      if (coPis.some(c => c.uid)) {
+        await batch.commit();
       }
     }
 
@@ -1762,6 +1762,59 @@ export async function updateEmrInterestDetails(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const interestRef = adminDb.collection('emrInterests').doc(interestId);
+    const interestSnap = await interestRef.get();
+    if (!interestSnap.exists) {
+      return { success: false, error: "Interest registration not found." };
+    }
+    const existingInterest = interestSnap.data() as EmrInterest;
+
+    // Check for newly added Co-PIs to notify them
+    if (updates.coPiDetails && Array.isArray(updates.coPiDetails)) {
+      const existingEmails = new Set((existingInterest.coPiEmails || []).map(e => e.toLowerCase()));
+      const newCoPis = updates.coPiDetails.filter(c => !existingEmails.has(c.email.toLowerCase()));
+
+      if (newCoPis.length > 0) {
+        const batch = adminDb.batch();
+        for (const coPi of newCoPis) {
+          // Send Email
+          if (coPi.email) {
+            await sendEmailUtility({
+              to: coPi.email,
+              subject: `You've been added to an EMR Project as Co-PI`,
+              html: `
+                <div ${EMAIL_STYLES.background}>
+                  ${EMAIL_STYLES.logo}
+                  <p style="color:#ffffff;">Dear ${coPi.name},</p>
+                  <p style="color:#e0e0e0;">You have been added as a Co-PI for the EMR project titled "<strong style="color:#ffffff;">${updates.callTitle || existingInterest.callTitle}</strong>" by ${existingInterest.userName}.</p>
+                  <p style="color:#cccccc; font-size: 14px; margin-top: 20px;">You can track this project on the R&D Portal using your institutional credentials.</p>
+                  ${EMAIL_STYLES.footer}
+                </div>`,
+              from: "default",
+            });
+          }
+
+          // In-App Notification
+          if (coPi.uid) {
+            const notificationRef = adminDb.collection("notifications").doc();
+            batch.set(notificationRef, {
+              uid: coPi.uid,
+              title: `You've been added as a Co-PI to: "${updates.callTitle || existingInterest.callTitle}"`,
+              createdAt: new Date().toISOString(),
+              isRead: false,
+            });
+          }
+        }
+        if (newCoPis.some(c => c.uid)) {
+          await batch.commit();
+        }
+      }
+
+      // Sync derivative fields if only coPiDetails was provided
+      if (!updates.coPiEmails) updates.coPiEmails = updates.coPiDetails.map(c => c.email.toLowerCase());
+      if (!updates.coPiNames) updates.coPiNames = updates.coPiDetails.map(c => c.name);
+      if (!updates.coPiUids) updates.coPiUids = updates.coPiDetails.map(c => c.uid).filter((uid): uid is string => !!uid);
+    }
+
     await interestRef.update(updates);
     await logActivity('INFO', 'EMR interest details updated', { interestId, updates });
     return { success: true };

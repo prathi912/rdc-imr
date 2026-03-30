@@ -14,11 +14,20 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { FileText, Loader2 } from "lucide-react"
+import { reportSystemError } from "@/lib/error-reporting"
 
-function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls: FundingCall[] }) {
+function EmrProjectList({ 
+  interests, 
+  calls, 
+  currentUser 
+}: { 
+  interests: EmrInterest[]; 
+  calls: FundingCall[]; 
+  currentUser: User | null 
+}) {
   if (interests.length === 0) {
     return (
       <Card>
@@ -30,11 +39,9 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
   }
 
   const getCallTitle = (interest: EmrInterest) => {
-    // For historical/bulk-uploaded projects, the title is stored directly in the interest record.
     if (interest.isBulkUploaded && interest.callTitle) {
       return interest.callTitle;
     }
-    // For regular projects, find the title from the associated funding call.
     return calls.find((c) => c.id === interest.callId)?.title || "Unknown Funding Call"
   }
 
@@ -45,7 +52,8 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
           <TableHeader>
             <TableRow>
               <TableHead>Funding Call Title</TableHead>
-              <TableHead>Details</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Date</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Proof</TableHead>
             </TableRow>
@@ -53,10 +61,21 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
           <TableBody>
             {interests.map((interest) => {
                 const proofLink = interest.proofUrl || interest.finalProofUrl;
+                const isPI = currentUser?.uid === interest.userId || currentUser?.email === interest.userEmail;
+                
                 return (
                   <TableRow key={interest.id}>
-                    <TableCell className="font-medium">{getCallTitle(interest)}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{interest.durationAmount || 'N/A'}</TableCell>
+                    <TableCell className="font-medium max-w-[300px] break-words whitespace-normal py-4">
+                        {getCallTitle(interest)}
+                    </TableCell>
+                    <TableCell>
+                        <Badge variant={isPI ? "default" : "outline"} className="font-semibold px-2 py-0.5">
+                            {isPI ? "PI" : "Co-PI"}
+                        </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                        {interest.registeredAt ? format(parseISO(interest.registeredAt), 'dd MMM yyyy') : 'N/A'}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={interest.status === "Recommended" || interest.status === 'Sanctioned' ? "default" : "secondary"}>
                         {interest.status}
@@ -66,7 +85,7 @@ function EmrProjectList({ interests, calls }: { interests: EmrInterest[]; calls:
                         {proofLink ? (
                             <Button asChild variant="outline" size="sm">
                                 <a href={proofLink} target="_blank" rel="noopener noreferrer">
-                                    <FileText className="h-4 w-4 mr-2"/> View Proof
+                                    <FileText className="h-4 w-4 mr-2"/> Proof
                                 </a>
                             </Button>
                         ) : (
@@ -160,7 +179,8 @@ export default function MyProjectsPage() {
       let constraints: any[] = [
         or(
           where("userId", "==", user.uid),
-          where("coPiUids", "array-contains", user.uid)
+          where("coPiUids", "array-contains", user.uid),
+          where("coPiEmails", "array-contains", user.email.toLowerCase())
         ),
         orderBy("registeredAt", "desc"),
         limit(itemsPerPage)
@@ -179,6 +199,7 @@ export default function MyProjectsPage() {
       setHasMoreEmr(snapshot.docs.length === itemsPerPage)
     } catch (error: any) {
       console.error("Error fetching EMR interests:", error)
+      reportSystemError(error, user)
       toast({ variant: "destructive", title: "Error", description: "Could not fetch EMR interests." })
     } finally {
       setLoading(false)
@@ -277,7 +298,7 @@ export default function MyProjectsPage() {
           </TabsContent>
           <TabsContent value="emr">
             <div className="space-y-6">
-                <EmrProjectList interests={filteredEmrInterests} calls={fundingCalls} />
+                <EmrProjectList interests={filteredEmrInterests} calls={fundingCalls} currentUser={user} />
                 {hasMoreEmr && (
                     <div className="flex justify-center">
                         <Button variant="outline" onClick={() => fetchEmrInterests(true)} disabled={loading}>

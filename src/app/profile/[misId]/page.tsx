@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import { collection, query, where, getDocs, limit, orderBy, or } from "firebase/firestore"
 import { db } from "@/lib/config"
+import { reportSystemError } from "@/lib/error-reporting"
 import type { User, IncentiveClaim, Project, EmrInterest, FundingCall, ResearchPaper } from "@/types"
 import { PageHeader } from "@/components/page-header"
 import { ProfileClient } from "@/components/profile/profile-client"
@@ -86,7 +87,8 @@ export default function ProfilePage() {
           emrInterestsRef, 
           or(
             where("userId", "==", fetchedUser.uid), 
-            where("coPiUids", "array-contains", fetchedUser.uid)
+            where("coPiUids", "array-contains", fetchedUser.uid),
+            where("coPiEmails", "array-contains", fetchedUser.email.toLowerCase())
           )
         );
         const emrInterestsSnapshot = await getDocs(emrInterestsQuery);
@@ -147,12 +149,13 @@ export default function ProfilePage() {
         }
 
       } catch (err: any) {
+        console.error("Error fetching data:", err)
+        reportSystemError(err, sessionUser)
         if (err.code === "permission-denied") {
           setError("Access Denied: You do not have permission to view this profile.")
         } else {
           setError(err.message || "Failed to load profile data.")
         }
-        console.error(err)
       } finally {
         setLoading(false)
       }
