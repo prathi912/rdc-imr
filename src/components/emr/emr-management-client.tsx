@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search, Send, CalendarDays, ChevronRight } from 'lucide-react';
+import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search, Send, CalendarDays, ChevronRight, Plus } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '../ui/form';
@@ -19,34 +19,34 @@ import * as z from 'zod';
 import { useForm } from 'react-hook-form';
 import { deleteEmrInterest, updateEmrInterestDetails, updateEmrStatus, signAndUploadEndorsement, markEmrAttendance, registerEmrInterest, sendPptReminderEmails, uploadFileToServer } from '@/app/emr-actions';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+    DialogClose,
 } from '@/components/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
+    DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import { ScheduleMeetingDialog } from './schedule-meeting-dialog';
 import { Input } from '../ui/input';
@@ -93,14 +93,14 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 const signEndorsementSchema = z.object({
     signedEndorsement: z.any()
-    .refine(files => files?.length > 0, "A signed PDF is required.")
-    .refine(files => files?.[0]?.size <= MAX_FILE_SIZE, `File size must be less than 5MB.`)
-    .refine(files => files?.[0]?.type === 'application/pdf', "Only PDF files are accepted."),
+        .refine(files => files?.length > 0, "A signed PDF is required.")
+        .refine(files => files?.[0]?.size <= MAX_FILE_SIZE, `File size must be less than 5MB.`)
+        .refine(files => files?.[0]?.type === 'application/pdf', "Only PDF files are accepted."),
 });
 
 const attendanceSchema = z.object({
-  absentApplicantIds: z.array(z.string()),
-  absentEvaluatorUids: z.array(z.string()),
+    absentApplicantIds: z.array(z.string()),
+    absentEvaluatorUids: z.array(z.string()),
 });
 
 function RegisterUserDialog({ call, adminUser, isOpen, onOpenChange, onRegisterSuccess }: { call: FundingCall, adminUser: User, isOpen: boolean, onOpenChange: (open: boolean) => void, onRegisterSuccess: () => void }) {
@@ -267,7 +267,7 @@ function AttendanceDialog({ call, interests, allUsers, isOpen, onOpenChange, onU
                             <h4 className="font-semibold mb-2">Evaluators ({assignedEvaluators.length})</h4>
                             <div className="space-y-2">
                                 {assignedEvaluators.map(evaluator => (
-                                     <FormField
+                                    <FormField
                                         key={evaluator.uid}
                                         control={form.control}
                                         name="absentEvaluatorUids"
@@ -458,7 +458,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                 <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-4">
                     <div><Label>Project Title</Label><Input value={title} onChange={e => setTitle(e.target.value)} /></div>
                     <div><Label>Funding Agency</Label><Input value={agency} onChange={e => setAgency(e.target.value)} /></div>
-                    <div><Label>Amount & Duration</Label><Input value={durationAmount} onChange={e => setDurationAmount(e.target.value)} placeholder="e.g., Amount: 50,00,000 | Duration: 3 Years"/></div>
+                    <div><Label>Amount & Duration</Label><Input value={durationAmount} onChange={e => setDurationAmount(e.target.value)} placeholder="e.g., Amount: 50,00,000 | Duration: 3 Years" /></div>
                     <div>
                         <Label>Date of Sanction</Label>
                         <Popover>
@@ -472,19 +472,19 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0">
-                                <Calendar 
-                                    mode="single" 
+                                <Calendar
+                                    mode="single"
                                     captionLayout="dropdown-buttons"
                                     fromYear={2010}
                                     toYear={new Date().getFullYear()}
-                                    selected={sanctionDate} 
-                                    onSelect={setSanctionDate} 
-                                    initialFocus 
+                                    selected={sanctionDate}
+                                    onSelect={setSanctionDate}
+                                    initialFocus
                                 />
                             </PopoverContent>
                         </Popover>
                     </div>
-                     <div>
+                    <div>
                         <Label>Proof of Sanction (Below 5 MB)</Label>
                         {interest.proofUrl && <a href={interest.proofUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline block mb-2">View current proof</a>}
                         <Input type="file" accept=".pdf" onChange={(e) => setProofFile(e.target.files?.[0] || null)} />
@@ -494,7 +494,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                         <Label>Co-PIs</Label>
                         <div className="flex gap-2 mt-1">
                             <Input placeholder="Search Co-PI by MIS ID" value={coPiSearchTerm} onChange={e => setCoPiSearchTerm(e.target.value)} />
-                            <Button onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin"/> : "Search"}</Button>
+                            <Button onClick={handleSearchCoPi} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}</Button>
                         </div>
                         <div className="space-y-2 mt-2">
                             {coPis.map(c => <div key={c.email} className="flex justify-between items-center p-2 bg-muted rounded-md text-sm"><span>{c.name}</span><Button variant="ghost" size="sm" onClick={() => handleRemoveCoPi(c.email)}>Remove</Button></div>)}
@@ -505,7 +505,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
                     <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
                     <Button onClick={handleSave} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save'}</Button>
                 </DialogFooter>
-                 <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
+                <Dialog open={isSelectionOpen} onOpenChange={setIsSelectionOpen}>
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Multiple Users Found</DialogTitle>
@@ -534,7 +534,7 @@ function EditBulkEmrDialog({ interest, isOpen, onOpenChange, onUpdate }: { inter
 export function EmrManagementClient({ call, allUsers, currentUser, onActionComplete }: EmrManagementClientProps) {
     const { toast } = useToast();
     const userMap = useMemo(() => new Map(allUsers.map(u => [u.uid, u])), [allUsers]);
-    
+
     const [interests, setInterests] = useState<EmrInterest[]>([]);
     const [loadingInterests, setLoadingInterests] = useState(false);
     const [lastVisibleDoc, setLastVisibleDoc] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
@@ -600,7 +600,7 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
         resolver: zodResolver(deleteRegistrationSchema),
         defaultValues: { remarks: '' },
     });
-    
+
     const remarksForm = useForm<z.infer<typeof adminRemarksSchema>>({
         resolver: zodResolver(adminRemarksSchema),
     });
@@ -628,10 +628,10 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
         deleteForm.reset({ remarks: '' });
         setIsDeleteDialogOpen(true);
     };
-    
+
     const handleStatusUpdate = async (interestId: string, newStatus: EmrInterest['status'], remarks?: string) => {
         const result = await updateEmrStatus(interestId, newStatus, remarks);
-         if (result.success) {
+        if (result.success) {
             toast({ title: "Status Updated", description: "The applicant has been notified." });
             onActionComplete();
             fetchInterests(); // Refresh
@@ -646,19 +646,19 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
         }
         setIsRemarksDialogOpen(false);
     };
-    
+
     const handleOpenRemarksDialog = (interest: EmrInterest, status: EmrInterest['status']) => {
         setInterestToUpdate(interest);
         setStatusToUpdate(status);
         remarksForm.reset({ remarks: '' });
         setIsRemarksDialogOpen(true);
     };
-    
+
     const handleOpenBulkEditDialog = (interest: EmrInterest) => {
         setInterestToUpdate(interest);
         setIsBulkEditDialogOpen(true);
     };
-    
+
     const handleOpenSignDialog = (interest: EmrInterest) => {
         setInterestToUpdate(interest);
         setIsSignEndorsementDialogOpen(true);
@@ -703,462 +703,523 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Registrations');
         XLSX.writeFile(workbook, `registrations_${call.title.replace(/\s+/g, '_')}.xlsx`);
     };
-    
+
     const filteredInterests = useMemo(() => {
         if (!searchTerm) return interests;
         const lowerCaseSearch = searchTerm.toLowerCase();
         return interests.filter(interest => {
             const user = userMap.get(interest.userId);
             return interest.userName.toLowerCase().includes(lowerCaseSearch) ||
-                   interest.userEmail.toLowerCase().includes(lowerCaseSearch) ||
-                   (user?.misId && user.misId.toLowerCase().includes(lowerCaseSearch));
+                interest.userEmail.toLowerCase().includes(lowerCaseSearch) ||
+                (user?.misId && user.misId.toLowerCase().includes(lowerCaseSearch));
         });
     }, [interests, searchTerm, userMap]);
-    
+
     const unscheduledApplicantsExist = interests.some(i => !i.meetingSlot && !i.wasAbsent);
     const meetingIsScheduled = !!call.meetingDetails?.date;
     const assignedEvaluators = useMemo(() => {
         if (!call.meetingDetails?.assignedEvaluators) return [];
         return allUsers.filter(u => call.meetingDetails?.assignedEvaluators?.includes(u.uid));
     }, [call.meetingDetails?.assignedEvaluators, allUsers]);
-    
+
     const pendingPptUploads = useMemo(() => {
         return interests.filter(i => !i.pptUrl).length;
     }, [interests]);
 
 
-return (
-<>
-{meetingIsScheduled && (
-    <Card className="mb-8 bg-primary/10 border-primary/20">
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-                <CalendarClock className="h-5 w-5" />
-                Meeting Scheduled
-            </CardTitle>
-        </CardHeader>
+    return (
+        <>
+            {meetingIsScheduled && (
+                <Card className="mb-8 bg-primary/10 border-primary/20">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <CalendarClock className="h-5 w-5" />
+                            Meeting Scheduled
+                        </CardTitle>
+                    </CardHeader>
 
-        <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <p><strong>Date:</strong> {format(parseISO(call.meetingDetails!.date), 'PPP')}</p>
-                <p><strong>Time:</strong> {call.meetingDetails!.time}</p>
-                <p><strong>Venue:</strong> {call.meetingDetails!.venue}</p>
-            </div>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <p><strong>Date:</strong> {format(parseISO(call.meetingDetails!.date), 'PPP')}</p>
+                            <p><strong>Time:</strong> {call.meetingDetails!.time}</p>
+                            <p><strong>Venue:</strong> {call.meetingDetails!.venue}</p>
+                        </div>
 
-            {assignedEvaluators.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-primary/20">
-                    <p className="text-sm font-semibold mb-2">Assigned Evaluators:</p>
-                    <div className="flex flex-wrap gap-2">
-                        {assignedEvaluators.map(evaluator => (
-                            <Badge key={evaluator.uid} variant="outline" className="bg-white/50">
-                                {evaluator.name}
-                            </Badge>
-                        ))}
-                    </div>
-                </div>
+                        {assignedEvaluators.length > 0 && (
+                            <div className="mt-4 pt-4 border-t border-primary/20">
+                                <p className="text-sm font-semibold mb-2">Assigned Evaluators:</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {assignedEvaluators.map(evaluator => (
+                                        <Badge key={evaluator.uid} variant="outline" className="bg-white/50">
+                                            {evaluator.name}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="mt-4 flex justify-end">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsScheduleDialogOpen(true)}
+                            >
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit Meeting Details
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
             )}
 
-            <div className="mt-4 flex justify-end">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsScheduleDialogOpen(true)}
-                >
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit Meeting Details
-                </Button>
-            </div>
-        </CardContent>
-    </Card>
-)}
+            <Card>
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <CardTitle>
+                                Applicant Registrations ({interests.length}{hasMore ? '+' : ''})
+                            </CardTitle>
+                            <CardDescription>
+                                Review and manage all applicants for this call.
+                            </CardDescription>
+                        </div>
 
-<Card>
-    <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <CardTitle>
-                    Applicant Registrations ({interests.length}{hasMore ? '+' : ''})
-                </CardTitle>
-                <CardDescription>
-                    Review and manage all applicants for this call.
-                </CardDescription>
-            </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {unscheduledApplicantsExist && currentUser.designation !== 'Head of Goa Campus' && (
+                                <Button onClick={() => setIsScheduleDialogOpen(true)}>
+                                    <CalendarClock className="mr-2 h-4 w-4" />
+                                    Schedule Meeting
+                                </Button>
+                            )}
 
-            <div className="flex flex-wrap items-center gap-2">
-                {unscheduledApplicantsExist && currentUser.designation !== 'Head of Goa Campus' && (
-                    <Button onClick={() => setIsScheduleDialogOpen(true)}>
-                        <CalendarClock className="mr-2 h-4 w-4" />
-                        Schedule Meeting
-                    </Button>
-                )}
+                            <Button
+                                variant="secondary"
+                                onClick={() => setIsRegisterUserDialogOpen(true)}
+                            >
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                Register User
+                            </Button>
 
-                <Button
-                    variant="secondary"
-                    onClick={() => setIsRegisterUserDialogOpen(true)}
-                >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Register User
-                </Button>
+                            <Button
+                                variant="outline"
+                                onClick={handleSendPptReminders}
+                                disabled={isSendingReminders}
+                            >
+                                {isSendingReminders
+                                    ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    : <Send className="mr-2 h-4 w-4" />
+                                }
+                                Remind ({pendingPptUploads})
+                            </Button>
 
-                <Button
-                    variant="outline"
-                    onClick={handleSendPptReminders}
-                    disabled={isSendingReminders}
-                >
-                    {isSendingReminders
-                        ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        : <Send className="mr-2 h-4 w-4" />
-                    }
-                    Remind ({pendingPptUploads})
-                </Button>
+                            {meetingIsScheduled && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsAttendanceDialogOpen(true)}
+                                >
+                                    <UserCheck className="mr-2 h-4 w-4" />
+                                    Attendance
+                                </Button>
+                            )}
 
-                {meetingIsScheduled && (
-                    <Button
-                        variant="outline"
-                        onClick={() => setIsAttendanceDialogOpen(true)}
-                    >
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        Attendance
-                    </Button>
-                )}
+                            <Button
+                                variant="outline"
+                                onClick={handleExport}
+                                disabled={interests.length === 0}
+                            >
+                                <Download className="mr-2 h-4 w-4" />
+                                Export XLSX
+                            </Button>
+                        </div>
+                    </div>
 
-                <Button
-                    variant="outline"
-                    onClick={handleExport}
-                    disabled={interests.length === 0}
-                >
-                    <Download className="mr-2 h-4 w-4" />
-                    Export XLSX
-                </Button>
-            </div>
-        </div>
+                    <div className="mt-4">
+                        <Input
+                            placeholder="Search by PI Name, Email, or MIS ID..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="max-w-md"
+                        />
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <div className="rounded-md border overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="hidden lg:table-cell">Interest ID</TableHead>
+                                    <TableHead>Principal Investigator</TableHead>
+                                    <TableHead className="hidden xl:table-cell">Co-PIs</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Documents</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredInterests.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                            {loadingInterests ? <Loader2 className="h-8 w-8 animate-spin mx-auto" /> : 'No registrations found.'}
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    filteredInterests.map((interest) => (
+                                        <TableRow key={interest.id}>
+                                            <TableCell className="font-medium hidden lg:table-cell">{interest.interestId || 'N/A'}</TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    {(() => {
+                                                        const piUser = userMap.get(interest.userId);
+                                                        const piProfileLink = piUser?.misId ? (piUser.campus === 'Goa' ? `/goa/${piUser.misId}` : `/profile/${piUser.misId}`) : null;
+                                                        return piProfileLink ? (
+                                                            <Link href={piProfileLink} className="font-medium line-clamp-1 hover:underline text-primary">
+                                                                {interest.userName}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="font-medium line-clamp-1">{interest.userName}</span>
+                                                        );
+                                                    })()}
+                                                    <span className="text-[10px] text-muted-foreground hidden sm:block">{interest.userEmail}</span>
+                                                    <div className="text-[10px] text-muted-foreground hidden md:flex flex-col">
+                                                        <span>{userMap.get(interest.userId)?.department || interest.department}</span>
+                                                        <span>{userMap.get(interest.userId)?.institute || interest.faculty || 'N/A'}</span>
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="hidden xl:table-cell">
+                                                <div className="flex flex-col gap-1">
+                                                    {interest.coPiNames && interest.coPiNames.length > 0 ? (
+                                                        interest.coPiNames.map((name, i) => {
+                                                            const coPiDetail = interest.coPiDetails?.find(d => d.name === name || d.email === interest.coPiEmails?.[i]);
+                                                            const coPiUser = allUsers.find(u => u.email === coPiDetail?.email || (coPiDetail?.uid && u.uid === coPiDetail.uid));
+                                                            const campus = coPiUser?.campus || 'Vadodara';
 
-        <div className="mt-4">
-            <Input
-                placeholder="Search by PI Name, Email, or MIS ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="max-w-md"
-            />
-        </div>
-    </CardHeader>
-    <CardContent>
-        <div className="rounded-md border overflow-x-auto">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Interest ID</TableHead>
-                        <TableHead>Principal Investigator</TableHead>
-                        <TableHead>Co-PIs</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Presentation</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {filteredInterests.length === 0 ? (
-                        <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                {loadingInterests ? <Loader2 className="h-8 w-8 animate-spin mx-auto" /> : 'No registrations found.'}
-                            </TableCell>
-                        </TableRow>
-                    ) : (
-                        filteredInterests.map((interest) => (
-                            <TableRow key={interest.id}>
-                                <TableCell className="font-medium">{interest.interestId || 'N/A'}</TableCell>
-                                <TableCell>
-                                    <div className="flex flex-col">
-                                        <span>{interest.userName}</span>
-                                        <span className="text-xs text-muted-foreground">{interest.userEmail}</span>
-                                        <span className="text-xs text-muted-foreground">{userMap.get(interest.userId)?.department || interest.department}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <div className="flex flex-col gap-1">
-                                        {interest.coPiNames && interest.coPiNames.length > 0 ? (
-                                            interest.coPiNames.map((name, i) => (
-                                                <Badge key={i} variant="outline" className="w-fit text-[10px]">{name}</Badge>
-                                            ))
-                                        ) : (
-                                            <span className="text-xs text-muted-foreground">None</span>
-                                        )}
-                                    </div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant={
-                                        interest.status === 'Sanctioned' ? 'default' :
-                                        (interest.status === 'Not Recommended' || interest.status === 'Not Sanctioned') ? 'destructive' : 'secondary'
-                                    }>
-                                        {interest.status}
-                                    </Badge>
-                                </TableCell>
-                                <TableCell>
-                                    {interest.pptUrl ? (
-                                        <Button variant="ghost" size="sm" asChild>
-                                            <a href={interest.pptUrl} target="_blank" rel="noopener noreferrer">
-                                                <ViewIcon className="h-4 w-4 mr-2" />
-                                                View
-                                            </a>
-                                        </Button>
-                                    ) : (
-                                        <span className="text-xs text-destructive italic">Not Uploaded</span>
-                                    )}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuLabel>Manage Registration</DropdownMenuLabel>
-                                            <DropdownMenuItem onClick={() => handleOpenBulkEditDialog(interest)}>
-                                                <Edit className="mr-2 h-4 w-4" />
-                                                Edit Details
-                                            </DropdownMenuItem>
-                                            
-                                            <DropdownMenuSeparator />
-                                            
-                                            <DropdownMenuSub>
-                                                <DropdownMenuSubTrigger>
-                                                    <MessageSquare className="mr-2 h-4 w-4" />
-                                                    Update Status
-                                                </DropdownMenuSubTrigger>
-                                                <DropdownMenuSubContent>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Registered')}>
-                                                        Interest Registered
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Evaluation Done')}>
-                                                        Evaluated
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Endorsement Submitted')}>
-                                                        Endorsement Pending
-                                                    </DropdownMenuItem>
-                                                     <DropdownMenuItem onClick={() => handleOpenSignDialog(interest)}>
-                                                        Sign Endorsement
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'PPT Submitted')}>
-                                                        Proposal Submitted
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Sanctioned')}>
-                                                        Sanctioned
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Not Recommended')}>
-                                                        Rejected
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuSubContent>
-                                            </DropdownMenuSub>
+                                                            const coPiProfileLink = coPiDetail?.misId ? (campus === 'Goa' ? `/goa/${coPiDetail.misId}` : `/profile/${coPiDetail.misId}`) : null;
 
-                                            <DropdownMenuSeparator />
+                                                            const badgeSnippet = <Badge variant="outline" className="w-fit text-[10px] hover:bg-primary/5 cursor-pointer">{name}</Badge>;
 
-                                            <DropdownMenuItem onClick={() => handleOpenPptUpload(interest)}>
-                                                <Upload className="mr-2 h-4 w-4" />
-                                                Upload/Replace PPT
-                                            </DropdownMenuItem>
+                                                            return coPiProfileLink ? (
+                                                                <Link key={i} href={coPiProfileLink} className="w-fit">
+                                                                    {badgeSnippet}
+                                                                </Link>
+                                                            ) : (
+                                                                <div key={i}>{badgeSnippet}</div>
+                                                            );
+                                                        })
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">None</span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant={
+                                                    interest.status === 'Sanctioned' ? 'default' :
+                                                        (interest.status === 'Not Recommended' || interest.status === 'Not Sanctioned') ? 'destructive' : 'secondary'
+                                                } className="text-[10px] px-1 h-5">
+                                                    {interest.status}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col gap-1.5 min-w-[80px]">
+                                                    <div className="flex items-center gap-1.5">
+                                                        {interest.pptUrl ? (
+                                                            <Button variant="ghost" size="sm" asChild className="h-7 px-1.5 hover:bg-primary/10 text-primary">
+                                                                <a href={interest.pptUrl} target="_blank" rel="noopener noreferrer" title="View Presentation">
+                                                                    <ViewIcon className="h-3.5 w-3.5" />
+                                                                    <span className="text-[10px] ml-1">PPT</span>
+                                                                </a>
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-7 px-1.5 text-muted-foreground hover:text-destructive"
+                                                                onClick={() => handleOpenPptUpload(interest)}
+                                                                title="Upload Presentation"
+                                                            >
+                                                                <Plus className="h-3.5 w-3.5" />
+                                                                <span className="text-[10px] ml-1">PPT</span>
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        {interest.proposalUrl ? (
+                                                            <Button variant="ghost" size="sm" asChild className="h-7 px-1.5 hover:bg-primary/10 text-primary">
+                                                                <a href={interest.proposalUrl} target="_blank" rel="noopener noreferrer" title="View Proposal">
+                                                                    <FileUp className="h-3.5 w-3.5" />
+                                                                    <span className="text-[10px] ml-1">Proposal</span>
+                                                                </a>
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="h-7 px-1.5 text-muted-foreground hover:text-primary"
+                                                                onClick={() => handleOpenProposalUpload(interest)}
+                                                                title="Upload Proposal"
+                                                            >
+                                                                <Plus className="h-3.5 w-3.5" />
+                                                                <span className="text-[10px] ml-1">Proposal</span>
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                            <MoreHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuLabel>Manage Registration</DropdownMenuLabel>
+                                                        <DropdownMenuItem onClick={() => handleOpenBulkEditDialog(interest)}>
+                                                            <Edit className="mr-2 h-4 w-4" />
+                                                            Edit Details
+                                                        </DropdownMenuItem>
 
-                                            <DropdownMenuItem onClick={() => handleOpenProposalUpload(interest)}>
-                                                <FileUp className="mr-2 h-4 w-4" />
-                                                Upload Proposal
-                                            </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
 
-                                            <DropdownMenuSeparator />
+                                                        <DropdownMenuSub>
+                                                            <DropdownMenuSubTrigger>
+                                                                <MessageSquare className="mr-2 h-4 w-4" />
+                                                                Update Status
+                                                            </DropdownMenuSubTrigger>
+                                                            <DropdownMenuSubContent>
+                                                                <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Registered')}>
+                                                                    Interest Registered
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Evaluation Done')}>
+                                                                    Evaluated
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Endorsement Submitted')}>
+                                                                    Endorsement Pending
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleOpenSignDialog(interest)}>
+                                                                    Sign Endorsement
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'PPT Submitted')}>
+                                                                    Proposal Submitted
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Sanctioned')}>
+                                                                    Sanctioned
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => handleOpenRemarksDialog(interest, 'Not Recommended')}>
+                                                                    Rejected
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuSubContent>
+                                                        </DropdownMenuSub>
 
-                                            <DropdownMenuItem
-                                                className="text-destructive focus:text-destructive"
-                                                onClick={() => handleOpenDeleteDialog(interest)}
-                                            >
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Delete Registration
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </TableCell>
-                            </TableRow>
-                        ))
+                                                        <DropdownMenuSeparator />
+
+                                                        <DropdownMenuItem onClick={() => handleOpenPptUpload(interest)}>
+                                                            <Upload className="mr-2 h-4 w-4" />
+                                                            Upload/Replace PPT
+                                                        </DropdownMenuItem>
+
+                                                        <DropdownMenuItem onClick={() => handleOpenProposalUpload(interest)}>
+                                                            <FileUp className="mr-2 h-4 w-4" />
+                                                            Upload Proposal
+                                                        </DropdownMenuItem>
+
+                                                        <DropdownMenuSeparator />
+
+                                                        <DropdownMenuItem
+                                                            className="text-destructive focus:text-destructive"
+                                                            onClick={() => handleOpenDeleteDialog(interest)}
+                                                        >
+                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                            Delete Registration
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    {hasMore && (
+                        <div className="flex justify-center py-4">
+                            <Button variant="outline" size="sm" onClick={() => fetchInterests(true)} disabled={loadingInterests}>
+                                {loadingInterests ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ChevronRight className="h-4 w-4 mr-2 rotate-90" />}
+                                Load More
+                            </Button>
+                        </div>
                     )}
-                </TableBody>
-            </Table>
-        </div>
-        {hasMore && (
-            <div className="flex justify-center py-4">
-                <Button variant="outline" size="sm" onClick={() => fetchInterests(true)} disabled={loadingInterests}>
-                    {loadingInterests ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <ChevronRight className="h-4 w-4 mr-2 rotate-90"/>}
-                    Load More
-                </Button>
-            </div>
-        )}
-    </CardContent>
+                </CardContent>
 
-    <ScheduleMeetingDialog
-        isOpen={isScheduleDialogOpen}
-        onOpenChange={setIsScheduleDialogOpen}
-        call={call}
-        interests={interests}
-        allUsers={allUsers}
-        currentUser={currentUser}
-        onActionComplete={() => {
-            fetchInterests();
-            onActionComplete();
-        }}
-    />
+                <ScheduleMeetingDialog
+                    isOpen={isScheduleDialogOpen}
+                    onOpenChange={setIsScheduleDialogOpen}
+                    call={call}
+                    interests={interests}
+                    allUsers={allUsers}
+                    currentUser={currentUser}
+                    onActionComplete={() => {
+                        fetchInterests();
+                        onActionComplete();
+                    }}
+                />
 
-    <RegisterUserDialog
-        call={call}
-        adminUser={currentUser}
-        isOpen={isRegisterUserDialogOpen}
-        onOpenChange={setIsRegisterUserDialogOpen}
-        onRegisterSuccess={() => {
-            onActionComplete();
-            fetchInterests();
-        }}
-    />
+                <RegisterUserDialog
+                    call={call}
+                    adminUser={currentUser}
+                    isOpen={isRegisterUserDialogOpen}
+                    onOpenChange={setIsRegisterUserDialogOpen}
+                    onRegisterSuccess={() => {
+                        onActionComplete();
+                        fetchInterests();
+                    }}
+                />
 
-    {interestToUpdate && (
-        <SignEndorsementDialog
-            interest={interestToUpdate}
-            isOpen={isSignEndorsementDialogOpen}
-            onOpenChange={setIsSignEndorsementDialogOpen}
-            onUpdate={() => {
-                onActionComplete();
-                fetchInterests();
-            }}
-        />
-    )}
-
-    {interestToUpdate && (
-        <EditBulkEmrDialog
-            interest={interestToUpdate}
-            isOpen={isBulkEditDialogOpen}
-            onOpenChange={setIsBulkEditDialogOpen}
-            onUpdate={() => fetchInterests()}
-        />
-    )}
-
-    {interestForPptUpload && (
-        <UploadPptDialog
-            interest={interestForPptUpload}
-            call={call}
-            user={allUsers.find(u => u.uid === interestForPptUpload.userId)!}
-            adminUser={currentUser}
-            isOpen={!!interestForPptUpload}
-            onOpenChange={(open) => !open && setInterestForPptUpload(null)}
-            onUploadSuccess={() => {
-                onActionComplete();
-                fetchInterests();
-            }}
-        />
-    )}
-
-    {interestForProposalUpload && (
-        <UploadProposalDialog
-            interest={interestForProposalUpload}
-            call={call}
-            user={allUsers.find(u => u.uid === interestForProposalUpload.userId)!}
-            adminUser={currentUser}
-            isOpen={!!interestForProposalUpload}
-            onOpenChange={(open) => !open && setInterestForProposalUpload(null)}
-            onUploadSuccess={() => {
-                onActionComplete();
-                fetchInterests();
-            }}
-        />
-    )}
-
-    <AttendanceDialog
-        call={call}
-        interests={interests}
-        allUsers={allUsers}
-        isOpen={isAttendanceDialogOpen}
-        onOpenChange={setIsAttendanceDialogOpen}
-        onUpdate={() => {
-            onActionComplete();
-            fetchInterests();
-        }}
-    />
-
-    {/* Admin Remarks Dialog */}
-    <Dialog open={isRemarksDialogOpen} onOpenChange={setIsRemarksDialogOpen}>
-        <DialogContent>
-            <DialogHeader>
-                <DialogTitle>Add Admin Remarks</DialogTitle>
-                <DialogDescription>
-                    Provide any notes or remarks for the applicant regarding this status change.
-                </DialogDescription>
-            </DialogHeader>
-            <Form {...remarksForm}>
-                <form id="remarks-form" onSubmit={remarksForm.handleSubmit(handleRemarksSubmit)} className="space-y-4 py-4">
-                    <FormField
-                        control={remarksForm.control}
-                        name="remarks"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Remarks</FormLabel>
-                                <FormControl>
-                                    <Textarea
-                                        placeholder="Enter your remarks here..."
-                                        className="min-h-[100px]"
-                                        {...field}
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
+                {interestToUpdate && (
+                    <SignEndorsementDialog
+                        interest={interestToUpdate}
+                        isOpen={isSignEndorsementDialogOpen}
+                        onOpenChange={setIsSignEndorsementDialogOpen}
+                        onUpdate={() => {
+                            onActionComplete();
+                            fetchInterests();
+                        }}
                     />
-                </form>
-            </Form>
-            <DialogFooter>
-                <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-                <Button type="submit" form="remarks-form">Update Status</Button>
-            </DialogFooter>
-        </DialogContent>
-    </Dialog>
+                )}
 
-    {/* Delete Registration Dialog */}
-    <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-            <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                    This will permanently delete the registration for <strong>{interestToUpdate?.userName}</strong>.
-                    This action cannot be undone and the user will be notified.
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            <Form {...deleteForm}>
-                <form id="delete-form" onSubmit={deleteForm.handleSubmit(handleDeleteInterest)} className="py-2">
-                    <FormField
-                        control={deleteForm.control}
-                        name="remarks"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Reason for Deletion</FormLabel>
-                                <FormControl>
-                                    <Textarea
-                                        placeholder="Provide a reason for the user..."
-                                        className="min-h-[80px]"
-                                        {...field}
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
+                {interestToUpdate && (
+                    <EditBulkEmrDialog
+                        interest={interestToUpdate}
+                        isOpen={isBulkEditDialogOpen}
+                        onOpenChange={setIsBulkEditDialogOpen}
+                        onUpdate={() => fetchInterests()}
                     />
-                </form>
-            </Form>
-            <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                    onClick={deleteForm.handleSubmit(handleDeleteInterest)}
-                    className="bg-destructive hover:bg-destructive/90"
-                    disabled={isDeleting}
-                >
-                    {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Confirm Delete
-                </AlertDialogAction>
-            </AlertDialogFooter>
-        </AlertDialogContent>
-    </AlertDialog>
-</Card>
-</>
-);
+                )}
+
+                {interestForPptUpload && (
+                    <UploadPptDialog
+                        interest={interestForPptUpload}
+                        call={call}
+                        user={allUsers.find(u => u.uid === interestForPptUpload.userId)!}
+                        adminUser={currentUser}
+                        isOpen={!!interestForPptUpload}
+                        onOpenChange={(open) => !open && setInterestForPptUpload(null)}
+                        onUploadSuccess={() => {
+                            onActionComplete();
+                            fetchInterests();
+                        }}
+                    />
+                )}
+
+                {interestForProposalUpload && (
+                    <UploadProposalDialog
+                        interest={interestForProposalUpload}
+                        call={call}
+                        user={allUsers.find(u => u.uid === interestForProposalUpload.userId)!}
+                        adminUser={currentUser}
+                        isOpen={!!interestForProposalUpload}
+                        onOpenChange={(open) => !open && setInterestForProposalUpload(null)}
+                        onUploadSuccess={() => {
+                            onActionComplete();
+                            fetchInterests();
+                        }}
+                    />
+                )}
+
+                <AttendanceDialog
+                    call={call}
+                    interests={interests}
+                    allUsers={allUsers}
+                    isOpen={isAttendanceDialogOpen}
+                    onOpenChange={setIsAttendanceDialogOpen}
+                    onUpdate={() => {
+                        onActionComplete();
+                        fetchInterests();
+                    }}
+                />
+
+                {/* Admin Remarks Dialog */}
+                <Dialog open={isRemarksDialogOpen} onOpenChange={setIsRemarksDialogOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Add Admin Remarks</DialogTitle>
+                            <DialogDescription>
+                                Provide any notes or remarks for the applicant regarding this status change.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <Form {...remarksForm}>
+                            <form id="remarks-form" onSubmit={remarksForm.handleSubmit(handleRemarksSubmit)} className="space-y-4 py-4">
+                                <FormField
+                                    control={remarksForm.control}
+                                    name="remarks"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Remarks</FormLabel>
+                                            <FormControl>
+                                                <Textarea
+                                                    placeholder="Enter your remarks here..."
+                                                    className="min-h-[100px]"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </form>
+                        </Form>
+                        <DialogFooter>
+                            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+                            <Button type="submit" form="remarks-form">Update Status</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Delete Registration Dialog */}
+                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will permanently delete the registration for <strong>{interestToUpdate?.userName}</strong>.
+                                This action cannot be undone and the user will be notified.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <Form {...deleteForm}>
+                            <form id="delete-form" onSubmit={deleteForm.handleSubmit(handleDeleteInterest)} className="py-2">
+                                <FormField
+                                    control={deleteForm.control}
+                                    name="remarks"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Reason for Deletion</FormLabel>
+                                            <FormControl>
+                                                <Textarea
+                                                    placeholder="Provide a reason for the user..."
+                                                    className="min-h-[80px]"
+                                                    {...field}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            </form>
+                        </Form>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={deleteForm.handleSubmit(handleDeleteInterest)}
+                                className="bg-destructive hover:bg-destructive/90"
+                                disabled={isDeleting}
+                            >
+                                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Confirm Delete
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </Card>
+        </>
+    );
 }

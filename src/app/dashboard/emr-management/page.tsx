@@ -451,25 +451,25 @@ export default function EmrManagementOverviewPage() {
                                             <Table>
                                                 <TableHeader><TableRow>
                                                     <TableHead>Call Title</TableHead>
-                                                    <TableHead>Agency</TableHead>
-                                                    <TableHead>Agency Deadline</TableHead>
-                                                    <TableHead>Registrations</TableHead>
-                                                    <TableHead>Date Added</TableHead>
+                                                    <TableHead className="hidden lg:table-cell">Agency</TableHead>
+                                                    <TableHead className="hidden md:table-cell">Agency Deadline</TableHead>
+                                                    <TableHead className="hidden sm:table-cell">Registrations</TableHead>
+                                                    <TableHead className="hidden xl:table-cell">Date Added</TableHead>
                                                     <TableHead>Status</TableHead>
-                                                    <TableHead>Announced</TableHead>
+                                                    <TableHead className="hidden md:table-cell">Announced</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow></TableHeader>
                                                 <TableBody>{paginatedCalls.map(call => {
                                                     const isClosed = isAfter(new Date(), parseISO(call.interestDeadline));
                                                     return (
                                                     <TableRow key={call.id}>
-                                                        <TableCell className="font-medium whitespace-normal">{call.title}</TableCell>
-                                                        <TableCell className="whitespace-normal">{call.agency}</TableCell>
-                                                        <TableCell className="whitespace-nowrap">{call.applyDeadline ? format(parseISO(call.applyDeadline), 'PP') : 'N/A'}</TableCell>
-                                                        <TableCell>{interestCounts[call.id] || 0}</TableCell>
-                                                        <TableCell>{format(parseISO(call.createdAt), 'PP')}</TableCell>
+                                                        <TableCell className="font-medium whitespace-normal line-clamp-2 md:line-clamp-none">{call.title}</TableCell>
+                                                        <TableCell className="whitespace-normal hidden lg:table-cell">{call.agency}</TableCell>
+                                                        <TableCell className="whitespace-nowrap hidden md:table-cell">{call.applyDeadline ? format(parseISO(call.applyDeadline), 'PP') : 'N/A'}</TableCell>
+                                                        <TableCell className="hidden sm:table-cell">{interestCounts[call.id] || 0}</TableCell>
+                                                        <TableCell className="hidden xl:table-cell">{format(parseISO(call.createdAt), 'PP')}</TableCell>
                                                         <TableCell>{getStatusBadge(call)}</TableCell>
-                                                        <TableCell>
+                                                        <TableCell className="hidden md:table-cell">
                                                             {call.isAnnounced ? (
                                                                 <div className="flex items-center gap-1 text-green-600"><CheckCircle className="h-4 w-4" /> Yes</div>
                                                             ) : (
