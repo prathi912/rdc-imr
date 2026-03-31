@@ -74,7 +74,7 @@ const callSchema = z.object({
   applyDeadline: z.date({ required_error: 'Application deadline is required.'}),
   interestDeadline: z.date({ required_error: 'Interest registration deadline is required.'}),
   detailsUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-  attachments: z.any().optional(),
+  driveLink: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
   notifyAllStaff: z.boolean().default(false).optional(),
   notifyDeadlineChange: z.boolean().default(false).optional(),
 }).refine(data => data.interestDeadline <= data.applyDeadline, {
@@ -217,7 +217,7 @@ export function AddEditCallDialog({
         detailsUrl: '',
         interestDeadline: setMinutes(setHours(new Date(), 17), 0),
         applyDeadline: undefined,
-        attachments: undefined,
+        driveLink: '',
         notifyAllStaff: true,
         notifyDeadlineChange: false,
       });
@@ -228,21 +228,6 @@ export function AddEditCallDialog({
     setIsSubmitting(true);
     try {
         const callDataForServer: any = { ...values };
-
-        // Only process attachments if they are valid File objects
-        if (values.attachments && values.attachments.length > 0 && 
-            values.attachments[0] instanceof File) {
-            const attachmentDataUrls = await Promise.all(
-                Array.from(values.attachments as FileList).map(async (file: File) => ({
-                    name: file.name,
-                    dataUrl: await fileToDataUrl(file),
-                }))
-            );
-            callDataForServer.attachments = attachmentDataUrls;
-        } else {
-            // Remove attachments if they're not valid files
-            delete callDataForServer.attachments;
-        }
 
         if (existingCall) {
             // Update logic
@@ -328,7 +313,7 @@ export function AddEditCallDialog({
               )} />
             </div>
              <FormField name="detailsUrl" control={form.control} render={({ field }) => ( <FormItem><FormLabel>URL for Full Details</FormLabel><FormControl><Input type="url" {...field} /></FormControl><FormMessage /></FormItem> )} />
-             <FormField name="attachments" control={form.control} render={({ field: { onChange, value, ...rest }}) => ( <FormItem><FormLabel>Attachments (Optional)</FormLabel><FormControl><Input type="file" multiple onChange={(e) => onChange(e.target.files)} {...rest} /></FormControl><FormMessage /></FormItem> )} />
+             <FormField name="driveLink" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Public Drive Link (Optional)</FormLabel><FormControl><Input type="url" placeholder="Paste Public Drive/OneDrive Link here" {...field} /></FormControl><FormMessage /></FormItem> )} />
               {existingCall && (
                  <FormField
                   control={form.control}
@@ -645,9 +630,7 @@ export function EmrCalendar({ user }: EmrCalendarProps) {
                     <div className="flex items-center gap-2 text-xs flex-wrap">
                         <ViewDescriptionDialog call={call} />
                         {call.detailsUrl && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.detailsUrl} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> View Full Details</a></Button>}
-                        {call.attachments && call.attachments.map((att, i) => (
-                            <Button key={i} variant="link" asChild className="p-0 h-auto text-xs"><a href={att.url} target="_blank" rel="noopener noreferrer"><Download className="h-3 w-3 mr-1"/>Download</a></Button>
-                        ))}
+                        {call.driveLink && <Button variant="link" asChild className="p-0 h-auto text-xs"><a href={call.driveLink} target="_blank" rel="noopener noreferrer"><LinkIcon className="h-3 w-3 mr-1"/> Access Documents</a></Button>}
                     </div>
                     {isSuperAdmin && !call.isAnnounced && !isCallClosed && (
                         <Button size="sm" variant="outline" className="h-8" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>

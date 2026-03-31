@@ -441,7 +441,7 @@ export type FundingCall = {
   interestDeadline: string // ISO String
   callType: "Fellowship" | "Grant" | "Collaboration" | "Other"
   detailsUrl?: string
-  attachments?: { name: string; url: string }[]
+  driveLink?: string
   createdAt: string // ISO String
   createdBy: string // UID of the admin who created it
   status: "Open" | "Closed" | "Meeting Scheduled"

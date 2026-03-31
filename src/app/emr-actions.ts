@@ -625,7 +625,7 @@ export async function uploadEmrPpt(
 
     if (adminName && interest.userEmail) {
       const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
-      const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
+      const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : 'your EMR application';
 
       const emailHtml = `
             <div ${EMAIL_STYLES.background}>
@@ -710,7 +710,7 @@ export async function uploadEmrProposal(
 
     if (adminName && interest.userEmail) {
       const callSnap = await adminDb.collection('fundingCalls').doc(interest.callId).get();
-      const callTitle = callSnap.exists() ? (callSnap.data() as FundingCall).title : 'your EMR application';
+      const callTitle = callSnap.exists ? (callSnap.data() as FundingCall).title : 'your EMR application';
 
       const emailHtml = `
             <div ${EMAIL_STYLES.background}>
@@ -1023,19 +1023,6 @@ export async function createFundingCall(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const newCallDocRef = adminDb.collection("fundingCalls").doc()
-    const attachments: { name: string; url: string }[] = []
-
-    if (callData.attachments && callData.attachments.length > 0) {
-      for (const attachment of callData.attachments) {
-        const path = `emr-attachments/${newCallDocRef.id}/${attachment.name}`
-        const result = await uploadFileToServer(attachment.dataUrl, path)
-        if (result.success && result.url) {
-          attachments.push({ name: attachment.name, url: result.url })
-        } else {
-          throw new Error(`Failed to upload attachment: ${attachment.name}`)
-        }
-      }
-    }
 
     // Transaction to generate a new sequential ID
     const newCallData = await adminDb.runTransaction(async (transaction) => {
@@ -1059,7 +1046,7 @@ export async function createFundingCall(
         applyDeadline: callData.applyDeadline.toISOString(),
         interestDeadline: callData.interestDeadline.toISOString(),
         detailsUrl: callData.detailsUrl,
-        attachments: attachments,
+        driveLink: callData.driveLink || null,
         createdAt: new Date().toISOString(),
         createdBy: "Super-admin",
         status: "Open",
@@ -1113,19 +1100,7 @@ export async function updateFundingCall(
       console.log(`   New deadline: ${newInterestDeadline}`)
     }
 
-    const attachments: { name: string; url: string }[] = existingCall.attachments || []
-
-    if (callData.attachments && callData.attachments.length > 0) {
-      for (const attachment of callData.attachments) {
-        const path = `emr-attachments/${callId}/${attachment.name}`
-        const result = await uploadFileToServer(attachment.dataUrl, path)
-        if (result.success && result.url) {
-          attachments.push({ name: attachment.name, url: result.url })
-        } else {
-          throw new Error(`Failed to upload attachment: ${attachment.name}`)
-        }
-      }
-    }
+    // We no longer process file attachments natively
 
     const updatedCallData = {
       title: callData.title,
@@ -1135,7 +1110,7 @@ export async function updateFundingCall(
       applyDeadline: callData.applyDeadline.toISOString(),
       interestDeadline: newInterestDeadline,
       detailsUrl: callData.detailsUrl,
-      attachments: attachments,
+      driveLink: callData.driveLink || null,
       updatedAt: new Date().toISOString(),
     }
 
@@ -1194,8 +1169,6 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
     const call = callSnap.data() as FundingCall
     const timeZone = "Asia/Kolkata"
 
-    const emailAttachments = (call.attachments || []).map((att) => ({ filename: att.name, path: att.url }))
-
     let emailHtml = `
       <div ${EMAIL_STYLES.background}>
         ${EMAIL_STYLES.logo}
@@ -1208,8 +1181,8 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
         </div>
     `
 
-    if (emailAttachments.length > 0) {
-      emailHtml += `<p style="color:#e0e0e0; margin-top: 20px;">Please find the relevant documents attached to this email.</p>`
+    if (call.driveLink) {
+      emailHtml += `<p style="color:#e0e0e0; margin-top: 20px;"><strong>Project Documents:</strong> <a href="${call.driveLink}" style="color: #64B5F6;">Access Files on Drive</a></p>`
     }
 
     emailHtml += `
@@ -1237,7 +1210,6 @@ export async function announceEmrCall(callId: string): Promise<{ success: boolea
       to: vadodaraEmail,
       subject: `New Funding Call: ${call.title}`,
       from: "rdc",
-      attachments: emailAttachments,
       html: emailHtml,
     })
 
@@ -1270,8 +1242,6 @@ export async function notifyDeadlineChangeToStaff(
 
     const timeZone = "Asia/Kolkata"
 
-    const emailAttachments = (call.attachments || []).map((att) => ({ filename: att.name, path: att.url }))
-
     let emailHtml = `
       <div ${EMAIL_STYLES.background}>
         ${EMAIL_STYLES.logo}
@@ -1290,8 +1260,8 @@ export async function notifyDeadlineChangeToStaff(
         </div>
     `
 
-    if (emailAttachments.length > 0) {
-      emailHtml += `<p style="color:#e0e0e0; margin-top: 20px;">Please find the relevant documents attached to this email.</p>`
+    if (call.driveLink) {
+      emailHtml += `<p style="color:#e0e0e0; margin-top: 20px;"><strong>Project Documents:</strong> <a href="${call.driveLink}" style="color: #64B5F6;">Access Files on Drive</a></p>`
     }
 
     emailHtml += `
@@ -1319,7 +1289,6 @@ export async function notifyDeadlineChangeToStaff(
       to: vadodaraEmail,
       subject: `Updated Interest Registration Deadline: ${call.title}`,
       from: "rdc",
-      attachments: emailAttachments,
       html: emailHtml,
     })
 
