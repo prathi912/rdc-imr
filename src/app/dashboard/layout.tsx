@@ -342,6 +342,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         if (!appUser.profileComplete) {
           router.replace("/profile-setup")
+          setLoading(false)
           return
         }
 

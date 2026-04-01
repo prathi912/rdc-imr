@@ -75,16 +75,27 @@ export default function LoginPage() {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        router.replace('/dashboard');
-      } else {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user && !isSubmitting) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data();
+          if (userData.profileComplete) {
+            router.replace('/dashboard');
+          } else {
+            router.replace('/profile-setup');
+          }
+        } else {
+          setLoading(false);
+        }
+      } else if (!user) {
         setLoading(false);
       }
     });
 
     return () => unsubscribe();
-  }, [router]);
+  }, [router, isSubmitting]);
 
 
   const processSignIn = async (firebaseUser: FirebaseUser) => {
