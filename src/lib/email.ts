@@ -1,8 +1,8 @@
-
 'use server';
 
 import nodemailer from 'nodemailer';
 import { getSystemSettings } from '@/app/actions';
+import { logEvent } from '@/lib/logger';
 
 const GMAIL_USER = process.env.GMAIL_USER;
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
@@ -120,6 +120,10 @@ export async function sendEmail({ to, cc, bcc, subject, html, attachments, from 
   try {
     await transporter.sendMail(mailOptions);
     console.log(`Email sent successfully to ${to} from ${selectedSender} account.`);
+    await logEvent('NOTIFICATION', 'Email sent successfully', {
+      metadata: { to, subject, from: selectedSender, attachments: attachments?.length || 0 },
+      status: 'success'
+    });
     return { success: true };
   } catch (error: any) {
     const canRetryWithDefault =
@@ -136,6 +140,10 @@ export async function sendEmail({ to, cc, bcc, subject, html, attachments, from 
           from: fallbackFromAddress,
         });
         console.warn(`RDC email failed for ${to}. Sent successfully using default account instead.`);
+        await logEvent('NOTIFICATION', 'Fallback email sent successfully', {
+          metadata: { to, subject, from: 'default', originalError: error.message },
+          status: 'warning'
+        });
         return {
           success: true,
           message: 'Sent using default email account after RDC account failed.',
@@ -153,6 +161,10 @@ export async function sendEmail({ to, cc, bcc, subject, html, attachments, from 
     console.error(`Error Message: ${error.message}`);
     console.error(`Full Error Object:`, error);
     console.error(`---------------------------`);
+    await logEvent('NOTIFICATION', 'Email sending failed', {
+      metadata: { to, subject, error: error.message, stack: error.stack },
+      status: 'error'
+    });
     return { success: false, error: error.message };
   }
 }

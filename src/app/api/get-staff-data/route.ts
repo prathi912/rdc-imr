@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
+import { logEvent } from '@/lib/logger';
 
 // Define the expected structure of a row in the Excel sheet
 interface StaffData {
@@ -68,6 +69,7 @@ const formatUserRecord = (record: StaffData, defaultCampus: 'Vadodara' | 'Goa') 
 };
 
 export async function GET(request: NextRequest) {
+  const start = performance.now();
   const { searchParams } = new URL(request.url);
   const email = searchParams.get('email');
   const misId = searchParams.get('misId');
@@ -75,6 +77,10 @@ export async function GET(request: NextRequest) {
   const fetchAll = searchParams.get('fetchAll');
 
   if (!email && !misId) {
+    await logEvent('APPLICATION', 'API Request failed: Missing params', {
+      metadata: { endpoint: '/api/get-staff-data', method: 'GET', statusCode: 400, latency_ms: performance.now() - start },
+      status: 'warning'
+    });
     return NextResponse.json({ success: false, error: 'Email or MIS ID query parameter is required.' }, { status: 400 });
   }
 
@@ -89,18 +95,22 @@ export async function GET(request: NextRequest) {
           foundRecord = data.find(row => row['MIS ID'] && String(row['MIS ID']).toLowerCase() === misId.toLowerCase());
       }
       
-      if (foundRecord && foundRecord.Email && !foundEmails.has(foundRecord.Email.toLowerCase())) {
-          allFoundRecords.push(formatUserRecord(foundRecord, defaultCampus) as any);
-          foundEmails.add(foundRecord.Email.toLowerCase());
+      if (foundRecord) {
+          const uniqueKey = foundRecord.Email ? foundRecord.Email.toLowerCase() : String(foundRecord['MIS ID']).toLowerCase();
+          if (!foundEmails.has(uniqueKey)) {
+              allFoundRecords.push(formatUserRecord(foundRecord, defaultCampus) as any);
+              foundEmails.add(uniqueKey);
+          }
       }
   };
   
   const searchAndAddAll = (data: StaffData[], defaultCampus: 'Vadodara' | 'Goa') => {
       data.forEach(row => {
           if (row['MIS ID'] && String(row['MIS ID']).toLowerCase() === misId?.toLowerCase()) {
-             if (row.Email && !foundEmails.has(row.Email.toLowerCase())) {
+             const uniqueKey = row.Email ? row.Email.toLowerCase() : String(row['MIS ID']).toLowerCase();
+             if (!foundEmails.has(uniqueKey)) {
                 allFoundRecords.push(formatUserRecord(row, defaultCampus) as any);
-                foundEmails.add(row.Email.toLowerCase());
+                foundEmails.add(uniqueKey);
             }
           }
       });
@@ -118,13 +128,28 @@ export async function GET(request: NextRequest) {
     const isGoaEmail = email.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
     searchAndAdd(isGoaEmail ? goastaffdata : staffdata, isGoaEmail ? 'Goa' : 'Vadodara');
   } else if (misId) {
-    const isGoaContext = userEmailForFileCheck?.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
-    searchAndAdd(isGoaContext ? goastaffdata : staffdata, isGoaContext ? 'Goa' : 'Vadodara');
+    if (userEmailForFileCheck) {
+        const isGoaContext = userEmailForFileCheck.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
+        searchAndAdd(isGoaContext ? goastaffdata : staffdata, isGoaContext ? 'Goa' : 'Vadodara');
+    } else {
+        searchAndAdd(staffdata, 'Vadodara');
+        searchAndAdd(goastaffdata, 'Goa');
+    }
   }
 
+  const latency_ms = performance.now() - start;
+
   if (allFoundRecords.length > 0) {
+    await logEvent('APPLICATION', 'API Request successful', {
+      metadata: { endpoint: '/api/get-staff-data', method: 'GET', statusCode: 200, latency_ms, email, misId },
+      status: 'info'
+    });
     return NextResponse.json({ success: true, data: allFoundRecords });
   } else {
+    await logEvent('APPLICATION', 'API Request: User not found', {
+      metadata: { endpoint: '/api/get-staff-data', method: 'GET', statusCode: 404, latency_ms, email, misId },
+      status: 'warning'
+    });
     return NextResponse.json({ success: false, error: `User not found in the staff data file.` }, { status: 404 });
   }
 }

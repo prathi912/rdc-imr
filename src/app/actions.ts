@@ -26,6 +26,7 @@ import { formatInTimeZone, toDate } from "date-fns-tz"
 import type * as z from "zod"
 import { awardInitialGrant, addGrantPhase, updatePhaseStatus } from "./grant-actions"
 import { generateSanctionOrder } from "./document-actions"
+import { logEvent, LogCategory } from "@/lib/logger"
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -37,13 +38,21 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
       return
     }
 
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      level,
-      message,
-      ...context,
-    }
-    await adminDb.collection("logs").add(logEntry)
+    let category: LogCategory = 'AUDIT';
+    const lowerMsg = message.toLowerCase();
+    if (lowerMsg.includes('project status') || lowerMsg.includes('evaluation') || lowerMsg.includes('phase')) category = 'WORKFLOW';
+    else if (lowerMsg.includes('failed') || lowerMsg.includes('error')) category = 'APPLICATION';
+    else if (lowerMsg.includes('bulk')) category = 'MIGRATION';
+    else if (lowerMsg.includes('login') || lowerMsg.includes('auth')) category = 'AUTH';
+
+    let status: 'info' | 'warning' | 'error' | 'success' = 'info';
+    if (level === 'ERROR') status = 'error';
+    if (level === 'WARNING') status = 'warning';
+
+    await logEvent(category, message, {
+      metadata: context,
+      status
+    });
   } catch (error) {
     console.error("FATAL: Failed to write to logs collection.", error)
     console.error("Original Log Entry:", { level, message, context })
@@ -97,7 +106,7 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string,
           mimeType: 'application/vnd.google-apps.folder',
         };
         const newFolder = await drive.files.create({
-          resource: fileMetadata,
+          requestBody: fileMetadata,
           fields: 'id',
         });
         parentFolderId = newFolder.data.id!;
@@ -124,7 +133,7 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string,
     };
 
     const file = await drive.files.create({
-      resource: fileMetadata,
+      requestBody: fileMetadata,
       media: media,
       fields: 'id, webViewLink',
     });
@@ -137,7 +146,7 @@ async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string,
     // 5. Make the file publicly readable
     await drive.permissions.create({
       fileId: fileId,
-      resource: {
+      requestBody: {
         role: 'reader',
         type: 'anyone',
       },
@@ -242,7 +251,7 @@ export async function sendErrorEmail(
   user: User | null
 ): Promise<{ success: boolean }> {
   try {
-    const to = process.env.HELPDESK_EMAIL || process.env.GMAIL_USER;
+    const to = process.env.HELPDESK_EMAIL || process.env.GMAIL_USER || "helpdesk.rdc@paruluniversity.ac.in";
     const subject = `RDC Portal Error Report: ${errorDetails.message.substring(0, 50)}...`;
 
     let userHtml = '<p>No user was logged in, or user details could not be retrieved.</p>';
@@ -400,6 +409,11 @@ export async function deleteImrProject(
     }
 
     await logActivity("INFO", "IMR project deleted", { projectId, title: project.title, deletedBy, reason });
+    await logEvent('AUDIT', 'IMR project deleted by admin', { 
+      metadata: { projectId, title: project.title, reason },
+      user: { uid: deletedBy, email: '', role: 'admin' },
+      status: 'warning'
+    });
     return { success: true }
   } catch (error: any) {
     console.error("Error deleting IMR project:", error)
@@ -517,7 +531,8 @@ export async function getEmrInterests(callId: string): Promise<EmrInterest[]> {
     const snapshot = await q.get()
     const interests: EmrInterest[] = []
     snapshot.forEach((doc) => {
-      interests.push({ id: doc.id, ...(doc.data() as EmrInterest) })
+      const data = doc.data() as EmrInterest;
+      interests.push({ ...data, id: doc.id });
     })
     return interests
   } catch (error) {
@@ -532,7 +547,8 @@ export async function getAllUsers(): Promise<User[]> {
     const snapshot = await usersRef.get()
     const users: User[] = []
     snapshot.forEach((doc) => {
-      users.push({ uid: doc.id, ...(doc.data() as User) })
+      const data = doc.data() as User;
+      users.push({ ...data, uid: doc.id });
     })
     return users
   } catch (error) {
@@ -791,6 +807,84 @@ export async function linkPapersToNewUser(
   }
 }
 
+// --- Structured Logging Actions ---
+
+export async function getLogs(filters: {
+  category?: LogCategory | 'ALL';
+  duration?: 'today' | '24h' | '7d' | '30d' | 'all';
+  search?: string;
+  limit?: number;
+}) {
+  try {
+    let query: admin.firestore.Query = adminDb.collection("system_logs");
+
+    if (filters.category && filters.category !== 'ALL') {
+      query = query.where("category", "==", filters.category);
+    }
+
+    const now = new Date();
+    if (filters.duration && filters.duration !== 'all') {
+      let startDate: Date;
+      if (filters.duration === 'today') {
+        startDate = new Date(now.setHours(0, 0, 0, 0));
+      } else if (filters.duration === '24h') {
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      } else if (filters.duration === '7d') {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (filters.duration === '30d') {
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      } else {
+        startDate = new Date(0);
+      }
+      query = query.where("timestamp", ">=", startDate);
+    }
+
+    query = query.orderBy("timestamp", "desc");
+
+    if (filters.limit) {
+      query = query.limit(filters.limit);
+    } else {
+      query = query.limit(100);
+    }
+
+    const snapshot = await query.get();
+    let logs = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp.toDate().toISOString(),
+    }));
+
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      logs = logs.filter((log: any) => 
+        log.message?.toLowerCase().includes(searchLower) ||
+        log.userId?.toLowerCase().includes(searchLower) ||
+        log.userEmail?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return { success: true, logs };
+  } catch (error: any) {
+    console.error("Error fetching logs:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+export async function logFrontendAction(
+  category: LogCategory,
+  message: string,
+  params: {
+    metadata?: Record<string, any>;
+    status?: 'info' | 'warning' | 'error' | 'success';
+    path?: string;
+    user?: User;
+  }
+) {
+  // This wraps the lib logger for client-side consumption
+  await logEvent(category, message, params);
+  return { success: true };
+}
+
 export async function updateProjectStatus(projectId: string, newStatus: Project["status"], comments?: string) {
   try {
     const projectRef = adminDb.collection("projects").doc(projectId)
@@ -812,6 +906,11 @@ export async function updateProjectStatus(projectId: string, newStatus: Project[
 
     await projectRef.update(updateData)
     await logActivity("INFO", "Project status updated", { projectId, newStatus, piUid: project.pi_uid })
+    await logEvent('WORKFLOW', 'Project status updated', {
+      metadata: { projectId, newStatus, title: project.title, comments },
+      user: { uid: project.pi_uid, email: project.pi_email || '', role: 'faculty' },
+      status: newStatus.includes('Recommended') || newStatus === 'Sanctioned' ? 'success' : 'info'
+    });
 
     const notification = {
       uid: project.pi_uid,
@@ -891,6 +990,11 @@ export async function updateIncentiveClaimStatus(claimId: string, newStatus: Inc
 
     await claimRef.update({ status: newStatus })
     await logActivity("INFO", "Incentive claim status updated", { claimId, newStatus, userId: claim.uid })
+    await logEvent('WORKFLOW', 'Incentive claim status updated', {
+      metadata: { claimId, newStatus, userName: claim.userName, claimId_human: claim.claimId },
+      user: { uid: claim.uid, email: claim.userEmail, role: 'faculty' },
+      status: newStatus.includes('Approval') || newStatus === 'Payment Completed' ? 'success' : 'info'
+    });
 
     const claimTitle =
       claim.paperTitle ||
@@ -957,7 +1061,8 @@ export async function scheduleMeeting(
   isMidTermReview: boolean = false,
 ) {
   try {
-    const batch = adminDb.batch()
+    const batch = adminDb.batch();
+    const emailPromises: Promise<any>[] = [];
     const timeZone = "Asia/Kolkata"
     const meetingDateTimeString = `${meetingDetails.date}T${meetingDetails.time}:00`
 
@@ -1106,7 +1211,7 @@ export async function scheduleMeeting(
           `ATTENDEE;CN=${user.name};RSVP=TRUE:mailto:${user.email}`, 'END:VEVENT', 'END:VCALENDAR'
         ].join('\r\n');
 
-        await sendEmailUtility({
+        emailPromises.push(sendEmailUtility({
           to: user.email,
           subject,
           html: htmlContent,
@@ -1116,7 +1221,7 @@ export async function scheduleMeeting(
             method: 'REQUEST',
             content: icalContent
           }
-        });
+        }));
       }
     }
 
@@ -1155,17 +1260,20 @@ export async function scheduleMeeting(
             </div>
           `;
 
-      await sendEmailUtility({
+      emailPromises.push(sendEmailUtility({
         to: projectData.pi_email!,
         subject,
         html: htmlContent,
         from: "default"
-      });
+      }));
     }
 
-    await logActivity("INFO", `IMR ${isMidTermReview ? 'mid-term review' : ''} meeting scheduled/rescheduled`, {
-      projectIds: projectsToSchedule.map((p) => p.id),
-      meetingDate: meetingDetails.date,
+    await Promise.all(emailPromises)
+    await logActivity("INFO", "Review meeting scheduled", { projectIds: projectsToSchedule.map((p) => p.id), meetingDate: meetingDetails.date })
+    await logEvent('WORKFLOW', 'Review meeting scheduled', {
+      metadata: { projectIds: projectsToSchedule.map((p) => p.id), meetingDate: meetingDetails.date, venue: meetingDetails.venue },
+      user: { uid: '', email: '', role: 'admin' }, // Performed by an admin (context usually from session)
+      status: 'success'
     });
     return { success: true };
   } catch (error: any) {
@@ -2439,10 +2547,11 @@ export async function bulkUploadProjects(
       }
 
       let submissionDate: Date;
-      if (sanction_date instanceof Date) {
-        submissionDate = sanction_date;
-      } else if (typeof sanction_date === 'number') {
-        submissionDate = excelDateToJSDate(sanction_date);
+      const sancDate = sanction_date as any;
+      if (sancDate instanceof Date) {
+        submissionDate = sancDate;
+      } else if (typeof sancDate === 'number') {
+        submissionDate = excelDateToJSDate(sancDate);
       } else {
         submissionDate = new Date();
       }
@@ -2450,7 +2559,7 @@ export async function bulkUploadProjects(
       const grant: GrantDetails = {
         totalAmount: grant_amount || 0,
         sanctionNumber: sanction_number || '',
-        status: grant_amount > 0 ? 'Awarded' : 'Pending',
+        status: grant_amount > 0 ? 'Awarded' : 'In Progress',
         phases: grant_amount > 0 ? [{
           id: new Date().toISOString(),
           name: "Phase 1",
@@ -2478,6 +2587,7 @@ export async function bulkUploadProjects(
         pi_uid: '',
         isBulkUploaded: true,
         grant: status !== 'Not Recommended' ? grant : undefined,
+        teamInfo: JSON.stringify({ coPi: [], subInv: [] })
       };
 
       await adminDb.collection('projects').add(project);
@@ -2491,6 +2601,12 @@ export async function bulkUploadProjects(
   if (failures.length > 0) {
     await logActivity('WARNING', 'Some projects failed during bulk upload', { failures });
   }
+
+  await logEvent('MIGRATION', 'Bulk project upload operated', {
+    metadata: { successfulCount, failureCount: failures.length, failures: failures.slice(0, 50) }, // Limit payload size
+    status: failures.length === 0 ? 'success' : (successfulCount === 0 ? 'error' : 'warning'),
+    user: { uid: 'system', email: 'system@rdc', role: 'Super-admin' } 
+  });
 
   return { success: true, data: { successfulCount, failures } };
 }

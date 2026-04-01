@@ -32,7 +32,9 @@ import {
   linkEmrInterestsToNewUser,
   linkEmrCoPiInterestsToNewUser,
   verifyLoginOtp,
+  logFrontendAction,
 } from "@/app/actions"
+import { LogCategory } from "@/lib/logger"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
 import { OtpDialog } from "@/components/otp-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -44,16 +46,16 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>
 
-async function logLogin(uid: string, email: string) {
+async function logLoginEvent(category: LogCategory, message: string, user?: User | any, status: 'success' | 'error' | 'warning' = 'success', error?: string) {
     try {
-        await addDoc(collection(db, 'logs'), {
-            timestamp: new Date().toISOString(),
-            level: 'INFO',
-            message: 'User logged in',
-            context: { uid, email }
+        await logFrontendAction(category, message, {
+            user,
+            status,
+            metadata: error ? { error } : {},
+            path: '/login'
         });
-    } catch (error) {
-        console.error("Failed to log user login:", error);
+    } catch (err) {
+        console.error("Failed to log internal event:", err);
     }
 }
 
@@ -175,7 +177,7 @@ export default function LoginPage() {
 
     await setDoc(userDocRef, user, { merge: true })
     
-    await logLogin(user.uid, user.email);
+    await logLoginEvent('AUTH', 'User logged in successfully', user);
 
     try {
       const result = await linkHistoricalData(user)
@@ -271,6 +273,7 @@ export default function LoginPage() {
             ? "Invalid email or password."
             : error.message || "An unknown error occurred.",
       })
+      await logLoginEvent('AUTH', 'Login attempt failed', { email: data.email }, 'error', error.message);
     } finally {
       setIsSubmitting(false)
     }
@@ -297,6 +300,7 @@ export default function LoginPage() {
           title: "Access Denied",
           description: "Access is for faculty members only. Student accounts are not permitted.",
         })
+        await logLoginEvent('AUTH', 'Google sign-in blocked: Unauthorized account type', { email }, 'warning');
         setIsSubmitting(false)
         return
       }
@@ -308,6 +312,7 @@ export default function LoginPage() {
           title: "Access Denied",
           description: "Access is restricted to authorized university domains.",
         })
+        await logLoginEvent('AUTH', 'Google sign-in blocked: Unauthorized domain', { email }, 'warning');
         setIsSubmitting(false)
         return
       }
@@ -320,6 +325,7 @@ export default function LoginPage() {
         title: "Sign In Failed",
         description: error.message || "Could not sign in with Google. Please try again.",
       })
+      await logLoginEvent('AUTH', 'Google sign-in attempt failed', {}, 'error', error.message);
     } finally {
       setIsSubmitting(false)
     }

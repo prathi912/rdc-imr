@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
 import type { User } from '@/types';
-import { sendErrorEmail } from '@/app/actions';
+import { sendErrorEmail, logFrontendAction } from '@/app/actions';
 
 export default function Error({
   error,
@@ -31,6 +31,13 @@ export default function Error({
       { message: error.message, digest: error.digest },
       parsedUser
     ).catch(e => console.error("Failed to send error report email:", e));
+
+    // Log to observability system
+    logFrontendAction('FRONTEND', 'Unhandled UI Exception', {
+      metadata: { errorMessage: error.message, digest: error.digest, stack: error.stack },
+      user: parsedUser,
+      status: 'error'
+    }).catch(e => console.error("Failed to log frontend error:", e));
 
   }, [error]);
 

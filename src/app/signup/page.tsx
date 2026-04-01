@@ -31,8 +31,12 @@ import {
   linkEmrInterestsToNewUser,
   isEmailDomainAllowed,
   linkEmrCoPiInterestsToNewUser,
+  logFrontendAction,
+  sendLoginOtp,
+  verifyLoginOtp,
 } from "@/app/actions"
 import { Eye, EyeOff, Loader2 } from "lucide-react"
+import { OtpDialog } from "@/components/otp-dialog"
 
 const signupSchema = z
   .object({
@@ -54,6 +58,8 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(true);
+  const [isOtpOpen, setIsOtpOpen] = useState(false)
+  const [pendingUser, setPendingUser] = useState<SignupFormValues | null>(null)
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -185,6 +191,11 @@ export default function SignupPage() {
 
     await setDoc(userDocRef, user, { merge: true })
 
+    await logFrontendAction('AUTH', 'User signed up successfully', {
+      user: user,
+      metadata: { method: firebaseUser.providerData[0]?.providerId || 'email', campus: user.campus }
+    });
+
     if (notifyRole) {
       await notifySuperAdminsOnNewUser(user.name, notifyRole)
     }
@@ -243,12 +254,23 @@ export default function SignupPage() {
           title: "Access Denied",
           description: "This email domain is not authorized for portal access, or student accounts are not permitted.",
         })
+        await logFrontendAction('AUTH', 'Signup blocked: Unauthorized domain', {
+          user: { email: data.email } as any,
+          metadata: { method: 'email' },
+          status: 'warning'
+        });
         setIsSubmitting(false)
         return
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password)
-      await processNewUser(userCredential.user)
+      setPendingUser(data);
+      const otpResult = await sendLoginOtp(data.email);
+      if (otpResult.success) {
+        setIsOtpOpen(true);
+        setIsSubmitting(false);
+      } else {
+        throw new Error(otpResult.error || "Failed to send OTP.");
+      }
     } catch (error: any) {
       console.error("Signup Error:", error)
       toast({
@@ -259,9 +281,48 @@ export default function SignupPage() {
             ? "This email is already registered."
             : error.message || "An unknown error occurred.",
       })
+      await logFrontendAction('AUTH', 'Signup attempt failed', {
+        user: { email: data.email } as any,
+        metadata: { error: error.message, code: error.code, method: 'email' },
+        status: 'error'
+      });
       setIsSubmitting(false)
     }
   }
+
+  const handleSuccessfulOtp = async (otp: string) => {
+    if (!pendingUser) return;
+    setIsSubmitting(true);
+    try {
+      const otpResult = await verifyLoginOtp(pendingUser.email, otp);
+      if (!otpResult.success) {
+        throw new Error(otpResult.error || "Invalid OTP");
+      }
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, pendingUser.email, pendingUser.password);
+      setIsOtpOpen(false);
+      await processNewUser(userCredential.user);
+    } catch (error: any) {
+      console.error("Signup OTP Error:", error);
+      toast({
+        variant: "destructive",
+        title: "Verification Failed",
+        description: error.code === "auth/email-already-in-use"
+            ? "This email is already registered."
+            : error.message || "An error occurred.",
+      });
+      if (error.code === "auth/email-already-in-use") {
+        await logFrontendAction('AUTH', 'Signup attempt failed', {
+          user: { email: pendingUser.email } as any,
+          metadata: { error: error.message, code: error.code, method: 'email' },
+          status: 'error'
+        });
+        setIsOtpOpen(false);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleGoogleSignUp = async () => {
     setIsSubmitting(true)
@@ -283,6 +344,11 @@ export default function SignupPage() {
           title: "Access Denied",
           description: "This email domain is not authorized for portal access, or student accounts are not permitted.",
         })
+        await logFrontendAction('AUTH', 'Google Signup blocked: Unauthorized domain', {
+          user: { email: email } as any,
+          metadata: { method: 'google' },
+          status: 'warning'
+        });
         setIsSubmitting(false)
         return
       }
@@ -295,6 +361,10 @@ export default function SignupPage() {
         title: "Sign Up Failed",
         description: error.message || "Could not sign up with Google. Please try again.",
       })
+      await logFrontendAction('AUTH', 'Google signup attempt failed', {
+        metadata: { error: error.message, code: error.code, method: 'google' },
+        status: 'error'
+      });
       setIsSubmitting(false)
     }
   }
@@ -308,7 +378,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
+    <>
+      <div className="flex flex-col min-h-screen bg-background dark:bg-transparent">
       <main className="flex-1 flex min-h-screen items-center justify-center bg-muted/40 p-4">
         <div className="w-full max-w-md">
           <Card className="shadow-xl">
@@ -447,5 +518,16 @@ export default function SignupPage() {
         </nav>
       </footer>
     </div>
+    {pendingUser && (
+      <OtpDialog
+        isOpen={isOtpOpen}
+        onOpenChange={setIsOtpOpen}
+        email={pendingUser.email}
+        onVerify={handleSuccessfulOtp}
+        isVerifying={isSubmitting}
+      />
+    )}
+    </>
   )
 }
+

@@ -38,6 +38,7 @@ import {
   BookOpenCheck,
   Building,
   Calculator,
+  FileText,
 } from "lucide-react"
 
 import {
@@ -324,6 +325,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         icon: Settings,
         label: "Settings",
         condition: true,
+      },
+      {
+        id: "logs",
+        href: "/dashboard/logs",
+        tooltip: "System Logs",
+        icon: FileText,
+        label: "System Logs",
+        condition: user?.role === "Super-admin",
       },
     ],
     [unreadCount, pendingMeetingsCount, pendingIncentiveApprovalsCount, pendingBankClaimsCount, pendingEvaluationsCount],
