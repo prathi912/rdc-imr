@@ -10,7 +10,7 @@ const EMAIL_STYLES = {
   footer: '<p style=\"color:#b0bec5; margin-top: 30px;\">Best Regards,<br>Research & Development Cell Team,<br>Parul University</p><p style=\"font-size:10px; color:#999999;\">This is automated. Report issues to helpdesk.</p>'
 };
 
-export async function POST() {
+export async function GET() {
   try {
     // Week: Mon-Sun UTC
     const now = new Date();
