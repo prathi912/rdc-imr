@@ -1,6 +1,4 @@
 
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
 
 // This API route is deprecated and no longer in use.

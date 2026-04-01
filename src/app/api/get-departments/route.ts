@@ -1,6 +1,4 @@
 
-'use server';
-
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import fs from 'fs';

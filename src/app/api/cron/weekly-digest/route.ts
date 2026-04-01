@@ -1,4 +1,3 @@
-'use server';
 
 import { adminDb } from '@/lib/admin';
 import { sendEmail } from '@/lib/email';

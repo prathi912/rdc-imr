@@ -1,6 +1,4 @@
 
-'use server';
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { adminDb } from '@/lib/admin';
 import { sendEmail } from '@/lib/email';
