@@ -9,6 +9,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -21,9 +22,9 @@ import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim, PatentInventor } from '@/types';
 import { checkPatentUniqueness } from '@/app/actions';
 import { uploadFileToApi } from '@/lib/upload-client';
-import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown, Edit } from 'lucide-react';
+import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Calendar as CalendarIcon, ChevronDown, Edit, Users, UserPlus } from 'lucide-react';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
-import { findUserByMisId } from '@/app/userfinding';
+import { AuthorSearch } from './author-search';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parseISO } from 'date-fns';
@@ -59,8 +60,22 @@ const patentSchema = z
     patentTitle: z.string().min(3, 'Patent title is required.'),
     patentApplicationNumber: z.string().min(3, 'Application number is required.'),
     patentDomain: z.string().min(3, 'Domain of IPR is required.'),
-    patentInventors: z.array(z.object({ name: z.string(), misId: z.string(), uid: z.string().optional().nullable() })).min(1, 'At least one inventor is required.'),
-    patentCoApplicants: z.array(z.object({ name: z.string(), misId: z.string(), uid: z.string().optional().nullable() })).optional(),
+    patentInventors: z.array(z.object({ 
+      name: z.string(), 
+      email: z.string().optional().nullable(),
+      misId: z.string().optional().nullable(), 
+      uid: z.string().optional().nullable(),
+      isExternal: z.boolean().optional(),
+      organization: z.string().optional(),
+    })).min(1, 'At least one inventor is required.'),
+    patentCoApplicants: z.array(z.object({ 
+      name: z.string(), 
+      email: z.string().optional().nullable(),
+      misId: z.string().optional().nullable(), 
+      uid: z.string().optional().nullable(),
+      isExternal: z.boolean().optional(),
+      organization: z.string().optional(),
+    })).optional(),
     isCollaboration: z.enum(['Yes', 'No', 'NA'], { required_error: 'This field is required.' }),
     collaborationDetails: z.string().optional(),
     isIprSdg: z.enum(['Yes', 'No', 'NA'], { required_error: 'This field is required.' }),
@@ -162,8 +177,8 @@ const patentSchema = z
           {renderDetail("Patent Title", data.patentTitle)}
           {renderDetail("Application Number", data.patentApplicationNumber)}
           {renderDetail("Domain", data.patentDomain)}
-          {renderDetail("Inventors", data.patentInventors)}
-          {renderDetail("Co-Applicants", data.patentCoApplicants)}
+          {renderDetail("Inventors", data.patentInventors as any)}
+          {renderDetail("Co-Applicants", data.patentCoApplicants as any)}
           {renderDetail("Collaboration", data.isCollaboration)}
           {renderDetail("Collaboration Details", data.collaborationDetails)}
           {renderDetail("Relates to SDGs", data.isIprSdg)}
@@ -194,13 +209,10 @@ const patentSchema = z
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bankDetailsMissing, setBankDetailsMissing] = useState(false);
   const [orcidOrMisIdMissing, setOrcidOrMisIdMissing] = useState(false);
-  const [searchType, setSearchType] = useState<'inventor' | 'applicant'>('inventor');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [foundUser, setFoundUser] = useState<PatentInventor | null>(null);
   const [calculatedIncentive, setCalculatedIncentive] = useState<number | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
+  const [addType, setAddType] = useState<'inventor' | 'applicant'>('inventor');
   
   const form = useForm<PatentFormValues>({
     resolver: zodResolver(patentSchema),
@@ -231,7 +243,7 @@ const patentSchema = z
       return undefined;
     };
     const mappedStatus = mapClaimStatus(formValues.currentStatus);
-    const incentiveInput: Partial<IncentiveClaim> = {
+    const incentiveInput: any = {
       ...formValues,
       currentStatus: mappedStatus,
       filingDate: formValues.filingDate?.toISOString(),
@@ -311,39 +323,6 @@ const patentSchema = z
     }
   }, [searchParams, user, form, toast]);
 
-  const handleSearchUser = async () => {
-    if (!searchTerm) return;
-    setIsSearching(true);
-    setFoundUser(null);
-    try {
-        const result = await findUserByMisId(searchTerm);
-        if (result.success && result.users && result.users.length > 0) {
-            const user = result.users[0];
-            setFoundUser({ ...user });
-        } else {
-            toast({ variant: 'destructive', title: 'User Not Found', description: result.error });
-        }
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'Search Failed', description: error.message || 'An error occurred while searching.' });
-    } finally {
-        setIsSearching(false);
-    }
-  };
-
-  const handleAddUser = () => {
-    if (foundUser) {
-        const list = searchType === 'inventor' ? inventorFields : applicantFields;
-        const appendFn = searchType === 'inventor' ? appendInventor : appendApplicant;
-        
-        if (list.some(u => u.misId === foundUser.misId)) {
-            toast({ variant: 'destructive', title: 'User Already Added', description: `This user is already in the ${searchType} list.` });
-            return;
-        }
-        appendFn(foundUser);
-        setFoundUser(null);
-        setSearchTerm('');
-    }
-  };
 
 
   const currentStatus = form.watch('currentStatus');
@@ -414,7 +393,7 @@ const patentSchema = z
           return undefined;
         };
         
-        const claimData: Partial<IncentiveClaim> = {
+        const claimData: any = {
             ...restOfData,
           currentStatus: mapClaimStatus(currentStatus),
           calculatedIncentive: calculatedIncentive ?? undefined,
@@ -529,25 +508,33 @@ const patentSchema = z
                 <FormField name="patentDomain" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Domain of IPR</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
                 
                 <Separator />
-                <h3 className="font-semibold text-sm">Inventors & Applicants</h3>
-                
-                 <div className="space-y-2 p-3 border rounded-md">
-                    <FormLabel className="text-sm">Add Inventor / Co-Applicant</FormLabel>
-                    <RadioGroup defaultValue="inventor" onValueChange={(v) => setSearchType(v as 'inventor' | 'applicant')} className="flex items-center space-x-4 mb-2">
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="inventor" id="r1" /><label htmlFor="r1">Inventor</label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="applicant" id="r2" /><label htmlFor="r2">Co-Applicant</label></div>
-                    </RadioGroup>
-                    <div className="flex items-center gap-2">
-                        <Input placeholder={`Search by ${searchType}'s Name or MIS ID`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        <Button type="button" onClick={handleSearchUser} disabled={isSearching}>{isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}</Button>
+                 <div className="space-y-6">
+                    <div className="space-y-4">
+                        <Label className="text-sm font-semibold">Select Member Type to Search</Label>
+                        <RadioGroup 
+                            defaultValue="inventor" 
+                            onValueChange={(val) => setAddType(val as 'inventor' | 'applicant')}
+                            className="flex items-center space-x-6"
+                        >
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="inventor" id="add-inventor" />
+                                <Label htmlFor="add-inventor" className="cursor-pointer">Inventor</Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="applicant" id="add-applicant" />
+                                <Label htmlFor="add-applicant" className="cursor-pointer">Co-Applicant</Label>
+                            </div>
+                        </RadioGroup>
+                        
+                        <AuthorSearch 
+                            authors={addType === 'inventor' ? inventorFields : applicantFields}
+                            onAdd={(u) => addType === 'inventor' ? appendInventor(u) : appendApplicant(u)}
+                            type={addType}
+                            title={`Search Internal ${addType === 'inventor' ? 'Inventor' : 'Co-Applicant'}`}
+                            currentUserEmail={user?.email}
+                        />
                     </div>
-                    {foundUser && (
-                        <div className="flex items-center justify-between p-2 border rounded-md mt-2">
-                            <div><p className="text-sm">{foundUser.name} ({foundUser.misId})</p></div>
-                            <Button type="button" size="sm" onClick={handleAddUser}>Add</Button>
-                        </div>
-                    )}
-                </div>
+                 </div>
                 
                 {inventorFields.length > 0 && (
                      <div className="space-y-2">

@@ -7,6 +7,8 @@ export type CoPiDetails = {
   misId?: string; // Stored when adding an unregistered user by MIS ID
   cvUrl?: string // URL to the uploaded CV
   cvFileName?: string // Original filename for display
+  organization?: string;
+  isExternal?: boolean;
 }
 
 export type UserBankDetails = {
@@ -59,6 +61,7 @@ export type Author = {
   role: "First Author" | "Corresponding Author" | "Co-Author" | "First & Corresponding Author" | "Presenting Author" | "First & Presenting Author";
   isExternal: boolean
   status: 'approved' | 'pending' | 'Applied';
+  organization?: string;
 }
 
 export type ResearchPaper = {
@@ -145,17 +148,17 @@ export type Project = {
   coPiDetails?: CoPiDetails[]
   coPiUids?: string[]
   status:
-    | "Draft"
-    | "Submitted"
-    | "Under Review"
-    | "Revision Needed"
-    | "Revision Submitted"
-    | "Recommended"
-    | "Sanctioned"
-    | "Not Recommended"
-    | "In Progress"
-    | "Completed"
-    | "Pending Completion Approval"
+  | "Draft"
+  | "Submitted"
+  | "Under Review"
+  | "Revision Needed"
+  | "Revision Submitted"
+  | "Recommended"
+  | "Sanctioned"
+  | "Not Recommended"
+  | "In Progress"
+  | "Completed"
+  | "Pending Completion Approval"
   teamInfo: string
   timelineAndOutcomes: string
   submissionDate: string // Should be ISO string
@@ -215,9 +218,12 @@ export type ApprovalStage = {
 };
 
 export type PatentInventor = {
-    name: string;
-    misId: string;
-    uid?: string | null;
+  name: string;
+  misId?: string;
+  email?: string;
+  uid?: string | null;
+  isExternal?: boolean;
+  organization?: string;
 }
 
 export type IncentiveClaim = {
@@ -263,7 +269,7 @@ export type IncentiveClaim = {
   journalWebsite?: string;
   paperTitle?: string;
   relevantLink?: string;
-  authorPosition?: '1st' | '2nd' | '3rd' | '4th' | '5th' | '6th' | '7th' | '8th' | '9th' | '10th' ;
+  authorPosition?: '1st' | '2nd' | '3rd' | '4th' | '5th' | '6th' | '7th' | '8th' | '9th' | '10th';
   locale?: 'National' | 'International';
   printIssn?: string;
   electronicIssn?: string;
@@ -316,12 +322,12 @@ export type IncentiveClaim = {
   conferencePaperTitle?: string
   conferenceType?: "International" | "National" | "Regional/State"
   conferenceVenue?:
-    | "India"
-    | "Indian Subcontinent"
-    | "South Korea, Japan, Australia and Middle East"
-    | "Europe"
-    | "African/South American/North American"
-    | 'Other'
+  | "India"
+  | "Indian Subcontinent"
+  | "South Korea, Japan, Australia and Middle East"
+  | "Europe"
+  | "African/South American/North American"
+  | 'Other'
   presentationType?: "Oral" | "Poster" | "Other"
   govtFundingRequestProofUrl?: string
   registrationFee?: number
@@ -476,21 +482,21 @@ export type EmrInterest = {
   coPiNames?: string[]
   coPiEmails?: string[]
   status:
-    | "Registered"
-    | "PPT Submitted"
-    | "Revision Submitted"
-    | "Evaluation Pending"
-    | "Evaluation Done"
-    | "Recommended"
-    | "Not Recommended"
-    | "Revision Needed"
-    | "Endorsement Submitted"
-    | "Endorsement Signed"
-    | "Submitted to Agency"
-    | "Sanctioned"
-    | "Not Sanctioned"
-    | "Process Complete"
-    | "Awaiting Rescheduling"
+  | "Registered"
+  | "PPT Submitted"
+  | "Revision Submitted"
+  | "Evaluation Pending"
+  | "Evaluation Done"
+  | "Recommended"
+  | "Not Recommended"
+  | "Revision Needed"
+  | "Endorsement Submitted"
+  | "Endorsement Signed"
+  | "Submitted to Agency"
+  | "Sanctioned"
+  | "Not Sanctioned"
+  | "Process Complete"
+  | "Awaiting Rescheduling"
   adminRemarks?: string
   revisedPptUrl?: string
   meetingSlot?: {
@@ -526,15 +532,15 @@ export type EmrEvaluation = {
 }
 
 export type CroAssignment = {
-    email: string;
-    faculty: string;
-    campus: string;
+  email: string;
+  faculty: string;
+  campus: string;
 };
 
 export type ApproverSetting = {
-    email: string;
-    stage: 1 | 2 | 3 | 4;
-    signatureUrl?: string;
+  email: string;
+  stage: 1 | 2 | 3 | 4;
+  signatureUrl?: string;
 };
 
 export type TemplateUrls = {
@@ -552,9 +558,9 @@ export type TemplateUrls = {
 };
 
 export type ApiIntegrations = {
-    scopus?: boolean;
-    wos?: boolean;
-    sci?: boolean;
+  scopus?: boolean;
+  wos?: boolean;
+  sci?: boolean;
 };
 
 export type SystemSettings = {
