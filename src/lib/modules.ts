@@ -32,8 +32,8 @@ export const ALL_MODULES = [
   { id: 'recruitment-approvals', label: 'Recruitment Approvals' },
 ]
 
-const coreModules = ["dashboard", "notifications", "settings", "emr-calendar"]
-const facultyCoreModules = ["new-submissiogin", "my-projects"]
+const coreModules = ["dashboard", "notifications", "settings", "emr-calendar","incentive-claim"]
+const facultyCoreModules = ["new-submission", "my-projects"]
 const hierarchyCoreModules = ["analytics"]
 
 const facultyDefaults = [...coreModules, ...facultyCoreModules]
