@@ -1,5 +1,6 @@
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { getStorage, type FirebaseStorage } from 'firebase/storage';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getFunctions, type Functions } from 'firebase/functions';
@@ -32,6 +33,7 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 let functions: Functions;
+let storage: FirebaseStorage;
 let analytics: Analytics | undefined;
 
 function initializeFirebase() {
@@ -52,6 +54,7 @@ function initializeFirebase() {
     auth = getAuth(app);
     db = getFirestore(app);
     functions = getFunctions(app);
+    storage = getStorage(app);
     if (typeof window !== 'undefined') {
         analytics = getAnalytics(app);
     }
@@ -60,4 +63,4 @@ function initializeFirebase() {
 // Call initialization once
 initializeFirebase();
 
-export { app, auth, db, functions, analytics };
+export { app, auth, db, functions, storage, analytics };

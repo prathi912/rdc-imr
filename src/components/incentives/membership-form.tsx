@@ -24,7 +24,7 @@ import { Loader2, AlertCircle, Edit } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 const membershipSchema = z.object({
     professionalBodyName: z.string().min(3, 'Name of the professional body is required.'),
@@ -33,7 +33,7 @@ const membershipSchema = z.object({
     membershipNumber: z.string().min(1, 'Membership number is required.'),
     membershipAmountPaid: z.coerce.number().positive('A valid positive amount is required.'),
     membershipPaymentDate: z.string().min(1, 'Payment date is required.'),
-    membershipProof: z.any().refine((files) => files?.length > 0, 'Proof of membership/payment is required.').refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    membershipProof: z.any().refine((files) => files?.length > 0, 'Proof of membership/payment is required.').refine((files) => !files || Array.from(files as FileList).every((file) => file.size <= MAX_FILE_SIZE), 'File must be less than 50 MB.'),
     membershipSelfDeclaration: z.boolean().refine(val => val === true, { message: 'You must agree to the self-declaration.' }),
 });
 

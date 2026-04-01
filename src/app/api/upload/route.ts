@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
     // 6. Upload to blob storage with Firebase Storage fallback
     const blob = await file.arrayBuffer();
     const buffer = Buffer.from(blob);
-    
+
     let uploadUrl: string | null = null;
     let uploadedVia = "unknown";
 

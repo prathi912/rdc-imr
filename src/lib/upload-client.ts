@@ -1,8 +1,9 @@
-import { auth } from "@/lib/config";
+import { auth, storage } from "@/lib/config";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 /**
- * Upload a file to the secure upload endpoint
- * Handles authentication, file validation, and streaming
+ * Upload a file directly to Firebase Storage from the client
+ * Bypasses Vercel Serverless Function body size limits (4.5MB)
  */
 export async function uploadFileToApi(
   file: File,
@@ -13,67 +14,83 @@ export async function uploadFileToApi(
   }
 ): Promise<{ success: boolean; url?: string; error?: string; fileData?: any }> {
   try {
-    // Get Firebase auth token
+    // 1. Check authentication
     const user = auth.currentUser;
     if (!user) {
-      return { success: false, error: "User not authenticated" };
+      return { success: false, error: "User not authenticated - please log in" };
     }
 
-    const token = await user.getIdToken();
+    // 2. Prepare storage reference
+    // Use provided path or generate a default one
+    const storagePath = options?.path || `uploads/${user.uid}/${Date.now()}-${file.name}`;
+    const storageRef = ref(storage, storagePath);
 
-    // Create FormData with file
-    const formData = new FormData();
-    formData.append("file", file);
-    if (options?.path) {
-      formData.append("path", options.path);
-    }
-
-    // Upload to the new API route with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-      },
-      body: formData,
-      signal: options?.signal || controller.signal,
+    // 3. Start resumable upload
+    const uploadTask = uploadBytesResumable(storageRef, file, {
+      contentType: file.type,
+      customMetadata: {
+        originalName: file.name,
+        uploadedBy: user.uid,
+      }
     });
 
-    clearTimeout(timeoutId);
+    // 4. Handle progress and completion via Promise
+    return new Promise((resolve) => {
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          // Calculate and report progress
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          if (options?.onProgress) {
+            options.onProgress(Math.round(progress));
+          }
+        },
+        (error) => {
+          // Handle upload error
+          console.error("Firebase upload error:", error);
+          resolve({
+            success: false,
+            error: error.message || "Failed to upload file to storage",
+          });
+        },
+        async () => {
+          // Handle successful completion
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+            resolve({
+              success: true,
+              url: downloadURL,
+              fileData: {
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                path: storagePath,
+                uploadedAt: new Date().toISOString(),
+              }
+            });
+          } catch (urlError: any) {
+            console.error("Error getting download URL:", urlError);
+            resolve({
+              success: false,
+              error: "Upload succeeded but failed to retrieve URL",
+            });
+          }
+        }
+      );
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage = errorData.error || errorData.message || `Upload failed with status ${response.status}`;
-      return {
-        success: false,
-        error: errorMessage,
-      };
-    }
-
-    const result = await response.json();
-    return {
-      success: true,
-      url: result.file?.uploadedUrl || result.uploadedUrl || result.url,
-      fileData: result.file || result,
-    };
+      // Handle abort signal if provided
+      if (options?.signal) {
+        options.signal.addEventListener("abort", () => {
+          uploadTask.cancel();
+          resolve({ success: false, error: "Upload cancelled by user" });
+        });
+      }
+    });
   } catch (error: any) {
-    console.error("Upload error:", error);
-    
-    // Provide specific error messages
-    let errorMessage = "Failed to upload file";
-    if (error.name === "AbortError") {
-      errorMessage = "Upload timeout - server did not respond";
-    } else if (error instanceof TypeError && error.message.includes("Failed to fetch")) {
-      errorMessage = "Network error - unable to reach server";
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-    
+    console.error("Setup error for upload:", error);
     return {
       success: false,
-      error: errorMessage,
+      error: error.message || "An unexpected error occurred during upload setup",
     };
   }
 }

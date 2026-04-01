@@ -153,7 +153,7 @@ export function AwardForm() {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const fileKey = `${fieldName}-${file.name}-${Date.now()}-${i}`;
-        
+
         if (file.size > MAX_FILE_SIZE) {
           toast({
             variant: 'destructive',
@@ -378,7 +378,7 @@ export function AwardForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardHeader>
-            
+
             <CardDescription>Submit details of your award for incentive claim</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

@@ -70,7 +70,7 @@ const conferenceSchema = z
       .any()
       .refine((files) => files?.length > 0, 'An abstract is required.')
       .refine((files) => files?.[0]?.type === 'application/pdf', 'Abstract must be a PDF file.')
-      .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+      .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 50 MB.'),
     organizerName: z.string().min(2, 'Organizer name is required.'),
     eventWebsite: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
     conferenceDate: z.string().min(1, 'Conference date is required.'),
@@ -80,10 +80,11 @@ const conferenceSchema = z
       .any()
       .refine((files) => files?.length > 0, 'Participation certificate is required.')
       .refine((files) => files?.[0]?.type === 'application/pdf', 'File must be a PDF.')
-      .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+      .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 50 MB.'),
     wonPrize: z.boolean().optional(),
     prizeDetails: z.string().optional(),
     prizeProof: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
+    conferenceProof: z.any().refine((files) => !files || Array.from(files as FileList).every((file) => file.size <= MAX_FILE_SIZE), 'File must be less than 10 MB.'),
     attendedOtherConference: z.boolean().optional(),
     travelPlaceVisited: z.string().optional(),
     travelMode: z.enum(['Bus', 'Train', 'Air', 'Other']).optional(),
