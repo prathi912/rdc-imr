@@ -60,110 +60,41 @@ async function logActivity(level: LogLevel, message: string, context: Record<str
 }
 
 // --- Google Drive Upload Logic ---
-async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string, filePath: string): Promise<{ success: boolean; url?: string; error?: string }> {
+export async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: string, filePath: string): Promise<{ success: boolean; url?: string; error?: string }> {
   try {
     const { google } = await import('googleapis');
     const { Readable } = await import('stream');
-
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-
-    if (!clientEmail || !privateKey) {
-      throw new Error('Google Drive API credentials are not configured on the server.');
-    }
-
-    const auth = new google.auth.GoogleAuth({
-      credentials: {
-        client_email: clientEmail,
-        private_key: privateKey,
-      },
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
-    });
-
-    const drive = google.drive({ version: 'v3', auth });
-
-    // --- Find or create the main folder ---
-    let parentFolderId: string | undefined;
-    const mainFolderName = 'R&D Portal Incentive Proofs';
-
-    // 1. Check Firestore for the stored folder ID
-    const settings = await getSystemSettings();
-    parentFolderId = settings.driveParentFolderId;
-
-    // 2. If not in Firestore, search or create on Drive
-    if (!parentFolderId) {
-      const folderRes = await drive.files.list({
-        q: `mimeType='application/vnd.google-apps.folder' and name='${mainFolderName}' and trashed=false`,
-        fields: 'files(id, name)',
-        spaces: 'drive',
-      });
-
-      if (folderRes.data.files && folderRes.data.files.length > 0) {
-        parentFolderId = folderRes.data.files[0].id!;
-      } else {
-        const fileMetadata = {
-          name: mainFolderName,
-          mimeType: 'application/vnd.google-apps.folder',
-        };
-        const newFolder = await drive.files.create({
-          requestBody: fileMetadata,
-          fields: 'id',
-        });
-        parentFolderId = newFolder.data.id!;
-      }
-
-      // 3. If we found or created it, save the ID to Firestore for next time
-      if (parentFolderId) {
-        await updateSystemSettings({ ...settings, driveParentFolderId: parentFolderId });
-      }
-    }
-
-    if (!parentFolderId) {
-      throw new Error("Could not find or create the parent folder in Google Drive.");
-    }
-
-    // 4. Upload the file
-    const fileMetadata = {
-      name: fileName,
-      parents: [parentFolderId],
-    };
-    const media = {
-      mimeType: mimeType,
-      body: Readable.from(buffer),
-    };
-
-    const file = await drive.files.create({
-      requestBody: fileMetadata,
-      media: media,
-      fields: 'id, webViewLink',
-    });
-
-    const fileId = file.data.id;
-    if (!fileId) {
-      throw new Error("File upload to Google Drive failed, no file ID returned.");
-    }
-
-    // 5. Make the file publicly readable
-    await drive.permissions.create({
-      fileId: fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone',
-      },
-    });
-
-    const webViewLink = file.data.webViewLink;
-
-    if (!webViewLink) {
-      throw new Error("Could not retrieve a shareable link for the uploaded file.");
-    }
-
+...
     return { success: true, url: webViewLink };
   } catch (error: any) {
     console.error("Google Drive upload error:", error);
     await logActivity('ERROR', 'Google Drive upload failed', { path: filePath, error: error.message });
     return { success: false, error: `Google Drive upload failed: ${error.message}.` };
   }
+}
+
+/**
+ * Server Action for client-side fallback to Google Drive
+ * Limited to 4.5MB by Vercel's body size limit!
+ */
+export async function uploadFileToDriveAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
+    try {
+        const file = formData.get('file') as File;
+        const filePath = formData.get('path') as string || `uploads/fallback/${Date.now()}-${file.name}`;
+        
+        if (!file) {
+            return { success: false, error: "No file provided to fallback upload." };
+        }
+
+        // Convert File to Buffer
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+
+        return await uploadToDrive(buffer, file.name, file.type, filePath);
+    } catch (error: any) {
+        console.error("Error in uploadFileToDriveAction:", error);
+        return { success: false, error: error.message || "Failed to process fallback upload." };
+    }
 }
 
 

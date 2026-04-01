@@ -1,9 +1,13 @@
 import { auth, storage } from "@/lib/config";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { uploadFileToDriveAction } from "@/app/actions";
 
 /**
  * Upload a file directly to Firebase Storage from the client
  * Bypasses Vercel Serverless Function body size limits (4.5MB)
+ * 
+ * FALLBACK: If Firebase fails, attempts to upload via Server Action to Google Drive 
+ * (Drive fallback is limited to 4.5MB).
  */
 export async function uploadFileToApi(
   file: File,
@@ -12,7 +16,7 @@ export async function uploadFileToApi(
     signal?: AbortSignal;
     path?: string;
   }
-): Promise<{ success: boolean; url?: string; error?: string; fileData?: any }> {
+): Promise<{ success: boolean; url?: string; error?: string; fileData?: any; provider?: 'firebase' | 'googledrive' }> {
   try {
     // 1. Check authentication
     const user = auth.currentUser;
@@ -21,7 +25,6 @@ export async function uploadFileToApi(
     }
 
     // 2. Prepare storage reference
-    // Use provided path or generate a default one
     const storagePath = options?.path || `uploads/${user.uid}/${Date.now()}-${file.name}`;
     const storageRef = ref(storage, storagePath);
 
@@ -35,18 +38,16 @@ export async function uploadFileToApi(
     });
 
     // 4. Handle progress and completion via Promise
-    return new Promise((resolve) => {
+    const firebaseResult = await new Promise<{ success: boolean; url?: string; error?: string; provider?: 'firebase' }>((resolve) => {
       uploadTask.on(
         "state_changed",
         (snapshot) => {
-          // Calculate and report progress
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           if (options?.onProgress) {
             options.onProgress(Math.round(progress));
           }
         },
         (error) => {
-          // Handle upload error
           console.error("Firebase upload error:", error);
           resolve({
             success: false,
@@ -54,19 +55,12 @@ export async function uploadFileToApi(
           });
         },
         async () => {
-          // Handle successful completion
           try {
             const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
             resolve({
               success: true,
               url: downloadURL,
-              fileData: {
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                path: storagePath,
-                uploadedAt: new Date().toISOString(),
-              }
+              provider: 'firebase'
             });
           } catch (urlError: any) {
             console.error("Error getting download URL:", urlError);
@@ -78,7 +72,6 @@ export async function uploadFileToApi(
         }
       );
 
-      // Handle abort signal if provided
       if (options?.signal) {
         options.signal.addEventListener("abort", () => {
           uploadTask.cancel();
@@ -86,6 +79,50 @@ export async function uploadFileToApi(
         });
       }
     });
+
+    // 5. IF FIREBASE FAILED, TRY GOOGLE DRIVE FALLBACK
+    if (!firebaseResult.success && firebaseResult.error !== "Upload cancelled by user") {
+        console.warn("Firebase upload failed, attempting Google Drive fallback...", firebaseResult.error);
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('path', storagePath);
+
+        const driveResult = await uploadFileToDriveAction(formData);
+        
+        if (driveResult.success) {
+            return {
+                success: true,
+                url: driveResult.url,
+                provider: 'googledrive',
+                fileData: {
+                    name: file.name,
+                    size: file.size,
+                    type: file.type,
+                    path: storagePath,
+                    uploadedAt: new Date().toISOString(),
+                }
+            };
+        } else {
+            return {
+                success: false,
+                error: `Both Firebase and Google Drive uploads failed. Drive error: ${driveResult.error}`,
+            };
+        }
+    }
+
+    // 6. Return Firebase result if it was successful
+    return {
+        ...firebaseResult,
+        fileData: firebaseResult.success ? {
+            name: file.name,
+            size: file.size,
+            type: file.type,
+            path: storagePath,
+            uploadedAt: new Date().toISOString(),
+        } : undefined
+    };
+
   } catch (error: any) {
     console.error("Setup error for upload:", error);
     return {
