@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { uploadFileToApi } from './upload-client';
 import { useToast } from '@/hooks/use-toast';
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 interface UploadProgressState {
   [key: string]: number;

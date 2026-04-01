@@ -28,8 +28,9 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
 
     // Check if amount hasn't been changed by any approver
     const isAmountUnchanged = useMemo(() => {
-        if (claim && claim.claimType === 'Research Papers' && claim.calculatedIncentive && claim.finalApprovedAmount) {
-            // If the amounts match, it means no approver has changed the amount
+        if (claim && claim.claimType === 'Research Papers' && claim.calculatedIncentive) {
+            // If the amounts match, or final amount is not yet set, it means it's still the initial calculation
+            if (!claim.finalApprovedAmount) return true;
             return claim.calculatedIncentive === claim.finalApprovedAmount;
         }
         return false;
@@ -127,7 +128,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
     const breakdown = isAmountUnchanged ? calculateIncentiveBreakdown() : null;
     
     const handleDownloadNoting = async () => {
-        if (!isEligibleForFinancialDisbursement(claim)) {
+        if (!claim || !isEligibleForFinancialDisbursement(claim)) {
             toast({
                 variant: 'destructive',
                 title: 'Not Eligible for Office Noting',
@@ -138,6 +139,7 @@ export function ClaimDetailsDialog({ claim, open, onOpenChange, currentUser, cla
 
         setIsPrinting(true);
         try {
+            if (!claim) return;
             const result = await generateOfficeNotingForClaim(claim.id);
             let fileName = result?.fileName || `Office_Noting_${claim.userName.replace(/\s/g, '_')}.docx`;
 
@@ -194,7 +196,7 @@ a.href = url;
             displayValue = String(value);
         }
         
-        const isAutoFetched = fieldId && claim.autoFetchedFields?.includes(fieldId);
+        const isAutoFetched = claim && fieldId && claim.autoFetchedFields?.includes(fieldId);
 
         return (
             <div className="grid grid-cols-3 gap-2 py-1">
@@ -244,11 +246,13 @@ a.href = url;
     }
 
     const isFullAdmin = currentUser?.role === 'Super-admin' || currentUser?.role === 'admin';
+    const isApprover = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-'));
+    const canSeeCalculation = isFullAdmin || isApprover;
     const canTakeAction = currentUser?.allowedModules?.some(m => m.startsWith('incentive-approver-')) && onTakeAction;
     const isPendingForBank = ['Accepted', 'Submitted to Accounts'].includes(claim.status);
     const canGenerateNoting = isEligibleForFinancialDisbursement(claim);
 
-    const profileLink = claimant?.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant.misId}`;
+    const profileLink = claimant && claimant.campus === 'Goa' ? `/goa/${claimant.misId}` : `/profile/${claimant?.misId}`;
     const hasProfileLink = claimant && claimant.misId;
 
     return (
@@ -458,7 +462,7 @@ a.href = url;
                         </>
                     )}
 
-                    {isFullAdmin && (
+                    {canSeeCalculation && (
                         <>
                             <hr className="my-2" />
                             <h4 className="font-semibold text-base mt-2">Benefit & Approval Details</h4>

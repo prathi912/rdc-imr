@@ -38,7 +38,7 @@ import { uploadFileToApi } from '@/lib/upload-client';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
 const workshopEventTypes = ['STTP', 'Workshop', 'Training Program', 'FDP', 'Other'];
 

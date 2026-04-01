@@ -86,7 +86,7 @@ const allPossibleResearchPaperFields: { id: keyof IncentiveClaim | 'name' | 'des
     { id: 'wosType', label: 'WoS Type' },
     { id: 'journalClassification', label: 'Q Rating of the Journal' },
     { id: 'authorRoleAndPosition', label: 'Author Role / Position' },
-    { id: 'totalPuAuthors', label: 'No. of Authors from PU' },
+    { id: 'totalAuthors', label: 'No. of Authors from PU' },
     { id: 'printIssn', label: 'ISSN' }, // Simplified for display
     { id: 'publicationProofUrls', label: 'PROOF OF PUBLICATION ATTACHED' },
     { id: 'isPuNameInPublication', label: 'Whether “PU” name exists' },
@@ -278,13 +278,13 @@ function ResearchPaperClaimDetails({
                 {renderDetail('wosType', 'WoS Type', claim.wosType)}
                 {renderDetail('journalClassification', 'Q Rating of the Journal', claim.journalClassification)}
                 {renderDetail('authorRoleAndPosition', 'Author Role / Position', `${claim.authorType || 'N/A'} / ${claim.authorPosition || 'N/A'}`)}
-                {renderDetail('totalPuAuthors', 'No. of Authors from PU', claim.totalPuAuthors)}
+                {renderDetail('totalAuthors', 'No. of Authors from PU', (claim.authors || []).filter(a => !a.isExternal).length)}
                 {renderDetail('printIssn', 'ISSN', `${claim.printIssn || 'N/A'} (Print), ${claim.electronicIssn || 'N/A'} (Electronic)`)}
                 {renderDetail('publicationProofUrls', 'PROOF OF PUBLICATION ATTACHED', !!claim.publicationProofUrls && claim.publicationProofUrls.length > 0)}
                 {renderDetail('isPuNameInPublication', 'Whether “PU” name exists', claim.isPuNameInPublication)}
                 {renderDetail('publicationMonth', 'Published Month & Year', `${claim.publicationMonth}, ${claim.publicationYear}`)}
             </div>
-            {breakdown && !isChecklistEnabled && (
+            {breakdown && (
                 <>
                     <Separator />
                     <div className="space-y-2 bg-blue-50 dark:bg-blue-950 rounded-lg p-3 border border-blue-200 dark:border-blue-800">

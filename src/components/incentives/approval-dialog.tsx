@@ -535,7 +535,7 @@ function ResearchPaperClaimDetails({
                     </div>
                 </>
             )}
-            {breakdown && !isChecklistEnabled && (
+            {breakdown && (
                 <>
                     <Separator />
                     <div className="space-y-2 bg-blue-50 dark:bg-blue-950 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
