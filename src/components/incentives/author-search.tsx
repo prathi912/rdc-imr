@@ -45,29 +45,44 @@ export function AuthorSearch({
     const [extOrg, setExtOrg] = useState('');
     const [extRole, setExtRole] = useState<string>(availableRoles[0] || 'Co-Author');
 
-    const handleSearch = useCallback(async (val: string) => {
+    const handleSearch = (val: string) => {
         setSearchTerm(val);
         if (val.length < 2) {
             setFoundUsers([]);
             setShowResults(false);
+            setIsSearching(false);
+            return;
+        }
+        
+        // Immediate clearing of results to prevent stale data flash
+        setFoundUsers([]);
+        setIsSearching(true);
+        setShowResults(true);
+    };
+
+    useEffect(() => {
+        if (searchTerm.length < 2) {
             return;
         }
 
-        setIsSearching(true);
-        setShowResults(true);
-        try {
-            const result = await findUserByMisId(val);
-            if (result.success && result.users) {
-                setFoundUsers(result.users);
-            } else {
+        const debounceTimer = setTimeout(async () => {
+            try {
+                const result = await findUserByMisId(searchTerm);
+                if (result.success && result.users) {
+                    setFoundUsers(result.users);
+                } else {
+                    setFoundUsers([]);
+                }
+            } catch (error) {
+                console.error("Search failed:", error);
                 setFoundUsers([]);
+            } finally {
+                setIsSearching(false);
             }
-        } catch (error) {
-            console.error("Search failed:", error);
-        } finally {
-            setIsSearching(false);
-        }
-    }, []);
+        }, 300);
+
+        return () => clearTimeout(debounceTimer);
+    }, [searchTerm]);
 
     const handleAddInternal = (user: FoundUser) => {
         if (currentUserEmail && user.email?.toLowerCase() === currentUserEmail.toLowerCase()) {
