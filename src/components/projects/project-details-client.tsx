@@ -405,9 +405,10 @@ export function ProjectDetailsClient({ project: initialProject, allUsers, piUser
 
   useEffect(() => {
     const fetchCoPiUsers = async () => {
-      if (project.coPiUids && project.coPiUids.length > 0) {
+      const coPiUids = (project.coPiUids || []).filter((uid): uid is string => !!uid);
+      if (coPiUids.length > 0) {
         const usersRef = collection(db, "users")
-        const q = query(usersRef, where("__name__", "in", project.coPiUids))
+        const q = query(usersRef, where("__name__", "in", coPiUids))
         const querySnapshot = await getDocs(q)
         const fetchedUsers = querySnapshot.docs.map((coPiDoc) => ({ uid: coPiDoc.id, ...coPiDoc.data() }) as User)
         setCoPiUsers(fetchedUsers)

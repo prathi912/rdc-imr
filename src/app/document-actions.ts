@@ -508,8 +508,9 @@ export async function generateSanctionOrder(projectId: string): Promise<{ succes
     const piUser = piUserSnap.exists ? (piUserSnap.data() as User) : null;
     
     const coPiUsers = new Map<string, User>();
-    if (project.coPiUids && project.coPiUids.length > 0) {
-        const coPiSnapshot = await adminDb.collection('users').where('__name__', 'in', project.coPiUids).get();
+    const coPiUids = (project.coPiUids || []).filter((uid): uid is string => !!uid);
+    if (coPiUids.length > 0) {
+        const coPiSnapshot = await adminDb.collection('users').where('__name__', 'in', coPiUids).get();
         coPiSnapshot.forEach(doc => coPiUsers.set(doc.id, doc.data() as User));
     }
 

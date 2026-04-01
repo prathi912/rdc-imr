@@ -1893,11 +1893,12 @@ export async function updateCoInvestigators(
     const project = projectSnap.data() as Project
     const existingCoPis = project.coPiUids || []
 
+    const filteredCoPiUids = (coPiUids || []).filter((uid): uid is string => !!uid);
     await projectRef.update({
-      coPiUids: coPiUids,
+      coPiUids: filteredCoPiUids,
     })
 
-    const newCoPis = coPiUids.filter((uid) => !existingCoPis.includes(uid))
+    const newCoPis = filteredCoPiUids.filter((uid) => !existingCoPis.includes(uid))
 
     if (newCoPis.length > 0) {
       const usersRef = adminDb.collection("users")
@@ -2225,7 +2226,7 @@ export async function sendGlobalEvaluationReminders(adminName: string): Promise<
     const pendingEvaluationsMap = new Map<string, { evaluator: User, projects: Project[] }>();
 
     // Get all potential evaluators in one go to minimize reads
-    const allPotentialEvaluatorUids = [...new Set(projectsToReview.flatMap(p => p.meetingDetails?.assignedEvaluators || []))];
+    const allPotentialEvaluatorUids = [...new Set(projectsToReview.flatMap(p => (p.meetingDetails?.assignedEvaluators || []).filter(Boolean)))];
     if (allPotentialEvaluatorUids.length === 0) {
       return { success: true, sentCount: 0 };
     }
