@@ -305,7 +305,7 @@ export async function calculateApcIncentive(
         
         const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
         
-        const finalIncentive = admissibleAmount / internalAuthorCount;
+        const finalIncentive = admissibleAmount;
         
         return { success: true, amount: Math.round(finalIncentive) };
         

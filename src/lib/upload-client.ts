@@ -1,6 +1,6 @@
 import { auth, storage } from "@/lib/config";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { uploadFileToDriveAction } from "@/app/actions";
+import { uploadFileToServerAction } from "@/app/actions";
 
 /**
  * Upload a file directly to Firebase Storage from the client
@@ -88,7 +88,7 @@ export async function uploadFileToApi(
         formData.append('file', file);
         formData.append('path', storagePath);
 
-        const driveResult = await uploadFileToDriveAction(formData);
+        const driveResult = await uploadFileToServerAction(formData);
         
         if (driveResult.success) {
             return {

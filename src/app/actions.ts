@@ -64,8 +64,53 @@ export async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: 
   try {
     const { google } = await import('googleapis');
     const { Readable } = await import('stream');
-...
-    return { success: true, url: webViewLink };
+
+    const auth = new google.auth.JWT(
+      process.env.FIREBASE_CLIENT_EMAIL,
+      undefined,
+      process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      ['https://www.googleapis.com/auth/drive.file']
+    );
+
+    const drive = google.drive({ version: 'v3', auth });
+
+    const fileMetadata = {
+      name: fileName,
+    };
+
+    const media = {
+      mimeType: mimeType,
+      body: Readable.from(buffer),
+    };
+
+    const response = await drive.files.create({
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id, webViewLink',
+    });
+
+    const fileId = response.data.id;
+
+    if (!fileId) {
+      throw new Error("Failed to get file ID after upload.");
+    }
+
+    // Make the file readable by anyone with the link
+    await drive.permissions.create({
+      fileId: fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+
+    // Get the updated webViewLink (sometimes it's not populated immediately or needs permissions)
+    const result = await drive.files.get({
+      fileId: fileId,
+      fields: 'webViewLink',
+    });
+
+    return { success: true, url: result.data.webViewLink || undefined };
   } catch (error: any) {
     console.error("Google Drive upload error:", error);
     await logActivity('ERROR', 'Google Drive upload failed', { path: filePath, error: error.message });
@@ -78,23 +123,32 @@ export async function uploadToDrive(buffer: Buffer, fileName: string, mimeType: 
  * Limited to 4.5MB by Vercel's body size limit!
  */
 export async function uploadFileToDriveAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
-    try {
-        const file = formData.get('file') as File;
-        const filePath = formData.get('path') as string || `uploads/fallback/${Date.now()}-${file.name}`;
-        
-        if (!file) {
-            return { success: false, error: "No file provided to fallback upload." };
-        }
+  // Now using the unified server upload action which prioritizes Firebase then Drive
+  return await uploadFileToServerAction(formData);
+}
 
-        // Convert File to Buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+/**
+ * Unified Server Action for browser fallbacks
+ */
+export async function uploadFileToServerAction(formData: FormData): Promise<{ success: boolean; url?: string; error?: string }> {
+  try {
+    const file = formData.get('file') as File;
+    const path = formData.get('path') as string;
 
-        return await uploadToDrive(buffer, file.name, file.type, filePath);
-    } catch (error: any) {
-        console.error("Error in uploadFileToDriveAction:", error);
-        return { success: false, error: error.message || "Failed to process fallback upload." };
+    if (!file || !path) {
+      return { success: false, error: "File and path are required for server-side upload fallback." };
     }
+
+    // Convert File to Data URL for consistency with existing uploadFileToServer
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const base64 = buffer.toString('base64');
+    const dataUrl = `data:${file.type};base64,${base64}`;
+
+    return await uploadFileToServer(dataUrl, path);
+  } catch (error: any) {
+    console.error("Error in uploadFileToServerAction:", error);
+    return { success: false, error: error.message || "Failed to process server-side fallback." };
+  }
 }
 
 
@@ -340,7 +394,7 @@ export async function deleteImrProject(
     }
 
     await logActivity("INFO", "IMR project deleted", { projectId, title: project.title, deletedBy, reason });
-    await logEvent('AUDIT', 'IMR project deleted by admin', { 
+    await logEvent('AUDIT', 'IMR project deleted by admin', {
       metadata: { projectId, title: project.title, reason },
       user: { uid: deletedBy, email: '', role: 'admin' },
       status: 'warning'
@@ -787,7 +841,7 @@ export async function getLogs(filters: {
 
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
-      logs = logs.filter((log: any) => 
+      logs = logs.filter((log: any) =>
         log.message?.toLowerCase().includes(searchLower) ||
         log.userId?.toLowerCase().includes(searchLower) ||
         log.userEmail?.toLowerCase().includes(searchLower)
@@ -1232,45 +1286,52 @@ export async function uploadFileToServer(
     const mimeType = match[1];
     const fileName = path.split('/').pop() || 'uploaded-file';
 
-    // If the path is for an incentive proof, use Google Drive
-    if (path.startsWith('incentive-proofs/')) {
-      console.log(`Uploading incentive proof to Google Drive: ${fileName}`);
-      const driveResult = await uploadToDrive(buffer, fileName, mimeType, path);
-      if (driveResult.success) {
-        return driveResult;
-      }
-      // If Drive upload fails, log it and fall through to the default (Firebase) method.
-      const errorMessage = `Google Drive upload failed. Falling back to default storage for ${path}. Error: ${driveResult.error}`;
-      console.warn(errorMessage);
-      await logActivity("WARNING", "Google Drive upload failed; falling back to default storage", { path, driveError: driveResult.error });
-    }
-
-    // Try Firebase first
+    // 1. Try Firebase Admin first (Highest Reliability, No CORS issues)
     try {
       const bucket = adminStorage.bucket();
       const file = bucket.file(path);
       await file.save(buffer, { metadata: { contentType: mimeType } });
-      await file.makePublic();
-      const publicUrl = file.publicUrl();
-      console.log(`File uploaded to Firebase Storage at ${path}`);
-      return { success: true, url: publicUrl };
-    } catch (firebaseError: any) {
-      console.warn("Firebase upload failed, falling back to Vercel Blob:", firebaseError.message);
-      await logActivity("WARNING", "Firebase upload failed, falling back to Vercel Blob", { path, error: firebaseError.message });
-
-      // Fallback to Vercel Blob
+      
+      // Attempt to make public, but fail gracefully
       try {
-        const blob = await put(path, buffer, {
-          access: 'public',
-          contentType: mimeType,
-          token: process.env.RDC_READ_WRITE_TOKEN,
-        });
-        console.log(`File uploaded to Vercel Blob: ${blob.url}`);
-        return { success: true, url: blob.url };
-      } catch (blobError: any) {
-        console.error("FATAL: Both Firebase and Vercel Blob uploads failed:", blobError.message);
-        await logActivity("ERROR", "Vercel Blob upload failed after Firebase failure", { path, error: blobError.message });
-        return { success: false, error: blobError.message || "Both Firebase and Vercel Blob uploads failed." };
+        await file.makePublic();
+      } catch (e) {
+        console.warn(`Could not make public ${path} - expected if uniform access is enabled.`);
+      }
+
+      const publicUrl = file.publicUrl();
+      console.log(`File uploaded to Firebase Storage (Admin) at ${path}`);
+      return { success: true, url: publicUrl, provider: 'firebase' } as any;
+    } catch (firebaseError: any) {
+      console.warn("Firebase Admin upload failed, attempting Google Drive fallback:", firebaseError.message);
+      await logActivity("WARNING", "Firebase Admin upload failed, falling back to Google Drive", { path, error: firebaseError.message });
+
+      // 2. Fallback to Google Drive
+      try {
+        const driveResult = await uploadToDrive(buffer, fileName, mimeType, path);
+        if (driveResult.success) {
+          return { ...driveResult, provider: 'googledrive' } as any;
+        }
+        throw new Error(driveResult.error || "Google Drive upload failed.");
+      } catch (driveError: any) {
+        console.warn("Google Drive fallback failed, trying Vercel Blob:", driveError.message);
+        await logActivity("WARNING", "Google Drive fallback failed, trying Vercel Blob", { path, error: driveError.message });
+
+        // 3. Last resort: Vercel Blob
+        try {
+          const blob = await put(path, buffer, {
+            access: 'public',
+            contentType: mimeType,
+            token: process.env.RDC_READ_WRITE_TOKEN,
+          });
+          console.log(`File uploaded to Vercel Blob: ${blob.url}`);
+          return { success: true, url: blob.url, provider: 'vercelblob' } as any;
+        } catch (blobError: any) {
+          const finalError = `FATAL: All upload methods (Firebase, Drive, Vercel) failed. Final error: ${blobError.message}`;
+          console.error(finalError);
+          await logActivity("ERROR", "All upload fallbacks failed", { path, error: blobError.message });
+          return { success: false, error: finalError };
+        }
       }
     }
   } catch (error: any) {
@@ -2536,7 +2597,7 @@ export async function bulkUploadProjects(
   await logEvent('MIGRATION', 'Bulk project upload operated', {
     metadata: { successfulCount, failureCount: failures.length, failures: failures.slice(0, 50) }, // Limit payload size
     status: failures.length === 0 ? 'success' : (successfulCount === 0 ? 'error' : 'warning'),
-    user: { uid: 'system', email: 'system@rdc', role: 'Super-admin' } 
+    user: { uid: 'system', email: 'system@rdc', role: 'Super-admin' }
   });
 
   return { success: true, data: { successfulCount, failures } };

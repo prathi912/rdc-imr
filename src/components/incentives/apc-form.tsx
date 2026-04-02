@@ -650,7 +650,7 @@ export function ApcForm() {
                 <Info className="h-4 w-4" />
                 <AlertTitle>APC Reimbursement Policy</AlertTitle>
                 <AlertDescription>
-                  Admissible APC = (Lesser of (Actual APC Paid, Max Policy Limit)) ÷ Total Number of PU Authors.
+                  Admissible APC = Lesser of (Actual APC Paid, Max Policy Limit).
                   The author must request the Editor for an APC waiver and submit the proof along with this application.
                 </AlertDescription>
               </Alert>

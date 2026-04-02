@@ -117,7 +117,7 @@ The incentive is based on patent status and is distributed equally among all inv
 
 ## 5. Seed Money for APC
 
-Reimbursement is the *lesser of* the actual APC paid and the maximum policy limit, distributed equally among PU authors.
+Reimbursement is the *lesser of* the actual APC paid and the maximum policy limit.
 - **Q1 Journal:** Up to ₹40,000
 - **Q2 Journal:** Up to ₹30,000
 - **Q3 Journal:** Up to ₹20,000
