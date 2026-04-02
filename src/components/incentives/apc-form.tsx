@@ -474,7 +474,7 @@ export function ApcForm() {
         email: selectedUser.email,
         uid: selectedUser.uid,
         role: 'Co-Author',
-        isExternal: !selectedUser.uid,
+        isExternal: false,
         status: 'pending',
       });
     }

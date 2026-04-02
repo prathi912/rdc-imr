@@ -1,7 +1,7 @@
 
 'use server';
 
-import type { IncentiveClaim, CoAuthor, Author } from '@/types';
+import type { IncentiveClaim, Author } from '@/types';
 import { isResearchCoAuthorBeyondFifthPosition } from '@/lib/incentive-eligibility';
 
 // --- Research Paper Calculation ---
@@ -242,7 +242,7 @@ export async function calculateBookIncentive(claimData: Partial<IncentiveClaim>)
             totalIncentive = Math.min(sum, baseBookIncentive);
         }
 
-        const internalAuthorsCount = (claimData.authors?.filter(a => !a.isExternal).length || 0) + (claimData.totalPuAuthors || 0);
+        const internalAuthorsCount = claimData.authors?.filter(a => !a.isExternal).length || 1;
         if (internalAuthorsCount > 1) {
             totalIncentive /= internalAuthorsCount;
         }
@@ -305,9 +305,10 @@ export async function calculateApcIncentive(
         
         const admissibleAmount = Math.min(actualAmountPaid, maxReimbursementLimit);
         
-        const finalIncentive = admissibleAmount;
+        // Split equally among all PU (internal) authors (as per SOP)
+        const individualShare = admissibleAmount / (internalAuthorCount || 1);
         
-        return { success: true, amount: Math.round(finalIncentive) };
+        return { success: true, amount: Math.round(individualShare) };
         
     } catch (error: any) {
         console.error("Error calculating APC incentive:", error);
@@ -454,9 +455,12 @@ export async function calculatePatentIncentive(claimData: Partial<IncentiveClaim
         }
         
         let baseAmount = 0;
-        if (currentStatus === 'Published') {
+        // Check both patentStatus and currentStatus to be robust
+        const status = claimData.patentStatus || claimData.currentStatus;
+        
+        if (status === 'Published') {
             baseAmount = 3000;
-        } else if (currentStatus === 'Granted') {
+        } else if (status === 'Granted' || status === 'Awarded') {
             baseAmount = 15000;
         } else {
              return { success: true, amount: 0 };
