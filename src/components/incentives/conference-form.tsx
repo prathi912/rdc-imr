@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import Link from 'next/link';
@@ -39,13 +39,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/config';
 import { collection, doc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
-import type { User, IncentiveClaim } from '@/types';
+import type { User, IncentiveClaim, Author } from '@/types';
 import { uploadFileToApi } from '@/lib/upload-client';
-import { Loader2, AlertCircle, Info, Edit } from 'lucide-react';
+import { Loader2, AlertCircle, Info, Edit, Trash2, Plus } from 'lucide-react';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { parseISO, addYears, format } from 'date-fns';
 import { calculateConferenceIncentive } from '@/app/incentive-calculation';
 import { WorkshopForm } from '@/components/incentives/workshop-form';
+import { AuthorSearch } from './author-search';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -90,6 +91,27 @@ const conferenceSchema = z
     travelMode: z.enum(['Bus', 'Train', 'Air', 'Other']).optional(),
     travelReceipts: z.any().optional().refine((files) => !files?.[0] || files?.[0]?.size <= MAX_FILE_SIZE, 'File must be less than 10 MB.'),
     conferenceSelfDeclaration: z.boolean().refine((val) => val === true, { message: 'You must agree to the self-declaration.' }),
+    authors: z
+      .array(
+        z
+          .object({
+            name: z.string().min(2, 'Author name is required.'),
+            email: z.string().email('Invalid email format.').or(z.literal('')),
+            uid: z.string().optional().nullable(),
+            role: z.enum(['First Author', 'Corresponding Author', 'Co-Author', 'First & Corresponding Author', "Presenting Author", "First & Presenting Author"]),
+            isExternal: z.boolean(),
+            status: z.enum(['approved', 'pending', 'Applied'])
+          })
+          .refine((data) => data.isExternal || !!data.email, {
+            message: 'Email is required for internal authors.',
+            path: ['email'],
+          })
+      )
+      .min(1, 'At least one author is required.')
+      .refine(data => {
+        const firstAuthors = data.filter(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+        return firstAuthors.length <= 1;
+      }, { message: 'Only one author can be designated as the First Author.', path: ['authors'] }),
     authorType: z.string().optional(),
     totalAuthors: z.string().optional(),
   })
@@ -131,7 +153,8 @@ const conferenceVenueOptions = {
 };
 
 const authorCountOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10+'];
-const authorTypeOptions = ['First Author', 'Corresponding Author', 'Co-Author'];
+const authorTypeOptions = ['First Author', 'Corresponding Author', 'Co-Author', 'Presenting Author', 'First & Presenting Author'];
+const coAuthorRoles: Author['role'][] = ['First Author', 'Corresponding Author', 'Co-Author', 'Presenting Author', 'First & Presenting Author'];
 
 function ReviewDetails({ data, onEdit }: { data: ConferenceFormValues; onEdit: () => void }) {
   const renderDetail = (label: string, value?: string | number | boolean) => {
@@ -253,6 +276,7 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
       eventType: '',
       conferenceName: '',
       conferencePaperTitle: '',
+      authors: [],
       conferenceType: undefined,
       conferenceVenue: undefined,
       presentationType: undefined,
@@ -273,12 +297,20 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
       wonPrize: false,
       prizeDetails: '',
       prizeProof: undefined,
+      conferenceProof: undefined,
       attendedOtherConference: false,
       travelPlaceVisited: '',
       travelMode: undefined,
       travelReceipts: undefined,
       conferenceSelfDeclaration: false,
+      authorType: '',
+      totalAuthors: '',
     },
+  });
+
+  const { fields, append, remove, update } = useFieldArray({
+    control: form.control,
+    name: "authors",
   });
 
   const selectedEventType = form.watch('eventType');
@@ -338,6 +370,18 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
       setBankDetailsMissing(!parsedUser.bankDetails);
       setOrcidOrMisIdMissing(!parsedUser.orcidId || !parsedUser.misId);
 
+      const isUserAlreadyAdded = form.getValues('authors').some(field => field.email.toLowerCase() === parsedUser.email.toLowerCase());
+      if (!isUserAlreadyAdded) {
+        append({
+          name: parsedUser.name,
+          email: parsedUser.email,
+          uid: parsedUser.uid,
+          role: "First Author",
+          isExternal: false,
+          status: 'approved'
+        })
+      }
+
       const checkEligibility = async () => {
         const claimsRef = collection(db, 'incentiveClaims');
         const q = query(
@@ -377,7 +421,7 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
     if (!claimId) {
       setIsLoadingDraft(false);
     }
-  }, [searchParams]);
+  }, [append, form, searchParams]);
 
   useEffect(() => {
     const claimId = searchParams.get('claimId');
@@ -388,14 +432,16 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
           const claimRef = doc(db, 'incentiveClaims', claimId);
           const claimSnap = await getDoc(claimRef);
           if (claimSnap.exists()) {
-            const draftData = claimSnap.data() as IncentiveClaim;
+            const draftData = claimSnap.data() as any;
             form.reset({
               ...draftData,
+              authors: draftData.authors || [],
               govtFundingRequestProof: undefined,
               abstractUpload: undefined,
               registrationFeeProof: undefined,
               participationCertificate: undefined,
               prizeProof: undefined,
+              conferenceProof: undefined,
               travelReceipts: undefined,
             });
           } else {
@@ -478,7 +524,7 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
         uploadFileHelper(travelReceipts?.[0], 'conference-travel-receipts'),
       ]);
 
-      const claimData = {
+      const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
         ...restOfData,
         govtFundingRequestProofUrl: govtFundingRequestProofUrl ?? undefined,
         abstractUrl: abstractUrl ?? undefined,
@@ -500,7 +546,7 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
         submissionDate: new Date().toISOString(),
         authorType: data.authorType,
         totalAuthors: data.totalAuthors,
-      } satisfies Omit<IncentiveClaim, 'id' | 'claimId'>;
+      };
 
       const result = await submitIncentiveClaimViaApi(claimData);
 
@@ -527,6 +573,39 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
   }
 
   const onFinalSubmit = () => handleSave('Pending');
+
+  const firstAuthorExists = fields.some(author => author.role === 'First Author' || author.role === 'First & Corresponding Author');
+
+  const getAvailableRoles = (currentAuthor?: Author) => {
+    const isCurrentAuthorFirst = currentAuthor && (currentAuthor.role === 'First Author' || currentAuthor.role === 'First & Corresponding Author');
+    if (firstAuthorExists && !isCurrentAuthorFirst) {
+      return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
+    }
+    return coAuthorRoles;
+  };
+
+  const removeAuthor = (index: number) => {
+    const authorToRemove = fields[index];
+    if (authorToRemove.email.toLowerCase() === user?.email.toLowerCase()) {
+      toast({ variant: 'destructive', title: 'Action not allowed', description: 'You cannot remove yourself as the primary author.' });
+      return;
+    }
+    remove(index);
+  };
+
+  const updateAuthorRole = (index: number, role: Author['role']) => {
+    const currentAuthors = form.getValues('authors');
+    const author = currentAuthors[index];
+    const isTryingToBeFirst = role === 'First Author' || role === 'First & Corresponding Author';
+    const isAnotherFirst = currentAuthors.some((a, i) => i !== index && (a.role === 'First Author' || a.role === 'First & Corresponding Author'));
+
+    if (isTryingToBeFirst && isAnotherFirst) {
+      toast({ title: 'Conflict', description: 'Another author is already the First Author.', variant: 'destructive' });
+      return;
+    }
+
+    update(index, { ...author, role });
+  };
 
   const { conferenceMode, conferenceType, wonPrize, organizerName, conferenceName, conferenceVenue } = form.watch();
   const isPuConference = organizerName?.toLowerCase().includes('parul university') || conferenceName?.toLowerCase().includes('picet');
@@ -860,6 +939,64 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
                       </FormItem>
                     )}
                   />
+                  <div className="space-y-4">
+                    <FormLabel>Author(s) & Roles</FormLabel>
+                    <div className="grid gap-3">
+                      {fields.map((field, index) => (
+                        <div
+                          key={field.id}
+                          className="flex flex-col md:flex-row items-start md:items-center gap-4 p-3 bg-muted/50 rounded-md"
+                        >
+                          <div className="flex-grow">
+                            <p className="font-medium text-sm">
+                              {field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 w-full md:w-auto">
+                            <FormField
+                              control={form.control}
+                              name={`authors.${index}.role`}
+                              render={({ field: roleField }) => (
+                                <FormItem className="w-full md:w-[180px]">
+                                  <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={roleField.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-9 text-xs">
+                                        <SelectValue placeholder="Select role" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (
+                                        <SelectItem key={role} value={role}>{role}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </FormItem>
+                              )}
+                            />
+                            {field.email.toLowerCase() !== user?.email.toLowerCase() && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => removeAuthor(index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <AuthorSearch
+                      authors={fields}
+                      onAdd={(author) => append(author)}
+                      availableRoles={getAvailableRoles()}
+                      currentUserEmail={user?.email}
+                    />
+                    <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -882,6 +1019,7 @@ function ConferenceFormContent({ onEventTypeChange }: ConferenceFormContentProps
                             </SelectContent>
                           </Select>
                           <FormMessage />
+                          <FormDescription>Calculated from the list above.</FormDescription>
                         </FormItem>
                       )}
                     />

@@ -133,9 +133,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, data: allFoundRecords });
   } else {
     await logEvent('APPLICATION', 'API Request: User not found', {
-      metadata: { endpoint: '/api/get-staff-data', method: 'GET', statusCode: 404, latency_ms, email, misId },
-      status: 'warning'
+      metadata: { endpoint: '/api/get-staff-data', method: 'GET', statusCode: 200, latency_ms, email, misId },
+      status: 'info'
     });
-    return NextResponse.json({ success: false, error: `User not found in the staff data file.` }, { status: 404 });
+    return NextResponse.json({ success: true, data: [], message: `User not found in the staff data file.` });
   }
 }

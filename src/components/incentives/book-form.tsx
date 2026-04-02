@@ -455,7 +455,7 @@ export function BookForm() {
 
     const removeAuthor = (index: number) => {
         const authorToRemove = fields[index];
-        if (authorToRemove.email === user?.email) {
+        if (authorToRemove.email.toLowerCase() === user?.email.toLowerCase()) {
             toast({ variant: 'destructive', title: 'Action not allowed', description: 'You cannot remove yourself as the primary author.' });
             return;
         }
@@ -522,46 +522,65 @@ export function BookForm() {
                                 <FormField name="publicationTitle" control={form.control} render={({ field }) => (<FormItem><FormLabel>Title of the {bookApplicationType || 'Publication'}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
                                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookTitleForChapter" control={form.control} render={({ field }) => (<FormItem><FormLabel>Title of the Book (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />)}
 
-                                <div className="space-y-4">
-                                    <FormLabel>Author(s) & Roles</FormLabel>
                                     <div className="space-y-4">
-                                        {fields.map((field, index) => (
-                                            <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-4 rounded-md items-end">
-                                                <FormItem className="md:col-span-2">
-                                                    <FormLabel>Name</FormLabel>
-                                                    <FormControl><Input value={field.name} readOnly /></FormControl>
-                                                </FormItem>
-                                                <FormField
-                                                    control={form.control}
-                                                    name={`authors.${index}.role`}
-                                                    render={({ field: roleField }) => (
-                                                        <FormItem>
-                                                            <FormLabel>Role</FormLabel>
-                                                            <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={roleField.value}>
-                                                                <FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl>
-                                                                <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
-                                                            </Select>
-                                                            <FormMessage />
-                                                        </FormItem>
-                                                    )}
-                                                />
-                                                {index > 0 && (
-                                                    <Button type="button" variant="destructive" className="md:col-start-4" onClick={() => remove(index)}>
-                                                        <Trash2 className="h-4 w-4 mr-2" /> Remove
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
+                                        <FormLabel>Author(s) & Roles</FormLabel>
+                                        <div className="grid gap-3">
+                                            {fields.map((field, index) => (
+                                                <div
+                                                    key={field.id}
+                                                    className="flex flex-col md:flex-row items-start md:items-center gap-4 p-3 bg-muted/50 rounded-md"
+                                                >
+                                                    <div className="flex-grow">
+                                                        <p className="font-medium text-sm">
+                                                            {field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 w-full md:w-auto">
+                                                        <FormField
+                                                            control={form.control}
+                                                            name={`authors.${index}.role`}
+                                                            render={({ field: roleField }) => (
+                                                                <FormItem className="w-full md:w-[180px]">
+                                                                    <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={roleField.value}>
+                                                                        <FormControl>
+                                                                            <SelectTrigger className="h-9 text-xs">
+                                                                                <SelectValue placeholder="Select role" />
+                                                                            </SelectTrigger>
+                                                                        </FormControl>
+                                                                        <SelectContent>
+                                                                            {getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (
+                                                                                <SelectItem key={role} value={role}>{role}</SelectItem>
+                                                                            ))}
+                                                                        </SelectContent>
+                                                                    </Select>
+                                                                    <FormMessage />
+                                                                </FormItem>
+                                                            )}
+                                                        />
+                                                        {field.email.toLowerCase() !== user?.email.toLowerCase() && (
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                                onClick={() => removeAuthor(index)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
 
-                                    <AuthorSearch
-                                        authors={fields}
-                                        onAdd={(author) => append(author)}
-                                        availableRoles={getAvailableRoles()}
-                                        currentUserEmail={user?.email}
-                                    />
-                                    <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
-                                </div>
+                                        <AuthorSearch
+                                            authors={fields}
+                                            onAdd={(author) => append(author)}
+                                            availableRoles={getAvailableRoles()}
+                                            currentUserEmail={user?.email}
+                                        />
+                                        <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
+                                    </div>
 
                                 {bookApplicationType === 'Book Chapter' && (<FormField name="bookEditor" control={form.control} render={({ field }) => (<FormItem><FormLabel>Name of the Editor (for Book Chapter)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />)}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

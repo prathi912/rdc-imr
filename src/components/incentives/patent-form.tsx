@@ -537,26 +537,54 @@ const patentSchema = z
                  </div>
                 
                 {inventorFields.length > 0 && (
-                     <div className="space-y-2">
+                     <div className="space-y-3">
                         <FormLabel>Inventor(s)</FormLabel>
-                        {inventorFields.map((field, index) => (
-                            <div key={field.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-                                <p className="text-sm">{field.name} ({field.misId})</p>
-                                {index > 0 && <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeInventor(index)}><Trash2 className="h-4 w-4" /></Button>}
-                            </div>
-                        ))}
+                        <div className="grid gap-2">
+                            {inventorFields.map((field, index) => (
+                                <div key={field.id} className="flex flex-col md:flex-row items-start md:items-center gap-4 p-3 bg-muted/50 rounded-md">
+                                    <div className="flex-grow">
+                                        <p className="font-medium text-sm">{field.name}</p>
+                                        <p className="text-xs text-muted-foreground">{field.misId || 'Internal'}</p>
+                                    </div>
+                                    {index > 0 && (
+                                        <Button 
+                                            type="button" 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                                            onClick={() => removeInventor(index)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                      </div>
                 )}
 
                 {applicantFields.length > 0 && (
-                     <div className="space-y-2">
+                     <div className="space-y-3">
                         <FormLabel>Co-Applicant(s)</FormLabel>
-                        {applicantFields.map((field, index) => (
-                            <div key={field.id} className="flex items-center justify-between p-2 bg-muted/50 rounded-md">
-                                <p className="text-sm">{field.name} ({field.misId})</p>
-                                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeApplicant(index)}><Trash2 className="h-4 w-4" /></Button>
-                            </div>
-                        ))}
+                        <div className="grid gap-2">
+                            {applicantFields.map((field, index) => (
+                                <div key={field.id} className="flex flex-col md:flex-row items-start md:items-center gap-4 p-3 bg-muted/50 rounded-md">
+                                    <div className="flex-grow">
+                                        <p className="font-medium text-sm">{field.name}</p>
+                                        <p className="text-xs text-muted-foreground">{field.misId || 'Internal'}</p>
+                                    </div>
+                                    <Button 
+                                        type="button" 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                                        onClick={() => removeApplicant(index)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
                      </div>
                 )}
                 

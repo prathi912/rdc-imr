@@ -23,7 +23,8 @@ import type { User, IncentiveClaim, Author } from '@/types';
 import { checkPatentUniqueness } from '@/app/actions';
 import { uploadFileToApi } from '@/lib/upload-client';
 import { findUserByMisId } from '@/app/userfinding';
-import { Loader2, AlertCircle, Info, Plus, Trash2, Search, Bot, Edit } from 'lucide-react';
+import { AuthorSearch } from './author-search';
+import { Loader2, AlertCircle, Info, Trash2, Search, Bot, Edit } from 'lucide-react';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { calculateApcIncentive } from '@/app/incentive-calculation';
@@ -197,13 +198,7 @@ export function ApcForm() {
   const [isLoadingDraft, setIsLoadingDraft] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
 
-  const [coPiSearchTerm, setCoPiSearchTerm] = useState('');
-  const [foundCoPis, setFoundCoPis] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [externalAuthorName, setExternalAuthorName] = useState('');
-  const [externalAuthorEmail, setExternalAuthorEmail] = useState('');
-  const [externalAuthorRole, setExternalAuthorRole] = useState<Author['role']>('Co-Author');
-  const [isSelectionOpen, setIsSelectionOpen] = useState(false);
+  // --- State Removal (Using AuthorSearch Component) ---
 
   const form = useForm<ApcFormValues>({
     resolver: zodResolver(apcSchema),
@@ -360,7 +355,7 @@ export function ApcForm() {
     if (firstAuthorExists && !isCurrentAuthorFirst) {
       return coAuthorRoles.filter(role => role !== 'First Author' && role !== 'First & Corresponding Author');
     }
-    return coAuthorRoles;
+    return coAuthorRoles.filter(role => role !== 'Presenting Author' && role !== 'First & Presenting Author');
   };
 
   const watchArticleType = form.watch('apcTypeOfArticle');
@@ -431,74 +426,7 @@ export function ApcForm() {
     }
   };
 
-  const handleSearchCoPi = async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.length < 2) {
-      setFoundCoPis([]);
-      return;
-    }
-    setIsSearching(true);
-    try {
-      // Check if search term looks like a MIS ID (numeric or alphanumeric, max 10 chars)
-      const isMisIdSearch = /^[a-zA-Z0-9]+$/.test(searchTerm) && searchTerm.length <= 10;
-
-      let url = '';
-      if (isMisIdSearch) {
-        url = `/api/find-users-by-name?misId=${encodeURIComponent(searchTerm)}`;
-      } else {
-        url = `/api/find-users-by-name?name=${encodeURIComponent(searchTerm)}`;
-      }
-
-      const res = await fetch(url);
-      const result = await res.json();
-      if (result.success && result.users) {
-        setFoundCoPis(result.users);
-        setIsSelectionOpen(true);
-      } else {
-        setFoundCoPis([]);
-      }
-    } catch (error) {
-      toast({ variant: 'destructive', title: 'Search Failed', description: 'An error occurred while searching.' });
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handleAddCoPi = (selectedUser: any) => {
-    if (selectedUser && !fields.some(field => field.email.toLowerCase() === selectedUser.email.toLowerCase())) {
-      if (user && selectedUser.email.toLowerCase() === user.email.toLowerCase()) {
-        toast({ variant: 'destructive', title: 'Cannot Add Self', description: 'You are already listed as an author.' });
-        return;
-      }
-      append({
-        name: selectedUser.name,
-        email: selectedUser.email,
-        uid: selectedUser.uid,
-        role: 'Co-Author',
-        isExternal: false,
-        status: 'pending',
-      });
-    }
-    setCoPiSearchTerm('');
-    setFoundCoPis([]);
-    setIsSelectionOpen(false);
-  };
-
-  const addExternalAuthor = () => {
-    const name = externalAuthorName.trim();
-    const email = externalAuthorEmail.trim().toLowerCase();
-    if (!name) {
-      toast({ title: 'Name is required for external authors', variant: 'destructive' });
-      return;
-    }
-    if (email && fields.some(a => a.email?.toLowerCase() === email)) {
-      toast({ title: 'Author already added', variant: 'destructive' });
-      return;
-    }
-    append({ name, email: email || '', role: externalAuthorRole, isExternal: true, uid: null, status: 'pending' });
-    setExternalAuthorName('');
-    setExternalAuthorEmail('');
-    setExternalAuthorRole('Co-Author'); // Reset role selector
-  };
+  // --- Logic Removal (Using AuthorSearch Component) ---
 
 
   const removeAuthor = (index: number) => {
@@ -683,79 +611,38 @@ export function ApcForm() {
 
                 <FormField name="apcPaperTitle" control={form.control} render={({ field }) => (<FormItem><FormLabel>Title of the Paper</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>)} />
 
-                <div className="space-y-4">
+                <div className="space-y-4 pt-4">
                   <FormLabel>Author(s) & Roles</FormLabel>
-                  <div className="space-y-4">
-                    {fields.map((field, index) => (
-                      <div key={field.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-4 rounded-md items-end">
-                        <FormItem className="md:col-span-2">
-                          <FormLabel>Name</FormLabel>
-                          <FormControl><Input value={field.name} readOnly /></FormControl>
-                        </FormItem>
-                        <FormField
-                          control={form.control}
-                          name={`authors.${index}.role`}
-                          render={({ field: roleField }) => (
-                            <FormItem>
-                              <FormLabel>Role</FormLabel>
-                              <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={roleField.value}>
-                                <FormControl><SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger></FormControl>
-                                <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
-                              </Select>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        {index > 0 && (
-                          <Button type="button" variant="destructive" className="md:col-start-4" onClick={() => remove(index)}>
-                            <Trash2 className="h-4 w-4 mr-2" /> Remove
-                          </Button>
+                  {fields.map((field, index) => (
+                    <div
+                      key={field.id}
+                      className="flex flex-col md:flex-row items-start md:items-center gap-4 p-3 bg-muted/50 rounded-md"
+                    >
+                      <div className="flex-grow">
+                        <p className="font-medium text-sm">
+                          {field.name} {field.isExternal && <span className="text-xs text-muted-foreground">(External)</span>}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 w-full md:w-auto">
+                        <Select onValueChange={(value) => updateAuthorRole(index, value as Author['role'])} value={field.role}>
+                          <SelectTrigger className="w-full md:w-[180px] h-9 text-xs"><SelectValue placeholder="Select role" /></SelectTrigger>
+                          <SelectContent>{getAvailableRoles(form.getValues(`authors.${index}`)).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
+                        </Select>
+                        {field.email.toLowerCase() !== user?.email.toLowerCase() && (
+                          <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeAuthor(index)}><Trash2 className="h-4 w-4" /></Button>
                         )}
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="space-y-2 p-3 border rounded-md">
-                    <FormLabel>Add Internal Co-Author</FormLabel>
-                    <div className="relative">
-                      <Input
-                        placeholder="Search by Co-Author's Name or MIS ID"
-                        value={coPiSearchTerm}
-                        onChange={(e) => {
-                          setCoPiSearchTerm(e.target.value);
-                          handleSearchCoPi(e.target.value);
-                        }}
-                      />
-                      {isSearching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />}
                     </div>
-                    {foundCoPis.length > 0 && isSelectionOpen && (
-                      <div className="relative">
-                        <div className="absolute w-full bg-background border rounded-md shadow-lg z-10 max-h-48 overflow-y-auto mt-1">
-                          {foundCoPis.map(coPi => (
-                            <div key={coPi.email} className="p-2 hover:bg-muted cursor-pointer" onClick={() => handleAddCoPi(coPi)}>
-                              {coPi.name} ({coPi.misId})
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  <div className="space-y-2 p-3 border rounded-md">
-                    <FormLabel className="text-sm">Add External Co-Author</FormLabel>
-                    <div className="flex flex-col md:flex-row gap-2 mt-1">
-                      <Input value={externalAuthorName} onChange={(e) => setExternalAuthorName(e.target.value)} placeholder="External author's name" />
-                      <Input value={externalAuthorEmail} onChange={(e) => setExternalAuthorEmail(e.target.value)} placeholder="External author's email (optional)" />
-                      <Select value={externalAuthorRole} onValueChange={(value) => setExternalAuthorRole(value as Author['role'])}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>{getAvailableRoles(undefined).map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent>
-                      </Select>
-                      <Button type="button" onClick={addExternalAuthor} variant="outline" size="icon" disabled={!externalAuthorName.trim()}><Plus className="h-4 w-4" /></Button>
-                    </div>
-                    <FormDescription className="!mt-2 text-destructive text-xs">
-                      Important: If an internal/external co-author is found at the approval stage that was not declared here, the claim will be rejected.
-                    </FormDescription>
-                  </div>
-                  <FormMessage>{form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}</FormMessage>
+                  ))}
+                  <AuthorSearch
+                    authors={fields}
+                    onAdd={(author) => append(author)}
+                    availableRoles={getAvailableRoles()}
+                    currentUserEmail={user?.email}
+                  />
+                  <FormMessage>
+                    {form.formState.errors.authors?.message || form.formState.errors.authors?.root?.message}
+                  </FormMessage>
                 </div>
 
                 <FormField name="apcTotalStudentAuthors" control={form.control} render={({ field }) => (<FormItem><FormLabel>Total Number of Student authors</FormLabel><FormControl><Input type="number" {...field} min="0" /></FormControl><FormMessage /></FormItem>)} />

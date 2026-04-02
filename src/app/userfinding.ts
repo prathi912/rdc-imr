@@ -100,7 +100,8 @@ export async function findUserByMisId(
             }
           });
         }
-      } else {
+      } else if (staffResponse.status !== 404) {
+        // Only warn for structural errors, not "not found" cases (though legacy code might still return 404)
         console.warn(`API call to get-staff-data failed with status: ${staffResponse.status}`);
       }
 
