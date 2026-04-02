@@ -4,7 +4,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { db } from '@/lib/config';
 import { collection, query, orderBy, onSnapshot, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import type { FundingCall, EmrInterest, User } from '@/types';
@@ -111,7 +111,7 @@ function EmrLogsTab({ user }: { user: User | null }) {
     }, [logs, searchTerm, users, calls]);
 
     const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
-    
+
     const paginatedLogs = filteredLogs.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
@@ -121,7 +121,7 @@ function EmrLogsTab({ user }: { user: User | null }) {
         setCurrentPage(1);
     }, [searchTerm]);
 
-    const handleExport = () => {
+    const handleExport = async () => {
         const dataToExport = filteredLogs.map(log => {
             const call = calls.get(log.callId);
             const user = users.get(log.userId);
@@ -136,10 +136,26 @@ function EmrLogsTab({ user }: { user: User | null }) {
                 'Acknowledgement': log.agencyAcknowledgementUrl || 'Not Provided',
             };
         });
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'EMR_Submission_Logs');
-        XLSX.writeFile(workbook, `emr_submission_logs_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('EMR_Submission_Logs');
+
+        if (dataToExport.length > 0) {
+            const headers = Object.keys(dataToExport[0]);
+            worksheet.addRow(headers);
+            dataToExport.forEach(item => {
+                worksheet.addRow(Object.values(item));
+            });
+        }
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `emr_submission_logs_${new Date().toISOString().split('T')[0]}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
     };
 
     const canViewFullDetails = user?.role === 'Super-admin' || user?.role === 'admin';
@@ -152,41 +168,42 @@ function EmrLogsTab({ user }: { user: User | null }) {
             </div>
             <Card>
                 <CardContent className="pt-6">
-                     {loading ? ( <Skeleton className="h-48 w-full" /> ) : 
-                     filteredLogs.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader><TableRow>
-                                    <TableHead>PI</TableHead>
-                                    <TableHead className="hidden md:table-cell">Funding Call</TableHead>
-                                    <TableHead className="hidden lg:table-cell">Agency Deadline</TableHead>
-                                    <TableHead className="hidden sm:table-cell">Reference No.</TableHead>
-                                    <TableHead>Logged On</TableHead>
-                                    <TableHead>Acknowledgement</TableHead>
-                                </TableRow></TableHeader>
-                                <TableBody>{paginatedLogs.map(log => {
-                                    const call = calls.get(log.callId);
-                                    return (
-                                    <TableRow key={log.id}>
-                                        <TableCell className="whitespace-nowrap">{users.get(log.userId)?.name || log.userName}</TableCell>
-                                        <TableCell className="hidden md:table-cell">{call?.title || 'Loading...'}</TableCell>
-                                        <TableCell className="hidden lg:table-cell">{call?.applyDeadline ? format(parseISO(call.applyDeadline), 'PP') : 'N/A'}</TableCell>
-                                        <TableCell className="hidden sm:table-cell">{log.agencyReferenceNumber || 'N/A'}</TableCell>
-                                        <TableCell className="whitespace-nowrap">{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
-                                        <TableCell>
-                                            {log.agencyAcknowledgementUrl ? (
-                                                <Button asChild variant="link" className="p-0 h-auto">
-                                                    <a href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View</a>
-                                                </Button>
-                                            ) : (
-                                                "Not Provided"
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                )})}</TableBody>
-                            </Table>
-                        </div>
-                    ) : ( <div className="text-center text-muted-foreground py-8">No submissions have been logged.</div> )}
+                    {loading ? (<Skeleton className="h-48 w-full" />) :
+                        filteredLogs.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader><TableRow>
+                                        <TableHead>PI</TableHead>
+                                        <TableHead className="hidden md:table-cell">Funding Call</TableHead>
+                                        <TableHead className="hidden lg:table-cell">Agency Deadline</TableHead>
+                                        <TableHead className="hidden sm:table-cell">Reference No.</TableHead>
+                                        <TableHead>Logged On</TableHead>
+                                        <TableHead>Acknowledgement</TableHead>
+                                    </TableRow></TableHeader>
+                                    <TableBody>{paginatedLogs.map(log => {
+                                        const call = calls.get(log.callId);
+                                        return (
+                                            <TableRow key={log.id}>
+                                                <TableCell className="whitespace-nowrap">{users.get(log.userId)?.name || log.userName}</TableCell>
+                                                <TableCell className="hidden md:table-cell">{call?.title || 'Loading...'}</TableCell>
+                                                <TableCell className="hidden lg:table-cell">{call?.applyDeadline ? format(parseISO(call.applyDeadline), 'PP') : 'N/A'}</TableCell>
+                                                <TableCell className="hidden sm:table-cell">{log.agencyReferenceNumber || 'N/A'}</TableCell>
+                                                <TableCell className="whitespace-nowrap">{log.submittedToAgencyAt ? format(new Date(log.submittedToAgencyAt), 'PP') : 'N/A'}</TableCell>
+                                                <TableCell>
+                                                    {log.agencyAcknowledgementUrl ? (
+                                                        <Button asChild variant="link" className="p-0 h-auto">
+                                                            <a href={log.agencyAcknowledgementUrl} target="_blank" rel="noopener noreferrer">View</a>
+                                                        </Button>
+                                                    ) : (
+                                                        "Not Provided"
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })}</TableBody>
+                                </Table>
+                            </div>
+                        ) : (<div className="text-center text-muted-foreground py-8">No submissions have been logged.</div>)}
                     {filteredLogs.length > itemsPerPage && (
                         <div className="flex items-center justify-between mt-4">
                             <p className="text-sm text-muted-foreground">
@@ -242,11 +259,11 @@ export default function EmrManagementOverviewPage() {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             const parsedUser = JSON.parse(storedUser);
-             if (!parsedUser.allowedModules?.includes('emr-management')) {
+            if (!parsedUser.allowedModules?.includes('emr-management')) {
                 toast({
-                title: 'Access Denied',
-                description: "You don't have permission to view this page.",
-                variant: 'destructive',
+                    title: 'Access Denied',
+                    description: "You don't have permission to view this page.",
+                    variant: 'destructive',
                 });
                 router.replace('/dashboard');
                 return;
@@ -262,7 +279,7 @@ export default function EmrManagementOverviewPage() {
         const callsQuery = query(collection(db, 'fundingCalls'), orderBy('interestDeadline', 'desc'));
         const interestsQuery = query(collection(db, 'emrInterests'));
 
-        const unsubscribeCalls = onSnapshot(callsQuery, 
+        const unsubscribeCalls = onSnapshot(callsQuery,
             (snapshot) => {
                 setCalls(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as FundingCall)));
                 setLoading(false);
@@ -290,7 +307,7 @@ export default function EmrManagementOverviewPage() {
     }, [toast]);
 
     useEffect(() => {
-        if(user) {
+        if (user) {
             const unsubscribe = fetchData();
             return () => unsubscribe();
         }
@@ -306,24 +323,24 @@ export default function EmrManagementOverviewPage() {
         }
         return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-200 dark:border-green-700">Open</Badge>;
     }
-    
+
     const handleAnnounceCall = async () => {
-      if (!selectedCall) return;
-      setIsAnnouncing(true);
-      try {
-        const result = await announceEmrCall(selectedCall.id);
-        if (result.success) {
-          toast({ title: "Success", description: "Announcement email has been sent to all staff." });
-          fetchData(); // Refresh data to show updated announcement status
-        } else {
-          toast({ variant: "destructive", title: "Failed to Announce", description: result.error });
+        if (!selectedCall) return;
+        setIsAnnouncing(true);
+        try {
+            const result = await announceEmrCall(selectedCall.id);
+            if (result.success) {
+                toast({ title: "Success", description: "Announcement email has been sent to all staff." });
+                fetchData(); // Refresh data to show updated announcement status
+            } else {
+                toast({ variant: "destructive", title: "Failed to Announce", description: result.error });
+            }
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
+        } finally {
+            setIsAnnouncing(false);
+            setIsAnnounceDialogOpen(false);
         }
-      } catch (error: any) {
-        toast({ variant: "destructive", title: "Error", description: error.message || "An unexpected error occurred." });
-      } finally {
-        setIsAnnouncing(false);
-        setIsAnnounceDialogOpen(false);
-      }
     };
 
     const interestCounts = useMemo(() => {
@@ -332,18 +349,18 @@ export default function EmrManagementOverviewPage() {
             return acc;
         }, {} as Record<string, number>);
     }, [interests]);
-    
+
     const filteredCalls = useMemo(() => {
         if (!searchTerm) return calls;
         const lowercasedFilter = searchTerm.toLowerCase();
-        
+
         const matchingCallIds = new Set(
             interests
                 .filter(interest => interest.userName.toLowerCase().includes(lowercasedFilter))
                 .map(interest => interest.callId)
         );
 
-        return calls.filter(call => 
+        return calls.filter(call =>
             call.title.toLowerCase().includes(lowercasedFilter) ||
             call.agency.toLowerCase().includes(lowercasedFilter) ||
             matchingCallIds.has(call.id)
@@ -351,7 +368,7 @@ export default function EmrManagementOverviewPage() {
     }, [calls, interests, searchTerm]);
 
     const totalCallPages = Math.ceil(filteredCalls.length / itemsPerPage);
-    
+
     const paginatedCalls = filteredCalls.slice(
         (currentPage - 1) * itemsPerPage,
         currentPage * itemsPerPage
@@ -363,7 +380,7 @@ export default function EmrManagementOverviewPage() {
 
     const isSuperAdmin = user?.role === 'Super-admin';
 
-    const handleExportCalls = () => {
+    const handleExportCalls = async () => {
         const dataToExport = filteredCalls.map(call => {
             const isClosed = isAfter(new Date(), parseISO(call.interestDeadline));
             let status = "Open";
@@ -372,7 +389,7 @@ export default function EmrManagementOverviewPage() {
             } else if (isClosed) {
                 status = "Closed";
             }
-            
+
             return {
                 'Call Title': call.title,
                 'Agency': call.agency,
@@ -383,10 +400,26 @@ export default function EmrManagementOverviewPage() {
                 'Announced': call.isAnnounced ? 'Yes' : 'No',
             };
         });
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Funding_Calls');
-        XLSX.writeFile(workbook, `funding_calls_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Funding_Calls');
+
+        if (dataToExport.length > 0) {
+            const headers = Object.keys(dataToExport[0]);
+            worksheet.addRow(headers);
+            dataToExport.forEach(item => {
+                worksheet.addRow(Object.values(item));
+            });
+        }
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `funding_calls_${new Date().toISOString().split('T')[0]}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
     };
 
     if (!user || loading) {
@@ -399,7 +432,7 @@ export default function EmrManagementOverviewPage() {
                             <Skeleton className="h-6 w-1/4" />
                         </CardHeader>
                         <CardContent>
-                             <Skeleton className="h-48 w-full" />
+                            <Skeleton className="h-48 w-full" />
                         </CardContent>
                     </Card>
                 </div>
@@ -419,23 +452,23 @@ export default function EmrManagementOverviewPage() {
                         </TabsList>
                         <TabsContent value="calls" className="mt-4">
                             <div className="flex justify-between items-center mb-4">
-                                <Input 
-                                    placeholder="Search by call, agency, or applicant..." 
-                                    value={searchTerm} 
-                                    onChange={(e) => setSearchTerm(e.target.value)} 
-                                    className="max-w-sm" 
+                                <Input
+                                    placeholder="Search by call, agency, or applicant..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="max-w-sm"
                                 />
-                                <Button 
-                                    onClick={handleExportCalls} 
-                                    disabled={loading || filteredCalls.length === 0} 
+                                <Button
+                                    onClick={handleExportCalls}
+                                    disabled={loading || filteredCalls.length === 0}
                                     variant="outline"
                                 >
-                                    <Download className="mr-2 h-4 w-4" /> 
+                                    <Download className="mr-2 h-4 w-4" />
                                     Export Calls List
                                 </Button>
                             </div>
                             <Card>
-                                 <CardHeader>
+                                <CardHeader>
                                     <p className="text-sm text-muted-foreground">
                                         Below is a list of all funding calls. Click the "Manage" button on a call to view registered applicants, schedule meetings, and manage evaluations for that specific opportunity.
                                     </p>
@@ -462,39 +495,40 @@ export default function EmrManagementOverviewPage() {
                                                 <TableBody>{paginatedCalls.map(call => {
                                                     const isClosed = isAfter(new Date(), parseISO(call.interestDeadline));
                                                     return (
-                                                    <TableRow key={call.id}>
-                                                        <TableCell className="font-medium whitespace-normal line-clamp-2 md:line-clamp-none">{call.title}</TableCell>
-                                                        <TableCell className="whitespace-normal hidden lg:table-cell">{call.agency}</TableCell>
-                                                        <TableCell className="whitespace-nowrap hidden md:table-cell">{call.applyDeadline ? format(parseISO(call.applyDeadline), 'PP') : 'N/A'}</TableCell>
-                                                        <TableCell className="hidden sm:table-cell">{interestCounts[call.id] || 0}</TableCell>
-                                                        <TableCell className="hidden xl:table-cell">{format(parseISO(call.createdAt), 'PP')}</TableCell>
-                                                        <TableCell>{getStatusBadge(call)}</TableCell>
-                                                        <TableCell className="hidden md:table-cell">
-                                                            {call.isAnnounced ? (
-                                                                <div className="flex items-center gap-1 text-green-600"><CheckCircle className="h-4 w-4" /> Yes</div>
-                                                            ) : (
-                                                                <div className="flex items-center gap-1 text-muted-foreground"><XCircle className="h-4 w-4" /> No</div>
-                                                            )}
-                                                        </TableCell>
-                                                        <TableCell className="text-right flex items-center justify-end gap-2">
-                                                            <Button asChild variant="outline" size="sm">
-                                                                <Link href={`/dashboard/emr-management/${call.id}`}><Eye className="mr-2 h-4 w-4" /> Manage</Link>
-                                                            </Button>
-                                                            {isSuperAdmin && (
-                                                                <>
-                                                                <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>
-                                                                    <Edit className="mr-2 h-4 w-4" /> Edit
-                                                                </Button>
-                                                                 {!call.isAnnounced && !isClosed && (
-                                                                    <Button variant="secondary" size="sm" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
-                                                                        <Send className="mr-2 h-4 w-4" /> Announce
-                                                                    </Button>
+                                                        <TableRow key={call.id}>
+                                                            <TableCell className="font-medium whitespace-normal line-clamp-2 md:line-clamp-none">{call.title}</TableCell>
+                                                            <TableCell className="whitespace-normal hidden lg:table-cell">{call.agency}</TableCell>
+                                                            <TableCell className="whitespace-nowrap hidden md:table-cell">{call.applyDeadline ? format(parseISO(call.applyDeadline), 'PP') : 'N/A'}</TableCell>
+                                                            <TableCell className="hidden sm:table-cell">{interestCounts[call.id] || 0}</TableCell>
+                                                            <TableCell className="hidden xl:table-cell">{format(parseISO(call.createdAt), 'PP')}</TableCell>
+                                                            <TableCell>{getStatusBadge(call)}</TableCell>
+                                                            <TableCell className="hidden md:table-cell">
+                                                                {call.isAnnounced ? (
+                                                                    <div className="flex items-center gap-1 text-green-600"><CheckCircle className="h-4 w-4" /> Yes</div>
+                                                                ) : (
+                                                                    <div className="flex items-center gap-1 text-muted-foreground"><XCircle className="h-4 w-4" /> No</div>
                                                                 )}
-                                                                </>
-                                                            )}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                )})}</TableBody>
+                                                            </TableCell>
+                                                            <TableCell className="text-right flex items-center justify-end gap-2">
+                                                                <Button asChild variant="outline" size="sm">
+                                                                    <Link href={`/dashboard/emr-management/${call.id}`}><Eye className="mr-2 h-4 w-4" /> Manage</Link>
+                                                                </Button>
+                                                                {isSuperAdmin && (
+                                                                    <>
+                                                                        <Button variant="ghost" size="sm" onClick={() => { setSelectedCall(call); setIsAddEditDialogOpen(true); }}>
+                                                                            <Edit className="mr-2 h-4 w-4" /> Edit
+                                                                        </Button>
+                                                                        {!call.isAnnounced && !isClosed && (
+                                                                            <Button variant="secondary" size="sm" onClick={() => { setSelectedCall(call); setIsAnnounceDialogOpen(true); }}>
+                                                                                <Send className="mr-2 h-4 w-4" /> Announce
+                                                                            </Button>
+                                                                        )}
+                                                                    </>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    )
+                                                })}</TableBody>
                                             </Table>
                                         </div>
                                     ) : (
@@ -541,32 +575,32 @@ export default function EmrManagementOverviewPage() {
             </div>
             {isSuperAdmin && user && (
                 <>
-                <AddEditCallDialog
-                    isOpen={isAddEditDialogOpen}
-                    onOpenChange={setIsAddEditDialogOpen}
-                    existingCall={selectedCall}
-                    user={user}
-                    onActionComplete={fetchData}
-                />
-                 {selectedCall && (
-                     <AlertDialog open={isAnnounceDialogOpen} onOpenChange={setIsAnnounceDialogOpen}>
-                       <AlertDialogContent>
-                         <AlertDialogHeader>
-                           <AlertDialogTitle>Announce Funding Call?</AlertDialogTitle>
-                           <AlertDialogDescription>
-                             This will send an email notification to all staff members about the call for "{selectedCall.title}". This action cannot be undone. Are you sure?
-                           </AlertDialogDescription>
-                         </AlertDialogHeader>
-                         <AlertDialogFooter>
-                           <AlertDialogCancel>Cancel</AlertDialogCancel>
-                           <AlertDialogAction onClick={handleAnnounceCall} disabled={isAnnouncing}>
-                             {isAnnouncing && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                             Confirm & Announce
-                           </AlertDialogAction>
-                         </AlertDialogFooter>
-                       </AlertDialogContent>
-                     </AlertDialog>
-                 )}
+                    <AddEditCallDialog
+                        isOpen={isAddEditDialogOpen}
+                        onOpenChange={setIsAddEditDialogOpen}
+                        existingCall={selectedCall}
+                        user={user}
+                        onActionComplete={fetchData}
+                    />
+                    {selectedCall && (
+                        <AlertDialog open={isAnnounceDialogOpen} onOpenChange={setIsAnnounceDialogOpen}>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Announce Funding Call?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This will send an email notification to all staff members about the call for "{selectedCall.title}". This action cannot be undone. Are you sure?
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleAnnounceCall} disabled={isAnnouncing}>
+                                        {isAnnouncing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        Confirm & Announce
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    )}
                 </>
             )}
         </>

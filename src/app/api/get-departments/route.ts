@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import * as XLSX from 'xlsx';
+import { readExcelFromFile } from '@/lib/excel-utils';
 import fs from 'fs';
 import path from 'path';
 import { logEvent } from '@/lib/logger';
@@ -23,14 +23,10 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'Department data source not found on the server.' }, { status: 404 });
     }
 
-    const buffer = fs.readFileSync(filePath);
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json<StaffData>(worksheet);
+    const jsonData = await readExcelFromFile<StaffData>(filePath);
 
     const departments = jsonData
-      .map(row => row.Department)
+      .map((row: StaffData) => row.Department)
       .filter((dept): dept is string => !!dept && typeof dept === 'string' && dept.trim() !== '');
 
     const uniqueDepartments = [...new Set(departments)].sort();

@@ -9,7 +9,7 @@ import { sendEmail as sendEmailUtility } from "@/lib/email";
 import { formatInTimeZone, toDate } from "date-fns-tz";
 import type * as z from 'zod';
 import { addDays, setHours, setMinutes, setSeconds, addHours, format, parseISO } from "date-fns";
-import * as XLSX from 'xlsx';
+
 
 // --- Centralized Logging Service ---
 type LogLevel = "INFO" | "WARNING" | "ERROR"
@@ -295,7 +295,7 @@ export async function registerEmrInterest(
 
     if (coPis && coPis.length > 0) {
       const batch = adminDb.batch();
-      
+
       for (const coPi of coPis) {
         // 1. Send Email Notification to all Co-PIs
         if (coPi.email) {
@@ -325,7 +325,7 @@ export async function registerEmrInterest(
           });
         }
       }
-      
+
       if (coPis.some(c => c.uid)) {
         await batch.commit();
       }
@@ -406,7 +406,7 @@ export async function scheduleEmrMeeting(
       const interest = interestDoc.data() as EmrInterest
 
       if (interest.pptUrl || interest.proposalUrl) {
-          anyDocumentUploaded = true;
+        anyDocumentUploaded = true;
       }
 
       batch.update(interestRef, {

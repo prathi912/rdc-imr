@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import path from 'path';
 import fs from 'fs';
 
@@ -16,10 +16,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'staffdata.xlsx not found' }, { status: 500 });
     }
 
-    const workbook = XLSX.readFile(filePath);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const jsonData: Array<Record<string, any>> = XLSX.utils.sheet_to_json(worksheet);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet(1);
+    if (!worksheet) {
+      return NextResponse.json({ success: false, error: 'Worksheet not found' }, { status: 500 });
+    }
+
+    const jsonData: any[] = [];
+    const headerRow = worksheet.getRow(1);
+    const headers = headerRow.values as any[];
+
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const rowData: any = {};
+      row.eachCell((cell, colNumber) => {
+        const header = headers[colNumber];
+        if (header) {
+          rowData[header] = cell.value;
+        }
+      });
+      jsonData.push(rowData);
+    });
 
     // Find staff by email (case-insensitive)
     const staff = jsonData.find((row) => {

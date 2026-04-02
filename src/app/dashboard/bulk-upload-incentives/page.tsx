@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
+import { readExcelFromBuffer } from '@/lib/excel-utils';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -55,55 +55,52 @@ export default function BulkUploadIncentivesPage() {
     setFileName(file.name);
     setUploadResult(null);
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
-        const binaryStr = event.target?.result;
-        const workbook = XLSX.read(binaryStr, { type: 'binary', cellDates: true });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+        const arrayBuffer = event.target?.result as ArrayBuffer;
+        const jsonData = await readExcelFromBuffer<any>(arrayBuffer);
 
         if (jsonData.length === 0) {
-            toast({ variant: 'destructive', title: 'Empty File', description: 'The uploaded file contains no data.' });
-            return;
+          toast({ variant: 'destructive', title: 'Empty File', description: 'The uploaded file contains no data.' });
+          return;
         }
 
         const requiredColumns = ['Title of Paper', 'Email', 'Journal', 'Amount', 'Index', 'Date of proof'];
         const firstRow = jsonData[0];
         const headers = Object.keys(firstRow).map(h => h.trim().toLowerCase());
-        
+
         const missingColumns = requiredColumns.filter(col => !headers.includes(col.trim().toLowerCase()));
 
         if (missingColumns.length > 0) {
-            toast({
-                variant: 'destructive',
-                title: 'Invalid File Format',
-                description: `The Excel file is missing the following columns: ${missingColumns.join(', ')}.`,
-                duration: 8000,
-            });
-            setData([]);
-            setFileName('');
-            return;
+          toast({
+            variant: 'destructive',
+            title: 'Invalid File Format',
+            description: `The Excel file is missing the following columns: ${missingColumns.join(', ')}.`,
+            duration: 8000,
+          });
+          setData([]);
+          setFileName('');
+          return;
         }
 
         const formattedData = jsonData.map((row: any) => {
-            const findKey = (key: string) => Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
+          const findKey = (key: string) => Object.keys(row).find(k => k.toLowerCase() === key.toLowerCase());
 
-            const titleKey = findKey('Title of Paper');
-            const emailKey = findKey('Email');
-            const journalKey = findKey('Journal');
-            const amountKey = findKey('Amount');
-            const indexKey = findKey('Index');
-            const dateKey = findKey('Date of proof');
+          const titleKey = findKey('Title of Paper');
+          const emailKey = findKey('Email');
+          const journalKey = findKey('Journal');
+          const amountKey = findKey('Amount');
+          const indexKey = findKey('Index');
+          const dateKey = findKey('Date of proof');
 
-            return {
-                'Title of Paper': row[titleKey!],
-                Email: row[emailKey!],
-                Journal: row[journalKey!],
-                Amount: Number(row[amountKey!]),
-                Index: row[indexKey!],
-                'Date of proof': row[dateKey!],
-            };
+          return {
+            'Title of Paper': row[titleKey!],
+            Email: row[emailKey!],
+            Journal: row[journalKey!],
+            Amount: Number(row[amountKey!]),
+            Index: row[indexKey!],
+            'Date of proof': row[dateKey!],
+          };
         });
 
         setData(formattedData);
@@ -112,7 +109,7 @@ export default function BulkUploadIncentivesPage() {
         toast({ variant: 'destructive', title: 'File Error', description: 'Could not parse the uploaded file.' });
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleUpload = async () => {
@@ -130,7 +127,7 @@ export default function BulkUploadIncentivesPage() {
     try {
       const plainData = JSON.parse(JSON.stringify(data));
       const result = await bulkUploadIncentiveClaims(plainData, claimType, currentUser.uid);
-      
+
       if (result.success) {
         setUploadResult(result.data);
         toast({ title: 'Upload Processed', description: `${result.data.successfulClaims.length} claims created from ${result.data.totalRecords} records.` });
@@ -145,7 +142,7 @@ export default function BulkUploadIncentivesPage() {
       setIsLoading(false);
     }
   };
-  
+
   const linkedClaims = uploadResult?.successfulClaims.filter(c => c.linked) || [];
   const pendingClaims = uploadResult?.successfulClaims.filter(c => !c.linked) || [];
 
@@ -195,7 +192,7 @@ export default function BulkUploadIncentivesPage() {
               <CardDescription>Summary of the bulk upload process.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-               {linkedClaims.length > 0 && (
+              {linkedClaims.length > 0 && (
                 <div>
                   <h3 className="font-semibold flex items-center gap-2 mb-2">
                     <CheckCircle className="h-5 w-5 text-green-500" />
@@ -208,7 +205,7 @@ export default function BulkUploadIncentivesPage() {
                   </ul>
                 </div>
               )}
-               {pendingClaims.length > 0 && (
+              {pendingClaims.length > 0 && (
                 <div>
                   <h3 className="font-semibold flex items-center gap-2 mb-2">
                     <Clock className="h-5 w-5 text-amber-500" />

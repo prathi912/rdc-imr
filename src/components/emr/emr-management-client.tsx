@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Download, Trash2, CalendarClock, Eye, MoreHorizontal, MessageSquare, Loader2, FileUp, FileText as ViewIcon, Edit, Upload, UserCheck, UserPlus, Search, Send, CalendarDays, ChevronRight, Plus } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Textarea } from '../ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '../ui/form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -687,7 +687,7 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
     };
 
 
-    const handleExport = () => {
+    const handleExport = async () => {
         const dataToExport = interests.map(interest => {
             const interestedUser = userMap.get(interest.userId);
             return {
@@ -701,10 +701,25 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
             };
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(dataToExport);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Registrations');
-        XLSX.writeFile(workbook, `registrations_${call.title.replace(/\s+/g, '_')}.xlsx`);
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Registrations');
+
+        if (dataToExport.length > 0) {
+            const headers = Object.keys(dataToExport[0]);
+            worksheet.addRow(headers);
+            dataToExport.forEach(item => {
+                worksheet.addRow(Object.values(item));
+            });
+        }
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `registrations_${call.title.replace(/\s+/g, '_')}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
     };
 
     const filteredInterests = useMemo(() => {
@@ -831,7 +846,7 @@ export function EmrManagementClient({ call, allUsers, currentUser, onActionCompl
                                 disabled={interests.length === 0}
                             >
                                 <Download className="mr-2 h-4 w-4" />
-                                Export XLSX
+                                Export Excel
                             </Button>
                         </div>
                     </div>

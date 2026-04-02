@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { getDefaultModulesForRole } from '@/lib/modules';
 import { Download } from 'lucide-react';
 import JSZip from 'jszip';
-import { utils as xlsxUtils, writeFile as xlsxWriteFile } from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export default function ArpsCalculatorPage() {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -447,68 +447,45 @@ export default function ArpsCalculatorPage() {
                 return;
             }
 
-            // Create workbook and worksheet
-            const ws_data = [
-                [
-                    'Faculty Name',
-                    'MIS ID',
-                    'Department',
-                    'Papers as First/Corresponding Author',
-                    'Papers as Co-Author',
-                    'EMR Count',
-                    'EMR Total Amount (₹)',
-                    'Consultancy Amount (₹)',
-                    'Patents Published',
-                    'Patents Granted',
-                ],
-                ...result.data.map(stat => [
-                    stat.name,
-                    stat.misId,
-                    stat.department,
-                    stat.papersFirstCorresponding,
-                    stat.papersCoAuthor,
-                    stat.emrCount,
-                    stat.emrTotalAmount,
-                    stat.consultancyAmount,
-                    stat.patentsPublished,
-                    stat.patentsGranted,
-                ]),
-            ];
-
-            const ws = xlsxUtils.aoa_to_sheet(ws_data);
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('ARPS Statistics');
             
-            // Set column widths
-            ws['!cols'] = [
-                { wch: 25 }, // Faculty Name
-                { wch: 12 }, // MIS ID
-                { wch: 18 }, // Department
-                { wch: 18 }, // Papers as First/Corresponding Author
-                { wch: 15 }, // Papers as Co-Author
-                { wch: 12 }, // EMR Count
-                { wch: 18 }, // EMR Total Amount
-                { wch: 18 }, // Consultancy Amount
-                { wch: 15 }, // Patents Published
-                { wch: 15 }, // Patents Granted
+            const columns = [
+                { header: 'Faculty Name', key: 'name', width: 25 },
+                { header: 'MIS ID', key: 'misId', width: 12 },
+                { header: 'Department', key: 'department', width: 18 },
+                { header: 'Papers as First/Corresponding Author', key: 'papersFirstCorresponding', width: 18 },
+                { header: 'Papers as Co-Author', key: 'papersCoAuthor', width: 15 },
+                { header: 'EMR Count', key: 'emrCount', width: 12 },
+                { header: 'EMR Total Amount (₹)', key: 'emrTotalAmount', width: 18 },
+                { header: 'Consultancy Amount (₹)', key: 'consultancyAmount', width: 18 },
+                { header: 'Patents Published', key: 'patentsPublished', width: 15 },
+                { header: 'Patents Granted', key: 'patentsGranted', width: 15 },
             ];
+            worksheet.columns = columns;
 
-            const wb = xlsxUtils.book_new();
-            xlsxUtils.book_append_sheet(wb, ws, 'ARPS Statistics');
+            result.data.forEach(stat => {
+                worksheet.addRow(stat);
+            });
 
-            // Add summary sheet with evaluation period
-            const summary_data = [
-                ['ARPS Statistics Report'],
-                ['Evaluation Year', selectedYear],
-                ['Evaluation Period', `${result.yearRange.startDate} to ${result.yearRange.endDate}`],
-                ['Total Faculty', result.data.length],
-                ['Report Generated', new Date().toLocaleString('en-IN')],
-            ];
+            // Add summary sheet
+            const summarySheet = workbook.addWorksheet('Summary');
+            summarySheet.addRow(['ARPS Statistics Report']);
+            summarySheet.addRow(['Evaluation Year', selectedYear]);
+            summarySheet.addRow(['Evaluation Period', `${result.yearRange.startDate} to ${result.yearRange.endDate}`]);
+            summarySheet.addRow(['Total Faculty', result.data.length]);
+            summarySheet.addRow(['Report Generated', new Date().toLocaleString('en-IN')]);
+            summarySheet.getColumn(1).width = 30;
+            summarySheet.getColumn(2).width = 30;
 
-            const ws_summary = xlsxUtils.aoa_to_sheet(summary_data);
-            ws_summary['!cols'] = [{ wch: 30 }, { wch: 30 }];
-            xlsxUtils.book_append_sheet(wb, ws_summary, 'Summary');
-
-            // Generate and download file
-            xlsxWriteFile(wb, `ARPS_Statistics_${selectedYear}.xlsx`);
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ARPS_Statistics_${selectedYear}.xlsx`;
+            a.click();
+            window.URL.revokeObjectURL(url);
 
             toast({ title: 'Report Downloaded', description: 'ARPS statistics Excel report generated successfully.' });
         } catch (error: any) {

@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import * as XLSX from 'xlsx';
+import { readExcelFromUrl } from '@/lib/excel-utils';
 import { logEvent } from '@/lib/logger';
 
 // Define the expected structure of a row in the Excel sheet
@@ -28,44 +28,30 @@ const GOA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.
 const VADODARA_STAFF_DATA_URL = 'https://pinxoxpbufq92wb4.public.blob.vercel-storage.com/staffdata.xlsx';
 
 const readStaffDataFromUrl = async (url: string): Promise<StaffData[]> => {
-    try {
-        const response = await fetch(url, { cache: 'no-store' }); // Use no-store to ensure fresh data
-        if (!response.ok) {
-            console.warn(`Failed to fetch staff data from URL: ${url}. Status: ${response.status}`);
-            return [];
-        }
-        const buffer = await response.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        return XLSX.utils.sheet_to_json<StaffData>(worksheet);
-    } catch (error) {
-        console.error(`Error reading staff data from ${url}:`, error);
-        return [];
-    }
+  return readExcelFromUrl<StaffData>(url);
 }
 
 const formatUserRecord = (record: StaffData, defaultCampus: 'Vadodara' | 'Goa') => {
-    const isGoaUser = record.Email?.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
-    const instituteName = record.Type === 'Institutional' ? record.Name : record.Institute;
-    const resolvedCampus = record.Campus || (isGoaUser ? 'Goa' : defaultCampus);
+  const isGoaUser = record.Email?.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
+  const instituteName = record.Type === 'Institutional' ? record.Name : record.Institute;
+  const resolvedCampus = record.Campus || (isGoaUser ? 'Goa' : defaultCampus);
 
-    return {
-        name: record.Name,
-        email: record.Email,
-        phoneNumber: String(record.Phone || ''),
-        institute: instituteName,
-        department: record.Department,
-        designation: record.Designation,
-        faculty: record.Faculty,
-        misId: String(record['MIS ID'] || ''),
-        scopusId: String(record.Scopus_ID || ''),
-        googleScholarId: String(record.Google_Scholar_ID || ''),
-        orcidId: String(record.ORCID_ID || record.Orcid || ''),
-        vidwanId: String(record.Vidwan_ID || ''),
-        type: record.Type || 'faculty',
-        campus: resolvedCampus,
-    };
+  return {
+    name: record.Name,
+    email: record.Email,
+    phoneNumber: String(record.Phone || ''),
+    institute: instituteName,
+    department: record.Department,
+    designation: record.Designation,
+    faculty: record.Faculty,
+    misId: String(record['MIS ID'] || ''),
+    scopusId: String(record.Scopus_ID || ''),
+    googleScholarId: String(record.Google_Scholar_ID || ''),
+    orcidId: String(record.ORCID_ID || record.Orcid || ''),
+    vidwanId: String(record.Vidwan_ID || ''),
+    type: record.Type || 'faculty',
+    campus: resolvedCampus,
+  };
 };
 
 export async function GET(request: NextRequest) {
@@ -88,52 +74,52 @@ export async function GET(request: NextRequest) {
   const foundEmails = new Set<string>();
 
   const searchAndAdd = (data: StaffData[], defaultCampus: 'Vadodara' | 'Goa') => {
-      let foundRecord: StaffData | undefined;
-      if (email) {
-          foundRecord = data.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
-      } else if (misId) {
-          foundRecord = data.find(row => row['MIS ID'] && String(row['MIS ID']).toLowerCase() === misId.toLowerCase());
+    let foundRecord: StaffData | undefined;
+    if (email) {
+      foundRecord = data.find(row => row.Email && row.Email.toLowerCase() === email.toLowerCase());
+    } else if (misId) {
+      foundRecord = data.find(row => row['MIS ID'] && String(row['MIS ID']).toLowerCase() === misId.toLowerCase());
+    }
+
+    if (foundRecord) {
+      const uniqueKey = foundRecord.Email ? foundRecord.Email.toLowerCase() : String(foundRecord['MIS ID']).toLowerCase();
+      if (!foundEmails.has(uniqueKey)) {
+        allFoundRecords.push(formatUserRecord(foundRecord, defaultCampus) as any);
+        foundEmails.add(uniqueKey);
       }
-      
-      if (foundRecord) {
-          const uniqueKey = foundRecord.Email ? foundRecord.Email.toLowerCase() : String(foundRecord['MIS ID']).toLowerCase();
-          if (!foundEmails.has(uniqueKey)) {
-              allFoundRecords.push(formatUserRecord(foundRecord, defaultCampus) as any);
-              foundEmails.add(uniqueKey);
-          }
-      }
+    }
   };
-  
+
   const searchAndAddAll = (data: StaffData[], defaultCampus: 'Vadodara' | 'Goa') => {
-      data.forEach(row => {
-          if (row['MIS ID'] && String(row['MIS ID']).toLowerCase() === misId?.toLowerCase()) {
-             const uniqueKey = row.Email ? row.Email.toLowerCase() : String(row['MIS ID']).toLowerCase();
-             if (!foundEmails.has(uniqueKey)) {
-                allFoundRecords.push(formatUserRecord(row, defaultCampus) as any);
-                foundEmails.add(uniqueKey);
-            }
-          }
-      });
+    data.forEach(row => {
+      if (row['MIS ID'] && String(row['MIS ID']).toLowerCase() === misId?.toLowerCase()) {
+        const uniqueKey = row.Email ? row.Email.toLowerCase() : String(row['MIS ID']).toLowerCase();
+        if (!foundEmails.has(uniqueKey)) {
+          allFoundRecords.push(formatUserRecord(row, defaultCampus) as any);
+          foundEmails.add(uniqueKey);
+        }
+      }
+    });
   };
 
   const [staffdata, goastaffdata] = await Promise.all([
-      readStaffDataFromUrl(VADODARA_STAFF_DATA_URL),
-      readStaffDataFromUrl(GOA_STAFF_DATA_URL)
+    readStaffDataFromUrl(VADODARA_STAFF_DATA_URL),
+    readStaffDataFromUrl(GOA_STAFF_DATA_URL)
   ]);
 
   if (fetchAll) {
-      searchAndAddAll(staffdata, 'Vadodara');
-      searchAndAddAll(goastaffdata, 'Goa');
+    searchAndAddAll(staffdata, 'Vadodara');
+    searchAndAddAll(goastaffdata, 'Goa');
   } else if (email) {
     const isGoaEmail = email.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
     searchAndAdd(isGoaEmail ? goastaffdata : staffdata, isGoaEmail ? 'Goa' : 'Vadodara');
   } else if (misId) {
     if (userEmailForFileCheck) {
-        const isGoaContext = userEmailForFileCheck.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
-        searchAndAdd(isGoaContext ? goastaffdata : staffdata, isGoaContext ? 'Goa' : 'Vadodara');
+      const isGoaContext = userEmailForFileCheck.toLowerCase().endsWith('@goa.paruluniversity.ac.in');
+      searchAndAdd(isGoaContext ? goastaffdata : staffdata, isGoaContext ? 'Goa' : 'Vadodara');
     } else {
-        searchAndAdd(staffdata, 'Vadodara');
-        searchAndAdd(goastaffdata, 'Goa');
+      searchAndAdd(staffdata, 'Vadodara');
+      searchAndAdd(goastaffdata, 'Goa');
     }
   }
 
