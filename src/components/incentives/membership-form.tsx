@@ -9,7 +9,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
@@ -20,9 +20,11 @@ import { db } from '@/lib/config';
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { User, IncentiveClaim } from '@/types';
 import { uploadFileToApi } from '@/lib/upload-client';
-import { Loader2, AlertCircle, Edit } from 'lucide-react';
+import { Loader2, AlertCircle, Edit, FileText, CheckCircle2, Info } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { submitIncentiveClaimViaApi } from '@/lib/incentive-claim-client';
+import { Badge } from '@/components/ui/badge';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -42,10 +44,20 @@ type MembershipFormValues = z.infer<typeof membershipSchema>;
 function ReviewDetails({ data, onEdit }: { data: MembershipFormValues; onEdit: () => void }) {
     const renderDetail = (label: string, value?: string | number | boolean) => {
         if (!value && value !== 0 && value !== false) return null;
+        
+        let displayValue: React.ReactNode = String(value);
+        if (typeof value === 'boolean') {
+            displayValue = (
+                <Badge variant={value ? "default" : "secondary"}>
+                    {value ? 'Yes' : 'No'}
+                </Badge>
+            );
+        }
+
         return (
-            <div className="grid grid-cols-3 gap-2 py-1.5 items-start">
-                <dt className="font-semibold text-muted-foreground col-span-1">{label}</dt>
-                <dd className="col-span-2">{String(value)}</dd>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 py-3 border-b border-muted last:border-0 items-start">
+                <dt className="font-bold text-muted-foreground text-sm uppercase tracking-wider">{label}</dt>
+                <dd className="col-span-2 text-base font-medium">{displayValue}</dd>
             </div>
         );
     };
@@ -53,24 +65,30 @@ function ReviewDetails({ data, onEdit }: { data: MembershipFormValues; onEdit: (
     const proofFile = data.membershipProof?.[0] as File | undefined;
 
     return (
-        <Card>
-            <CardHeader>
+        <Card className="max-w-4xl mx-auto shadow-xl border-t-4 border-t-primary">
+            <CardHeader className="bg-muted/30">
                 <div className="flex justify-between items-center">
-                    <div>
-                        <CardTitle>Review Your Application</CardTitle>
-                        <CardDescription>Please review the details below before final submission.</CardDescription>
+                    <div className="space-y-1">
+                        <CardTitle className="text-2xl flex items-center gap-2 font-bold tracking-tight">
+                            <CheckCircle2 className="h-7 w-7 text-primary" /> Review Application
+                        </CardTitle>
+                        <CardDescription className="text-base text-muted-foreground">Please verify your membership details before final submission.</CardDescription>
                     </div>
-                    <Button variant="outline" onClick={onEdit}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+                    <Button variant="outline" onClick={onEdit} className="rounded-xl border-primary text-primary hover:bg-primary/5">
+                        <Edit className="h-4 w-4 mr-2" /> Edit
+                    </Button>
                 </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-                {renderDetail("Professional Body Name", data.professionalBodyName)}
-                {renderDetail("Membership Type", data.membershipType)}
-                {renderDetail("Locale", data.membershipLocale)}
-                {renderDetail("Membership Number", data.membershipNumber)}
-                {renderDetail("Amount Paid (INR)", `₹${data.membershipAmountPaid.toLocaleString('en-IN')}`)}
-                {renderDetail("Payment Date", data.membershipPaymentDate)}
-                {renderDetail("Proof Document", proofFile?.name)}
+            <CardContent className="space-y-1 pt-6">
+                <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10">
+                    {renderDetail("Professional Body", data.professionalBodyName)}
+                    {renderDetail("Membership Type", data.membershipType)}
+                    {renderDetail("Locale", data.membershipLocale)}
+                    {renderDetail("Membership #", data.membershipNumber)}
+                    {renderDetail("Amount Paid", `₹${data.membershipAmountPaid.toLocaleString('en-IN')}`)}
+                    {renderDetail("Payment Date", data.membershipPaymentDate)}
+                    {renderDetail("Proof File", proofFile?.name)}
+                </div>
             </CardContent>
         </Card>
     );
@@ -203,9 +221,9 @@ export function MembershipForm() {
 
         const claimData: Omit<IncentiveClaim, 'id' | 'claimId'> = {
             ...restOfData,
-            calculatedIncentive,
-            misId: user.misId || null,
-            orcidId: user.orcidId || null,
+            calculatedIncentive: calculatedIncentive || undefined,
+            misId: user.misId || undefined,
+            orcidId: user.orcidId || undefined,
             claimType: 'Membership of Professional Bodies',
             benefitMode: 'reimbursement',
             uid: user.uid,
@@ -214,7 +232,7 @@ export function MembershipForm() {
             faculty: user.faculty,
             status,
             submissionDate: new Date().toISOString(),
-            bankDetails: user.bankDetails || null,
+            bankDetails: user.bankDetails || undefined,
         };
 
         if (membershipProofUrl) claimData.membershipProofUrl = membershipProofUrl;
@@ -253,74 +271,225 @@ export function MembershipForm() {
 
   if (currentStep === 2) {
     return (
-        <Card>
-            <form onSubmit={form.handleSubmit(onFinalSubmit)}>
-                <CardContent className="pt-6">
-                    <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
-                </CardContent>
-                <CardFooter>
-                    <Button type="submit" disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
-                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isSubmitting ? 'Submitting...' : 'Submit Claim'}
+        <div className="space-y-6">
+            <ReviewDetails data={form.getValues()} onEdit={() => setCurrentStep(1)} />
+            <Card className="max-w-4xl mx-auto bg-muted/20 border-t">
+                <CardFooter className="flex justify-between p-6">
+                    <Button variant="ghost" onClick={() => setCurrentStep(1)} disabled={isSubmitting} className="rounded-xl px-8">
+                        Back to Edit
+                    </Button>
+                    <Button onClick={form.handleSubmit(onFinalSubmit)} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="rounded-xl px-10 h-12 font-bold shadow-lg shadow-primary/25">
+                        {isSubmitting ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Submitting Claim...
+                            </>
+                        ) : 'Confirm & Submit Membership Claim'}
                     </Button>
                 </CardFooter>
-            </form>
-        </Card>
+            </Card>
+        </div>
     );
   }
 
   return (
-    <Card>
-      <Form {...form}>
-        <form>
-          <CardContent className="space-y-6 pt-6">
+    <Card className="max-w-4xl mx-auto shadow-2xl border-t-4 border-t-primary overflow-hidden">
+      <CardHeader className="bg-primary/5 pb-8">
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <CardTitle className="text-3xl font-bold tracking-tight text-primary">Membership Incentive Claim</CardTitle>
+            <CardDescription className="text-base text-muted-foreground">Submit for reimbursement of professional body membership fees.</CardDescription>
+          </div>
+          <div className="bg-primary/10 p-3 rounded-2xl">
+            <FileText className="h-10 w-10 text-primary" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-8 bg-card">
+        <Form {...form}>
+          <form className="space-y-8">
             {(bankDetailsMissing || orcidOrMisIdMissing) && (
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>Profile Incomplete</AlertTitle>
+                <Alert variant="destructive" className="rounded-2xl border-2">
+                    <AlertCircle className="h-5 w-5" />
+                    <AlertTitle className="font-bold">Profile Incomplete</AlertTitle>
                     <AlertDescription>
                         An ORCID iD, MIS ID, and bank details are mandatory for submitting incentive claims. Please add them to your profile.
-                        <Button asChild variant="link" className="p-1 h-auto"><Link href="/dashboard/settings">Go to Settings</Link></Button>
+                        <Button asChild variant="link" className="p-0 h-auto text-destructive-foreground font-bold underline ml-2"><Link href="/dashboard/settings">Go to Settings</Link></Button>
                     </AlertDescription>
                 </Alert>
             )}
-            <div className="rounded-lg border p-4 space-y-4 animate-in fade-in-0">
-                <h3 className="font-semibold text-sm -mb-2">MEMBERSHIP DETAILS</h3>
-                <Separator />
-                <FormField name="professionalBodyName" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Name of Professional Body</FormLabel><FormControl><Input placeholder="e.g., Institute of Electrical and Electronics Engineers" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="membershipType" render={({ field }) => ( <FormItem><FormLabel>Type of Membership</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Lifetime" /></FormControl><FormLabel className="font-normal">Lifetime</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Yearly" /></FormControl><FormLabel className="font-normal">Yearly</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="Other" /></FormControl><FormLabel className="font-normal">Other</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="membershipLocale" render={({ field }) => ( <FormItem><FormLabel>Locale of Professional Body</FormLabel><FormControl><RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-6"><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="National" /></FormControl><FormLabel className="font-normal">National</FormLabel></FormItem><FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="International" /></FormControl><FormLabel className="font-normal">International</FormLabel></FormItem></RadioGroup></FormControl><FormMessage /></FormItem> )} />
-                <FormField name="membershipNumber" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Membership Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem> )} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField name="membershipAmountPaid" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Amount Paid (INR)</FormLabel><FormControl><Input type="number" placeholder="e.g., 10000" {...field} min="0" /></FormControl><FormMessage /></FormItem> )} />
-                    <FormField name="membershipPaymentDate" control={form.control} render={({ field }) => ( <FormItem><FormLabel>Payment Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem> )} />
-                </div>
-                {calculatedIncentive !== null && (
-                    <div className="p-4 bg-secondary rounded-md">
-                        <p className="text-sm font-medium">Tentative Eligible Incentive Amount: <span className="font-bold text-lg text-primary">₹{calculatedIncentive.toLocaleString('en-IN')}</span></p>
-                        <p className="text-xs text-muted-foreground">50% of the membership fee, capped at ₹10,000.</p>
+
+            <div className="space-y-8">
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                        <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                        Membership Details
                     </div>
+
+                    <FormField name="professionalBodyName" control={form.control} render={({ field }) => ( 
+                        <FormItem>
+                            <FormLabel className="text-base font-semibold">Name of Professional Body</FormLabel>
+                            <FormControl>
+                                <Input placeholder="e.g., Institute of Electrical and Electronics Engineers" {...field} className="h-12 shadow-sm text-lg focus-visible:ring-primary" />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem> 
+                    )} />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <FormField control={form.control} name="membershipType" render={({ field }) => ( 
+                            <FormItem className="space-y-3">
+                                <FormLabel className="text-base font-semibold">Type of Membership</FormLabel>
+                                <FormControl>
+                                    <RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-wrap gap-4">
+                                        <Label 
+                                            htmlFor="mem-lifetime" 
+                                            className="flex items-center space-x-3 bg-muted/50 px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer min-w-[120px] [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
+                                        >
+                                            <RadioGroupItem value="Lifetime" id="mem-lifetime" />
+                                            <span className="font-medium cursor-pointer flex-1">Lifetime</span>
+                                        </Label>
+                                        <Label 
+                                            htmlFor="mem-yearly" 
+                                            className="flex items-center space-x-3 bg-muted/50 px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer min-w-[120px] [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
+                                        >
+                                            <RadioGroupItem value="Yearly" id="mem-yearly" />
+                                            <span className="font-medium cursor-pointer flex-1">Yearly</span>
+                                        </Label>
+                                        <Label 
+                                            htmlFor="mem-other" 
+                                            className="flex items-center space-x-3 bg-muted/50 px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer min-w-[120px] [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
+                                        >
+                                            <RadioGroupItem value="Other" id="mem-other" />
+                                            <span className="font-medium cursor-pointer flex-1">Other</span>
+                                        </Label>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem> 
+                        )} />
+
+                        <FormField control={form.control} name="membershipLocale" render={({ field }) => ( 
+                            <FormItem className="space-y-3">
+                                <FormLabel className="text-base font-semibold">Locale</FormLabel>
+                                <FormControl>
+                                    <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                                        <Label 
+                                            htmlFor="loc-nat" 
+                                            className="flex items-center space-x-3 bg-muted/50 px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer min-w-[120px] [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
+                                        >
+                                            <RadioGroupItem value="National" id="loc-nat" />
+                                            <span className="font-medium cursor-pointer flex-1">National</span>
+                                        </Label>
+                                        <Label 
+                                            htmlFor="loc-int" 
+                                            className="flex items-center space-x-3 bg-muted/50 px-4 py-2 rounded-xl border hover:bg-muted transition-colors cursor-pointer min-w-[120px] [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5"
+                                        >
+                                            <RadioGroupItem value="International" id="loc-int" />
+                                            <span className="font-medium cursor-pointer flex-1">International</span>
+                                        </Label>
+                                    </RadioGroup>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem> 
+                        )} />
+                    </div>
+
+                    <FormField name="membershipNumber" control={form.control} render={({ field }) => ( 
+                        <FormItem>
+                            <FormLabel className="text-base font-semibold">Membership Number</FormLabel>
+                            <FormControl><Input {...field} className="h-12 shadow-sm font-mono" placeholder="Enter membership ID/Number" /></FormControl>
+                            <FormMessage />
+                        </FormItem> 
+                    )} />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <FormField name="membershipAmountPaid" control={form.control} render={({ field }) => ( 
+                            <FormItem>
+                                <FormLabel className="text-base font-semibold">Amount Paid (INR)</FormLabel>
+                                <FormControl>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">₹</span>
+                                        <Input type="number" placeholder="e.g., 10000" {...field} min="0" className="h-12 pl-8 text-lg font-mono shadow-sm" />
+                                    </div>
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem> 
+                        )} />
+                        <FormField name="membershipPaymentDate" control={form.control} render={({ field }) => ( 
+                            <FormItem>
+                                <FormLabel className="text-base font-semibold">Payment Date</FormLabel>
+                                <FormControl><Input type="date" {...field} className="h-12 shadow-sm" /></FormControl>
+                                <FormMessage />
+                            </FormItem> 
+                        )} />
+                    </div>
+                </section>
+
+                <Separator className="my-8" />
+
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 text-primary font-bold text-lg mb-4">
+                        <div className="h-8 w-1.5 bg-primary rounded-full"></div>
+                        Documentation
+                    </div>
+                    
+                    <FormField name="membershipProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( 
+                        <FormItem>
+                            <FormLabel className="text-base font-semibold">Proof of Membership & Payment (PDF)</FormLabel>
+                            <FormControl>
+                                <Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" className="h-12 border-dashed border-2 cursor-pointer hover:bg-muted/30 transition-colors file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
+                            </FormControl>
+                            <FormDescription>Attach Membership Certificate and Payment Receipt.</FormDescription>
+                            <FormMessage />
+                        </FormItem> 
+                    )} />
+
+                    <FormField control={form.control} name="membershipSelfDeclaration" render={({ field }) => ( 
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-2xl border-2 border-primary/20 p-6 bg-primary/5 shadow-sm">
+                            <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="h-6 w-6 rounded-md" /></FormControl>
+                            <div className="space-y-1">
+                                <FormLabel className="font-bold text-primary">Self Declaration Acknowledgement</FormLabel>
+                                <p className="text-sm text-primary/80 font-medium">I hereby confirm that I have not applied/claimed for any reimbursement for this membership earlier.</p>
+                                <FormMessage />
+                            </div>
+                        </FormItem> 
+                    )} />
+                </section>
+
+                {calculatedIncentive !== null && (
+                    <Alert className="bg-primary/5 border-primary/20 py-6 rounded-2xl ring-1 ring-primary/10">
+                        <Info className="h-5 w-5 text-primary" />
+                        <AlertTitle className="text-primary font-bold text-lg">Reimbursement Estimate</AlertTitle>
+                        <AlertDescription className="mt-2 text-primary/90">
+                            <p className="text-lg font-medium">Based on the amount paid, your tentative reimbursement will be:</p>
+                            <p className="text-4xl font-black text-primary mt-1">₹{calculatedIncentive.toLocaleString('en-IN')}</p>
+                            <p className="text-xs mt-2 font-semibold bg-primary/10 inline-block px-2 py-1 rounded">50% of fee, capped at ₹10,000 as per policy.</p>
+                        </AlertDescription>
+                    </Alert>
                 )}
-                <FormField name="membershipProof" control={form.control} render={({ field: { value, onChange, ...fieldProps } }) => ( <FormItem><FormLabel>Attach Proof (Membership Certificate, Invoice/Receipt and Payment Proof)</FormLabel><FormControl><Input {...fieldProps} type="file" onChange={(e) => onChange(e.target.files)} accept="application/pdf" /></FormControl><FormMessage /></FormItem> )} />
-                <FormField control={form.control} name="membershipSelfDeclaration" render={({ field }) => ( <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none"><FormLabel>Self Declaration</FormLabel><FormMessage /><p className="text-xs text-muted-foreground">I hereby confirm that I have not applied/claimed for any incentive for the same application/publication earlier.</p></div></FormItem> )} />
             </div>
-          </CardContent>
-          <CardFooter className="flex justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => handleSave('Draft')}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save as Draft
+          </form>
+        </Form>
+      </CardContent>
+      <CardFooter className="flex justify-between p-8 bg-muted/20 border-t items-center">
+        <Button
+            type="button"
+            variant="ghost"
+            onClick={() => handleSave('Draft')}
+            disabled={isSubmitting}
+            className="rounded-xl px-6 h-12 font-semibold hover:bg-background/80"
+        >
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Save as Draft
+        </Button>
+        <div className="flex gap-4">
+            <Button variant="ghost" size="lg" onClick={() => router.back()} className="rounded-xl px-8 h-12 font-semibold">Cancel</Button>
+            <Button size="lg" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing} className="rounded-xl px-10 h-12 font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all">
+                Review Application
             </Button>
-            <Button type="button" onClick={handleProceedToReview} disabled={isSubmitting || bankDetailsMissing || orcidOrMisIdMissing}>
-                Proceed to Review
-            </Button>
-          </CardFooter>
-        </form>
-      </Form>
+        </div>
+      </CardFooter>
     </Card>
   );
 }

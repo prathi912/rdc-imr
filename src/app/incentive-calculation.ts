@@ -591,3 +591,16 @@ export async function calculateJournalPublicationPoints(
         return { success: false, error: error.message || "An unknown error occurred during calculation." };
     }
 }
+
+// --- EMR Sanction Project Calculation ---
+
+export async function calculateEmrSanctionIncentive(claimData: Partial<IncentiveClaim>): Promise<{ success: boolean; amount?: number; error?: string }> {
+    try {
+        const sanctionAmount = claimData.sanctionAmount || 0;
+        const incentive = sanctionAmount * 0.01; // 1% as per user request
+        return { success: true, amount: Math.round(incentive) };
+    } catch (error: any) {
+        console.error("Error calculating EMR sanction incentive:", error);
+        return { success: false, error: error.message || "An unknown error occurred during calculation." };
+    }
+}

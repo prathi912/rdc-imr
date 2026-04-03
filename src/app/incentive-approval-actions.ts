@@ -45,6 +45,7 @@ const getClaimTypeAcronym = (claimType: string): string => {
         case 'Books': return 'BOOK';
         case 'Membership of Professional Bodies': return 'MEMBERSHIP';
         case 'Seed Money for APC': return 'APC';
+        case 'EMR Sanction Project': return 'EMR';
         default: return 'GENERAL';
     }
 };
@@ -56,6 +57,7 @@ const getClaimTitle = (claimData: Partial<IncentiveClaim>): string => {
         || claimData.conferencePaperTitle 
         || claimData.professionalBodyName 
         || claimData.apcPaperTitle 
+        || claimData.emrProjectName
         || 'your recent incentive claim';
 };
 
@@ -106,7 +108,7 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
         const newClaimRef = claimIdToUpdate ? claimsRef.doc(claimIdToUpdate) : claimsRef.doc();
         const claimId = newClaimRef.id;
 
-        let standardizedClaimId = claimData.claimId;
+        let standardizedClaimId = (claimData as any).claimId;
         if (!standardizedClaimId && !claimIdToUpdate) {
             const acronym = getClaimTypeAcronym(claimData.claimType);
             const counterRef = adminDb.collection('counters').doc(`incentiveClaim_${acronym}`);
@@ -126,12 +128,12 @@ export async function submitIncentiveClaim(claimData: Omit<IncentiveClaim, 'id' 
         let initialStatus: IncentiveClaim['status'] = 'Accepted'; // Default if no workflow
         if (workflow && workflow.length > 0) {
             const firstStage = Math.min(...workflow);
-            initialStatus = `Pending Stage ${firstStage} Approval`;
+            initialStatus = `Pending Stage ${firstStage} Approval` as IncentiveClaim['status'];
         }
 
         const finalClaimData: Omit<IncentiveClaim, 'id'> = {
             ...claimData,
-            claimId: standardizedClaimId || claimData.claimId,
+            claimId: standardizedClaimId || (claimData as any).claimId,
             status: claimData.status === 'Draft' ? 'Draft' : initialStatus,
             authors: claimData.authors || [],
             authorUids: (claimData.authors || []).map(a => a.uid).filter(Boolean) as string[],
@@ -298,6 +300,7 @@ async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
                 name: claim.userName,
                 role: 'Co-Author', // Default role, can be adjusted if more info is available
                 status: 'approved',
+                isExternal: false,
             });
         }
         
@@ -311,9 +314,9 @@ async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
             authors,
             authorUids: authors.map(a => a.uid).filter(Boolean) as string[],
             authorEmails: authors.map(a => a.email.toLowerCase()),
-            journalName: claim.journalName || null,
-            journalWebsite: claim.journalWebsite || null,
-            qRating: claim.journalClassification || null,
+            journalName: claim.journalName || undefined,
+            journalWebsite: claim.journalWebsite || undefined,
+            qRating: claim.journalClassification || undefined,
             createdAt: now,
             updatedAt: now,
         };
@@ -324,6 +327,60 @@ async function addPaperFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
     } catch (error: any) {
         console.error('Error creating paper from claim:', error);
         await logActivity('ERROR', 'Failed to create paper from approved claim', { claimId: claim.id, error: error.message });
+    }
+}
+
+async function addEmrProjectFromApprovedClaim(claim: IncentiveClaim): Promise<void> {
+    if (claim.claimType !== 'EMR Sanction Project' || !claim.emrProjectName) {
+        return;
+    }
+
+    try {
+        const emrRef = adminDb.collection('emrInterests').doc();
+        const now = new Date().toISOString();
+
+        // Construct a new sanctioned EMR project document
+        const newEmrProject: any = {
+            callId: "ADMIN_ADDED_VIA_INCENTIVE",
+            callTitle: claim.emrProjectName,
+            agency: claim.sanctionFrom || 'N/A',
+            userId: claim.uid,
+            userName: claim.userName,
+            userEmail: claim.userEmail,
+            faculty: claim.faculty || 'N/A',
+            registeredAt: now,
+            status: "Sanctioned",
+            durationAmount: `Amount: ₹${(claim.sanctionAmount || 0).toLocaleString('en-IN')}`,
+            sanctionDate: claim.sanctionDate || now,
+            coPiDetails: claim.externalCoPis || [],
+            coPiUids: [], // We don't have internal Co-PI UIDs from externalCoPis field easily, 
+                           // but internal Co-PIs are in 'authors'
+            coPiNames: (claim.externalCoPis || []).map(p => p.name).concat((claim.authors || []).map(a => a.name)),
+            coPiEmails: (claim.externalCoPis || []).map(p => p.email).concat((claim.authors || []).map(a => a.email)),
+            isBulkUploaded: true,
+            isOpenToPi: true,
+            proofUrl: claim.sanctionProofUrl || null,
+        };
+
+        // Add internal Co-PI details if available in 'authors'
+        if (claim.authors && claim.authors.length > 0) {
+            const internalCoPis = claim.authors.map(a => ({
+                uid: a.uid,
+                name: a.name,
+                email: a.email,
+                organization: a.organization,
+                isExternal: false
+            }));
+            newEmrProject.coPiDetails = [...(newEmrProject.coPiDetails || []), ...internalCoPis];
+            newEmrProject.coPiUids = internalCoPis.map(c => c.uid).filter(Boolean);
+        }
+
+        await emrRef.set(newEmrProject);
+        await logActivity('INFO', 'EMR project automatically created from approved incentive claim.', { claimId: claim.id, emrProjectId: emrRef.id, title: claim.emrProjectName });
+
+    } catch (error: any) {
+        console.error('Error creating EMR project from claim:', error);
+        await logActivity('ERROR', 'Failed to create EMR project from approved claim', { claimId: claim.id, error: error.message });
     }
 }
 
@@ -385,7 +442,7 @@ export async function processIncentiveClaimAction(
         const nextStage = workflow.find(stage => stage > currentStage);
 
         if (nextStage) {
-            newStatus = `Pending Stage ${nextStage} Approval`;
+            newStatus = `Pending Stage ${nextStage} Approval` as IncentiveClaim['status'];
         } else {
             newStatus = 'Accepted'; // No more stages in the workflow
         }
@@ -454,6 +511,8 @@ export async function processIncentiveClaimAction(
         
         if (claim.claimType === 'Research Papers') {
             await addPaperFromApprovedClaim(claim);
+        } else if (claim.claimType === 'EMR Sanction Project') {
+            await addEmrProjectFromApprovedClaim(claim);
         }
     }
     

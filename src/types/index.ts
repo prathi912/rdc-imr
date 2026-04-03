@@ -435,6 +435,15 @@ export type IncentiveClaim = {
   apcAmountClaimed?: number
   apcTotalAmount?: number
   apcSelfDeclaration?: boolean
+
+  // EMR Sanction Project Fields
+  emrProjectName?: string;
+  wasRoutedThroughRdc?: boolean;
+  sanctionFrom?: string;
+  sanctionAmount?: number;
+  sanctionDate?: string; // ISO
+  externalCoPis?: CoPiDetails[];
+  sanctionProofUrl?: string;
 }
 
 export type FundingCall = {

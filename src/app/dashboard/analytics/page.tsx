@@ -172,130 +172,206 @@ export default function AnalyticsPage() {
 
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
-    toast({ title: "Generating Report", description: "This may take a moment..." });
+    toast({ title: "Generating Report", description: "Crafting a professional PDF report..." });
 
     try {
       const doc = new jsPDF('p', 'mm', 'a4');
-      let yPos = 20;
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 15;
+      const margin = 20;
       const contentWidth = pageWidth - margin * 2;
       const isDarkMode = document.documentElement.classList.contains('dark');
       const imageBgColor = isDarkMode ? '#0f172a' : '#ffffff';
 
-      const addImageToPdf = async (ref: React.RefObject<HTMLDivElement>, title: string) => {
-        if (!ref.current) return;
-
-        const imgHeight = (ref.current.clientHeight * contentWidth) / ref.current.clientWidth;
-
-        if (yPos + imgHeight + 20 > (pageHeight - margin * 2)) {
-          doc.addPage();
-          yPos = 20;
-        }
-
-        doc.setFontSize(14);
-        doc.text(title, margin, yPos);
-        yPos += 8;
-
-        const dataUrl = await toPng(ref.current, { backgroundColor: imageBgColor, pixelRatio: 2 });
-        doc.addImage(dataUrl, 'PNG', margin, yPos, contentWidth, imgHeight);
-        yPos += imgHeight + 15;
+      // --- Helper: Draw Header ---
+      const drawHeader = (pageNum: number) => {
+        // Top Primary Bar
+        doc.setFillColor(15, 23, 42); // slate-900
+        doc.rect(0, 0, pageWidth, 40, 'F');
+        
+        // Brand Text
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(24);
+        doc.text('R&D ANALYTICS REPORT', margin, 22);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(148, 163, 184); // slate-400
+        doc.text(`PARUL UNIVERSITY | RESEARCH & DEVELOPMENT CELL`, margin, 29);
+        
+        // Timestamp
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Generated: ${format(new Date(), 'PPP p')}`, pageWidth - margin, 22, { align: 'right' });
+        doc.text(`Reference: RDC-${format(new Date(), 'yyyyMMdd')}-X`, pageWidth - margin, 27, { align: 'right' });
       };
 
-      // --- PDF Header ---
-      doc.setFontSize(22);
-      doc.text('R&D Portal Analytics Report', pageWidth / 2, yPos, { align: 'center' });
-      yPos += 8;
-      doc.setFontSize(10);
-      doc.text(`Generated on: ${format(new Date(), 'PPP p')}`, pageWidth / 2, yPos, { align: 'center' });
-      yPos += 15;
+      // --- Helper: Draw Footer ---
+      const drawFooter = (pageNum: number, totalPages: number) => {
+        doc.setDrawColor(226, 232, 240); // slate-200
+        doc.setLineWidth(0.5);
+        doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139); // slate-500
+        doc.text('Confidential - Internal RDC Document', margin, pageHeight - 10);
+        doc.text(`Page ${pageNum} of ${totalPages}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+      };
 
-      // --- Stat Cards ---
-      doc.setFontSize(16);
-      doc.text('Key Metrics', margin, yPos);
-      yPos += 8;
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Metric', 'Value', 'Description']],
-        body: statCards.map(card => [card.title, card.value, card.description]),
-        theme: 'grid'
+      // --- Helper: Section Header ---
+      const drawSectionHeader = (title: string, y: number) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor(15, 23, 42);
+        doc.text(title.toUpperCase(), margin, y);
+        
+        // Accent bar
+        doc.setFillColor(59, 130, 246); // blue-500
+        doc.rect(margin, y + 2, 20, 1.5, 'F');
+        return y + 12;
+      };
+
+      // --- Helper: Stat Card ---
+      const drawStatCard = (title: string, value: string, desc: string, x: number, y: number, width: number) => {
+        const height = 30;
+        doc.setFillColor(248, 250, 252); // slate-50
+        doc.setDrawColor(226, 232, 240); // slate-200
+        doc.roundedRect(x, y, width, height, 3, 3, 'FD');
+        
+        // Left accent line
+        doc.setFillColor(59, 130, 246); // blue-500
+        doc.rect(x, y, 1.5, height, 'F');
+        
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(title.toUpperCase(), x + 5, y + 7);
+        
+        doc.setFontSize(16);
+        doc.setTextColor(15, 23, 42);
+        doc.text(value, x + 5, y + 18);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7);
+        doc.setTextColor(100, 116, 139);
+        doc.text(desc, x + 5, y + 25, { maxWidth: width - 10 });
+      };
+
+      let yPos = 55;
+
+      // --- Page 1: Executive Summary ---
+      drawHeader(1);
+      yPos = drawSectionHeader('Executive Summary', yPos);
+      
+      const cardWidth = (contentWidth - 10) / 3;
+      statCards.slice(0, 3).forEach((card, idx) => {
+        drawStatCard(card.title, card.value, card.description, margin + (idx * (cardWidth + 5)), yPos, cardWidth);
       });
-      yPos = (doc as any).lastAutoTable.finalY + 15;
+      yPos += 45;
 
-      // --- IMR & EMR Section ---
-      doc.setFontSize(18);
-      doc.text('IMR & EMR Project Analytics', margin, yPos);
-      yPos += 10;
-      await addImageToPdf(statusChartRef, 'IMR Project Status Distribution');
-      await addImageToPdf(projectTypeChartRef, 'IMR Projects by Type');
+      // --- Helper: Add Chart Image ---
+      const addChartToPdf = async (ref: React.RefObject<HTMLDivElement>, title: string, requiredSpace: number = 80) => {
+        if (!ref.current) return;
 
-      doc.addPage(); yPos = 20;
-      await addImageToPdf(submissionsTimeChartRef, 'IMR Submissions Over Time');
-      await addImageToPdf(submissionsYearChartRef, 'Yearly IMR Submissions & Sanctions');
+        if (yPos + requiredSpace > pageHeight - 30) {
+          doc.addPage();
+          drawHeader(0); // pageNum will be fixed later
+          yPos = 55;
+        }
 
-      doc.addPage(); yPos = 20;
-      await addImageToPdf(projectsByGroupChartRef, `Projects by ${aggregationLabel}`);
-      await addImageToPdf(fundingByAgencyChartRef, 'Top 5 EMR Funding Agencies');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(71, 85, 105);
+        doc.text(title, margin, yPos);
+        yPos += 6;
 
-      doc.addPage(); yPos = 20;
-      await addImageToPdf(imrGrantByInstituteChartRef, 'IMR Grant Amount by Institute');
+        const canvasWidth = ref.current.clientWidth;
+        const canvasHeight = ref.current.clientHeight;
+        const ratio = canvasHeight / canvasWidth;
+        const displayHeight = contentWidth * ratio;
 
-      // --- Publication & Incentive Section ---
-      doc.addPage(); yPos = 20;
-      doc.setFontSize(18);
-      doc.text('Publication & Incentive Analytics', margin, yPos);
-      yPos += 10;
-      await addImageToPdf(incentiveAmountChartRef, 'Incentive Amounts by Category');
-      await addImageToPdf(publicationChartRef, 'Publications by Journal Quartile');
+        const dataUrl = await toPng(ref.current, { backgroundColor: imageBgColor, pixelRatio: 2 });
+        doc.addImage(dataUrl, 'PNG', margin, yPos, contentWidth, displayHeight);
+        yPos += displayHeight + 15;
+      };
 
-      doc.addPage(); yPos = 20;
-      await addImageToPdf(monthlyPublicationChartRef, 'Monthly Publication Distribution');
+      // --- Section: Projects ---
+      await addChartToPdf(statusChartRef, 'IMR Project Status Distribution');
+      await addChartToPdf(submissionsTimeChartRef, 'Project Submissions Over Time');
 
-      // --- System & AI Section (if applicable) ---
+      // --- Page 2: Detailed Breakdown ---
+      doc.addPage();
+      drawHeader(2);
+      yPos = 55;
+      yPos = drawSectionHeader('Project Portfolio Analysis', yPos);
+      
+      await addChartToPdf(projectTypeChartRef, 'Disciplinary Distribution');
+      await addChartToPdf(submissionsYearChartRef, 'Year-over-Year IMR Growth');
+      await addChartToPdf(projectsByGroupChartRef, `Institutional ${aggregationLabel} Breakdown`);
+
+      // --- Page 3: Financials ---
+      doc.addPage();
+      drawHeader(3);
+      yPos = 55;
+      yPos = drawSectionHeader('Financials & Grants', yPos);
+      
+      await addChartToPdf(fundingByAgencyChartRef, 'Extramural (EMR) Funding Sources');
+      await addChartToPdf(imrGrantByInstituteChartRef, 'Internal (IMR) Grant Disbursements', 120);
+
+      // --- Page 4: Scientific Output ---
+      doc.addPage();
+      drawHeader(4);
+      yPos = 55;
+      yPos = drawSectionHeader('Research Output & Incentives', yPos);
+      
+      await addChartToPdf(incentiveAmountChartRef, 'Claim Categories by Sanctioned Amount');
+      await addChartToPdf(publicationChartRef, 'Journal Quartile Distribution (Q1-Q4)');
+      await addChartToPdf(monthlyPublicationChartRef, 'Publication Velocity (Per Month)');
+
+      // --- Page 5: AI Insights (Admin Only) ---
       if (user?.role === 'Super-admin') {
-        doc.addPage(); yPos = 20;
-        doc.setFontSize(18);
-        doc.text('System & AI Analytics', margin, yPos);
-        yPos += 10;
+        doc.addPage();
+        drawHeader(5);
+        yPos = 55;
+        yPos = drawSectionHeader('AI Domain Intelligence', yPos);
+        
+        await addChartToPdf(fieldOfStudyChartRef, 'Field Clusters (Inferred Domains)');
+        await addChartToPdf(fieldOfStudySubdomainChartRef, 'Top 12 Research Subdomains');
 
-        await addImageToPdf(fieldOfStudyChartRef, 'Field of Studies by Domain');
-        await addImageToPdf(fieldOfStudySubdomainChartRef, 'Top Subdomains');
-
-        doc.addPage(); yPos = 20;
-        await addImageToPdf(activeUsersChartRef, 'Daily Active Users');
+        doc.addPage();
+        drawHeader(6);
+        yPos = 55;
+        yPos = drawSectionHeader('System Health', yPos);
+        await addChartToPdf(activeUsersChartRef, 'Platform Engagement (7-Day DAU)');
 
         if (fieldOfStudyDrilldown.length > 0) {
-          if (yPos > 240) { doc.addPage(); yPos = 20; }
-          doc.setFontSize(14);
-          doc.text('Claim-Level Domain Drilldown', margin, yPos);
-          yPos += 8;
+          yPos = drawSectionHeader('Recent Domain Classifications', yPos);
           autoTable(doc, {
             startY: yPos,
-            head: [['Claim ID', 'Title', 'Domain', 'Subdomain', 'Confidence']],
-            body: fieldOfStudyDrilldown.map(row => [row.claimId, row.title, row.domain, row.subdomain, `${row.confidence}%`]),
-            theme: 'grid',
-            styles: { fontSize: 8, cellPadding: 1 },
-            columnStyles: { 1: { cellWidth: 80 } },
+            head: [['REF ID', 'TITLE', 'DOMAIN', 'SUBDOMAIN', 'MATCH']],
+            body: fieldOfStudyDrilldown.slice(0, 20).map(row => [row.claimId, row.title, row.domain, row.subdomain, `${row.confidence}%`]),
+            theme: 'striped',
+            styles: { fontSize: 7, cellPadding: 2, font: 'helvetica' },
+            headStyles: { fillColor: [15, 23, 42], textColor: 255 },
+            columnStyles: { 1: { cellWidth: 70 } },
           });
-          yPos = (doc as any).lastAutoTable.finalY + 15;
         }
       }
 
-      // --- Add page numbers ---
-      const pageCount = doc.internal.pages.length - 1;
-      for (let i = 1; i <= pageCount; i++) {
+      // --- Final Polish: Page Numbers & Footers ---
+      const totalPages = doc.internal.pages.length - 1;
+      for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150);
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+        drawFooter(i, totalPages);
       }
 
-      doc.save(`RDC_Analytics_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
-      toast({ title: "Report Generated", description: "Your PDF report is downloading." });
+      doc.save(`RDC_Analytics_Report_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      toast({ title: "Report Ready", description: "Your premium PDF analysis is downloading now." });
     } catch (err: any) {
       console.error("PDF generation failed:", err);
-      toast({ variant: 'destructive', title: 'PDF Generation Failed', description: err.message });
+      toast({ variant: 'destructive', title: 'Generation Error', description: err.message });
     } finally {
       setIsGeneratingReport(false);
     }
