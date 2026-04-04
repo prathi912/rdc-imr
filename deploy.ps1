@@ -1,0 +1,44 @@
+# Deployment script for R&D Portal
+# This script handles build-time and runtime environment variables for Cloud Run
+
+$NEXT_PUBLIC_FIREBASE_API_KEY = "AIzaSyC7KtUCaU8MdWfWHDOPX9x2ZfvqAFHnEww"
+$NEXT_PUBLIC_FIREBASE_APP_ID = "1:1060393366040:web:127916ec07816db06dc96d"
+$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = "1060393366040"
+$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "rdc-imr-emr-portal-776a7.firebasestorage.app"
+$NEXT_PUBLIC_FIREBASE_PROJECT_ID = "rdc-imr-emr-portal-776a7"
+$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = "rdc-imr-emr-portal-776a7.firebaseapp.com"
+$NEXT_PUBLIC_FIREBASE_API = "AIzaSyC7KtUCaU8MdWfWHDOPX9x2ZfvqAFHnEww"
+$NEXT_PUBLIC_BASE_URL = "https://rndprojects.paruluniversity.ac.in"
+$NEXT_PUBLIC_FIREBASE_DATABASE_URL = "https://rdc-imr-emr-portal-776a7-default-rtdb.firebaseio.com/"
+
+$GEMINI_API_KEY = "AIzaSyDch_P5AVW7mI2ZJUvpLNFGCtkAnM6m-uA"
+$GENERATIVE_AI_API_KEY = "AIzaSyDch_P5AVW7mI2ZJUvpLNFGCtkAnM6m-uA"
+$WOS_API_KEY = "1a15ce50c22dc3f2fd0a35e749b3603a0c84626e"
+$SPRINGER_API_KEY = "0ed6c54a28ee866c46831470202773e3"
+$SCOPUS_API_KEY = "b8d81b7bd4f288a377176f3383da381b"
+
+# Handle the private key - escaping newlines correctly for gcloud substitutions
+$FIREBASE_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQD0IfQa+dwWTnv+\nNiEex8J+KXHl6HUseomoZroO4f0xZBnNCKwPnbJUuJ8B82BMWkKpw3SM1p/WZuE+\nHpr06C3Db6hYc4TEVrHtxreWwnSIso+Y1M1MqPdEFiMdwr7sXwHkbM83o9wgoJQI\nRpifGFghVi8n2fRsURYnkdtKWEPqXCjfeqXz0yvL74s2xTkJEzPKXexI76Aqf48G\n4sVXn07F8CvmaxRP+phOpSZdry69ciBjsjgcWUoq2x2R5toZPlpX8bb56IPXV/Jr\nqDeyZT3tR1hxg5cSDJxWCLlp5r48qq3dafcB1B0kJFp7btHMtzReiKz75v7Z11U4\njEuznvF1AgMBAAECggEAL547zdM0kYlHeCM4vJc8IX2WAMEhscZI+XboDaUYzLx4\np9xsKzOYKBxGr4u4Gcx1OkWsgxgN3zT79DDmCqUK4Bb0YCRQHjfGxtk+0AIn1s31\nYlsHnE9Mw5QJz3E/6jzx0otCs9ibRCXuGdsjQ8zsy7vSwNQrb8E1MAysGEk1Hg3w\nRmOmFZsebJmRLfVKaytGpQBecFj/VnEc0whQ40Jz8LNBhH4kdoFK0i12u9vwa96J\ndOHhL/iboYAph1osGR4NlgWVcm+HOoI6pbYqm1O0owf0lRDj3NrKwOks+9X5PGa9\noElXWVvijfVLytrUctP0nqoh2sZ9ebeyZz1fzKfKVQKBgQD9WcGmwbiAkKcM6Tdg\nl/awkVZreOGKCp2SXWEInNgvrst+XFbP+ALGpsp5DQUVaoantCOi7sC8JKTzgM+x\niZPMbZJm8kG5zNAUsm0xd0W4DbXSInnDcJkI/sfoqQKU3Vcw0ORdAlOZLmP8GuF9\nPqRNwEITE45WWRKloUneulWq/wKBgQD2r4UJ0yJMZCha58oeNI6bnA+BR2zCKgwY\n+hIrr3na1jFuM0VK/+A9utVui5bZBbfWGfi46Jaew6rWtKx3vZWNadF0cBc5qyzI\nMjcIXSl/NbDk37iZqKXexFboKhJhrf22yPkKyzpYEJcPDHzsJKVObHl/mDFmq+HS\nenxXgTHniwKBgQCs4IJz99yeXhafiMRw9UEwWvxNeb7tIzFCntWHuv8KCoxxPTE/\n2EyMoWOoFmpRos8fwJxQofqCZ77nKg6PZwGjjWFJPiX7UvbqKJa6GllIrpJTQZM0\n+bBzoudmq21Hh4HnnaM2lE/XRwCTFwSnIgebxoVP3xhRc5Z1zwlJIn0yoQKBgEsD\nmsgfDSn/twnVvG+s+cS2Ezzz1E3C7YTW3pmsNbjnM4bYTnT9FFqRKv//sLJz+7A+\nm5TXHZ5Pz+6UaHHNE+I50HjA8T8XH3oNUxDXC5xkXlNq+L65Ox9fwzG8QXS0rRdd\nS+YNYMOQ3+6ylHZWunH7qIK1bChVkkkn+BG/9sX7AoGAF/jrvhA+0RCtlzxU7R8e\nxcdKBpwBuEKQwv2E5rA45riBL4nNlcj6U6sqC29AjDldj1D68PLQ/j36NYExyi0e\n03E0hJve9GEqc32jPg4P6R4bzkSCed2w4ma6ovILtEmobMjbWoI/ldnnUI0wcUKr\nNF4sygxbZHI3lURUWJHFbdo=\n-----END PRIVATE KEY-----\n"
+
+# Building the substitutions string
+# Note: we use PowerShell's string joining for clarity
+$subs = "_NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY," + `
+        "_NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID," + `
+        "_NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID," + `
+        "_NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET," + `
+        "_NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID," + `
+        "_NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN," + `
+        "_NEXT_PUBLIC_FIREBASE_API=$NEXT_PUBLIC_FIREBASE_API," + `
+        "_NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL," + `
+        "_NEXT_PUBLIC_FIREBASE_DATABASE_URL=$NEXT_PUBLIC_FIREBASE_DATABASE_URL," + `
+        "_GEMINI_API_KEY=$GEMINI_API_KEY," + `
+        "_GENERATIVE_AI_API_KEY=$GENERATIVE_AI_API_KEY," + `
+        "_WOS_API_KEY=$WOS_API_KEY," + `
+        "_SPRINGER_API_KEY=$SPRINGER_API_KEY," + `
+        "_SCOPUS_API_KEY=$SCOPUS_API_KEY," + `
+        "_FIREBASE_PRIVATE_KEY=$FIREBASE_PRIVATE_KEY"
+
+Write-Host "Starting Cloud Build process with automated environment variable injection..." -ForegroundColor Cyan
+
+# Run the build
+gcloud builds submit --config cloudbuild.yaml --substitutions=$subs
